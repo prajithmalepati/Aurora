@@ -97,6 +97,149 @@ def list_playlists():
     }
 
 
+@router.delete("/playlists/{playlist_id}/songs/{song_id}", status_code=200)
+def delete_song_from_playlist(playlist_id: int, song_id: int):
+    """Remove a song from a playlist and recompact positions."""
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    # Verify playlist exists
+    cursor.execute(
+        "SELECT id FROM playlists WHERE id = ?",
+        (playlist_id,),
+    )
+    playlist_row = cursor.fetchone()
+    
+    if not playlist_row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Playlist not found")
+    
+    # Verify song exists
+    cursor.execute(
+        "SELECT id FROM songs WHERE id = ?",
+        (song_id,),
+    )
+    song_row = cursor.fetchone()
+    
+    if not song_row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Song not found")
+    
+    # Verify song is in the playlist
+    cursor.execute(
+        "SELECT id, position FROM playlist_songs WHERE playlist_id = ? AND song_id = ?",
+        (playlist_id, song_id),
+    )
+    existing = cursor.fetchone()
+    
+    if not existing:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Song not in playlist")
+    
+    # Get the position of the song being deleted
+    deleted_position = existing["position"]
+    
+    # Delete the playlist_songs row
+    cursor.execute(
+        "DELETE FROM playlist_songs WHERE playlist_id = ? AND song_id = ?",
+        (playlist_id, song_id),
+    )
+    conn.commit()
+    
+    # Recompack positions: decrement position for all songs after the deleted one
+    cursor.execute(
+        """
+        UPDATE playlist_songs
+        SET position = position - 1
+        WHERE playlist_id = ? AND position > ?
+        """,
+        (playlist_id, deleted_position),
+    )
+    conn.commit()
+    conn.close()
+    
+    # Fetch and return the full playlist with songs
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    query = """
+        SELECT 
+            s.id,
+            s.title,
+            s.artist,
+            s.album,
+            s.duration,
+            s.source,
+            GROUP_CONCAT(t.name) as tags,
+            ps.position
+        FROM songs s
+        JOIN playlist_songs ps ON s.id = ps.song_id
+        LEFT JOIN song_tags st ON s.id = st.song_id
+        LEFT JOIN tags t ON st.tag_id = t.id
+        WHERE ps.playlist_id = ?
+        GROUP BY s.id
+        ORDER BY ps.position ASC
+    """
+    
+    cursor.execute(query, (playlist_id,))
+    song_rows = cursor.fetchall()
+    conn.close()
+    
+    # Build songs list with tags parsed from GROUP_CONCAT
+    songs = []
+    for song_row in song_rows:
+        tags_str = song_row["tags"]
+        tags = tags_str.split(",") if tags_str else []
+        
+        songs.append(
+            SongResponse(
+                id=song_row["id"],
+                title=song_row["title"],
+                artist=song_row["artist"],
+                album=song_row["album"],
+                duration=song_row["duration"],
+                file_path=None,
+                source=song_row["source"],
+                tags=tags,
+                playlists=[],
+                created_at="",
+                updated_at="",
+                position=song_row["position"],
+            )
+        )
+    
+    # Fetch playlist metadata
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    cursor.execute(
+        """
+        SELECT id, name, color, emoji, created_at, updated_at
+        FROM playlists
+        WHERE id = ?
+        """,
+        (playlist_id,),
+    )
+    row = cursor.fetchone()
+    conn.close()
+    
+    song_count = len(songs)
+    
+    return {
+        "data": {
+            "id": row["id"],
+            "name": row["name"],
+            "color": row["color"],
+            "emoji": row["emoji"],
+            "song_count": song_count,
+            "songs": songs,
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+        },
+        "message": "ok",
+    }
+
+
 @router.get("/playlists/{playlist_id}")
 def get_playlist(playlist_id: int):
     """Get playlist with its songs ordered by position, each song includes tags."""
@@ -164,6 +307,7 @@ def get_playlist(playlist_id: int):
                 playlists=[],
                 created_at="",
                 updated_at="",
+                position=song_row["position"],
             )
         )
     
@@ -413,6 +557,7 @@ def add_song_to_playlist(playlist_id: int, song_add: PlaylistSongAdd):
                 playlists=[],
                 created_at="",
                 updated_at="",
+                position=song_row["position"],
             )
         )
     

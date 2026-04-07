@@ -32,6 +32,7 @@ class SongResponse(BaseModel):
     playlists: list[str]
     created_at: str
     updated_at: str
+    position: Optional[int] = None
 
 
 # ---- Tags ----
