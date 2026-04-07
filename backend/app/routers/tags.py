@@ -4,7 +4,8 @@ from fastapi import APIRouter, HTTPException
 from datetime import datetime, timezone
 
 from app.database import get_db
-from app.models import TagCreate, TagResponse
+from app.models import TagCreate, TagResponse, TagAssign
+from app.routers.songs import song_row_to_dict
 
 router = APIRouter(tags=["tags"])
 
@@ -109,3 +110,88 @@ def delete_tag(tag_id: int):
     conn.close()
     
     return {"message": "Tag deleted successfully"}
+
+
+@router.post("/songs/{song_id}/tags", response_model=dict)
+def assign_tags_to_song(song_id: int, tag_assign: TagAssign):
+    """Add tags to a song. Creates tags and song_tags links as needed."""
+    # Validate tag_names is not empty
+    if not tag_assign.tag_names:
+        raise HTTPException(status_code=400, detail="tag_names is empty")
+    
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    # Check if song exists
+    cursor.execute("SELECT id FROM songs WHERE id = ?", (song_id,))
+    if not cursor.fetchone():
+        conn.close()
+        raise HTTPException(status_code=404, detail="Song not found")
+    
+    # Process each tag name
+    for tag_name in tag_assign.tag_names:
+        # Lowercase and trim
+        name = tag_name.lower().strip()
+        
+        # Skip empty names
+        if not name:
+            continue
+        
+        # Create tag if it doesn't exist (INSERT OR IGNORE)
+        cursor.execute(
+            """
+            INSERT OR IGNORE INTO tags (name, created_at)
+            VALUES (?, ?)
+            """,
+            (name, _get_utc_now()),
+        )
+        
+        # Get the tag ID
+        cursor.execute("SELECT id FROM tags WHERE name = ?", (name,))
+        tag_row = cursor.fetchone()
+        if not tag_row:
+            continue
+        tag_id = tag_row["id"]
+        
+        # Create song_tags link if it doesn't exist (INSERT OR IGNORE)
+        cursor.execute(
+            """
+            INSERT OR IGNORE INTO song_tags (song_id, tag_id)
+            VALUES (?, ?)
+            """,
+            (song_id, tag_id),
+        )
+    
+    conn.commit()
+    
+    # Fetch the updated song with joined query
+    query = """
+        SELECT 
+            s.id,
+            s.title,
+            s.artist,
+            s.album,
+            s.duration,
+            s.file_path,
+            s.source,
+            GROUP_CONCAT(t.name) as tags,
+            GROUP_CONCAT(p.name) as playlists,
+            s.created_at,
+            s.updated_at
+        FROM songs s
+        LEFT JOIN song_tags st ON s.id = st.song_id
+        LEFT JOIN tags t ON st.tag_id = t.id
+        LEFT JOIN playlist_songs ps ON s.id = ps.song_id
+        LEFT JOIN playlists p ON ps.playlist_id = p.id
+        WHERE s.id = ?
+        GROUP BY s.id
+    """
+    
+    cursor.execute(query, (song_id,))
+    row = cursor.fetchone()
+    conn.close()
+    
+    if row is None:
+        raise HTTPException(status_code=404, detail="Song not found")
+    
+    return song_row_to_dict(row)
