@@ -89,3 +89,23 @@ def list_tags():
         "total": len(data),
         "message": "ok",
     }
+
+
+@router.delete("/tags/{tag_id}", response_model=dict[str, str])
+def delete_tag(tag_id: int):
+    """Delete a tag by ID. Returns 404 if tag doesn't exist."""
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    # Check if tag exists
+    cursor.execute("SELECT id FROM tags WHERE id = ?", (tag_id,))
+    if not cursor.fetchone():
+        conn.close()
+        raise HTTPException(status_code=404, detail="tag not found")
+    
+    # Delete the tag (cascading removes song_tags rows)
+    cursor.execute("DELETE FROM tags WHERE id = ?", (tag_id,))
+    conn.commit()
+    conn.close()
+    
+    return {"message": "Tag deleted successfully"}
