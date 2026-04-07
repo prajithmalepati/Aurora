@@ -1,7 +1,8 @@
 """Songs router."""
 import sqlite3
+from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from datetime import datetime, timezone
 
 from app.database import get_db
@@ -13,6 +14,118 @@ router = APIRouter(tags=["songs"])
 def _get_utc_now() -> str:
     """Return current UTC timestamp in ISO format."""
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def song_row_to_dict(row: sqlite3.Row) -> dict:
+    """Convert a database row (from joined query) to a response dict.
+    
+    Handles parsing of comma-separated tags and playlists strings into lists.
+    """
+    tags_str = row["tags"] if row["tags"] else ""
+    playlists_str = row["playlists"] if row["playlists"] else ""
+    
+    tags = [t.strip() for t in tags_str.split(",") if t.strip()] if tags_str else []
+    playlists = [p.strip() for p in playlists_str.split(",") if p.strip()] if playlists_str else []
+    
+    return {
+        "id": row["id"],
+        "title": row["title"],
+        "artist": row["artist"],
+        "album": row["album"],
+        "duration": row["duration"],
+        "file_path": row["file_path"],
+        "source": row["source"],
+        "tags": tags,
+        "playlists": playlists,
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }
+
+
+@router.get("/songs")
+def list_songs(
+    search: Optional[str] = Query(None),
+    limit: int = Query(50, ge=1),
+    offset: int = Query(0, ge=0),
+):
+    """List all songs with optional search, limit, and offset."""
+    
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    # Build the query with LEFT JOINs for tags and playlists
+    query = """
+        SELECT 
+            s.id,
+            s.title,
+            s.artist,
+            s.album,
+            s.duration,
+            s.file_path,
+            s.source,
+            GROUP_CONCAT(t.name) as tags,
+            GROUP_CONCAT(p.name) as playlists,
+            s.created_at,
+            s.updated_at
+        FROM songs s
+        LEFT JOIN song_tags st ON s.id = st.song_id
+        LEFT JOIN tags t ON st.tag_id = t.id
+        LEFT JOIN playlist_songs ps ON s.id = ps.song_id
+        LEFT JOIN playlists p ON ps.playlist_id = p.id
+    """
+    
+    params = []
+    where_clauses = []
+    
+    if search:
+        where_clauses.append("(s.title LIKE ? OR s.artist LIKE ?)")
+        search_pattern = f"%{search}%"
+        params.extend([search_pattern, search_pattern])
+    
+    if where_clauses:
+        query += " WHERE " + " AND ".join(where_clauses)
+    
+    query += " GROUP BY s.id ORDER BY s.title ASC"
+    
+    if limit is not None and limit > 0:
+        query += " LIMIT ?"
+        params.append(limit)
+    
+    if offset is not None and offset >= 0:
+        query += " OFFSET ?"
+        params.append(offset)
+    
+    cursor.execute(query, params)
+    rows = cursor.fetchall()
+    
+    # Get total count for pagination
+    count_query = """
+        SELECT COUNT(*) as total
+        FROM songs s
+    """
+    count_params = []
+    where_clauses = []
+    
+    if search:
+        where_clauses.append("(s.title LIKE ? OR s.artist LIKE ?)")
+        search_pattern = f"%{search}%"
+        count_params.extend([search_pattern, search_pattern])
+    
+    if where_clauses:
+        count_query += " WHERE " + " AND ".join(where_clauses)
+    
+    cursor.execute(count_query, count_params)
+    total = cursor.fetchone()["total"]
+    
+    conn.close()
+    
+    data = [song_row_to_dict(row) for row in rows]
+    
+    return {
+        "data": data,
+        "total": total,
+        "message": "ok",
+    }
 
 
 @router.post("/songs", status_code=201, response_model=SongResponse)
