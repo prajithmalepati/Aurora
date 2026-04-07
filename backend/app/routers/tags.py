@@ -53,7 +53,7 @@ def create_tag(tag: TagCreate):
     )
 
 
-@router.get("/tags", response_model=list[TagResponse])
+@router.get("/tags")
 def list_tags():
     """List all tags with song_count using LEFT JOIN on song_tags, ordered alphabetically."""
     conn = get_db()
