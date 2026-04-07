@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Query
 from datetime import datetime, timezone
 
 from app.database import get_db
-from app.models import SongCreate, SongResponse
+from app.models import SongCreate, SongResponse, SongUpdate
 
 router = APIRouter(tags=["songs"])
 
@@ -217,3 +217,86 @@ def create_song(song: SongCreate):
         created_at=now,
         updated_at=now,
     )
+
+
+@router.put("/songs/{song_id}", response_model=SongResponse)
+def update_song(song_id: int, song_update: SongUpdate):
+    """Update a song by ID."""
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    # Check if song exists
+    cursor.execute("SELECT id FROM songs WHERE id = ?", (song_id,))
+    if cursor.fetchone() is None:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Song not found")
+    
+    # Validate title and artist are non-empty if provided
+    if song_update.title is not None and not song_update.title:
+        conn.close()
+        raise HTTPException(status_code=400, detail="title must be non-empty")
+    if song_update.artist is not None and not song_update.artist:
+        conn.close()
+        raise HTTPException(status_code=400, detail="artist must be non-empty")
+    
+    now = _get_utc_now()
+    
+    # Build update query with only non-None fields
+    update_fields = []
+    params = []
+    
+    if song_update.title is not None:
+        update_fields.append("title = ?")
+        params.append(song_update.title)
+    if song_update.artist is not None:
+        update_fields.append("artist = ?")
+        params.append(song_update.artist)
+    if song_update.album is not None:
+        update_fields.append("album = ?")
+        params.append(song_update.album)
+    if song_update.duration is not None:
+        update_fields.append("duration = ?")
+        params.append(song_update.duration)
+    
+    update_fields.append("updated_at = ?")
+    params.append(now)
+    
+    params.append(song_id)
+    
+    cursor.execute(
+        f"UPDATE songs SET {', '.join(update_fields)} WHERE id = ?",
+        params
+    )
+    conn.commit()
+    
+    # Fetch the updated song with joined query
+    query = """
+        SELECT 
+            s.id,
+            s.title,
+            s.artist,
+            s.album,
+            s.duration,
+            s.file_path,
+            s.source,
+            GROUP_CONCAT(t.name) as tags,
+            GROUP_CONCAT(p.name) as playlists,
+            s.created_at,
+            s.updated_at
+        FROM songs s
+        LEFT JOIN song_tags st ON s.id = st.song_id
+        LEFT JOIN tags t ON st.tag_id = t.id
+        LEFT JOIN playlist_songs ps ON s.id = ps.song_id
+        LEFT JOIN playlists p ON ps.playlist_id = p.id
+        WHERE s.id = ?
+        GROUP BY s.id
+    """
+    
+    cursor.execute(query, (song_id,))
+    row = cursor.fetchone()
+    conn.close()
+    
+    if row is None:
+        raise HTTPException(status_code=404, detail="Song not found")
+    
+    return song_row_to_dict(row)
