@@ -169,6 +169,26 @@ def get_song(song_id: int):
     return song_row_to_dict(row)
 
 
+@router.delete("/songs/{song_id}")
+def delete_song(song_id: int):
+    """Delete a song by ID."""
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    # Check if song exists
+    cursor.execute("SELECT id FROM songs WHERE id = ?", (song_id,))
+    if cursor.fetchone() is None:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Song not found")
+    
+    # Delete the song (cascading deletes handle song_tags and playlist_songs)
+    cursor.execute("DELETE FROM songs WHERE id = ?", (song_id,))
+    conn.commit()
+    conn.close()
+    
+    return {"message": "Song deleted successfully"}
+
+
 @router.post("/songs", status_code=201, response_model=SongResponse)
 def create_song(song: SongCreate):
     """Create a new song."""
