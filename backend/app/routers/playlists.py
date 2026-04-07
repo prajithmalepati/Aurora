@@ -1,1 +1,4 @@
-# Playlists router
+"""Playlists router."""
+from fastapi import APIRouter
+
+router = APIRouter(tags=["playlists"])

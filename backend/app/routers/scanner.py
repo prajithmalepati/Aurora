@@ -1,1 +1,4 @@
-# Scanner router
+"""Scanner router."""
+from fastapi import APIRouter
+
+router = APIRouter(tags=["scanner"])
