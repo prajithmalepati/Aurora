@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException
 from datetime import datetime, timezone
 
 from app.database import get_db
-from app.models import PlaylistCreate, PlaylistUpdate, PlaylistResponse, SongResponse
+from app.models import PlaylistCreate, PlaylistUpdate, PlaylistResponse, SongResponse, PlaylistSongAdd
 
 router = APIRouter(tags=["playlists"])
 
@@ -304,3 +304,145 @@ def delete_playlist(playlist_id: int):
     conn.close()
     
     return {"message": "Playlist deleted successfully"}
+
+
+@router.post("/playlists/{playlist_id}/songs", status_code=200)
+def add_song_to_playlist(playlist_id: int, song_add: PlaylistSongAdd):
+    """Add a song to a playlist at the end (position = max position + 1)."""
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    # Verify playlist exists
+    cursor.execute(
+        "SELECT id FROM playlists WHERE id = ?",
+        (playlist_id,),
+    )
+    playlist_row = cursor.fetchone()
+    
+    if not playlist_row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Playlist not found")
+    
+    # Verify song exists
+    cursor.execute(
+        "SELECT id FROM songs WHERE id = ?",
+        (song_add.song_id,),
+    )
+    song_row = cursor.fetchone()
+    
+    if not song_row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Song not found")
+    
+    # Check song not already in playlist
+    cursor.execute(
+        "SELECT id FROM playlist_songs WHERE playlist_id = ? AND song_id = ?",
+        (playlist_id, song_add.song_id),
+    )
+    existing = cursor.fetchone()
+    
+    if existing:
+        conn.close()
+        raise HTTPException(status_code=409, detail="Song already in playlist")
+    
+    # Get current max position
+    cursor.execute(
+        "SELECT COALESCE(MAX(position), -1) as max_pos FROM playlist_songs WHERE playlist_id = ?",
+        (playlist_id,),
+    )
+    max_pos_row = cursor.fetchone()
+    max_pos = max_pos_row["max_pos"]
+    
+    # Insert at position = current max position + 1
+    new_position = max_pos + 1
+    now = _get_utc_now()
+    
+    cursor.execute(
+        """
+        INSERT INTO playlist_songs (playlist_id, song_id, position, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (playlist_id, song_add.song_id, new_position, now, now),
+    )
+    conn.commit()
+    conn.close()
+    
+    # Fetch and return the full playlist with songs (reuse the same query from GET /playlists/{id})
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    query = """
+        SELECT 
+            s.id,
+            s.title,
+            s.artist,
+            s.album,
+            s.duration,
+            s.source,
+            GROUP_CONCAT(t.name) as tags,
+            ps.position
+        FROM songs s
+        JOIN playlist_songs ps ON s.id = ps.song_id
+        LEFT JOIN song_tags st ON s.id = st.song_id
+        LEFT JOIN tags t ON st.tag_id = t.id
+        WHERE ps.playlist_id = ?
+        GROUP BY s.id
+        ORDER BY ps.position ASC
+    """
+    
+    cursor.execute(query, (playlist_id,))
+    song_rows = cursor.fetchall()
+    conn.close()
+    
+    # Build songs list with tags parsed from GROUP_CONCAT
+    songs = []
+    for song_row in song_rows:
+        tags_str = song_row["tags"]
+        tags = tags_str.split(",") if tags_str else []
+        
+        songs.append(
+            SongResponse(
+                id=song_row["id"],
+                title=song_row["title"],
+                artist=song_row["artist"],
+                album=song_row["album"],
+                duration=song_row["duration"],
+                file_path=None,
+                source=song_row["source"],
+                tags=tags,
+                playlists=[],
+                created_at="",
+                updated_at="",
+            )
+        )
+    
+    # Fetch playlist metadata
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    cursor.execute(
+        """
+        SELECT id, name, color, emoji, created_at, updated_at
+        FROM playlists
+        WHERE id = ?
+        """,
+        (playlist_id,),
+    )
+    row = cursor.fetchone()
+    conn.close()
+    
+    song_count = len(songs)
+    
+    return {
+        "data": {
+            "id": row["id"],
+            "name": row["name"],
+            "color": row["color"],
+            "emoji": row["emoji"],
+            "song_count": song_count,
+            "songs": songs,
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+        },
+        "message": "ok",
+    }
