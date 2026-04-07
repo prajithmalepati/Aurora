@@ -276,3 +276,31 @@ def update_playlist(playlist_id: int, playlist: PlaylistUpdate):
         created_at=row["created_at"],
         updated_at=row["updated_at"],
     )
+
+
+@router.delete("/playlists/{playlist_id}", status_code=200)
+def delete_playlist(playlist_id: int):
+    """Delete a playlist. Songs are NOT deleted. Returns success message."""
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    # Check if playlist exists
+    cursor.execute(
+        "SELECT id FROM playlists WHERE id = ?",
+        (playlist_id,),
+    )
+    row = cursor.fetchone()
+    
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Playlist not found")
+    
+    # Delete the playlist (cascading handles playlist_songs)
+    cursor.execute(
+        "DELETE FROM playlists WHERE id = ?",
+        (playlist_id,),
+    )
+    conn.commit()
+    conn.close()
+    
+    return {"message": "Playlist deleted successfully"}
