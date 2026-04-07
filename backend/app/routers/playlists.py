@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException
 from datetime import datetime, timezone
 
 from app.database import get_db
-from app.models import PlaylistCreate, PlaylistUpdate, PlaylistResponse, SongResponse, PlaylistSongAdd
+from app.models import PlaylistCreate, PlaylistUpdate, PlaylistResponse, SongResponse, PlaylistSongAdd, PlaylistReorder
 
 router = APIRouter(tags=["playlists"])
 
@@ -93,6 +93,137 @@ def list_playlists():
     return {
         "data": data,
         "total": len(data),
+        "message": "ok",
+    }
+
+
+@router.put("/playlists/{playlist_id}/songs/reorder")
+def reorder_playlist_songs(playlist_id: int, reorder: PlaylistReorder):
+    """Reorder songs in a playlist based on the provided song_ids array."""
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    # Verify playlist exists
+    cursor.execute(
+        "SELECT id FROM playlists WHERE id = ?",
+        (playlist_id,),
+    )
+    playlist_row = cursor.fetchone()
+    
+    if not playlist_row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Playlist not found")
+    
+    # Get current songs in the playlist
+    cursor.execute(
+        "SELECT song_id FROM playlist_songs WHERE playlist_id = ? ORDER BY position",
+        (playlist_id,),
+    )
+    current_rows = cursor.fetchall()
+    current_song_ids = [row["song_id"] for row in current_rows]
+    
+    # Verify song_ids matches exactly the current songs
+    if [s for s in reorder.song_ids] != current_song_ids:
+        conn.close()
+        raise HTTPException(
+            status_code=400, 
+            detail="song_ids doesn't match the actual songs in the playlist"
+        )
+    
+    now = _get_utc_now()
+    
+    # Update position for each song based on its index in the array
+    for new_position, song_id in enumerate(reorder.song_ids):
+        cursor.execute(
+            """
+            UPDATE playlist_songs
+            SET position = ?, updated_at = ?
+            WHERE playlist_id = ? AND song_id = ?
+            """,
+            (new_position, now, playlist_id, song_id),
+        )
+    
+    conn.commit()
+    conn.close()
+    
+    # Fetch and return the full playlist with songs in new order
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    query = """
+        SELECT 
+            s.id,
+            s.title,
+            s.artist,
+            s.album,
+            s.duration,
+            s.source,
+            GROUP_CONCAT(t.name) as tags,
+            ps.position
+        FROM songs s
+        JOIN playlist_songs ps ON s.id = ps.song_id
+        LEFT JOIN song_tags st ON s.id = st.song_id
+        LEFT JOIN tags t ON st.tag_id = t.id
+        WHERE ps.playlist_id = ?
+        GROUP BY s.id
+        ORDER BY ps.position ASC
+    """
+    
+    cursor.execute(query, (playlist_id,))
+    song_rows = cursor.fetchall()
+    conn.close()
+    
+    # Build songs list with tags parsed from GROUP_CONCAT
+    songs = []
+    for song_row in song_rows:
+        tags_str = song_row["tags"]
+        tags = tags_str.split(",") if tags_str else []
+        
+        songs.append(
+            SongResponse(
+                id=song_row["id"],
+                title=song_row["title"],
+                artist=song_row["artist"],
+                album=song_row["album"],
+                duration=song_row["duration"],
+                file_path=None,
+                source=song_row["source"],
+                tags=tags,
+                playlists=[],
+                created_at="",
+                updated_at="",
+                position=song_row["position"],
+            )
+        )
+    
+    # Fetch playlist metadata
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    cursor.execute(
+        """
+        SELECT id, name, color, emoji, created_at, updated_at
+        FROM playlists
+        WHERE id = ?
+        """,
+        (playlist_id,),
+    )
+    row = cursor.fetchone()
+    conn.close()
+    
+    song_count = len(songs)
+    
+    return {
+        "data": {
+            "id": row["id"],
+            "name": row["name"],
+            "color": row["color"],
+            "emoji": row["emoji"],
+            "song_count": song_count,
+            "songs": songs,
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+        },
         "message": "ok",
     }
 
