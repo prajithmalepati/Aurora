@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException
 from datetime import datetime, timezone
 
 from app.database import get_db
-from app.models import PlaylistCreate, PlaylistResponse, SongResponse
+from app.models import PlaylistCreate, PlaylistUpdate, PlaylistResponse, SongResponse
 
 router = APIRouter(tags=["playlists"])
 
@@ -183,3 +183,96 @@ def get_playlist(playlist_id: int):
         },
         "message": "ok",
     }
+
+
+@router.put("/playlists/{playlist_id}")
+def update_playlist(playlist_id: int, playlist: PlaylistUpdate):
+    """Update playlist metadata. Only update fields that are not None."""
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    # Check if playlist exists
+    cursor.execute(
+        "SELECT id, name FROM playlists WHERE id = ?",
+        (playlist_id,),
+    )
+    row = cursor.fetchone()
+    
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Playlist not found")
+    
+    # Check name uniqueness if name is being changed
+    if playlist.name is not None and playlist.name.strip() != row["name"]:
+        new_name = playlist.name.strip()
+        cursor.execute(
+            "SELECT id FROM playlists WHERE name = ? AND id != ?",
+            (new_name, playlist_id),
+        )
+        existing = cursor.fetchone()
+        if existing:
+            conn.close()
+            raise HTTPException(status_code=409, detail="playlist with this name already exists")
+    
+    now = _get_utc_now()
+    
+    # Build update query dynamically based on provided fields
+    updates = []
+    params = []
+    
+    if playlist.name is not None:
+        updates.append("name = ?")
+        params.append(playlist.name.strip())
+    
+    if playlist.color is not None:
+        updates.append("color = ?")
+        params.append(playlist.color)
+    
+    if playlist.emoji is not None:
+        updates.append("emoji = ?")
+        params.append(playlist.emoji)
+    
+    updates.append("updated_at = ?")
+    params.append(now)
+    
+    params.append(playlist_id)
+    
+    query = f"UPDATE playlists SET {', '.join(updates)} WHERE id = ?"
+    
+    cursor.execute(query, params)
+    conn.commit()
+    conn.close()
+    
+    # Fetch updated playlist with song_count
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    cursor.execute(
+        """
+        SELECT 
+            p.id,
+            p.name,
+            p.color,
+            p.emoji,
+            COUNT(ps.song_id) as song_count,
+            p.created_at,
+            p.updated_at
+        FROM playlists p
+        LEFT JOIN playlist_songs ps ON p.id = ps.playlist_id
+        WHERE p.id = ?
+        GROUP BY p.id
+        """,
+        (playlist_id,),
+    )
+    row = cursor.fetchone()
+    conn.close()
+    
+    return PlaylistResponse(
+        id=row["id"],
+        name=row["name"],
+        color=row["color"],
+        emoji=row["emoji"],
+        song_count=row["song_count"],
+        created_at=row["created_at"],
+        updated_at=row["updated_at"],
+    )
