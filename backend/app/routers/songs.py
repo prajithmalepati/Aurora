@@ -128,6 +128,47 @@ def list_songs(
     }
 
 
+@router.get("/songs/{song_id}")
+def get_song(song_id: int):
+    """Get a song by ID."""
+    
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    # Build the query with LEFT JOINs for tags and playlists
+    query = """
+        SELECT 
+            s.id,
+            s.title,
+            s.artist,
+            s.album,
+            s.duration,
+            s.file_path,
+            s.source,
+            GROUP_CONCAT(t.name) as tags,
+            GROUP_CONCAT(p.name) as playlists,
+            s.created_at,
+            s.updated_at
+        FROM songs s
+        LEFT JOIN song_tags st ON s.id = st.song_id
+        LEFT JOIN tags t ON st.tag_id = t.id
+        LEFT JOIN playlist_songs ps ON s.id = ps.song_id
+        LEFT JOIN playlists p ON ps.playlist_id = p.id
+        WHERE s.id = ?
+        GROUP BY s.id
+    """
+    
+    cursor.execute(query, (song_id,))
+    row = cursor.fetchone()
+    
+    conn.close()
+    
+    if row is None:
+        raise HTTPException(status_code=404, detail="Song not found")
+    
+    return song_row_to_dict(row)
+
+
 @router.post("/songs", status_code=201, response_model=SongResponse)
 def create_song(song: SongCreate):
     """Create a new song."""
