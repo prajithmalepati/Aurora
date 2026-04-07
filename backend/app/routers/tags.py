@@ -195,3 +195,69 @@ def assign_tags_to_song(song_id: int, tag_assign: TagAssign):
         raise HTTPException(status_code=404, detail="Song not found")
     
     return song_row_to_dict(row)
+
+
+@router.delete("/songs/{song_id}/tags/{tag_id}", response_model=dict)
+def remove_tag_from_song(song_id: int, tag_id: int):
+    """Remove a tag from a song. Returns 404 if song, tag, or song_tags link not found."""
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    # Check if song exists
+    cursor.execute("SELECT id FROM songs WHERE id = ?", (song_id,))
+    if not cursor.fetchone():
+        conn.close()
+        raise HTTPException(status_code=404, detail="Song not found")
+    
+    # Check if tag exists
+    cursor.execute("SELECT id FROM tags WHERE id = ?", (tag_id,))
+    if not cursor.fetchone():
+        conn.close()
+        raise HTTPException(status_code=404, detail="Tag not found")
+    
+    # Check if song_tags link exists and delete it
+    cursor.execute(
+        "SELECT id FROM song_tags WHERE song_id = ? AND tag_id = ?",
+        (song_id, tag_id)
+    )
+    if not cursor.fetchone():
+        conn.close()
+        raise HTTPException(status_code=404, detail="Song-tag link not found")
+    
+    cursor.execute(
+        "DELETE FROM song_tags WHERE song_id = ? AND tag_id = ?",
+        (song_id, tag_id)
+    )
+    conn.commit()
+    
+    # Fetch the updated song with joined query
+    query = """
+        SELECT 
+            s.id,
+            s.title,
+            s.artist,
+            s.album,
+            s.duration,
+            s.file_path,
+            s.source,
+            GROUP_CONCAT(t.name) as tags,
+            GROUP_CONCAT(p.name) as playlists,
+            s.created_at,
+            s.updated_at
+        FROM songs s
+        LEFT JOIN song_tags st ON s.id = st.song_id
+        LEFT JOIN tags t ON st.tag_id = t.id
+        LEFT JOIN playlist_songs ps ON s.id = ps.song_id
+        LEFT JOIN playlists p ON ps.playlist_id = p.id
+        WHERE s.id = ?
+        GROUP BY s.id
+    """
+    
+    cursor.execute(query, (song_id,))
+    row = cursor.fetchone()
+    conn.close()
+    
+    if row is None:
+        raise HTTPException(status_code=404, detail="Song not found")
+    
+    return song_row_to_dict(row)
