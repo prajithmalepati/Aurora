@@ -1,0 +1,78 @@
+"""SQLite database connection and initialization."""
+import sqlite3
+from pathlib import Path
+
+DB_PATH = Path(__file__).parent.parent / "aurora.db"
+
+INIT_SQL = """
+PRAGMA foreign_keys = ON;
+PRAGMA journal_mode = WAL;
+
+CREATE TABLE IF NOT EXISTS songs (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    title       TEXT    NOT NULL,
+    artist      TEXT    NOT NULL,
+    album       TEXT,
+    duration    INTEGER,
+    file_path   TEXT    UNIQUE,
+    source      TEXT    NOT NULL DEFAULT 'manual',
+    external_id TEXT,
+    created_at  TEXT    NOT NULL,
+    updated_at  TEXT    NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS playlists (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    name       TEXT    NOT NULL UNIQUE,
+    color      TEXT,
+    emoji      TEXT,
+    created_at TEXT    NOT NULL,
+    updated_at TEXT    NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS tags (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    name       TEXT    NOT NULL UNIQUE,
+    created_at TEXT    NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS playlist_songs (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    playlist_id INTEGER NOT NULL REFERENCES playlists(id) ON DELETE CASCADE,
+    song_id     INTEGER NOT NULL REFERENCES songs(id)     ON DELETE CASCADE,
+    position    INTEGER NOT NULL DEFAULT 0,
+    added_at    TEXT    NOT NULL,
+    UNIQUE(playlist_id, song_id)
+);
+
+CREATE TABLE IF NOT EXISTS song_tags (
+    id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    song_id INTEGER NOT NULL REFERENCES songs(id) ON DELETE CASCADE,
+    tag_id  INTEGER NOT NULL REFERENCES tags(id)  ON DELETE CASCADE,
+    UNIQUE(song_id, tag_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_songs_title            ON songs(title);
+CREATE INDEX IF NOT EXISTS idx_songs_artist           ON songs(artist);
+CREATE INDEX IF NOT EXISTS idx_songs_source           ON songs(source);
+CREATE INDEX IF NOT EXISTS idx_tags_name              ON tags(name);
+CREATE INDEX IF NOT EXISTS idx_playlist_songs_playlist ON playlist_songs(playlist_id);
+CREATE INDEX IF NOT EXISTS idx_playlist_songs_song     ON playlist_songs(song_id);
+CREATE INDEX IF NOT EXISTS idx_song_tags_song          ON song_tags(song_id);
+CREATE INDEX IF NOT EXISTS idx_song_tags_tag           ON song_tags(tag_id);
+"""
+
+
+def get_db() -> sqlite3.Connection:
+    """Get a database connection with row_factory set to sqlite3.Row."""
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
+    return conn
+
+
+def init_db():
+    """Initialize the database — create tables if they don't exist."""
+    conn = get_db()
+    conn.executescript(INIT_SQL)
+    conn.close()
