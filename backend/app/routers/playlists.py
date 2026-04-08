@@ -122,8 +122,8 @@ def reorder_playlist_songs(playlist_id: int, reorder: PlaylistReorder):
     current_rows = cursor.fetchall()
     current_song_ids = [row["song_id"] for row in current_rows]
     
-    # Verify song_ids matches exactly the current songs
-    if [s for s in reorder.song_ids] != current_song_ids:
+    # Verify song_ids matches exactly the current songs (as a set comparison)
+    if set(reorder.song_ids) != set(current_song_ids):
         conn.close()
         raise HTTPException(
             status_code=400, 
@@ -137,10 +137,10 @@ def reorder_playlist_songs(playlist_id: int, reorder: PlaylistReorder):
         cursor.execute(
             """
             UPDATE playlist_songs
-            SET position = ?, updated_at = ?
+            SET position = ?
             WHERE playlist_id = ? AND song_id = ?
             """,
-            (new_position, now, playlist_id, song_id),
+            (new_position, playlist_id, song_id),
         )
     
     conn.commit()
@@ -634,10 +634,10 @@ def add_song_to_playlist(playlist_id: int, song_add: PlaylistSongAdd):
     
     cursor.execute(
         """
-        INSERT INTO playlist_songs (playlist_id, song_id, position, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO playlist_songs (playlist_id, song_id, position, added_at)
+        VALUES (?, ?, ?, ?)
         """,
-        (playlist_id, song_add.song_id, new_position, now, now),
+        (playlist_id, song_add.song_id, new_position, now),
     )
     conn.commit()
     conn.close()
