@@ -1,8 +1,10 @@
 """Songs router."""
 import sqlite3
+from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import FileResponse
 from datetime import datetime, timezone
 
 from app.database import get_db
@@ -167,6 +169,71 @@ def get_song(song_id: int):
         raise HTTPException(status_code=404, detail="Song not found")
     
     return song_row_to_dict(row)
+
+
+@router.get("/songs/{song_id}/stream")
+def stream_song(song_id: int):
+    """Stream a song's audio file to the browser."""
+    
+    # MIME type mapping
+    mime_map = {
+        ".mp3": "audio/mpeg",
+        ".flac": "audio/flac",
+        ".m4a": "audio/mp4",
+        ".ogg": "audio/ogg",
+        ".wav": "audio/wav",
+        ".aac": "audio/aac",
+        ".wma": "audio/x-ms-wma",
+        ".opus": "audio/opus",
+    }
+    
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    # Get the song by ID
+    query = """
+        SELECT 
+            s.id,
+            s.title,
+            s.artist,
+            s.album,
+            s.duration,
+            s.file_path,
+            s.source,
+            GROUP_CONCAT(t.name) as tags,
+            GROUP_CONCAT(p.name) as playlists,
+            s.created_at,
+            s.updated_at
+        FROM songs s
+        LEFT JOIN song_tags st ON s.id = st.song_id
+        LEFT JOIN tags t ON st.tag_id = t.id
+        LEFT JOIN playlist_songs ps ON s.id = ps.song_id
+        LEFT JOIN playlists p ON ps.playlist_id = p.id
+        WHERE s.id = ?
+        GROUP BY s.id
+    """
+    
+    cursor.execute(query, (song_id,))
+    row = cursor.fetchone()
+    
+    conn.close()
+    
+    if row is None:
+        raise HTTPException(status_code=404, detail="Song not found")
+    
+    file_path = row["file_path"]
+    
+    if file_path is None:
+        raise HTTPException(status_code=404, detail="No audio file available")
+    
+    # Check if file exists on disk
+    if not Path(file_path).exists():
+        raise HTTPException(status_code=404, detail="Audio file not found on disk")
+    
+    # Detect MIME type from file extension
+    mime_type = mime_map.get(Path(file_path).suffix.lower(), "application/octet-stream")
+    
+    return FileResponse(str(file_path), media_type=mime_type)
 
 
 @router.delete("/songs/{song_id}")
