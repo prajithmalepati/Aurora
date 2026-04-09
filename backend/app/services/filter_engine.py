@@ -48,9 +48,9 @@ def build_tag_set(tag_names_csv: str | None, playlist_names_csv: str | None) -> 
     """
     tags = set()
     if tag_names_csv:
-        tags.update(name.strip() for name in tag_names_csv.split(","))
+        tags.update(name.strip().lower() for name in tag_names_csv.split(","))
     if playlist_names_csv:
-        tags.update(name.strip() for name in playlist_names_csv.split(","))
+        tags.update(name.strip().lower() for name in playlist_names_csv.split(","))
     return tags
 
 
