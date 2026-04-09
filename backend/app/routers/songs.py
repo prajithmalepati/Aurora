@@ -27,7 +27,15 @@ def song_row_to_dict(row: sqlite3.Row) -> dict:
     playlists_str = row["playlists"] if row["playlists"] else ""
     
     tags = [t.strip() for t in tags_str.split(",") if t.strip()] if tags_str else []
-    playlists = [p.strip() for p in playlists_str.split(",") if p.strip()] if playlists_str else []
+    
+    # Parse playlists as objects with id and name
+    playlists = []
+    if playlists_str:
+        # playlists_str format: "id1:name1,id2:name2,..."
+        for item in playlists_str.split(","):
+            if ":" in item:
+                id_part, name_part = item.split(":", 1)
+                playlists.append({"id": int(id_part), "name": name_part.strip()})
     
     return {
         "id": row["id"],
@@ -66,7 +74,7 @@ def list_songs(
             s.file_path,
             s.source,
             GROUP_CONCAT(t.name) as tags,
-            GROUP_CONCAT(p.name) as playlists,
+            GROUP_CONCAT(p.id || ':' || p.name) as playlists,
             s.created_at,
             s.updated_at
         FROM songs s
@@ -148,7 +156,7 @@ def get_song(song_id: int):
             s.file_path,
             s.source,
             GROUP_CONCAT(t.name) as tags,
-            GROUP_CONCAT(p.name) as playlists,
+            GROUP_CONCAT(p.id || ':' || p.name) as playlists,
             s.created_at,
             s.updated_at
         FROM songs s
@@ -201,7 +209,7 @@ def stream_song(song_id: int):
             s.file_path,
             s.source,
             GROUP_CONCAT(t.name) as tags,
-            GROUP_CONCAT(p.name) as playlists,
+            GROUP_CONCAT(p.id || ':' || p.name) as playlists,
             s.created_at,
             s.updated_at
         FROM songs s
@@ -367,7 +375,7 @@ def update_song(song_id: int, song_update: SongUpdate):
             s.file_path,
             s.source,
             GROUP_CONCAT(t.name) as tags,
-            GROUP_CONCAT(p.name) as playlists,
+            GROUP_CONCAT(p.id || ':' || p.name) as playlists,
             s.created_at,
             s.updated_at
         FROM songs s

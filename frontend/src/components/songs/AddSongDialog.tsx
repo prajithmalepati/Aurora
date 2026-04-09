@@ -61,11 +61,11 @@ export function AddSongDialog({ onAdd }: AddSongDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger>
-        <Button>
+      <DialogTrigger render={<Button />}>
+        <span className="inline-flex items-center">
           <Plus className="h-4 w-4 mr-2" />
           Add Song
-        </Button>
+        </span>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px] bg-[var(--aurora-bg-surface)] text-[var(--aurora-text)] border-[var(--aurora-border)]">
         <form onSubmit={handleSubmit}>

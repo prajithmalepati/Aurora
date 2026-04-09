@@ -120,7 +120,7 @@ def filter_songs(db_connection, query_string: str) -> list[dict]:
             s.id, s.title, s.artist, s.album, s.duration,
             s.file_path, s.source,
             GROUP_CONCAT(DISTINCT t.name) AS tag_names,
-            GROUP_CONCAT(DISTINCT LOWER(p.name)) AS playlist_names
+            GROUP_CONCAT(DISTINCT p.id || ':' || p.name) AS playlist_ids_names
         FROM songs s
         LEFT JOIN song_tags st ON s.id = st.song_id
         LEFT JOIN tags t ON st.tag_id = t.id
@@ -131,9 +131,17 @@ def filter_songs(db_connection, query_string: str) -> list[dict]:
     
     results = []
     for row in cursor.fetchall():
-        tag_set = build_tag_set(row["tag_names"], row["playlist_names"])
+        tag_set = build_tag_set(row["tag_names"], row["playlist_ids_names"])
         
         if evaluate_song(expression, quoted_tags, tag_set):
+            # Parse playlists as objects with id and name
+            playlists = []
+            if row["playlist_ids_names"]:
+                for item in row["playlist_ids_names"].split(","):
+                    if ":" in item:
+                        id_part, name_part = item.split(":", 1)
+                        playlists.append({"id": int(id_part), "name": name_part.strip()})
+            
             results.append({
                 "id": row["id"],
                 "title": row["title"],
@@ -143,7 +151,7 @@ def filter_songs(db_connection, query_string: str) -> list[dict]:
                 "file_path": row["file_path"],
                 "source": row["source"],
                 "tags": sorted(tag_set),
-                "playlists": [n.strip() for n in (row["playlist_names"] or "").split(",") if n.strip()],
+                "playlists": playlists,
             })
     
     # Sort by title

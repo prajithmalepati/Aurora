@@ -4,22 +4,9 @@ import { Input } from "@/components/ui/input"
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command"
 import { useSongStore } from "@/stores/songStore"
 import { useTagStore } from "@/stores/tagStore"
 import { toast } from "sonner"
@@ -32,155 +19,105 @@ interface TagEditorProps {
   onOpenChange: (open: boolean) => void
 }
 
-export function TagEditor({
-  songId,
-  songTitle,
-  currentTags,
-  open,
-  onOpenChange,
-}: TagEditorProps) {
+export function TagEditor({ songId, songTitle, currentTags, open, onOpenChange }: TagEditorProps) {
   const [inputValue, setInputValue] = useState("")
-  const [popoverOpen, setPopoverOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const assignTags = useSongStore((s) => s.assignTags)
+  const removeTag = useSongStore((s) => s.removeTag)
+  const allTags = useTagStore((s) => s.tags)
+  const fetchTags = useTagStore((s) => s.fetchTags)
 
-  const assignTags = useSongStore((state) => state.assignTags)
-  const removeTag = useSongStore((state) => state.removeTag)
-  const fetchTags = useTagStore((state) => state.fetchTags)
-  const allTags = useTagStore((state) => state.tags)
-
-  // Focus input when dialog opens
   useEffect(() => {
     if (open) {
+      fetchTags()
       setTimeout(() => inputRef.current?.focus(), 100)
     }
-  }, [open])
+  }, [open, fetchTags])
 
-  // Get unique tag names from tagStore
-  const tagNames = allTags.map((tag) => tag.name)
-
-  // Filter tags for autocomplete: show all tags when input is empty, filter as user types
-  // Also exclude tags that are already on the song
   const currentTagSet = new Set(currentTags)
-  const filteredTags = tagNames
-    .filter((tag) => !currentTagSet.has(tag)) // Exclude already-assigned tags
-    .filter((tag) => {
-      if (!inputValue) return true // Show all when input is empty
-      return tag.toLowerCase().includes(inputValue.toLowerCase())
-    })
+  const filteredTags = allTags
+    .filter((t) => !currentTagSet.has(t.name))
+    .filter((t) => !inputValue || t.name.toLowerCase().includes(inputValue.toLowerCase()))
 
-  const handleAddTag = useCallback(
-    async (tagName: string) => {
-      if (!tagName.trim()) return
+  const handleAddTag = async (name: string) => {
+    const trimmed = name.trim().toLowerCase()
+    if (!trimmed) return
+    try {
+      await assignTags(songId, [trimmed])
+      await fetchTags()
+      setInputValue("")
+      toast.success(`Tag "${trimmed}" added`)
+    } catch {
+      toast.error("Failed to add tag")
+    }
+  }
 
-      const newTags = [tagName.trim()]
-      try {
-        await assignTags(songId, newTags)
-        await fetchTags()
-        toast.success(`Tag "${tagName}" added`)
-        setInputValue("")
-        onOpenChange(false)
-      } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : "Unknown error"
-        toast.error(`Failed to add tag: ${message}`)
-      }
-    },
-    [songId, assignTags, fetchTags, onOpenChange]
-  )
-
-  const handleRemoveTag = useCallback(
-    async (tagName: string) => {
-      // Look up the tag ID by name
-      const tag = allTags.find((t) => t.name === tagName)
-      if (!tag) {
-        toast.error(`Tag "${tagName}" not found`)
-        return
-      }
-
-      try {
-        await removeTag(songId, tag.id)
-        await fetchTags()
-        toast.success(`Tag "${tagName}" removed`)
-      } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : "Unknown error"
-        toast.error(`Failed to remove tag: ${message}`)
-      }
-    },
-    [songId, removeTag, fetchTags, allTags]
-  )
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === "Enter" || e.key === ",") {
-        e.preventDefault()
-        handleAddTag(inputValue)
-      }
-    },
-    [handleAddTag, inputValue]
-  )
+  const handleRemoveTag = async (tagName: string) => {
+    const tag = allTags.find((t) => t.name === tagName)
+    if (!tag) return
+    try {
+      await removeTag(songId, tag.id)
+      await fetchTags()
+      toast.success(`Tag "${tagName}" removed`)
+    } catch {
+      toast.error("Failed to remove tag")
+    }
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md bg-[var(--aurora-bg-surface)] border-[var(--aurora-border)]">
         <DialogHeader>
           <DialogTitle>Edit tags — {songTitle}</DialogTitle>
-          <DialogDescription>
-            Add or remove tags for this song. Press Enter or comma to add a tag.
-          </DialogDescription>
         </DialogHeader>
 
-        {/* Current tags */}
         <div className="flex flex-wrap gap-2 py-2">
+          {currentTags.length === 0 && (
+            <span className="text-sm text-[var(--aurora-text-muted)]">No tags yet</span>
+          )}
           {currentTags.map((tag) => (
-            <div key={tag} className="flex items-center gap-1">
-              <span className="bg-[var(--aurora-bg-hover)] text-[var(--aurora-teal)] text-xs px-2 py-0.5 rounded-full">
-                {tag}
-              </span>
-              <button
-                onClick={() => handleRemoveTag(tag)}
-                className="hover:text-[var(--aurora-danger)] transition-colors"
-                aria-label={`Remove tag ${tag}`}
-              >
+            <span key={tag} className="inline-flex items-center gap-1 bg-[var(--aurora-bg-hover)] text-[var(--aurora-teal)] text-xs px-2 py-1 rounded-full">
+              {tag}
+              <button onClick={() => handleRemoveTag(tag)} className="hover:text-[var(--aurora-danger)]">
                 <X className="h-3 w-3" />
               </button>
-            </div>
+            </span>
           ))}
         </div>
 
-        {/* Add tag input with autocomplete */}
-        <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
-          <PopoverTrigger>
-            <Input
-              ref={inputRef}
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Type a tag name and press Enter..."
-              className="w-full"
-              onFocus={() => setPopoverOpen(true)}
-            />
-          </PopoverTrigger>
-          <PopoverContent className="w-full p-0" align="start">
-            <Command filter={(value, search) => (value.includes(search) ? 1 : 0)}>
-              <CommandList>
-                <CommandEmpty>No tags found.</CommandEmpty>
-                <CommandGroup>
-                  {filteredTags.map((tag) => (
-                    <CommandItem
-                      key={tag}
-                      value={tag}
-                      onSelect={() => {
-                        handleAddTag(tag)
-                        setPopoverOpen(false)
-                      }}
-                    >
-                      {tag}
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
+        <div>
+          <Input
+            ref={inputRef}
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === ",") {
+                e.preventDefault()
+                handleAddTag(inputValue)
+              }
+            }}
+            placeholder="Type a tag and press Enter..."
+            className="bg-[var(--aurora-bg)] border-[var(--aurora-border)]"
+          />
+        </div>
+
+        {filteredTags.length > 0 && (
+          <div className="max-h-[150px] overflow-y-auto border border-[var(--aurora-border)] rounded-md bg-[var(--aurora-bg)]">
+            {filteredTags.map((tag) => (
+              <div
+                key={tag.id}
+                onClick={() => handleAddTag(tag.name)}
+                className="px-3 py-2 text-sm text-[var(--aurora-text)] cursor-pointer hover:bg-[var(--aurora-bg-hover)] transition-colors"
+              >
+                {tag.name} <span className="text-[var(--aurora-text-muted)]">({tag.song_count})</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {filteredTags.length === 0 && allTags.length > 0 && currentTags.length > 0 && (
+          <p className="text-xs text-[var(--aurora-text-muted)]">All tags are already assigned</p>
+        )}
       </DialogContent>
     </Dialog>
   )
