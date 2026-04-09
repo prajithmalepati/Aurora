@@ -1,9 +1,11 @@
 import { useFilterStore } from "@/stores/filterStore"
 import { useTagStore } from "@/stores/tagStore"
 import { usePlaylistStore } from "@/stores/playlistStore"
+import { usePlayerStore } from "@/stores/playerStore"
 import { QueryInput } from "./QueryInput"
 import { SongTable } from "@/components/songs/SongTable"
 import { Search, X } from "lucide-react"
+import type { Song } from "@/types"
 
 type OperatorKind = "AND" | "OR" | "NOT" | "(" | ")"
 
@@ -24,8 +26,13 @@ export function QueryBuilder() {
   const executeFilter = useFilterStore((state) => state.executeFilter)
   const clearResults = useFilterStore((state) => state.clearResults)
 
+  const playSong = usePlayerStore((state) => state.playSong)
   const tags = useTagStore((state) => state.tags)
   const playlists = usePlaylistStore((state) => state.playlists)
+
+  const handlePlaySong = (song: Song) => {
+    playSong(song, results)
+  }
 
   const hasSearched = query.trim().length > 0
 
@@ -197,7 +204,7 @@ export function QueryBuilder() {
             <p className="label-micro mb-4">
               {results.length} {results.length === 1 ? "result" : "results"}
             </p>
-            <SongTable songs={results} loading={false} />
+            <SongTable songs={results} loading={false} onPlay={handlePlaySong} />
           </>
         )}
       </div>

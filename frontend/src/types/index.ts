@@ -33,6 +33,7 @@ export interface PlaylistSong {
   artist: string
   album: string | null
   duration: number | null
+  file_path: string | null
   tags: string[]
   position: number
 }
