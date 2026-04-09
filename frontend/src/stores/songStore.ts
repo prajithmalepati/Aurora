@@ -2,6 +2,7 @@ import { create } from "zustand"
 import { api } from "@/lib/api"
 import type { Song, ApiResponse, Tag } from "@/types"
 import { useTagStore } from "./tagStore"
+import { toast } from "sonner"
 
 type View =
   | { kind: "all-songs" }
@@ -55,8 +56,10 @@ export const useSongStore = create<SongState>((set, get) => ({
     try {
       await api.post("/songs", data)
       await get().fetchSongs()
+      toast.success("Song added")
     } catch (e: any) {
       set({ error: e.message })
+      toast.error(e.message ?? "Failed to add song")
       throw e  // re-throw so the dialog can show the error
     }
   },
@@ -65,8 +68,10 @@ export const useSongStore = create<SongState>((set, get) => ({
     try {
       await api.put(`/songs/${id}`, data)
       await get().fetchSongs()
+      toast.success("Song updated")
     } catch (e: any) {
       set({ error: e.message })
+      toast.error(e.message ?? "Failed to update song")
       throw e
     }
   },
@@ -75,8 +80,10 @@ export const useSongStore = create<SongState>((set, get) => ({
     try {
       await api.delete(`/songs/${id}`)
       await get().fetchSongs()
+      toast.success("Song deleted")
     } catch (e: any) {
       set({ error: e.message })
+      toast.error(e.message ?? "Failed to delete song")
       throw e
     }
   },
@@ -85,8 +92,10 @@ export const useSongStore = create<SongState>((set, get) => ({
     try {
       await api.post(`/songs/${songId}/tags`, { tag_names: tagNames })
       await get().fetchSongs()
+      toast.success("Tags updated")
     } catch (e: any) {
       set({ error: e.message })
+      toast.error(e.message ?? "Failed to update tags")
       throw e
     }
   },
@@ -95,8 +104,10 @@ export const useSongStore = create<SongState>((set, get) => ({
     try {
       await api.delete(`/songs/${songId}/tags/${tagId}`)
       await get().fetchSongs()
+      toast.success("Tag removed")
     } catch (e: any) {
       set({ error: e.message })
+      toast.error(e.message ?? "Failed to remove tag")
       throw e
     }
   },
@@ -120,8 +131,14 @@ export const useSongStore = create<SongState>((set, get) => ({
     if (!matchingTag) {
       throw new Error("Tag not found")
     }
-    await api.delete(`/songs/${songId}/tags/${matchingTag.id}`)
-    await get().fetchSongs()
+    try {
+      await api.delete(`/songs/${songId}/tags/${matchingTag.id}`)
+      await get().fetchSongs()
+      toast.success("Tag removed")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to remove tag")
+      throw e
+    }
   },
 
   setView: (view) => {

@@ -1,6 +1,7 @@
 import { create } from "zustand"
 import { api } from "@/lib/api"
 import type { Tag, ApiResponse } from "@/types"
+import { toast } from "sonner"
 
 interface TagState {
   tags: Tag[]
@@ -25,7 +26,13 @@ export const useTagStore = create<TagState>((set, get) => ({
   },
 
   deleteTag: async (id) => {
-    await api.delete(`/tags/${id}`)
-    await get().fetchTags()
+    try {
+      await api.delete(`/tags/${id}`)
+      await get().fetchTags()
+      toast.success("Tag deleted")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to delete tag")
+      throw e
+    }
   },
 }))
