@@ -92,7 +92,6 @@ export const useSongStore = create<SongState>((set, get) => ({
     try {
       await api.post(`/songs/${songId}/tags`, { tag_names: tagNames })
       await get().fetchSongs()
-      toast.success("Tags updated")
     } catch (e: any) {
       set({ error: e.message })
       toast.error(e.message ?? "Failed to update tags")
@@ -104,7 +103,6 @@ export const useSongStore = create<SongState>((set, get) => ({
     try {
       await api.delete(`/songs/${songId}/tags/${tagId}`)
       await get().fetchSongs()
-      toast.success("Tag removed")
     } catch (e: any) {
       set({ error: e.message })
       toast.error(e.message ?? "Failed to remove tag")

@@ -50,7 +50,10 @@ def build_tag_set(tag_names_csv: str | None, playlist_names_csv: str | None) -> 
     if tag_names_csv:
         tags.update(name.strip().lower() for name in tag_names_csv.split(","))
     if playlist_names_csv:
-        tags.update(name.strip().lower() for name in playlist_names_csv.split(","))
+        for item in playlist_names_csv.split(","):
+            # Items are formatted as "id:name" — extract just the name
+            name = item.split(":", 1)[1].strip().lower() if ":" in item else item.strip().lower()
+            tags.add(name)
     return tags
 
 
