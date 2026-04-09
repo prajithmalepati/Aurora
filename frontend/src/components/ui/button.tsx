@@ -12,32 +12,38 @@ export interface ButtonProps
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = "default", size = "default", ...props }, ref) => {
     const baseStyles =
-      "inline-flex items-center justify-center rounded-md font-medium transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-[var(--aurora-teal)] focus:ring-offset-2 focus:ring-offset-[var(--aurora-bg)] disabled:opacity-50 disabled:pointer-events-none"
+      "relative inline-flex items-center justify-center rounded-md font-medium tracking-tight transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--aurora-teal)]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--aurora-void)] disabled:opacity-40 disabled:pointer-events-none active:scale-[0.97]"
 
     const variants = {
       default:
-        "bg-[var(--aurora-bg-surface)] text-[var(--aurora-text)] hover:bg-[var(--aurora-bg-hover)] border border-[var(--aurora-border)]",
+        "text-[var(--aurora-text-dim)] hover:text-[var(--aurora-text)] bg-white/[0.02] hover:bg-white/[0.04] shadow-[inset_0_0_0_1px_var(--aurora-rim)] hover:shadow-[inset_0_0_0_1px_var(--aurora-rim-bright)]",
       primary:
-        "bg-[var(--aurora-teal)] text-white hover:bg-opacity-90 focus:ring-[var(--aurora-teal)]",
+        "text-[#050608] shadow-[0_0_22px_-6px_rgba(94,234,212,0.45)] hover:shadow-[0_0_28px_-4px_rgba(94,234,212,0.6)]",
       secondary:
-        "bg-[var(--aurora-bg-hover)] text-[var(--aurora-text)] hover:bg-opacity-80 border border-[var(--aurora-border)]",
+        "text-[var(--aurora-text-dim)] hover:text-[var(--aurora-text)] bg-white/[0.02] hover:bg-white/[0.04] shadow-[inset_0_0_0_1px_var(--aurora-rim)]",
       ghost:
-        "text-[var(--aurora-text)] hover:bg-[var(--aurora-bg-hover)]",
+        "text-[var(--aurora-text-dim)] hover:text-[var(--aurora-text)] hover:bg-white/[0.03]",
       outline:
-        "border border-[var(--aurora-border)] text-[var(--aurora-text)] hover:bg-[var(--aurora-bg-hover)]",
+        "text-[var(--aurora-text-dim)] hover:text-[var(--aurora-text)] shadow-[inset_0_0_0_1px_var(--aurora-rim)] hover:shadow-[inset_0_0_0_1px_var(--aurora-rim-bright)]",
     }
 
     const sizes = {
-      default: "h-10 px-4 py-2 text-sm",
-      sm: "h-8 px-3 text-xs",
-      lg: "h-12 px-6 text-base",
-      icon: "h-10 w-10",
+      default: "h-10 px-4 text-[13px]",
+      sm: "h-8 px-3 text-[12px]",
+      lg: "h-11 px-6 text-[14px]",
+      icon: "h-9 w-9",
     }
+
+    const primaryStyle =
+      variant === "primary"
+        ? { background: "var(--aurora-gradient)" }
+        : undefined
 
     return (
       <button
         ref={ref}
         className={cn(baseStyles, variants[variant], sizes[size], className)}
+        style={primaryStyle}
         {...props}
       />
     )
