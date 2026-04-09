@@ -7,6 +7,7 @@ interface PlayerState {
   queueIndex: number
   isPlaying: boolean
   volume: number          // 0 to 1
+  preMuteVolume: number   // volume to restore when unmuting
   seek: number            // current position in seconds
   duration: number        // total duration in seconds
 
@@ -15,6 +16,7 @@ interface PlayerState {
   next: () => void
   previous: () => void
   setVolume: (v: number) => void
+  toggleMute: () => void
   setSeek: (s: number) => void
   setDuration: (d: number) => void
   updateSeek: (s: number) => void
@@ -27,6 +29,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   queueIndex: 0,
   isPlaying: false,
   volume: 0.7,
+  preMuteVolume: 0.7,
   seek: 0,
   duration: 0,
 
@@ -89,7 +92,25 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     }
   },
 
-  setVolume: (v) => set({ volume: Math.max(0, Math.min(1, v)) }),
+  setVolume: (v) => {
+    const clamped = Math.max(0, Math.min(1, v))
+    // Track the last non-zero volume so unmute can restore it
+    if (clamped > 0) {
+      set({ volume: clamped, preMuteVolume: clamped })
+    } else {
+      set({ volume: clamped })
+    }
+  },
+
+  toggleMute: () => {
+    const { volume, preMuteVolume } = get()
+    if (volume > 0) {
+      set({ volume: 0, preMuteVolume: volume })
+    } else {
+      // Restore previous level (fallback to 0.7 if somehow zero)
+      set({ volume: preMuteVolume > 0 ? preMuteVolume : 0.7 })
+    }
+  },
   setSeek: (s) => set({ seek: s }),
   setDuration: (d) => set({ duration: d }),
   updateSeek: (s) => set({ seek: s }),
