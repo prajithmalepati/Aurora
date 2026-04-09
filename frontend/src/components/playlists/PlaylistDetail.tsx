@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react"
-import type { PlaylistDetail, PlaylistSong } from "@/types"
+import { useEffect, useState, useMemo } from "react"
+import type { PlaylistSong } from "@/types"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { useSongStore } from "@/stores/songStore"
+import { usePlayerStore } from "@/stores/playerStore"
 import { formatDuration } from "@/lib/utils"
+import { albumGradient } from "@/lib/albumGradient"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -27,6 +29,7 @@ import { toast } from "sonner"
 import { Pencil, Trash2, ChevronUp, ChevronDown, X } from "lucide-react"
 import { TagList } from "@/components/tags/TagList"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Equalizer } from "@/components/ui/Equalizer"
 
 interface PlaylistDetailProps {
   playlistId: number
@@ -51,6 +54,16 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
   useEffect(() => {
     fetchPlaylistDetail(playlistId)
   }, [playlistId, fetchPlaylistDetail])
+
+  const heroArt = useMemo(
+    () => albumGradient(activePlaylist?.name ?? `playlist-${playlistId}`),
+    [activePlaylist?.name, playlistId]
+  )
+
+  const totalDuration = useMemo(() => {
+    if (!activePlaylist) return 0
+    return activePlaylist.songs.reduce((sum, s) => sum + (s.duration ?? 0), 0)
+  }, [activePlaylist])
 
   const handleEdit = () => {
     if (activePlaylist) {
@@ -117,7 +130,10 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
     if (newIndex < 0 || newIndex >= songs.length) return
 
     const newSongIds = songs.map((s) => s.id)
-    ;[newSongIds[currentIndex], newSongIds[newIndex]] = [newSongIds[newIndex], newSongIds[currentIndex]]
+    ;[newSongIds[currentIndex], newSongIds[newIndex]] = [
+      newSongIds[newIndex],
+      newSongIds[currentIndex],
+    ]
 
     try {
       await reorderSongs(activePlaylist.id, newSongIds)
@@ -129,11 +145,17 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
 
   if (loading) {
     return (
-      <div className="p-6 space-y-4">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-4 w-32" />
-        <div className="space-y-2 mt-4">
-          {[...Array(4)].map((_, i) => (
+      <div className="p-10 space-y-6 aurora-fade-in">
+        <div className="flex items-end gap-6">
+          <Skeleton className="h-40 w-40 rounded-lg" />
+          <div className="space-y-3">
+            <Skeleton className="h-3 w-16" />
+            <Skeleton className="h-12 w-64" />
+            <Skeleton className="h-4 w-40" />
+          </div>
+        </div>
+        <div className="space-y-2 mt-8">
+          {[...Array(5)].map((_, i) => (
             <Skeleton key={i} className="h-12 w-full rounded" />
           ))}
         </div>
@@ -143,93 +165,140 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
 
   if (!activePlaylist) {
     return (
-      <div className="p-6">
-        <span className="text-[var(--aurora-text-muted)]">Playlist not found</span>
+      <div className="p-10">
+        <span className="font-display-italic text-[20px] text-[var(--aurora-text-muted)]">
+          Playlist not found
+        </span>
       </div>
     )
   }
 
+  const formatTotal = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const hours = Math.floor(mins / 60)
+    if (hours > 0) return `${hours} hr ${mins % 60} min`
+    return `${mins} min`
+  }
+
   return (
-    <div className="p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          {activePlaylist.emoji && (
-            <span className="text-3xl">{activePlaylist.emoji}</span>
-          )}
-          <div>
-            <h1 className="text-2xl font-[Outfit] text-[var(--aurora-text)]">
+    <div className="aurora-fade-in">
+      {/* ── HERO HEADER ── */}
+      <div className="relative px-10 pt-10 pb-8 overflow-hidden">
+        {/* Background halo derived from playlist art */}
+        <div
+          className="absolute inset-0 opacity-60 pointer-events-none"
+          style={{
+            background: `radial-gradient(ellipse 700px 400px at 18% 0%, ${heroArt.glow} 0%, transparent 65%)`,
+          }}
+          aria-hidden="true"
+        />
+        <div className="relative flex items-end gap-7">
+          {/* Hero art tile */}
+          <div
+            className="w-[168px] h-[168px] rounded-xl flex-shrink-0 aurora-rim flex items-center justify-center text-5xl"
+            style={{
+              background: heroArt.background,
+              boxShadow: `0 20px 60px -20px ${heroArt.glow}, inset 0 0 0 1px rgba(255,255,255,0.06)`,
+            }}
+          >
+            {activePlaylist.emoji && <span>{activePlaylist.emoji}</span>}
+          </div>
+
+          {/* Metadata */}
+          <div className="flex-1 min-w-0 pb-2">
+            <p className="label-micro mb-3">Playlist</p>
+            <h1 className="font-display text-[64px] leading-[0.95] tracking-tight text-[var(--aurora-text)] truncate">
               {activePlaylist.name}
             </h1>
-            <span className="text-sm text-[var(--aurora-text-dim)]">
-              {activePlaylist.songs.length} songs
-            </span>
+            <div className="flex items-center gap-2 mt-4 text-[12px] text-[var(--aurora-text-dim)]">
+              <span className="tabular-nums font-medium">
+                {activePlaylist.songs.length} {activePlaylist.songs.length === 1 ? "song" : "songs"}
+              </span>
+              {totalDuration > 0 && (
+                <>
+                  <span className="text-[var(--aurora-text-muted)]">·</span>
+                  <span className="tabular-nums">{formatTotal(totalDuration)}</span>
+                </>
+              )}
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleEdit}
-            className="h-8 w-8 text-[var(--aurora-text-dim)]"
-            title="Edit playlist"
-          >
-            <Pencil className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setDeleteDialogOpen(true)}
-            className="h-8 w-8 text-[var(--aurora-danger)] hover:text-[var(--aurora-danger)]"
-            title="Delete playlist"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+
+          {/* Actions */}
+          <div className="flex items-center gap-1 pb-4">
+            <button
+              onClick={handleEdit}
+              title="Edit playlist"
+              aria-label="Edit playlist"
+              className="h-9 w-9 rounded-md flex items-center justify-center text-[var(--aurora-text-dim)] hover:text-[var(--aurora-text)] hover:bg-white/[0.04] transition-all duration-150"
+            >
+              <Pencil className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setDeleteDialogOpen(true)}
+              title="Delete playlist"
+              aria-label="Delete playlist"
+              className="h-9 w-9 rounded-md flex items-center justify-center text-[var(--aurora-text-muted)] hover:text-[var(--aurora-danger)] hover:bg-[var(--aurora-danger)]/10 transition-all duration-150"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Song list */}
-      <div className="w-full overflow-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-[var(--aurora-border)]">
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--aurora-text-dim)] uppercase tracking-wider">
-                #
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--aurora-text-dim)] uppercase tracking-wider">
-                Title / Artist
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--aurora-text-dim)] uppercase tracking-wider">
-                Duration
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--aurora-text-dim)] uppercase tracking-wider">
-                Tags
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--aurora-text-dim)] uppercase tracking-wider">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {activePlaylist.songs.map((song, index) => (
-              <PlaylistSongRow
-                key={song.id}
-                song={song}
-                index={index}
-                onRemove={() => handleRemoveSong(song.id)}
-                onReorder={(direction) => handleReorder(song.id, direction)}
-              />
-            ))}
-          </tbody>
-        </table>
+      {/* Fade divider before song list */}
+      <div className="aurora-divider-h mx-10" />
+
+      {/* ── SONG LIST ── */}
+      <div className="px-6 py-4">
+        {activePlaylist.songs.length === 0 ? (
+          <div className="py-16 text-center">
+            <p className="font-display-italic text-[22px] text-[var(--aurora-text-muted)]">
+              This playlist is empty
+            </p>
+          </div>
+        ) : (
+          <table className="w-full border-separate border-spacing-0">
+            <thead>
+              <tr>
+                <th className="px-4 py-3 text-left label-micro text-[10px] text-[var(--aurora-text-muted)] w-12 text-center">
+                  #
+                </th>
+                <th className="px-4 py-3 text-left label-micro text-[10px] text-[var(--aurora-text-muted)]">
+                  Title
+                </th>
+                <th className="px-4 py-3 text-left label-micro text-[10px] text-[var(--aurora-text-muted)] w-24">
+                  Duration
+                </th>
+                <th className="px-4 py-3 text-left label-micro text-[10px] text-[var(--aurora-text-muted)]">
+                  Tags
+                </th>
+                <th className="px-4 py-3 text-left label-micro text-[10px] text-[var(--aurora-text-muted)] w-36 text-right">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {activePlaylist.songs.map((song, index) => (
+                <PlaylistSongRow
+                  key={song.id}
+                  song={song}
+                  index={index}
+                  total={activePlaylist.songs.length}
+                  onRemove={() => handleRemoveSong(song.id)}
+                  onReorder={(direction) => handleReorder(song.id, direction)}
+                />
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {/* Edit Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="bg-[var(--aurora-bg)] border-[var(--aurora-border)] text-[var(--aurora-text)]">
+        <DialogContent>
           <form onSubmit={(e) => { e.preventDefault(); handleSaveEdit(); }}>
             <DialogHeader>
-              <DialogTitle>Edit Playlist</DialogTitle>
+              <DialogTitle className="font-display text-[24px]">Edit Playlist</DialogTitle>
               <DialogDescription className="text-[var(--aurora-text-dim)]">
                 Update your playlist details.
               </DialogDescription>
@@ -237,34 +306,31 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
 
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <label className="text-sm text-[var(--aurora-text-dim)]">Name</label>
+                <label className="label-micro text-[10px]">Name</label>
                 <Input
                   type="text"
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  className="bg-[var(--aurora-bg)] border-[var(--aurora-border)] focus:border-[var(--aurora-teal)]"
                 />
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm text-[var(--aurora-text-dim)]">Color (optional)</label>
+                <label className="label-micro text-[10px]">Color (optional)</label>
                 <Input
                   type="text"
                   value={editColor}
                   onChange={(e) => setEditColor(e.target.value)}
-                  placeholder="#00C9A7"
-                  className="bg-[var(--aurora-bg)] border-[var(--aurora-border)] focus:border-[var(--aurora-teal)]"
+                  placeholder="#5eead4"
                 />
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm text-[var(--aurora-text-dim)]">Emoji (optional)</label>
+                <label className="label-micro text-[10px]">Emoji (optional)</label>
                 <Input
                   type="text"
                   value={editEmoji}
                   onChange={(e) => setEditEmoji(e.target.value)}
                   placeholder="🎸"
-                  className="bg-[var(--aurora-bg)] border-[var(--aurora-border)] focus:border-[var(--aurora-teal)]"
                 />
               </div>
             </div>
@@ -274,11 +340,10 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
                 type="button"
                 variant="ghost"
                 onClick={() => setEditDialogOpen(false)}
-                className="text-[var(--aurora-text-dim)]"
               >
                 Cancel
               </Button>
-              <Button type="submit" className="bg-[var(--aurora-teal)] text-[var(--aurora-bg-deep)]">
+              <Button type="submit" variant="primary">
                 Save
               </Button>
             </DialogFooter>
@@ -286,20 +351,22 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
+      {/* Delete Confirmation */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent className="bg-[var(--aurora-bg)] border-[var(--aurora-border)] text-[var(--aurora-text)]">
+        <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete "{activePlaylist.name}"?</AlertDialogTitle>
-            <AlertDialogDescription className="text-[var(--aurora-text-dim)]">
+            <AlertDialogTitle className="font-display text-[22px]">
+              Delete "{activePlaylist.name}"?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
               This will remove the playlist and all its songs. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="text-[var(--aurora-text-dim)]">Cancel</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
-              className="bg-[var(--aurora-danger)]"
+              className="bg-[var(--aurora-danger)] text-black hover:bg-[var(--aurora-danger)]/90"
             >
               Delete
             </AlertDialogAction>
@@ -313,77 +380,170 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
 interface PlaylistSongRowProps {
   song: PlaylistSong
   index: number
+  total: number
   onRemove: () => void
   onReorder: (direction: "up" | "down") => void
 }
 
-function PlaylistSongRow({ song, index, onRemove, onReorder }: PlaylistSongRowProps) {
+function PlaylistSongRow({ song, index, total, onRemove, onReorder }: PlaylistSongRowProps) {
+  const currentSong = usePlayerStore((s) => s.currentSong)
+  const isPlaying = usePlayerStore((s) => s.isPlaying)
+
+  const isCurrent = currentSong?.id === song.id
+  const art = useMemo(() => albumGradient(song.id ?? song.title), [song.id, song.title])
+
   return (
-    <tr className="bg-[var(--aurora-bg)] border-b border-[var(--aurora-border)] hover:bg-[var(--aurora-bg-hover)] transition-colors duration-150">
-      {/* # column */}
-      <td className="px-4 py-3 text-[var(--aurora-text-dim)] text-sm">
-        {index + 1}
+    <tr className="group relative transition-colors duration-200">
+      <td className="relative px-4 py-3 w-12 text-center">
+        {isCurrent && (
+          <span
+            className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-7 rounded-r-full"
+            style={{
+              background: "linear-gradient(to bottom, #5eead4, #86efac)",
+              boxShadow: "0 0 10px rgba(94, 234, 212, 0.6)",
+            }}
+            aria-hidden="true"
+          />
+        )}
+        <span
+          className={`absolute inset-0 transition-colors duration-200 pointer-events-none ${
+            isCurrent ? "" : "group-hover:bg-white/[0.025]"
+          }`}
+          style={
+            isCurrent
+              ? {
+                  background:
+                    "linear-gradient(to right, rgba(94,234,212,0.06) 0%, transparent 60%)",
+                }
+              : undefined
+          }
+          aria-hidden="true"
+        />
+        <span className="relative z-10 flex items-center justify-center text-[var(--aurora-text-muted)]">
+          {isCurrent ? (
+            <Equalizer playing={isPlaying} />
+          ) : (
+            <span className="text-xs tabular-nums">{index + 1}</span>
+          )}
+        </span>
       </td>
 
-      {/* Title / Artist column */}
-      <td className="px-4 py-3">
-        <div className="font-medium text-[var(--aurora-text)]">{song.title}</div>
-        <div className="text-sm text-[var(--aurora-text-dim)]">{song.artist}</div>
+      <td className="relative px-4 py-3">
+        <span
+          className={`absolute inset-0 transition-colors duration-200 pointer-events-none ${
+            isCurrent ? "" : "group-hover:bg-white/[0.025]"
+          }`}
+          aria-hidden="true"
+        />
+        <div className="relative z-10 flex items-center gap-3 min-w-0">
+          <div
+            className="w-10 h-10 rounded-md flex-shrink-0 aurora-rim"
+            style={{ background: art.background }}
+            aria-hidden="true"
+          />
+          <div className="flex flex-col min-w-0">
+            <span
+              className={`truncate text-[14px] font-medium leading-tight ${
+                isCurrent ? "aurora-gradient-text" : "text-[var(--aurora-text)]"
+              }`}
+            >
+              {song.title}
+            </span>
+            <span className="truncate text-[12px] text-[var(--aurora-text-dim)] mt-0.5">
+              {song.artist}
+            </span>
+          </div>
+        </div>
       </td>
 
-      {/* Duration column */}
-      <td className="px-4 py-3 text-[var(--aurora-text-dim)] text-sm">
-        {formatDuration(song.duration)}
+      <td className="relative px-4 py-3 w-24 text-[12px] text-[var(--aurora-text-dim)] tabular-nums">
+        <span
+          className={`absolute inset-0 transition-colors duration-200 pointer-events-none ${
+            isCurrent ? "" : "group-hover:bg-white/[0.025]"
+          }`}
+          aria-hidden="true"
+        />
+        <span className="relative z-10">{formatDuration(song.duration)}</span>
       </td>
 
-      {/* Tags column */}
-      <td className="px-4 py-3">
-        <TagList tags={song.tags} />
+      <td className="relative px-4 py-3">
+        <span
+          className={`absolute inset-0 transition-colors duration-200 pointer-events-none ${
+            isCurrent ? "" : "group-hover:bg-white/[0.025]"
+          }`}
+          aria-hidden="true"
+        />
+        <div className="relative z-10">
+          <TagList tags={song.tags} />
+        </div>
       </td>
 
-      {/* Actions column */}
-      <td className="px-4 py-3">
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
+      <td className="relative px-4 py-3 w-36">
+        <span
+          className={`absolute inset-0 transition-colors duration-200 pointer-events-none ${
+            isCurrent ? "" : "group-hover:bg-white/[0.025]"
+          }`}
+          aria-hidden="true"
+        />
+        <div className="relative z-10 flex items-center gap-0.5 justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+          <IconBtn
+            label="Move up"
+            disabled={index === 0}
             onClick={(e) => {
               e.stopPropagation()
               onReorder("up")
             }}
-            disabled={index === 0}
-            title="Move up"
           >
-            <ChevronUp className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
+            <ChevronUp className="h-3.5 w-3.5" />
+          </IconBtn>
+          <IconBtn
+            label="Move down"
+            disabled={index === total - 1}
             onClick={(e) => {
               e.stopPropagation()
               onReorder("down")
             }}
-            disabled={index === 0}
-            title="Move down"
           >
-            <ChevronDown className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-[var(--aurora-danger)] hover:text-[var(--aurora-danger)]"
+            <ChevronDown className="h-3.5 w-3.5" />
+          </IconBtn>
+          <IconBtn
+            label="Remove"
+            danger
             onClick={(e) => {
               e.stopPropagation()
               onRemove()
             }}
-            title="Remove from playlist"
           >
-            <X className="h-4 w-4" />
-          </Button>
+            <X className="h-3.5 w-3.5" />
+          </IconBtn>
         </div>
       </td>
     </tr>
+  )
+}
+
+interface IconBtnProps {
+  children: React.ReactNode
+  label: string
+  danger?: boolean
+  disabled?: boolean
+  onClick: (e: React.MouseEvent) => void
+}
+
+function IconBtn({ children, label, danger, disabled, onClick }: IconBtnProps) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={label}
+      aria-label={label}
+      className={`h-7 w-7 rounded-md flex items-center justify-center transition-all duration-150 disabled:opacity-25 disabled:pointer-events-none ${
+        danger
+          ? "text-[var(--aurora-text-muted)] hover:text-[var(--aurora-danger)] hover:bg-[var(--aurora-danger)]/10"
+          : "text-[var(--aurora-text-muted)] hover:text-[var(--aurora-text)] hover:bg-white/[0.04]"
+      }`}
+    >
+      {children}
+    </button>
   )
 }

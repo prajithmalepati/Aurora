@@ -9,9 +9,9 @@ import { PlayerBar } from "@/components/layout/PlayerBar"
 import { Toaster } from "sonner"
 import { SongTable } from "@/components/songs/SongTable"
 import { AddSongDialog } from "@/components/songs/AddSongDialog"
-import { Input } from "@/components/ui/input"
 import { PlaylistDetail } from "@/components/playlists/PlaylistDetail"
 import { QueryBuilder } from "@/components/filter/QueryBuilder"
+import { Search } from "lucide-react"
 import type { Song } from "@/types"
 
 function App() {
@@ -67,17 +67,42 @@ function App() {
     switch (view.kind) {
       case "all-songs":
         return (
-          <div className="p-6">
-            <div className="flex items-center gap-4 mb-6">
-              <Input
-                type="text"
-                placeholder="Search songs..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-[var(--aurora-bg)] border-[var(--aurora-border)] focus:border-[var(--aurora-teal)] flex-1"
-              />
+          <div className="px-10 pt-10 pb-6 max-w-[1400px] mx-auto aurora-fade-in">
+            {/* Hero header */}
+            <div className="flex items-end justify-between gap-6 mb-8">
+              <div>
+                <p className="label-micro mb-2">Library</p>
+                <h1 className="font-display text-[52px] leading-[0.95] tracking-tight text-[var(--aurora-text)]">
+                  All Songs
+                </h1>
+                <p className="text-[12px] text-[var(--aurora-text-dim)] mt-2 tabular-nums">
+                  {songs.length} {songs.length === 1 ? "song" : "songs"} in your library
+                </p>
+              </div>
               <AddSongDialog />
             </div>
+
+            {/* Search — pill with inset glow on focus */}
+            <div
+              className="relative flex items-center rounded-full mb-6 transition-all duration-200 focus-within:shadow-[0_0_24px_-6px_rgba(94,234,212,0.3)]"
+              style={{
+                background: "rgba(255,255,255,0.02)",
+                boxShadow: "inset 0 0 0 1px var(--aurora-rim)",
+              }}
+            >
+              <Search
+                className="absolute left-4 h-3.5 w-3.5 text-[var(--aurora-text-muted)] pointer-events-none"
+                strokeWidth={2}
+              />
+              <input
+                type="text"
+                placeholder="Search titles, artists, albums..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-transparent border-0 outline-none pl-11 pr-5 py-2.5 text-[13px] text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-muted)] placeholder:font-display-italic placeholder:text-[14px]"
+              />
+            </div>
+
             <SongTable songs={songs} loading={songsLoading} onPlay={handlePlaySong} />
           </div>
         )
@@ -97,7 +122,18 @@ function App() {
           playerBar: <PlayerBar />,
         }}
       />
-      <Toaster position="bottom-right" theme="dark" />
+      <Toaster
+        position="bottom-right"
+        theme="dark"
+        toastOptions={{
+          style: {
+            background: "rgba(10, 12, 17, 0.95)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            color: "var(--aurora-text)",
+            backdropFilter: "blur(12px)",
+          },
+        }}
+      />
     </>
   )
 }

@@ -11,7 +11,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { useSongStore } from "@/stores/songStore"
 import { toast } from "sonner"
 
@@ -61,57 +60,62 @@ export function AddSongDialog({ onAdd }: AddSongDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button />}>
+      <DialogTrigger render={<Button variant="primary" />}>
         <span className="inline-flex items-center">
-          <Plus className="h-4 w-4 mr-2" />
+          <Plus className="h-4 w-4 mr-1.5" strokeWidth={2.5} />
           Add Song
         </span>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px] bg-[var(--aurora-bg-surface)] text-[var(--aurora-text)] border-[var(--aurora-border)]">
+      <DialogContent>
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>Add New Song</DialogTitle>
+            <DialogTitle>Add a song</DialogTitle>
             <DialogDescription>
               Manually add a song to your library.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-4 py-4">
+          <div className="grid gap-4 pt-4">
             <div className="grid gap-2">
-              <Label htmlFor="title">Title *</Label>
+              <label htmlFor="title" className="label-micro text-[9.5px]">
+                Title <span className="text-[var(--aurora-teal)]">*</span>
+              </label>
               <Input
                 id="title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Song title"
-                className="bg-[var(--aurora-bg)] border-[var(--aurora-border)] focus:border-[var(--aurora-teal)]"
               />
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="artist">Artist *</Label>
+              <label htmlFor="artist" className="label-micro text-[9.5px]">
+                Artist <span className="text-[var(--aurora-teal)]">*</span>
+              </label>
               <Input
                 id="artist"
                 value={artist}
                 onChange={(e) => setArtist(e.target.value)}
                 placeholder="Artist name"
-                className="bg-[var(--aurora-bg)] border-[var(--aurora-border)] focus:border-[var(--aurora-teal)]"
               />
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="album">Album</Label>
+              <label htmlFor="album" className="label-micro text-[9.5px]">
+                Album
+              </label>
               <Input
                 id="album"
                 value={album}
                 onChange={(e) => setAlbum(e.target.value)}
                 placeholder="Album name"
-                className="bg-[var(--aurora-bg)] border-[var(--aurora-border)] focus:border-[var(--aurora-teal)]"
               />
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="duration">Duration (seconds)</Label>
+              <label htmlFor="duration" className="label-micro text-[9.5px]">
+                Duration (seconds)
+              </label>
               <Input
                 id="duration"
                 type="number"
@@ -119,18 +123,17 @@ export function AddSongDialog({ onAdd }: AddSongDialogProps) {
                 onChange={(e) => setDuration(e.target.value)}
                 placeholder="e.g., 245"
                 min="0"
-                className="bg-[var(--aurora-bg)] border-[var(--aurora-border)] focus:border-[var(--aurora-teal)]"
               />
             </div>
           </div>
 
           {error && (
-            <div className="text-[var(--aurora-danger)] text-sm mb-4">
+            <div className="text-[var(--aurora-danger)] text-[12px] mt-3">
               {error}
             </div>
           )}
 
-          <DialogFooter>
+          <DialogFooter className="pt-5">
             <Button
               type="button"
               variant="ghost"
@@ -138,7 +141,9 @@ export function AddSongDialog({ onAdd }: AddSongDialogProps) {
             >
               Cancel
             </Button>
-            <Button type="submit">Add Song</Button>
+            <Button type="submit" variant="primary">
+              Add Song
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

@@ -12,16 +12,16 @@ import {
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { toast } from "sonner"
 
-// Preset color swatches
+// Preset color swatches — retuned to the aurora palette
 const PRESET_COLORS = [
-  { hex: "#E63946", name: "red" },
-  { hex: "#00C9A7", name: "teal" },
-  { hex: "#7B68EE", name: "purple" },
-  { hex: "#F59E0B", name: "amber" },
-  { hex: "#00E676", name: "green" },
-  { hex: "#4FC3F7", name: "blue" },
-  { hex: "#FF6B35", name: "orange" },
-  { hex: "#EC4899", name: "pink" },
+  { hex: "#5eead4", name: "teal" },
+  { hex: "#86efac", name: "mint" },
+  { hex: "#a78bfa", name: "violet" },
+  { hex: "#7dd3fc", name: "sky" },
+  { hex: "#fbbf24", name: "amber" },
+  { hex: "#f87171", name: "coral" },
+  { hex: "#f472b6", name: "rose" },
+  { hex: "#c084fc", name: "orchid" },
 ]
 
 interface CreatePlaylistDialogProps {
@@ -69,91 +69,92 @@ export function CreatePlaylistDialog({ open, onOpenChange }: CreatePlaylistDialo
   }
 
   return (
-    <Dialog open={open} onOpenChange={(open) => {
-      onOpenChange(open)
-      if (!open) {
-        setName("")
-        setColor("")
-        setEmoji("")
-      setError(null)
-      }
-    }}>
-      <DialogContent className="bg-[var(--aurora-bg-surface)] border-[var(--aurora-border)] text-[var(--aurora-text)] shadow-2xl">
+    <Dialog
+      open={open}
+      onOpenChange={(open) => {
+        onOpenChange(open)
+        if (!open) {
+          setName("")
+          setColor("")
+          setEmoji("")
+          setError(null)
+        }
+      }}
+    >
+      <DialogContent>
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>Create Playlist</DialogTitle>
-            <DialogDescription className="text-[var(--aurora-text-dim)]">
+            <DialogTitle>Create a playlist</DialogTitle>
+            <DialogDescription>
               Create a new playlist to organize your songs.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 pt-4">
             <div className="space-y-2">
-              <label className="text-sm text-[var(--aurora-text-dim)]">Name</label>
+              <label className="label-micro text-[9.5px]">Name</label>
               <Input
                 type="text"
                 placeholder="My Playlist"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="bg-[var(--aurora-bg)] border-[var(--aurora-border)] focus:border-[var(--aurora-teal)]"
               />
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm text-[var(--aurora-text-dim)]">Color (optional)</label>
-              {/* Preset color swatches */}
-              <div className="flex flex-wrap gap-2 mb-2">
-                {PRESET_COLORS.map((preset) => (
-                  <button
-                    key={preset.hex}
-                    type="button"
-                    onClick={() => handlePresetClick(preset.hex)}
-                    className={`w-6 h-6 rounded-full border-2 transition-transform hover:scale-110 ${
-                      color === preset.hex
-                        ? "border-[var(--aurora-teal)] ring-2 ring-[var(--aurora-teal)]/30"
-                        : "border-[var(--aurora-border)]"
-                    }`}
-                    style={{ backgroundColor: preset.hex }}
-                    title={preset.name}
-                  />
-                ))}
+            <div className="space-y-2.5">
+              <label className="label-micro text-[9.5px]">Color</label>
+              <div className="flex flex-wrap gap-2">
+                {PRESET_COLORS.map((preset) => {
+                  const isSelected = color === preset.hex
+                  return (
+                    <button
+                      key={preset.hex}
+                      type="button"
+                      onClick={() => handlePresetClick(preset.hex)}
+                      className="relative w-6 h-6 rounded-full transition-transform duration-150 hover:scale-110"
+                      style={{
+                        backgroundColor: preset.hex,
+                        boxShadow: isSelected
+                          ? `0 0 0 2px var(--aurora-void), 0 0 0 3px ${preset.hex}, 0 0 14px ${preset.hex}80`
+                          : `0 0 8px ${preset.hex}40`,
+                      }}
+                      title={preset.name}
+                    />
+                  )
+                })}
               </div>
-              {/* Custom hex input */}
               <Input
                 type="text"
-                placeholder="Custom color (hex)"
+                placeholder="Custom hex (e.g. #5eead4)"
                 value={color}
                 onChange={(e) => setColor(e.target.value)}
-                className="bg-[var(--aurora-bg)] border-[var(--aurora-border)] focus:border-[var(--aurora-teal)]"
               />
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm text-[var(--aurora-text-dim)]">Emoji (optional)</label>
+              <label className="label-micro text-[9.5px]">Emoji</label>
               <Input
                 type="text"
                 placeholder="🎸"
                 value={emoji}
                 onChange={(e) => setEmoji(e.target.value)}
-                className="bg-[var(--aurora-bg)] border-[var(--aurora-border)] focus:border-[var(--aurora-teal)]"
               />
             </div>
 
             {error && (
-              <div className="text-sm text-[var(--aurora-danger)]">{error}</div>
+              <div className="text-[12px] text-[var(--aurora-danger)]">{error}</div>
             )}
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="pt-5">
             <Button
               type="button"
               variant="ghost"
               onClick={() => onOpenChange(false)}
-              className="text-[var(--aurora-text-dim)]"
             >
               Cancel
             </Button>
-            <Button type="submit" className="bg-[var(--aurora-teal)] text-[var(--aurora-bg-deep)]">
+            <Button type="submit" variant="primary">
               Create
             </Button>
           </DialogFooter>

@@ -8,60 +8,58 @@ interface SongTableProps {
   onPlay?: (song: Song, index: number) => void
 }
 
+const HEADER_CLASS =
+  "px-4 py-3 text-left label-micro text-[10px] text-[var(--aurora-text-muted)] font-medium"
+
+function TableHeader() {
+  return (
+    <thead>
+      <tr>
+        <th className={`${HEADER_CLASS} w-12 text-center`}>#</th>
+        <th className={HEADER_CLASS}>Title</th>
+        <th className={`${HEADER_CLASS} w-24`}>Duration</th>
+        <th className={`${HEADER_CLASS} w-48`}>Playlists</th>
+        <th className={HEADER_CLASS}>Tags</th>
+        <th className={`${HEADER_CLASS} w-32 text-right`}>Actions</th>
+      </tr>
+    </thead>
+  )
+}
+
 export function SongTable({ songs, loading = false, onPlay }: SongTableProps) {
   if (loading) {
     return (
-      <div className="w-full overflow-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-[var(--aurora-border)]">
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--aurora-text-dim)] uppercase tracking-wider">
-                #
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--aurora-text-dim)] uppercase tracking-wider">
-                Title / Artist
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--aurora-text-dim)] uppercase tracking-wider">
-                Duration
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--aurora-text-dim)] uppercase tracking-wider">
-                Playlists
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--aurora-text-dim)] uppercase tracking-wider">
-                Tags
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--aurora-text-dim)] uppercase tracking-wider">
-                Actions
-              </th>
-            </tr>
-          </thead>
+      <div className="w-full overflow-auto aurora-fade-in">
+        <table className="w-full border-separate border-spacing-0">
+          <TableHeader />
           <tbody>
-            {[...Array(5)].map((_, i) => (
-              <tr key={i} className="border-b border-[var(--aurora-border)]">
+            {[...Array(6)].map((_, i) => (
+              <tr key={i}>
                 <td className="px-4 py-3">
-                  <Skeleton className="h-4 w-8" />
+                  <Skeleton className="h-4 w-4 mx-auto" />
                 </td>
                 <td className="px-4 py-3">
                   <div className="space-y-2">
-                    <Skeleton className="h-4 w-32" />
-                    <Skeleton className="h-3 w-24" />
+                    <Skeleton className="h-4 w-48" />
+                    <Skeleton className="h-3 w-32" />
                   </div>
                 </td>
                 <td className="px-4 py-3">
-                  <Skeleton className="h-4 w-12" />
+                  <Skeleton className="h-3 w-10" />
                 </td>
                 <td className="px-4 py-3">
-                  <Skeleton className="h-4 w-16" />
+                  <Skeleton className="h-3 w-20" />
                 </td>
                 <td className="px-4 py-3">
-                  <div className="flex gap-1">
-                    <Skeleton className="h-5 w-12 rounded-full" />
+                  <div className="flex gap-1.5">
+                    <Skeleton className="h-5 w-14 rounded-full" />
+                    <Skeleton className="h-5 w-10 rounded-full" />
                   </div>
                 </td>
                 <td className="px-4 py-3">
-                  <div className="flex gap-1">
-                    <Skeleton className="h-8 w-8 rounded" />
-                    <Skeleton className="h-8 w-8 rounded" />
+                  <div className="flex gap-1 justify-end">
+                    <Skeleton className="h-7 w-7 rounded-md" />
+                    <Skeleton className="h-7 w-7 rounded-md" />
                   </div>
                 </td>
               </tr>
@@ -74,67 +72,26 @@ export function SongTable({ songs, loading = false, onPlay }: SongTableProps) {
 
   if (songs.length === 0) {
     return (
-      <div className="w-full overflow-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-[var(--aurora-border)]">
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--aurora-text-dim)] uppercase tracking-wider">
-                #
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--aurora-text-dim)] uppercase tracking-wider">
-                Title / Artist
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--aurora-text-dim)] uppercase tracking-wider">
-                Duration
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--aurora-text-dim)] uppercase tracking-wider">
-                Playlists
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--aurora-text-dim)] uppercase tracking-wider">
-                Tags
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--aurora-text-dim)] uppercase tracking-wider">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td colSpan={6} className="px-4 py-12 text-center">
-                <span className="text-[var(--aurora-text-muted)]">No songs found</span>
-              </td>
-            </tr>
-          </tbody>
+      <div className="w-full aurora-fade-in">
+        <table className="w-full border-separate border-spacing-0">
+          <TableHeader />
         </table>
+        <div className="py-20 flex flex-col items-center justify-center gap-3">
+          <p className="font-display-italic text-[22px] text-[var(--aurora-text-muted)]">
+            Nothing here yet
+          </p>
+          <p className="text-xs text-[var(--aurora-text-muted)]">
+            Scan a folder or add a song to begin.
+          </p>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="w-full overflow-auto">
-      <table className="w-full">
-        <thead>
-          <tr className="border-b border-[var(--aurora-border)]">
-            <th className="px-4 py-3 text-left text-xs font-medium text-[var(--aurora-text-dim)] uppercase tracking-wider">
-              #
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-[var(--aurora-text-dim)] uppercase tracking-wider">
-              Title / Artist
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-[var(--aurora-text-dim)] uppercase tracking-wider">
-              Duration
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-[var(--aurora-text-dim)] uppercase tracking-wider">
-              Playlists
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-[var(--aurora-text-dim)] uppercase tracking-wider">
-              Tags
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-[var(--aurora-text-dim)] uppercase tracking-wider">
-              Actions
-            </th>
-          </tr>
-        </thead>
+    <div className="w-full overflow-auto aurora-fade-in">
+      <table className="w-full border-separate border-spacing-0">
+        <TableHeader />
         <tbody>
           {songs.map((song, index) => (
             <SongRow key={song.id} song={song} index={index} onPlay={onPlay} />

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useState, useRef, useEffect } from "react"
 import { X } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import {
@@ -66,24 +66,38 @@ export function TagEditor({ songId, songTitle, currentTags, open, onOpenChange }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md bg-[var(--aurora-bg-surface)] border-[var(--aurora-border)]">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Edit tags — {songTitle}</DialogTitle>
+          <DialogTitle className="font-display text-[22px] leading-tight">
+            Edit tags
+          </DialogTitle>
+          <p className="text-[12px] text-[var(--aurora-text-dim)] font-display-italic mt-0.5 truncate">
+            {songTitle}
+          </p>
         </DialogHeader>
 
-        <div className="space-y-3">
+        <div className="space-y-4 pt-2">
           <div>
-            <p className="text-xs text-[var(--aurora-text-dim)] mb-2">Current tags</p>
-            <div className="flex flex-wrap gap-2 min-h-[28px]">
+            <p className="label-micro text-[9.5px] mb-2.5">Current</p>
+            <div className="flex flex-wrap gap-1.5 min-h-[24px]">
               {currentTags.length === 0 && (
-                <span className="text-sm text-[var(--aurora-text-muted)]">No tags yet</span>
+                <span className="text-[12px] text-[var(--aurora-text-muted)] font-display-italic">
+                  No tags yet
+                </span>
               )}
               {currentTags.map((tag) => (
-                <span key={tag} className="inline-flex items-center gap-1 bg-[var(--aurora-bg-hover)] text-[var(--aurora-teal)] text-xs px-2 py-1 rounded-full border border-[var(--aurora-teal)]/30">
+                <span
+                  key={tag}
+                  className="inline-flex items-center gap-1 text-[10.5px] font-medium text-[var(--aurora-teal)] px-2 py-[2px] rounded-full"
+                  style={{
+                    boxShadow: "inset 0 0 0 1px rgba(94, 234, 212, 0.28)",
+                    background: "rgba(94, 234, 212, 0.05)",
+                  }}
+                >
                   {tag}
                   <button
                     onClick={() => handleRemoveTag(tag)}
-                    className="text-[var(--aurora-teal)] hover:text-[var(--aurora-danger)] transition-colors duration-150 ml-0.5"
+                    className="text-[var(--aurora-teal)]/60 hover:text-[var(--aurora-danger)] transition-colors duration-150"
                   >
                     <X className="h-3 w-3" />
                   </button>
@@ -92,8 +106,10 @@ export function TagEditor({ songId, songTitle, currentTags, open, onOpenChange }
             </div>
           </div>
 
-          <div className="border-t border-[var(--aurora-border)] pt-3">
-            <p className="text-xs text-[var(--aurora-text-dim)] mb-2">Add tag</p>
+          <div className="aurora-divider-h" />
+
+          <div>
+            <p className="label-micro text-[9.5px] mb-2.5">Add tag</p>
             <Input
               ref={inputRef}
               value={inputValue}
@@ -104,28 +120,38 @@ export function TagEditor({ songId, songTitle, currentTags, open, onOpenChange }
                   handleAddTag(inputValue)
                 }
               }}
-              placeholder="Type a tag and press Enter..."
-              className="bg-[var(--aurora-bg)] border-[var(--aurora-border)] focus:border-[var(--aurora-teal)]"
+              placeholder="Type and press Enter..."
             />
           </div>
 
           {filteredTags.length > 0 && (
-            <div className="max-h-[150px] overflow-y-auto border border-[var(--aurora-border)] rounded-md bg-[var(--aurora-bg)]">
+            <div
+              className="max-h-[180px] overflow-y-auto rounded-md"
+              style={{
+                boxShadow: "inset 0 0 0 1px var(--aurora-rim)",
+                background: "rgba(255,255,255,0.015)",
+              }}
+            >
               {filteredTags.map((tag) => (
-                <div
+                <button
                   key={tag.id}
+                  type="button"
                   onClick={() => handleAddTag(tag.name)}
-                  className="px-3 py-2 text-sm text-[var(--aurora-text)] cursor-pointer hover:bg-[var(--aurora-bg-hover)] transition-colors duration-150 flex items-center justify-between"
+                  className="w-full px-3 py-2 text-[13px] text-[var(--aurora-text)] cursor-pointer hover:bg-white/[0.03] transition-colors duration-150 flex items-center justify-between"
                 >
                   <span>{tag.name}</span>
-                  <span className="text-xs text-[var(--aurora-text-muted)]">{tag.song_count} songs</span>
-                </div>
+                  <span className="text-[10px] text-[var(--aurora-text-muted)] tabular-nums">
+                    {tag.song_count}
+                  </span>
+                </button>
               ))}
             </div>
           )}
 
           {filteredTags.length === 0 && allTags.length > 0 && currentTags.length > 0 && (
-            <p className="text-xs text-[var(--aurora-text-muted)]">All tags already assigned</p>
+            <p className="text-[11px] text-[var(--aurora-text-muted)] font-display-italic">
+              All tags already assigned
+            </p>
           )}
         </div>
       </DialogContent>

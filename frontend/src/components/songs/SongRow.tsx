@@ -1,7 +1,8 @@
 import type { Song } from "@/types"
 import { formatDuration } from "@/lib/utils"
-import { Trash2, Tag as TagIcon, Pencil } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { albumGradient } from "@/lib/albumGradient"
+import { Equalizer } from "@/components/ui/Equalizer"
+import { Trash2, Tag as TagIcon, Pencil, Play } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,7 +16,7 @@ import {
 import { useSongStore } from "@/stores/songStore"
 import { usePlayerStore } from "@/stores/playerStore"
 import { toast } from "sonner"
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { TagList } from "@/components/tags/TagList"
 import { TagEditor } from "@/components/tags/TagEditor"
 
@@ -29,8 +30,11 @@ export function SongRow({ song, index, onPlay }: SongRowProps) {
   const deleteSong = useSongStore((state) => state.deleteSong)
   const playSong = usePlayerStore((state) => state.playSong)
   const currentSong = usePlayerStore((state) => state.currentSong)
+  const isPlaying = usePlayerStore((state) => state.isPlaying)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [tagEditorOpen, setTagEditorOpen] = useState(false)
+
+  const art = useMemo(() => albumGradient(song.id ?? song.title), [song.id, song.title])
 
   const handleDelete = async () => {
     setDeleteDialogOpen(false)
@@ -59,96 +63,189 @@ export function SongRow({ song, index, onPlay }: SongRowProps) {
     <>
       <tr
         onClick={handlePlay}
-        className={`border-b border-[var(--aurora-border)] transition-colors duration-150 ${
-          isCurrentSong
-            ? "bg-[color-mix(in_srgb,var(--aurora-teal)_6%,var(--aurora-bg))] border-l-2 border-l-[var(--aurora-teal)]"
-            : "bg-[var(--aurora-bg)] hover:bg-[var(--aurora-bg-hover)]"
-        } ${!hasFile ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+        className={`group relative transition-colors duration-200 ${
+          hasFile ? "cursor-pointer" : "cursor-not-allowed opacity-40"
+        }`}
       >
-        {/* # column */}
-        <td className="px-4 py-3 text-[var(--aurora-text-dim)] text-sm">
-          {index + 1}
+        {/* # column / play indicator */}
+        <td
+          className={`relative px-4 py-3 w-12 text-center ${
+            isCurrentSong ? "" : "text-[var(--aurora-text-muted)]"
+          }`}
+        >
+          {/* Left accent bar — only on currently playing */}
+          {isCurrentSong && (
+            <span
+              className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-7 rounded-r-full"
+              style={{
+                background: "linear-gradient(to bottom, #5eead4, #86efac)",
+                boxShadow: "0 0 10px rgba(94, 234, 212, 0.6)",
+              }}
+              aria-hidden="true"
+            />
+          )}
+          {/* Row-level hover background */}
+          <span
+            className={`absolute inset-0 transition-colors duration-200 pointer-events-none ${
+              isCurrentSong
+                ? ""
+                : "group-hover:bg-white/[0.025]"
+            }`}
+            style={
+              isCurrentSong
+                ? {
+                    background:
+                      "linear-gradient(to right, rgba(94,234,212,0.06) 0%, transparent 60%)",
+                  }
+                : undefined
+            }
+            aria-hidden="true"
+          />
+          <span className="relative z-10 flex items-center justify-center">
+            {isCurrentSong ? (
+              <Equalizer playing={isPlaying} />
+            ) : (
+              <>
+                <span className="text-xs tabular-nums group-hover:hidden">
+                  {index + 1}
+                </span>
+                <Play
+                  className="h-3.5 w-3.5 hidden group-hover:block text-[var(--aurora-text)]"
+                  fill="currentColor"
+                  strokeWidth={0}
+                />
+              </>
+            )}
+          </span>
         </td>
 
-        {/* Title / Artist column */}
-        <td className="px-4 py-3">
-          <div className="flex items-center gap-2">
-            <span className="font-medium text-[var(--aurora-text)]">{song.title}</span>
-            <span className="text-sm text-[var(--aurora-text-dim)]">{song.artist}</span>
+        {/* Title / Artist + art thumbnail */}
+        <td className="relative px-4 py-3">
+          <span
+            className={`absolute inset-0 transition-colors duration-200 pointer-events-none ${
+              isCurrentSong ? "" : "group-hover:bg-white/[0.025]"
+            }`}
+            aria-hidden="true"
+          />
+          <div className="relative z-10 flex items-center gap-3 min-w-0">
+            <div
+              className="w-10 h-10 rounded-md flex-shrink-0 aurora-rim"
+              style={{ background: art.background }}
+              aria-hidden="true"
+            />
+            <div className="flex flex-col min-w-0">
+              <span
+                className={`truncate text-[14px] font-medium leading-tight ${
+                  isCurrentSong
+                    ? "aurora-gradient-text"
+                    : "text-[var(--aurora-text)]"
+                }`}
+              >
+                {song.title}
+              </span>
+              <span className="truncate text-[12px] text-[var(--aurora-text-dim)] mt-0.5">
+                {song.artist}
+              </span>
+            </div>
           </div>
         </td>
 
-        {/* Duration column */}
-        <td className="px-4 py-3 text-[var(--aurora-text-dim)] text-sm">
-          {formatDuration(song.duration)}
+        {/* Duration */}
+        <td className="relative px-4 py-3 w-24 text-[12px] text-[var(--aurora-text-dim)] tabular-nums">
+          <span
+            className={`absolute inset-0 transition-colors duration-200 pointer-events-none ${
+              isCurrentSong ? "" : "group-hover:bg-white/[0.025]"
+            }`}
+            aria-hidden="true"
+          />
+          <span className="relative z-10">{formatDuration(song.duration)}</span>
         </td>
 
-        {/* Playlists column */}
-        <td className="px-4 py-3">
-          {song.playlists.length > 0 ? (
-            <div className="flex flex-wrap gap-1">
-              {song.playlists.map((playlist) => (
-                <span
-                  key={playlist.id}
-                  className="text-xs text-[var(--aurora-text-dim)]"
-                >
-                  {playlist.name}
-                </span>
-              ))}
-            </div>
-          ) : (
-            <span className="text-[var(--aurora-text-muted)] text-sm">—</span>
-          )}
+        {/* Playlists */}
+        <td className="relative px-4 py-3 w-48">
+          <span
+            className={`absolute inset-0 transition-colors duration-200 pointer-events-none ${
+              isCurrentSong ? "" : "group-hover:bg-white/[0.025]"
+            }`}
+            aria-hidden="true"
+          />
+          <div className="relative z-10">
+            {song.playlists.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5">
+                {song.playlists.slice(0, 2).map((playlist) => (
+                  <span
+                    key={playlist.id}
+                    className="text-[11px] text-[var(--aurora-text-dim)] truncate max-w-[100px]"
+                  >
+                    {playlist.name}
+                  </span>
+                ))}
+                {song.playlists.length > 2 && (
+                  <span className="text-[11px] text-[var(--aurora-text-muted)]">
+                    +{song.playlists.length - 2}
+                  </span>
+                )}
+              </div>
+            ) : (
+              <span className="text-[var(--aurora-text-muted)] text-[12px]">—</span>
+            )}
+          </div>
         </td>
 
-        {/* Tags column */}
-        <td className="px-4 py-3">
-          <TagList tags={song.tags} />
+        {/* Tags */}
+        <td className="relative px-4 py-3">
+          <span
+            className={`absolute inset-0 transition-colors duration-200 pointer-events-none ${
+              isCurrentSong ? "" : "group-hover:bg-white/[0.025]"
+            }`}
+            aria-hidden="true"
+          />
+          <div className="relative z-10">
+            <TagList tags={song.tags} />
+          </div>
         </td>
 
-        {/* Actions column */}
-        <td className="px-4 py-3">
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
+        {/* Actions */}
+        <td className="relative px-4 py-3 w-32">
+          <span
+            className={`absolute inset-0 transition-colors duration-200 pointer-events-none ${
+              isCurrentSong ? "" : "group-hover:bg-white/[0.025]"
+            }`}
+            aria-hidden="true"
+          />
+          <div className="relative z-10 flex items-center gap-0.5 justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+            <IconBtn
+              label="Edit tags"
               onClick={(e) => {
                 e.stopPropagation()
                 setTagEditorOpen(true)
               }}
-              title="Edit tags"
             >
-              <TagIcon className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-[var(--aurora-text-dim)] hover:text-[var(--aurora-text)]"
+              <TagIcon className="h-3.5 w-3.5" />
+            </IconBtn>
+            <IconBtn
+              label="Edit song"
               onClick={(e) => {
                 e.stopPropagation()
-                // Navigate to edit song
               }}
-              title="Edit song"
             >
-              <Pencil className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-[var(--aurora-danger)] hover:text-[var(--aurora-danger)]"
+              <Pencil className="h-3.5 w-3.5" />
+            </IconBtn>
+            <IconBtn
+              label="Delete"
+              danger
               onClick={(e) => {
                 e.stopPropagation()
                 setDeleteDialogOpen(true)
               }}
             >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+              <Trash2 className="h-3.5 w-3.5" />
+            </IconBtn>
           </div>
         </td>
       </tr>
 
-      {/* Delete Confirmation Dialog */}
+      {/* Delete confirmation */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -160,14 +257,16 @@ export function SongRow({ song, index, onPlay }: SongRowProps) {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-[var(--aurora-danger)]">
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-[var(--aurora-danger)] text-black hover:bg-[var(--aurora-danger)]/90"
+            >
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Tag Editor Dialog */}
       <TagEditor
         songId={song.id}
         songTitle={song.title}
@@ -179,4 +278,26 @@ export function SongRow({ song, index, onPlay }: SongRowProps) {
   )
 }
 
+interface IconBtnProps {
+  children: React.ReactNode
+  label: string
+  danger?: boolean
+  onClick: (e: React.MouseEvent) => void
+}
 
+function IconBtn({ children, label, danger, onClick }: IconBtnProps) {
+  return (
+    <button
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      className={`h-7 w-7 rounded-md flex items-center justify-center transition-all duration-150 ${
+        danger
+          ? "text-[var(--aurora-text-muted)] hover:text-[var(--aurora-danger)] hover:bg-[var(--aurora-danger)]/10"
+          : "text-[var(--aurora-text-muted)] hover:text-[var(--aurora-text)] hover:bg-white/[0.04]"
+      }`}
+    >
+      {children}
+    </button>
+  )
+}

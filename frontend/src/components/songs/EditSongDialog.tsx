@@ -11,7 +11,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import type { Song } from "@/types"
 import { useSongStore } from "@/stores/songStore"
 import { toast } from "sonner"
@@ -64,51 +63,54 @@ export function EditSongDialog({ song, onEdit }: EditSongDialogProps) {
           <Pencil className="h-4 w-4" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px] bg-[var(--aurora-bg-surface)] text-[var(--aurora-text)] border-[var(--aurora-border)]">
+      <DialogContent>
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>Edit Song</DialogTitle>
-            <DialogDescription>
-              Update the song details.
-            </DialogDescription>
+            <DialogTitle>Edit song</DialogTitle>
+            <DialogDescription>Update the song details.</DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-4 py-4">
+          <div className="grid gap-4 pt-4">
             <div className="grid gap-2">
-              <Label htmlFor="edit-title">Title *</Label>
+              <label htmlFor="edit-title" className="label-micro text-[9.5px]">
+                Title <span className="text-[var(--aurora-teal)]">*</span>
+              </label>
               <Input
                 id="edit-title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Song title"
-                className="bg-[var(--aurora-bg)] border-[var(--aurora-border)] focus:border-[var(--aurora-teal)]"
               />
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="edit-artist">Artist *</Label>
+              <label htmlFor="edit-artist" className="label-micro text-[9.5px]">
+                Artist <span className="text-[var(--aurora-teal)]">*</span>
+              </label>
               <Input
                 id="edit-artist"
                 value={artist}
                 onChange={(e) => setArtist(e.target.value)}
                 placeholder="Artist name"
-                className="bg-[var(--aurora-bg)] border-[var(--aurora-border)] focus:border-[var(--aurora-teal)]"
               />
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="edit-album">Album</Label>
+              <label htmlFor="edit-album" className="label-micro text-[9.5px]">
+                Album
+              </label>
               <Input
                 id="edit-album"
                 value={album}
                 onChange={(e) => setAlbum(e.target.value)}
                 placeholder="Album name"
-                className="bg-[var(--aurora-bg)] border-[var(--aurora-border)] focus:border-[var(--aurora-teal)]"
               />
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="edit-duration">Duration (seconds)</Label>
+              <label htmlFor="edit-duration" className="label-micro text-[9.5px]">
+                Duration (seconds)
+              </label>
               <Input
                 id="edit-duration"
                 type="number"
@@ -116,26 +118,23 @@ export function EditSongDialog({ song, onEdit }: EditSongDialogProps) {
                 onChange={(e) => setDuration(e.target.value)}
                 placeholder="e.g., 245"
                 min="0"
-                className="bg-[var(--aurora-bg)] border-[var(--aurora-border)] focus:border-[var(--aurora-teal)]"
               />
             </div>
           </div>
 
           {error && (
-            <div className="text-[var(--aurora-danger)] text-sm mb-4">
+            <div className="text-[var(--aurora-danger)] text-[12px] mt-3">
               {error}
             </div>
           )}
 
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => setOpen(false)}
-            >
+          <DialogFooter className="pt-5">
+            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit">Save Changes</Button>
+            <Button type="submit" variant="primary">
+              Save Changes
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
