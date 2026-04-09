@@ -1,6 +1,6 @@
 import type { Song } from "@/types"
 import { formatDuration } from "@/lib/utils"
-import { Trash2, Tag as TagIcon } from "lucide-react"
+import { Trash2, Tag as TagIcon, Pencil } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   AlertDialog,
@@ -15,7 +15,6 @@ import {
 import { useSongStore } from "@/stores/songStore"
 import { toast } from "sonner"
 import { useState } from "react"
-import { EditSongDialog } from "./EditSongDialog"
 import { TagList } from "@/components/tags/TagList"
 import { TagEditor } from "@/components/tags/TagEditor"
 
@@ -50,8 +49,10 @@ export function SongRow({ song, index }: SongRowProps) {
 
         {/* Title / Artist column */}
         <td className="px-4 py-3">
-          <div className="font-medium text-[var(--aurora-text)]">{song.title}</div>
-          <div className="text-sm text-[var(--aurora-text-dim)]">{song.artist}</div>
+          <div className="flex items-center gap-2">
+            <span className="font-medium text-[var(--aurora-text)]">{song.title}</span>
+            <span className="text-sm text-[var(--aurora-text-dim)]">{song.artist}</span>
+          </div>
         </td>
 
         {/* Duration column */}
@@ -65,10 +66,10 @@ export function SongRow({ song, index }: SongRowProps) {
             <div className="flex flex-wrap gap-1">
               {song.playlists.map((playlist) => (
                 <span
-                  key={playlist}
+                  key={playlist.id}
                   className="text-xs text-[var(--aurora-text-dim)]"
                 >
-                  {playlist}
+                  {playlist.name}
                 </span>
               ))}
             </div>
@@ -97,7 +98,18 @@ export function SongRow({ song, index }: SongRowProps) {
             >
               <TagIcon className="h-4 w-4" />
             </Button>
-            <EditSongDialog song={song} />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-[var(--aurora-text-dim)] hover:text-[var(--aurora-text)]"
+              onClick={(e) => {
+                e.stopPropagation()
+                // Navigate to edit song
+              }}
+              title="Edit song"
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
             <Button
               variant="ghost"
               size="icon"
@@ -143,3 +155,5 @@ export function SongRow({ song, index }: SongRowProps) {
     </>
   )
 }
+
+

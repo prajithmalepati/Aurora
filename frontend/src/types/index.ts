@@ -8,7 +8,7 @@ export interface Song {
   source: string
   external_id?: string | null
   tags: string[]
-  playlists: string[]
+  playlists: Playlist[]
   created_at: string
   updated_at: string
 }
@@ -51,7 +51,7 @@ export interface FilterResult {
   album: string | null
   duration: number | null
   tags: string[]
-  playlists: string[]
+  playlists: Playlist[]
   source: string
 }
 

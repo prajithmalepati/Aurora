@@ -9,18 +9,15 @@ import { Toaster } from "sonner"
 import { SongTable } from "@/components/songs/SongTable"
 import { AddSongDialog } from "@/components/songs/AddSongDialog"
 import { Input } from "@/components/ui/input"
-
-type View =
-  | { kind: "all-songs" }
-  | { kind: "filter" }
-  | { kind: "playlist"; playlistId: number }
+import { PlaylistDetail } from "@/components/playlists/PlaylistDetail"
 
 function App() {
-  const [view, setView] = useState<View>({ kind: "all-songs" })
   const [searchQuery, setSearchQuery] = useState("")
 
   const fetchSongs = useSongStore((state) => state.fetchSongs)
   const songs = useSongStore((state) => state.songs)
+  const view = useSongStore((state) => state.view)
+  const setView = useSongStore((state) => state.setView)
   const fetchPlaylists = usePlaylistStore((state) => state.fetchPlaylists)
   const fetchTags = useTagStore((state) => state.fetchTags)
 
@@ -64,7 +61,7 @@ function App() {
       case "filter":
         return <div className="p-4">Filter View</div>
       case "playlist":
-        return <div className="p-4">Playlist {view.playlistId}</div>
+        return <PlaylistDetail playlistId={view.playlistId} />
     }
   }
 
