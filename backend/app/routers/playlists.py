@@ -157,6 +157,7 @@ def reorder_playlist_songs(playlist_id: int, reorder: PlaylistReorder):
             s.artist,
             s.album,
             s.duration,
+            s.file_path,
             s.source,
             GROUP_CONCAT(t.name) as tags,
             ps.position
@@ -168,17 +169,17 @@ def reorder_playlist_songs(playlist_id: int, reorder: PlaylistReorder):
         GROUP BY s.id
         ORDER BY ps.position ASC
     """
-    
+
     cursor.execute(query, (playlist_id,))
     song_rows = cursor.fetchall()
     conn.close()
-    
+
     # Build songs list with tags parsed from GROUP_CONCAT
     songs = []
     for song_row in song_rows:
         tags_str = song_row["tags"]
         tags = tags_str.split(",") if tags_str else []
-        
+
         songs.append(
             SongResponse(
                 id=song_row["id"],
@@ -186,7 +187,7 @@ def reorder_playlist_songs(playlist_id: int, reorder: PlaylistReorder):
                 artist=song_row["artist"],
                 album=song_row["album"],
                 duration=song_row["duration"],
-                file_path=None,
+                file_path=song_row["file_path"],
                 source=song_row["source"],
                 tags=tags,
                 playlists=[],
@@ -195,11 +196,11 @@ def reorder_playlist_songs(playlist_id: int, reorder: PlaylistReorder):
                 position=song_row["position"],
             )
         )
-    
+
     # Fetch playlist metadata
     conn = get_db()
     cursor = conn.cursor()
-    
+
     cursor.execute(
         """
         SELECT id, name, color, emoji, created_at, updated_at
@@ -210,9 +211,9 @@ def reorder_playlist_songs(playlist_id: int, reorder: PlaylistReorder):
     )
     row = cursor.fetchone()
     conn.close()
-    
+
     song_count = len(songs)
-    
+
     return {
         "data": {
             "id": row["id"],
@@ -300,6 +301,7 @@ def delete_song_from_playlist(playlist_id: int, song_id: int):
             s.artist,
             s.album,
             s.duration,
+            s.file_path,
             s.source,
             GROUP_CONCAT(t.name) as tags,
             ps.position
@@ -311,17 +313,17 @@ def delete_song_from_playlist(playlist_id: int, song_id: int):
         GROUP BY s.id
         ORDER BY ps.position ASC
     """
-    
+
     cursor.execute(query, (playlist_id,))
     song_rows = cursor.fetchall()
     conn.close()
-    
+
     # Build songs list with tags parsed from GROUP_CONCAT
     songs = []
     for song_row in song_rows:
         tags_str = song_row["tags"]
         tags = tags_str.split(",") if tags_str else []
-        
+
         songs.append(
             SongResponse(
                 id=song_row["id"],
@@ -329,7 +331,7 @@ def delete_song_from_playlist(playlist_id: int, song_id: int):
                 artist=song_row["artist"],
                 album=song_row["album"],
                 duration=song_row["duration"],
-                file_path=None,
+                file_path=song_row["file_path"],
                 source=song_row["source"],
                 tags=tags,
                 playlists=[],
@@ -338,11 +340,11 @@ def delete_song_from_playlist(playlist_id: int, song_id: int):
                 position=song_row["position"],
             )
         )
-    
+
     # Fetch playlist metadata
     conn = get_db()
     cursor = conn.cursor()
-    
+
     cursor.execute(
         """
         SELECT id, name, color, emoji, created_at, updated_at
@@ -353,9 +355,9 @@ def delete_song_from_playlist(playlist_id: int, song_id: int):
     )
     row = cursor.fetchone()
     conn.close()
-    
+
     song_count = len(songs)
-    
+
     return {
         "data": {
             "id": row["id"],
@@ -403,6 +405,7 @@ def get_playlist(playlist_id: int):
             s.artist,
             s.album,
             s.duration,
+            s.file_path,
             s.source,
             GROUP_CONCAT(t.name) as tags,
             ps.position
@@ -414,17 +417,17 @@ def get_playlist(playlist_id: int):
         GROUP BY s.id
         ORDER BY ps.position ASC
     """
-    
+
     cursor.execute(query, (playlist_id,))
     song_rows = cursor.fetchall()
     conn.close()
-    
+
     # Build songs list with tags parsed from GROUP_CONCAT
     songs = []
     for song_row in song_rows:
         tags_str = song_row["tags"]
         tags = tags_str.split(",") if tags_str else []
-        
+
         songs.append(
             SongResponse(
                 id=song_row["id"],
@@ -432,7 +435,7 @@ def get_playlist(playlist_id: int):
                 artist=song_row["artist"],
                 album=song_row["album"],
                 duration=song_row["duration"],
-                file_path=None,
+                file_path=song_row["file_path"],
                 source=song_row["source"],
                 tags=tags,
                 playlists=[],
@@ -441,10 +444,10 @@ def get_playlist(playlist_id: int):
                 position=song_row["position"],
             )
         )
-    
+
     # Calculate song_count
     song_count = len(songs)
-    
+
     return {
         "data": {
             "id": row["id"],
@@ -653,6 +656,7 @@ def add_song_to_playlist(playlist_id: int, song_add: PlaylistSongAdd):
             s.artist,
             s.album,
             s.duration,
+            s.file_path,
             s.source,
             GROUP_CONCAT(t.name) as tags,
             ps.position
@@ -664,17 +668,17 @@ def add_song_to_playlist(playlist_id: int, song_add: PlaylistSongAdd):
         GROUP BY s.id
         ORDER BY ps.position ASC
     """
-    
+
     cursor.execute(query, (playlist_id,))
     song_rows = cursor.fetchall()
     conn.close()
-    
+
     # Build songs list with tags parsed from GROUP_CONCAT
     songs = []
     for song_row in song_rows:
         tags_str = song_row["tags"]
         tags = tags_str.split(",") if tags_str else []
-        
+
         songs.append(
             SongResponse(
                 id=song_row["id"],
@@ -682,7 +686,7 @@ def add_song_to_playlist(playlist_id: int, song_add: PlaylistSongAdd):
                 artist=song_row["artist"],
                 album=song_row["album"],
                 duration=song_row["duration"],
-                file_path=None,
+                file_path=song_row["file_path"],
                 source=song_row["source"],
                 tags=tags,
                 playlists=[],

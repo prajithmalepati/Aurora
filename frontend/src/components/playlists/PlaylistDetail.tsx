@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
-import { Pencil, Trash2, ChevronUp, ChevronDown, X } from "lucide-react"
+import { Pencil, Trash2, ChevronUp, ChevronDown, X, Play } from "lucide-react"
 import { TagList } from "@/components/tags/TagList"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Equalizer } from "@/components/ui/Equalizer"
@@ -42,6 +42,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
   const removeSongFromPlaylist = usePlaylistStore((state) => state.removeSongFromPlaylist)
   const reorderSongs = usePlaylistStore((state) => state.reorderSongs)
 
+  const playSong = usePlayerStore((state) => state.playSong)
   const activePlaylist = usePlaylistStore((state) => state.activePlaylist)
   const loading = usePlaylistStore((state) => state.loading)
 
@@ -118,6 +119,21 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
       const message = err instanceof Error ? err.message : "Failed to remove song"
       toast.error(message)
     }
+  }
+
+  const handlePlaySong = (song: PlaylistSong) => {
+    if (!song.file_path || !activePlaylist) return
+    const queue = activePlaylist.songs
+      .filter((s) => s.file_path)
+      .map((s) => ({
+        ...s,
+        source: "local" as const,
+        playlists: [],
+        created_at: "",
+        updated_at: "",
+      }))
+    const asSong = { ...song, source: "local" as const, playlists: [], created_at: "", updated_at: "" }
+    playSong(asSong, queue)
   }
 
   const handleReorder = async (songId: number, direction: "up" | "down") => {
@@ -286,6 +302,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
                   total={activePlaylist.songs.length}
                   onRemove={() => handleRemoveSong(song.id)}
                   onReorder={(direction) => handleReorder(song.id, direction)}
+                  onPlay={handlePlaySong}
                 />
               ))}
             </tbody>
@@ -383,17 +400,29 @@ interface PlaylistSongRowProps {
   total: number
   onRemove: () => void
   onReorder: (direction: "up" | "down") => void
+  onPlay: (song: PlaylistSong) => void
 }
 
-function PlaylistSongRow({ song, index, total, onRemove, onReorder }: PlaylistSongRowProps) {
+function PlaylistSongRow({ song, index, total, onRemove, onReorder, onPlay }: PlaylistSongRowProps) {
   const currentSong = usePlayerStore((s) => s.currentSong)
   const isPlaying = usePlayerStore((s) => s.isPlaying)
 
   const isCurrent = currentSong?.id === song.id
+  const hasFile = song.file_path !== null
   const art = useMemo(() => albumGradient(song.id ?? song.title), [song.id, song.title])
 
+  const handlePlay = () => {
+    if (!hasFile) return
+    onPlay(song)
+  }
+
   return (
-    <tr className="group relative transition-colors duration-200">
+    <tr
+      onClick={handlePlay}
+      className={`group relative transition-colors duration-200 ${
+        hasFile ? "cursor-pointer" : "cursor-not-allowed opacity-40"
+      }`}
+    >
       <td className="relative px-4 py-3 w-12 text-center">
         {isCurrent && (
           <span
@@ -423,7 +452,16 @@ function PlaylistSongRow({ song, index, total, onRemove, onReorder }: PlaylistSo
           {isCurrent ? (
             <Equalizer playing={isPlaying} />
           ) : (
-            <span className="text-xs tabular-nums">{index + 1}</span>
+            <>
+              <span className="text-xs tabular-nums group-hover:hidden">
+                {index + 1}
+              </span>
+              <Play
+                className="h-3.5 w-3.5 hidden group-hover:block text-[var(--aurora-text)]"
+                fill="currentColor"
+                strokeWidth={0}
+              />
+            </>
           )}
         </span>
       </td>
