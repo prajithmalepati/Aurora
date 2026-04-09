@@ -1,0 +1,58 @@
+{
+  "features": [
+    {
+      "id": "f001",
+      "name": "Fix filter case sensitivity",
+      "description": "Make the filter engine case-insensitive. Lowercase both query terms and tag/playlist names during comparison in backend/app/services/filter_engine.py",
+      "status": "pending",
+      "passes": false,
+      "scope": "backend",
+      "files": ["backend/app/services/filter_engine.py"]
+    },
+    {
+      "id": "f002",
+      "name": "Toast notifications on all actions",
+      "description": "Add toast.success/toast.error calls for: song create/update/delete, tag add/remove, playlist create/delete, song added to/removed from playlist, scan complete, all errors. Use sonner (already installed). Check every store action and every dialog submit handler.",
+      "status": "pending",
+      "passes": false,
+      "scope": "frontend",
+      "files": ["frontend/src/stores/*.ts", "frontend/src/components/**/*.tsx"]
+    },
+    {
+      "id": "f003",
+      "name": "Loading skeletons everywhere",
+      "description": "Add shadcn Skeleton placeholders while data loads: SongTable (3-5 skeleton rows), Sidebar playlist list (skeleton items), PlaylistDetail (skeleton while loading), Filter results (loading text while filtering). Use the loading boolean from each Zustand store.",
+      "status": "pending",
+      "passes": false,
+      "scope": "frontend",
+      "files": ["frontend/src/components/songs/SongTable.tsx", "frontend/src/components/layout/Sidebar.tsx", "frontend/src/components/playlists/PlaylistDetail.tsx", "frontend/src/components/filter/QueryBuilder.tsx"]
+    },
+    {
+      "id": "f004",
+      "name": "Keyboard shortcut: space to play/pause",
+      "description": "In App.tsx, add a keydown listener for Space that calls playerStore.togglePlay() — but ONLY when no input/textarea is focused (check document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA').",
+      "status": "pending",
+      "passes": false,
+      "scope": "frontend",
+      "files": ["frontend/src/App.tsx"]
+    },
+    {
+      "id": "f005",
+      "name": "Visual polish pass",
+      "description": "Fix: volume slider right-edge clipping (add padding), player bar left/center/right spacing balance, consistent hover effects (transition-colors duration-150) on all interactive elements, currently-playing song highlighted with teal left border in table, tag editor styling improvements. Do NOT change the audio slider implementation (keep HTML range inputs).",
+      "status": "pending",
+      "passes": false,
+      "scope": "frontend",
+      "files": ["frontend/src/components/layout/PlayerBar.tsx", "frontend/src/components/songs/SongRow.tsx", "frontend/src/components/tags/TagEditor.tsx"]
+    },
+    {
+      "id": "f006",
+      "name": "Lock down CORS",
+      "description": "In backend/app/main.py, change allow_origins from ['*'] back to ['http://localhost:5173', 'http://localhost:5174']. Test that the frontend still works.",
+      "status": "pending",
+      "passes": false,
+      "scope": "backend",
+      "files": ["backend/app/main.py"]
+    }
+  ]
+}
