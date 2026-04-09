@@ -45,6 +45,20 @@ function App() {
     return () => clearTimeout(timer)
   }, [searchQuery, fetchSongs])
 
+  const togglePlay = usePlayerStore((state) => state.togglePlay)
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code !== "Space") return
+      const tag = (document.activeElement as HTMLElement)?.tagName
+      if (tag === "INPUT" || tag === "TEXTAREA") return
+      e.preventDefault()
+      togglePlay()
+    }
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [togglePlay])
+
   const handlePlaySong = (song: Song) => {
     playSong(song, songs)
   }
