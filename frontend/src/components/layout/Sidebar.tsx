@@ -6,6 +6,7 @@ import { usePlaylistStore } from "@/stores/playlistStore"
 import { PlaylistItem } from "@/components/playlists/PlaylistItem"
 import { CreatePlaylistDialog } from "@/components/playlists/CreatePlaylistDialog"
 import { ScanDialog } from "@/components/scanner/ScanDialog"
+import { Skeleton } from "@/components/ui/skeleton"
 import { useState } from "react"
 
 interface SidebarProps {
@@ -17,6 +18,7 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [scanOpen, setScanOpen] = useState(false)
   const playlists = usePlaylistStore((state) => state.playlists)
+  const playlistsLoading = usePlaylistStore((state) => state.loading)
 
   const isActive = (view: View) => {
     if (view.kind === "playlist" && currentView.kind === "playlist") {
@@ -65,7 +67,13 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
 
         {/* Playlist list */}
         <div className="flex-1 overflow-y-auto px-2">
-          {playlists.length === 0 ? (
+          {playlistsLoading ? (
+            <div className="space-y-1 px-2 py-1">
+              {[...Array(4)].map((_, i) => (
+                <Skeleton key={i} className="h-8 w-full rounded" />
+              ))}
+            </div>
+          ) : playlists.length === 0 ? (
             <div className="text-sm text-[var(--aurora-text-muted)] px-4 py-2">
               No playlists yet
             </div>

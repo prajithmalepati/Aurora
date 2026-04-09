@@ -144,12 +144,14 @@ export function QueryBuilder() {
           <div className="text-[var(--aurora-danger)] text-center py-8">
             {error}
           </div>
+        ) : loading ? (
+          <SongTable songs={[]} loading={true} />
         ) : results.length === 0 ? (
           <div className="text-[var(--aurora-text-muted)] text-center py-8">
             No songs match this query
           </div>
         ) : (
-          <SongTable songs={results} loading={loading} />
+          <SongTable songs={results} loading={false} />
         )}
       </div>
     </div>

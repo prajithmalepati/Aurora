@@ -26,6 +26,7 @@ import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
 import { Pencil, Trash2, ChevronUp, ChevronDown, X } from "lucide-react"
 import { TagList } from "@/components/tags/TagList"
+import { Skeleton } from "@/components/ui/skeleton"
 
 interface PlaylistDetailProps {
   playlistId: number
@@ -128,9 +129,14 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
 
   if (loading) {
     return (
-      <div className="p-6">
-        <div className="h-8 w-48 bg-[var(--aurora-bg-hover)] rounded mb-4" />
-        <div className="h-4 w-32 bg-[var(--aurora-bg-hover)] rounded" />
+      <div className="p-6 space-y-4">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-4 w-32" />
+        <div className="space-y-2 mt-4">
+          {[...Array(4)].map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full rounded" />
+          ))}
+        </div>
       </div>
     )
   }
