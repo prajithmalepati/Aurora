@@ -5,6 +5,7 @@ type View =
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { PlaylistItem } from "@/components/playlists/PlaylistItem"
 import { CreatePlaylistDialog } from "@/components/playlists/CreatePlaylistDialog"
+import { ScanDialog } from "@/components/scanner/ScanDialog"
 import { useState } from "react"
 
 interface SidebarProps {
@@ -14,6 +15,7 @@ interface SidebarProps {
 
 export function Sidebar({ currentView, onViewChange }: SidebarProps) {
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
+  const [scanOpen, setScanOpen] = useState(false)
   const playlists = usePlaylistStore((state) => state.playlists)
 
   const isActive = (view: View) => {
@@ -88,7 +90,10 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
         </button>
 
         {/* Scan Folder button */}
-        <button className="mx-4 mb-4 px-4 py-2 text-left bg-[var(--aurora-bg-hover)] rounded hover:bg-opacity-80 transition-colors">
+        <button
+          onClick={() => setScanOpen(true)}
+          className="mx-4 mb-4 px-4 py-2 text-left bg-[var(--aurora-bg-hover)] rounded hover:bg-opacity-80 transition-colors"
+        >
           Scan Folder
         </button>
       </aside>
@@ -98,6 +103,9 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
       />
+
+      {/* Scan Folder Dialog */}
+      <ScanDialog open={scanOpen} onOpenChange={setScanOpen} />
     </>
   )
 }
