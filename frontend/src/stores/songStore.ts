@@ -2,6 +2,7 @@ import { create } from "zustand"
 import { api } from "@/lib/api"
 import type { Song, ApiResponse, Tag } from "@/types"
 import { useTagStore } from "./tagStore"
+import { useFilterStore } from "./filterStore"
 import { toast } from "sonner"
 
 type View =
@@ -92,6 +93,8 @@ export const useSongStore = create<SongState>((set, get) => ({
     try {
       await api.post(`/songs/${songId}/tags`, { tag_names: tagNames })
       await get().fetchSongs()
+      const filterState = useFilterStore.getState()
+      if (filterState.query.trim()) filterState.executeFilter()
     } catch (e: any) {
       set({ error: e.message })
       toast.error(e.message ?? "Failed to update tags")
@@ -103,6 +106,8 @@ export const useSongStore = create<SongState>((set, get) => ({
     try {
       await api.delete(`/songs/${songId}/tags/${tagId}`)
       await get().fetchSongs()
+      const filterState = useFilterStore.getState()
+      if (filterState.query.trim()) filterState.executeFilter()
     } catch (e: any) {
       set({ error: e.message })
       toast.error(e.message ?? "Failed to remove tag")
@@ -120,8 +125,6 @@ export const useSongStore = create<SongState>((set, get) => ({
     if (!tag) {
       throw new Error("Tag not found on song")
     }
-    // We need to find the tag ID - this requires a separate API call
-    // For now, we'll fetch all tags and find the matching one
     const tagStore = useTagStore.getState()
     await tagStore.fetchTags()
     const tagStoreTags: Tag[] = tagStore.tags
@@ -132,6 +135,8 @@ export const useSongStore = create<SongState>((set, get) => ({
     try {
       await api.delete(`/songs/${songId}/tags/${matchingTag.id}`)
       await get().fetchSongs()
+      const filterState = useFilterStore.getState()
+      if (filterState.query.trim()) filterState.executeFilter()
       toast.success("Tag removed")
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to remove tag")
