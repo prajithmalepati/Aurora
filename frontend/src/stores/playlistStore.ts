@@ -1,6 +1,7 @@
 import { create } from "zustand"
 import { api } from "@/lib/api"
 import type { Playlist, PlaylistDetail, ApiResponse } from "@/types"
+import { toast } from "sonner"
 
 interface PlaylistState {
   playlists: Playlist[]
@@ -57,8 +58,10 @@ export const usePlaylistStore = create<PlaylistState>((set, get) => ({
     try {
       await api.post("/playlists", data)
       await get().fetchPlaylists()
+      toast.success("Playlist created")
     } catch (e: any) {
       set({ error: e.message })
+      toast.error(e.message ?? "Failed to create playlist")
       throw e
     }
   },
@@ -71,8 +74,10 @@ export const usePlaylistStore = create<PlaylistState>((set, get) => ({
       if (get().activePlaylist?.id === id) {
         await get().fetchPlaylistDetail(id)
       }
+      toast.success("Playlist updated")
     } catch (e: any) {
       set({ error: e.message })
+      toast.error(e.message ?? "Failed to update playlist")
       throw e
     }
   },
@@ -85,8 +90,10 @@ export const usePlaylistStore = create<PlaylistState>((set, get) => ({
         set({ activePlaylist: null })
       }
       await get().fetchPlaylists()
+      toast.success("Playlist deleted")
     } catch (e: any) {
       set({ error: e.message })
+      toast.error(e.message ?? "Failed to delete playlist")
       throw e
     }
   },
@@ -98,8 +105,10 @@ export const usePlaylistStore = create<PlaylistState>((set, get) => ({
       if (get().activePlaylist?.id === playlistId) {
         await get().fetchPlaylistDetail(playlistId)
       }
+      toast.success("Song added to playlist")
     } catch (e: any) {
       set({ error: e.message })
+      toast.error(e.message ?? "Failed to add song to playlist")
       throw e
     }
   },
@@ -111,8 +120,10 @@ export const usePlaylistStore = create<PlaylistState>((set, get) => ({
       if (get().activePlaylist?.id === playlistId) {
         await get().fetchPlaylistDetail(playlistId)
       }
+      toast.success("Song removed from playlist")
     } catch (e: any) {
       set({ error: e.message })
+      toast.error(e.message ?? "Failed to remove song from playlist")
       throw e
     }
   },

@@ -57,6 +57,7 @@ export function ScanDialog({ open, onOpenChange }: ScanDialogProps) {
         }
       )
       setState((s) => ({ ...s, results: res.data, loading: false }))
+      toast.success(`Scan complete — ${res.data.imported} song${res.data.imported === 1 ? "" : "s"} imported`)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to scan folder"
       setState((s) => ({ ...s, loading: false, error: message }))
