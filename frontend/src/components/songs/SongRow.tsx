@@ -1,6 +1,6 @@
 import type { Song } from "@/types"
 import { formatDuration } from "@/lib/utils"
-import { Trash2 } from "lucide-react"
+import { Trash2, Tag as TagIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   AlertDialog,
@@ -16,6 +16,8 @@ import { useSongStore } from "@/stores/songStore"
 import { toast } from "sonner"
 import { useState } from "react"
 import { EditSongDialog } from "./EditSongDialog"
+import { TagList } from "@/components/tags/TagList"
+import { TagEditor } from "@/components/tags/TagEditor"
 
 interface SongRowProps {
   song: Song
@@ -25,6 +27,7 @@ interface SongRowProps {
 export function SongRow({ song, index }: SongRowProps) {
   const deleteSong = useSongStore((state) => state.deleteSong)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [tagEditorOpen, setTagEditorOpen] = useState(false)
 
   const handleDelete = async () => {
     setDeleteDialogOpen(false)
@@ -74,27 +77,26 @@ export function SongRow({ song, index }: SongRowProps) {
           )}
         </td>
 
-        {/* Tags column - plain text for now */}
+        {/* Tags column */}
         <td className="px-4 py-3">
-          {song.tags.length > 0 ? (
-            <div className="flex flex-wrap gap-1">
-              {song.tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="bg-[var(--aurora-bg-hover)] text-[var(--aurora-teal)] text-xs px-2 py-0.5 rounded-full"
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-          ) : (
-            <span className="text-[var(--aurora-text-muted)] text-sm">—</span>
-          )}
+          <TagList tags={song.tags} />
         </td>
 
         {/* Actions column */}
         <td className="px-4 py-3">
           <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={(e) => {
+                e.stopPropagation()
+                setTagEditorOpen(true)
+              }}
+              title="Edit tags"
+            >
+              <TagIcon className="h-4 w-4" />
+            </Button>
             <EditSongDialog song={song} />
             <Button
               variant="ghost"
@@ -129,6 +131,15 @@ export function SongRow({ song, index }: SongRowProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Tag Editor Dialog */}
+      <TagEditor
+        songId={song.id}
+        songTitle={song.title}
+        currentTags={song.tags}
+        open={tagEditorOpen}
+        onOpenChange={setTagEditorOpen}
+      />
     </>
   )
 }
