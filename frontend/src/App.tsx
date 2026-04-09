@@ -19,6 +19,7 @@ function App() {
 
   const fetchSongs = useSongStore((state) => state.fetchSongs)
   const songs = useSongStore((state) => state.songs)
+  const songsLoading = useSongStore((state) => state.loading)
   const view = useSongStore((state) => state.view)
   const setView = useSongStore((state) => state.setView)
   const fetchPlaylists = usePlaylistStore((state) => state.fetchPlaylists)
@@ -63,7 +64,7 @@ function App() {
               />
               <AddSongDialog />
             </div>
-            <SongTable songs={songs} loading={false} onPlay={handlePlaySong} />
+            <SongTable songs={songs} loading={songsLoading} onPlay={handlePlaySong} />
           </div>
         )
       case "filter":
