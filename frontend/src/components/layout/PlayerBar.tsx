@@ -18,7 +18,7 @@ export function PlayerBar() {
   const hasSong = currentSong !== null && currentSong.file_path !== null
 
   return (
-    <div className="bg-[var(--aurora-bg-surface)] border-t border-[var(--aurora-border)] pl-6 pr-10 py-3 col-span-2">
+    <div className="bg-[var(--aurora-bg-surface)] border-t border-[var(--aurora-border)] px-6 py-3 col-span-2">
       <div className="flex items-center gap-6 h-[72px]">
         {/* Left: Song info */}
         <div className="w-[200px] min-w-[150px] overflow-hidden">
@@ -88,13 +88,14 @@ export function PlayerBar() {
         </div>
 
         {/* Right: Volume */}
-        <div className="w-[110px] flex-shrink-0 flex items-center gap-2 mr-2">
+        <div className="w-[130px] flex-shrink-0 flex items-center gap-2">
           <button
             onClick={() => setVolume(volume > 0 ? 0 : 0.7)}
-            className="text-[var(--aurora-text-dim)] hover:text-[var(--aurora-text)] transition-colors"
+            className="text-[var(--aurora-text-dim)] hover:text-[var(--aurora-text)] transition-colors duration-150"
           >
             {volume > 0 ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
           </button>
+          <div className="flex-1 px-1 overflow-visible">
             <input
               type="range"
               min={0}
@@ -103,8 +104,9 @@ export function PlayerBar() {
               value={volume}
               onChange={(e) => setVolume(Number(e.target.value))}
               disabled={!hasSong}
-               className="w-20 h-1 appearance-none bg-[var(--aurora-border-bright)] rounded-full outline-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer disabled:opacity-30"
+              className="w-full h-1 appearance-none bg-[var(--aurora-border-bright)] rounded-full outline-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer disabled:opacity-30"
             />
+          </div>
         </div>
       </div>
     </div>

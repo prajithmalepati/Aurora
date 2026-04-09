@@ -59,8 +59,10 @@ export function SongRow({ song, index, onPlay }: SongRowProps) {
     <>
       <tr
         onClick={handlePlay}
-        className={`bg-[var(--aurora-bg)] border-b border-[var(--aurora-border)] hover:bg-[var(--aurora-bg-hover)] transition-colors duration-150 ${
-          isCurrentSong ? "border-l-2 border-l-[var(--aurora-teal)]" : ""
+        className={`border-b border-[var(--aurora-border)] transition-colors duration-150 ${
+          isCurrentSong
+            ? "bg-[color-mix(in_srgb,var(--aurora-teal)_6%,var(--aurora-bg))] border-l-2 border-l-[var(--aurora-teal)]"
+            : "bg-[var(--aurora-bg)] hover:bg-[var(--aurora-bg-hover)]"
         } ${!hasFile ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
       >
         {/* # column */}
