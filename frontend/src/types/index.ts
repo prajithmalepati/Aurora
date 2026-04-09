@@ -50,9 +50,12 @@ export interface FilterResult {
   artist: string
   album: string | null
   duration: number | null
+  file_path: string | null
+  source: string
   tags: string[]
   playlists: Playlist[]
-  source: string
+  created_at: string
+  updated_at: string
 }
 
 export interface ScanResult {

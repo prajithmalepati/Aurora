@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import { useSongStore } from "@/stores/songStore"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { useTagStore } from "@/stores/tagStore"
+import { usePlayerStore } from "@/stores/playerStore"
 import { AppShell } from "@/components/layout/AppShell"
 import { Sidebar } from "@/components/layout/Sidebar"
 import { PlayerBar } from "@/components/layout/PlayerBar"
@@ -10,6 +11,8 @@ import { SongTable } from "@/components/songs/SongTable"
 import { AddSongDialog } from "@/components/songs/AddSongDialog"
 import { Input } from "@/components/ui/input"
 import { PlaylistDetail } from "@/components/playlists/PlaylistDetail"
+import { QueryBuilder } from "@/components/filter/QueryBuilder"
+import type { Song } from "@/types"
 
 function App() {
   const [searchQuery, setSearchQuery] = useState("")
@@ -20,6 +23,7 @@ function App() {
   const setView = useSongStore((state) => state.setView)
   const fetchPlaylists = usePlaylistStore((state) => state.fetchPlaylists)
   const fetchTags = useTagStore((state) => state.fetchTags)
+  const playSong = usePlayerStore((state) => state.playSong)
 
   useEffect(() => {
     fetchSongs()
@@ -40,6 +44,10 @@ function App() {
     return () => clearTimeout(timer)
   }, [searchQuery, fetchSongs])
 
+  const handlePlaySong = (song: Song) => {
+    playSong(song, songs)
+  }
+
   const renderMainContent = () => {
     switch (view.kind) {
       case "all-songs":
@@ -55,11 +63,11 @@ function App() {
               />
               <AddSongDialog />
             </div>
-            <SongTable songs={songs} loading={false} />
+            <SongTable songs={songs} loading={false} onPlay={handlePlaySong} />
           </div>
         )
       case "filter":
-        return <div className="p-4">Filter View</div>
+        return <QueryBuilder />
       case "playlist":
         return <PlaylistDetail playlistId={view.playlistId} />
     }

@@ -5,9 +5,10 @@ import { Skeleton } from "@/components/ui/skeleton"
 interface SongTableProps {
   songs: Song[]
   loading?: boolean
+  onPlay?: (song: Song, index: number) => void
 }
 
-export function SongTable({ songs, loading = false }: SongTableProps) {
+export function SongTable({ songs, loading = false, onPlay }: SongTableProps) {
   if (loading) {
     return (
       <div className="w-full overflow-auto">
@@ -136,7 +137,7 @@ export function SongTable({ songs, loading = false }: SongTableProps) {
         </thead>
         <tbody>
           {songs.map((song, index) => (
-            <SongRow key={song.id} song={song} index={index} />
+            <SongRow key={song.id} song={song} index={index} onPlay={onPlay} />
           ))}
         </tbody>
       </table>

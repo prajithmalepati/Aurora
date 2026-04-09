@@ -13,6 +13,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { useSongStore } from "@/stores/songStore"
+import { usePlayerStore } from "@/stores/playerStore"
 import { toast } from "sonner"
 import { useState } from "react"
 import { TagList } from "@/components/tags/TagList"
@@ -21,10 +22,13 @@ import { TagEditor } from "@/components/tags/TagEditor"
 interface SongRowProps {
   song: Song
   index: number
+  onPlay?: (song: Song, index: number) => void
 }
 
-export function SongRow({ song, index }: SongRowProps) {
+export function SongRow({ song, index, onPlay }: SongRowProps) {
   const deleteSong = useSongStore((state) => state.deleteSong)
+  const playSong = usePlayerStore((state) => state.playSong)
+  const currentSong = usePlayerStore((state) => state.currentSong)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [tagEditorOpen, setTagEditorOpen] = useState(false)
 
@@ -39,9 +43,26 @@ export function SongRow({ song, index }: SongRowProps) {
     }
   }
 
+  const handlePlay = () => {
+    if (!song.file_path) return
+    if (onPlay) {
+      onPlay(song, index)
+    } else {
+      playSong(song)
+    }
+  }
+
+  const isCurrentSong = currentSong?.id === song.id
+  const hasFile = song.file_path !== null
+
   return (
     <>
-      <tr className="bg-[var(--aurora-bg)] border-b border-[var(--aurora-border)] hover:bg-[var(--aurora-bg-hover)] transition-colors duration-150">
+      <tr
+        onClick={handlePlay}
+        className={`bg-[var(--aurora-bg)] border-b border-[var(--aurora-border)] hover:bg-[var(--aurora-bg-hover)] transition-colors duration-150 ${
+          isCurrentSong ? "border-l-2 border-l-[var(--aurora-teal)]" : ""
+        } ${!hasFile ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+      >
         {/* # column */}
         <td className="px-4 py-3 text-[var(--aurora-text-dim)] text-sm">
           {index + 1}

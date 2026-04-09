@@ -118,7 +118,7 @@ def filter_songs(db_connection, query_string: str) -> list[dict]:
     cursor = db_connection.execute("""
         SELECT
             s.id, s.title, s.artist, s.album, s.duration,
-            s.file_path, s.source,
+            s.file_path, s.source, s.created_at, s.updated_at,
             GROUP_CONCAT(DISTINCT t.name) AS tag_names,
             GROUP_CONCAT(DISTINCT p.id || ':' || p.name) AS playlist_ids_names
         FROM songs s
@@ -152,6 +152,8 @@ def filter_songs(db_connection, query_string: str) -> list[dict]:
                 "source": row["source"],
                 "tags": sorted(tag_set),
                 "playlists": playlists,
+                "created_at": row["created_at"],
+                "updated_at": row["updated_at"],
             })
     
     # Sort by title
