@@ -40,7 +40,7 @@ export const useSongStore = create<SongState>((set, get) => ({
   songs: [],
   loading: false,
   error: null,
-  view: { kind: "all-songs" },
+  view: { kind: "filter" },
 
   fetchSongs: async (search) => {
     set({ loading: true, error: null })
