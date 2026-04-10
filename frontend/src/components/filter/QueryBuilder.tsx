@@ -4,7 +4,7 @@ import { usePlaylistStore } from "@/stores/playlistStore"
 import { usePlayerStore } from "@/stores/playerStore"
 import { QueryInput } from "./QueryInput"
 import { SongTable } from "@/components/songs/SongTable"
-import { Search, X } from "lucide-react"
+import { Search, X, Shuffle } from "lucide-react"
 import type { Song } from "@/types"
 
 type OperatorKind = "AND" | "OR" | "NOT" | "(" | ")"
@@ -23,7 +23,9 @@ export function QueryBuilder() {
   const error = useFilterStore((state) => state.error)
   const loading = useFilterStore((state) => state.loading)
   const appendToQuery = useFilterStore((state) => state.appendToQuery)
+  const appendTerm = useFilterStore((state) => state.appendTerm)
   const executeFilter = useFilterStore((state) => state.executeFilter)
+  const shuffleFilter = useFilterStore((state) => state.shuffleFilter)
   const clearResults = useFilterStore((state) => state.clearResults)
 
   const playSong = usePlayerStore((state) => state.playSong)
@@ -40,9 +42,8 @@ export function QueryBuilder() {
     <div className="p-10 max-w-[1400px] mx-auto aurora-fade-in">
       {/* Header */}
       <div className="mb-6">
-        <p className="label-micro mb-2">Query Builder</p>
         <h1 className="font-display text-[44px] leading-[0.95] tracking-tight text-[var(--aurora-text)]">
-          Find what you need.
+          Mix
         </h1>
       </div>
 
@@ -85,21 +86,9 @@ export function QueryBuilder() {
               <button
                 key={tag.id}
                 onClick={() =>
-                  appendToQuery(tag.name.includes(" ") ? `"${tag.name}"` : tag.name)
+                  appendTerm(tag.name.includes(" ") ? `"${tag.name}"` : tag.name)
                 }
-                className="text-[11px] font-medium text-[var(--aurora-teal)] px-2.5 py-[3px] rounded-full transition-all duration-150 hover:scale-[1.03]"
-                style={{
-                  boxShadow: "inset 0 0 0 1px rgba(94, 234, 212, 0.22)",
-                  background: "rgba(94, 234, 212, 0.04)",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.boxShadow =
-                    "inset 0 0 0 1px rgba(94, 234, 212, 0.5), 0 0 14px -4px rgba(94, 234, 212, 0.4)"
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.boxShadow =
-                    "inset 0 0 0 1px rgba(94, 234, 212, 0.22)"
-                }}
+                className="aurora-chip text-[11px] font-medium text-[var(--aurora-text-dim)] px-2.5 py-[3px] rounded-full transition-all duration-150 hover:scale-[1.03] hover:text-[var(--aurora-text)]"
               >
                 {tag.name}
               </button>
@@ -118,7 +107,13 @@ export function QueryBuilder() {
               return (
                 <button
                   key={playlist.id}
-                  onClick={() => appendToQuery(playlist.name.toLowerCase())}
+                  onClick={() =>
+                    appendTerm(
+                      playlist.name.includes(" ")
+                        ? `"${playlist.name}"`
+                        : playlist.name.toLowerCase()
+                    )
+                  }
                   className="text-[11px] font-medium px-2.5 py-[3px] rounded-full transition-all duration-150 hover:scale-[1.03] inline-flex items-center gap-1.5"
                   style={{
                     color: color,
@@ -159,6 +154,18 @@ export function QueryBuilder() {
           {loading ? "Searching..." : "Search"}
         </button>
         <button
+          onClick={shuffleFilter}
+          disabled={loading}
+          className="h-10 px-4 rounded-md text-[13px] font-medium text-[var(--aurora-text-dim)] hover:text-[var(--aurora-text)] inline-flex items-center gap-2 transition-all duration-150 disabled:opacity-50"
+          style={{
+            background: "rgba(255,255,255,0.02)",
+            boxShadow: "inset 0 0 0 1px var(--aurora-rim)",
+          }}
+        >
+          <Shuffle className="h-3.5 w-3.5" />
+          Shuffle
+        </button>
+        <button
           onClick={clearResults}
           className="h-10 px-4 rounded-md text-[13px] font-medium text-[var(--aurora-text-dim)] hover:text-[var(--aurora-text)] inline-flex items-center gap-2 transition-all duration-150"
           style={{
@@ -182,7 +189,7 @@ export function QueryBuilder() {
               Build a query above
             </p>
             <p className="text-xs text-[var(--aurora-text-muted)] mt-2">
-              Press Enter or click Search to execute
+              Click tags to combine them, then press Enter or Search
             </p>
           </div>
         ) : error ? (
@@ -201,8 +208,8 @@ export function QueryBuilder() {
           </div>
         ) : (
           <>
-            <p className="label-micro mb-4">
-              {results.length} {results.length === 1 ? "result" : "results"}
+            <p className="text-[13px] text-[var(--aurora-text-dim)] mb-4 font-medium">
+              {results.length} {results.length === 1 ? "song matches" : "songs match"} this mix
             </p>
             <SongTable songs={results} loading={false} onPlay={handlePlaySong} />
           </>
