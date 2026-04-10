@@ -33,9 +33,12 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
       <aside className="w-60 h-full flex flex-col bg-[#050608]/60 backdrop-blur-xl">
         {/* Brand lockup */}
         <div className="px-6 pt-7 pb-6">
-          <h1 className="font-display text-[34px] leading-none tracking-tight aurora-gradient-text select-none">
+          <button
+            onClick={() => onViewChange({ kind: "all-songs" })}
+            className="font-display text-[34px] leading-none tracking-tight aurora-gradient-text select-none hover:opacity-80 transition-opacity duration-150"
+          >
             Aurora
-          </h1>
+          </button>
           <p className="label-micro mt-1.5">Your Library</p>
         </div>
 
