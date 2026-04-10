@@ -30,6 +30,8 @@ import { Pencil, Trash2, ChevronUp, ChevronDown, X, Play } from "lucide-react"
 import { TagList } from "@/components/tags/TagList"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Equalizer } from "@/components/ui/Equalizer"
+import { PlaylistImagePicker } from "@/components/playlists/PlaylistImagePicker"
+import { getPlaylistImage, setPlaylistImage, removePlaylistImage } from "@/lib/playlistImage"
 
 interface PlaylistDetailProps {
   playlistId: number
@@ -51,6 +53,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
   const [editName, setEditName] = useState("")
   const [editColor, setEditColor] = useState("")
   const [editEmoji, setEditEmoji] = useState("")
+  const [editImageDataUrl, setEditImageDataUrl] = useState<string | null>(null)
 
   useEffect(() => {
     fetchPlaylistDetail(playlistId)
@@ -71,6 +74,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
       setEditName(activePlaylist.name)
       setEditColor(activePlaylist.color || "")
       setEditEmoji(activePlaylist.emoji || "")
+      setEditImageDataUrl(getPlaylistImage(activePlaylist.id))
       setEditDialogOpen(true)
     }
   }
@@ -88,6 +92,11 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
         color: editColor.trim() || undefined,
         emoji: editEmoji.trim() || undefined,
       })
+      if (editImageDataUrl) {
+        setPlaylistImage(activePlaylist.id, editImageDataUrl)
+      } else {
+        removePlaylistImage(activePlaylist.id)
+      }
       toast.success("Playlist updated")
       setEditDialogOpen(false)
     } catch (err: unknown) {
@@ -322,6 +331,15 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
             </DialogHeader>
 
             <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <label className="label-micro text-[10px]">Cover</label>
+                <PlaylistImagePicker
+                  name={editName}
+                  imageDataUrl={editImageDataUrl}
+                  onImageChange={setEditImageDataUrl}
+                />
+              </div>
+
               <div className="space-y-2">
                 <label className="label-micro text-[10px]">Name</label>
                 <Input
