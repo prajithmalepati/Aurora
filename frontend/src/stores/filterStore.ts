@@ -10,7 +10,9 @@ interface FilterState {
 
   setQuery: (query: string) => void
   appendToQuery: (text: string) => void
+  appendTerm: (term: string) => void
   executeFilter: () => Promise<void>
+  shuffleFilter: () => Promise<void>
   clearResults: () => void
 }
 
@@ -49,6 +51,21 @@ export const useFilterStore = create<FilterState>((set, get) => ({
     set({ query: current + separator + text })
   },
 
+  appendTerm: (term) => {
+    const current = get().query.trim()
+    if (!current) {
+      set({ query: term })
+      return
+    }
+    const lastToken = current.split(/\s+/).pop()?.toUpperCase() ?? ""
+    const isLastOperatorOrOpen = ["AND", "OR", "NOT", "("].includes(lastToken)
+    if (isLastOperatorOrOpen) {
+      set({ query: current + " " + term })
+    } else {
+      set({ query: current + " AND " + term })
+    }
+  },
+
   executeFilter: async () => {
     const query = get().query.trim()
     if (!query) return
@@ -57,8 +74,28 @@ export const useFilterStore = create<FilterState>((set, get) => ({
     try {
       const res = await api.post<ApiResponse<FilterResult[]>>("/filter", { query })
       set({ results: res.data, loading: false })
-    } catch (e: any) {
-      set({ error: friendlyFilterError(query, e.message), loading: false, results: [] })
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Unknown error"
+      set({ error: friendlyFilterError(query, message), loading: false, results: [] })
+    }
+  },
+
+  shuffleFilter: async () => {
+    const query = get().query.trim()
+    if (!query) return
+
+    set({ loading: true, error: null })
+    try {
+      const res = await api.post<ApiResponse<FilterResult[]>>("/filter", { query })
+      const shuffled = [...res.data]
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1))
+        ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+      }
+      set({ results: shuffled, loading: false })
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Unknown error"
+      set({ error: friendlyFilterError(query, message), loading: false, results: [] })
     }
   },
 
