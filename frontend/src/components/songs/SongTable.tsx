@@ -18,8 +18,8 @@ function TableHeader() {
         <th className={`${HEADER_CLASS} w-12 text-center`}>#</th>
         <th className={HEADER_CLASS}>Title</th>
         <th className={`${HEADER_CLASS} w-24`}>Duration</th>
-        <th className={`${HEADER_CLASS} w-48`}>Playlists</th>
-        <th className={HEADER_CLASS}>Tags</th>
+        <th className={`${HEADER_CLASS} w-40`}>Playlists</th>
+        <th className={`${HEADER_CLASS} max-w-[200px]`}>Tags</th>
         <th className={`${HEADER_CLASS} w-32 text-right`}>Actions</th>
       </tr>
     </thead>
