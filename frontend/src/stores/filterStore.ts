@@ -14,6 +14,27 @@ interface FilterState {
   clearResults: () => void
 }
 
+function friendlyFilterError(query: string, raw: string): string {
+  // Bare terms with no operators — likely missing AND/OR
+  if (!/\b(AND|OR|NOT)\b/i.test(query) && /\S+\s+\S+/.test(query)) {
+    return 'Use AND, OR, NOT operators between terms. Example: rock AND roll'
+  }
+  // Common typo: using & or | instead of AND/OR
+  if (/[&|]/.test(query) && !/\b(AND|OR)\b/i.test(query)) {
+    return 'Use AND / OR instead of & / |. Example: rock AND roll'
+  }
+  // Unmatched parentheses
+  if (/unbalanced|parenthes/i.test(raw)) {
+    return 'Unmatched parentheses — check that every ( has a matching )'
+  }
+  // Empty / trailing operator
+  if (/unexpected|expected/i.test(raw)) {
+    return 'Incomplete expression — each AND, OR, NOT needs a term on both sides'
+  }
+  // Fall back to a cleaned-up version of the raw error
+  return raw.replace(/^Invalid query syntax:\s*/i, 'Invalid syntax: ')
+}
+
 export const useFilterStore = create<FilterState>((set, get) => ({
   query: "",
   results: [],
@@ -37,7 +58,7 @@ export const useFilterStore = create<FilterState>((set, get) => ({
       const res = await api.post<ApiResponse<FilterResult[]>>("/filter", { query })
       set({ results: res.data, loading: false })
     } catch (e: any) {
-      set({ error: e.message, loading: false, results: [] })
+      set({ error: friendlyFilterError(query, e.message), loading: false, results: [] })
     }
   },
 
