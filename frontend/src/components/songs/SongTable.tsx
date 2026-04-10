@@ -1,6 +1,7 @@
 import type { Song } from "@/types"
 import { SongRow } from "./SongRow"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Music } from "lucide-react"
 
 interface SongTableProps {
   songs: Song[]
@@ -77,6 +78,7 @@ export function SongTable({ songs, loading = false, onPlay }: SongTableProps) {
           <TableHeader />
         </table>
         <div className="py-20 flex flex-col items-center justify-center gap-3">
+          <Music className="h-8 w-8 text-[var(--aurora-text-muted)] opacity-40" />
           <p className="font-display-italic text-[22px] text-[var(--aurora-text-muted)]">
             Nothing here yet
           </p>

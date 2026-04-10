@@ -16,10 +16,14 @@ import { toast } from "sonner"
 
 interface AddSongDialogProps {
   onAdd?: () => void
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
-export function AddSongDialog({ onAdd }: AddSongDialogProps) {
-  const [open, setOpen] = useState(false)
+export function AddSongDialog({ onAdd, open: controlledOpen, onOpenChange }: AddSongDialogProps) {
+  const [internalOpen, setInternalOpen] = useState(false)
+  const open = controlledOpen ?? internalOpen
+  const setOpen = onOpenChange ?? setInternalOpen
   const [title, setTitle] = useState("")
   const [artist, setArtist] = useState("")
   const [album, setAlbum] = useState("")
@@ -60,12 +64,14 @@ export function AddSongDialog({ onAdd }: AddSongDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="primary" />}>
-        <span className="inline-flex items-center">
-          <Plus className="h-4 w-4 mr-1.5" strokeWidth={2.5} />
-          Add Song
-        </span>
-      </DialogTrigger>
+      {controlledOpen === undefined && (
+        <DialogTrigger render={<Button variant="primary" />}>
+          <span className="inline-flex items-center">
+            <Plus className="h-4 w-4 mr-1.5" strokeWidth={2.5} />
+            Add Song
+          </span>
+        </DialogTrigger>
+      )}
       <DialogContent>
         <form onSubmit={handleSubmit}>
           <DialogHeader>

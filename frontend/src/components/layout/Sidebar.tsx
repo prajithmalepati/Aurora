@@ -8,7 +8,8 @@ import { CreatePlaylistDialog } from "@/components/playlists/CreatePlaylistDialo
 import { ScanDialog } from "@/components/scanner/ScanDialog"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useState } from "react"
-import { Library, SlidersHorizontal, Plus, FolderSearch } from "lucide-react"
+import { Library, SlidersHorizontal, Plus, FolderSearch, Music } from "lucide-react"
+import { AddSongDialog } from "@/components/songs/AddSongDialog"
 
 interface SidebarProps {
   currentView: View
@@ -18,6 +19,7 @@ interface SidebarProps {
 export function Sidebar({ currentView, onViewChange }: SidebarProps) {
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [scanOpen, setScanOpen] = useState(false)
+  const [addSongOpen, setAddSongOpen] = useState(false)
   const playlists = usePlaylistStore((state) => state.playlists)
   const playlistsLoading = usePlaylistStore((state) => state.loading)
 
@@ -52,7 +54,7 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
           />
           <NavItem
             icon={<SlidersHorizontal className="h-4 w-4" />}
-            label="Filter"
+            label="Mix"
             active={isActive({ kind: "filter" })}
             onClick={() => onViewChange({ kind: "filter" })}
           />
@@ -109,6 +111,11 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
             label="Scan Folder"
             onClick={() => setScanOpen(true)}
           />
+          <FooterAction
+            icon={<Music className="h-3.5 w-3.5" />}
+            label="Add Song"
+            onClick={() => setAddSongOpen(true)}
+          />
         </div>
       </aside>
 
@@ -117,6 +124,7 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
         onOpenChange={setCreateDialogOpen}
       />
       <ScanDialog open={scanOpen} onOpenChange={setScanOpen} />
+      <AddSongDialog open={addSongOpen} onOpenChange={setAddSongOpen} />
     </>
   )
 }
@@ -138,25 +146,25 @@ function NavItem({ icon, label, active, onClick }: NavItemProps) {
           : "text-[var(--aurora-text-dim)] hover:text-[var(--aurora-text)]"
       }`}
     >
-      {/* Active indicator — 2px left bar with aurora fill */}
+      {/* Active indicator — 2px left bar with aurora gradient */}
       <span
         className={`absolute left-0 top-1/2 -translate-y-1/2 w-[2px] rounded-r-full transition-all duration-300 ${
           active ? "h-5 opacity-100" : "h-0 opacity-0"
         }`}
         style={{
           background:
-            "linear-gradient(to bottom, #5eead4, #86efac)",
-          boxShadow: active ? "0 0 10px rgba(94, 234, 212, 0.7)" : "none",
+            "linear-gradient(to bottom, #5eead4, #86efac, #a78bfa)",
+          boxShadow: active ? "0 0 10px rgba(94, 234, 212, 0.5), 0 0 10px rgba(167, 139, 250, 0.3)" : "none",
         }}
         aria-hidden="true"
       />
-      {/* Active background — subtle radial halo */}
+      {/* Active background — aurora gradient halo */}
       {active && (
         <span
           className="absolute inset-0 rounded-md pointer-events-none"
           style={{
             background:
-              "radial-gradient(ellipse at left, rgba(94,234,212,0.08) 0%, transparent 70%)",
+              "radial-gradient(ellipse at left, rgba(94,234,212,0.06) 0%, rgba(134,239,172,0.03) 40%, rgba(167,139,250,0.04) 80%, transparent 100%)",
           }}
           aria-hidden="true"
         />
@@ -169,7 +177,7 @@ function NavItem({ icon, label, active, onClick }: NavItemProps) {
         aria-hidden="true"
       />
       <span className="relative z-10 flex items-center gap-3">
-        <span className={active ? "text-[var(--aurora-teal)]" : ""}>{icon}</span>
+        <span className={active ? "text-[var(--aurora-mint)]" : ""}>{icon}</span>
         <span className="font-medium tracking-tight">{label}</span>
       </span>
     </button>
