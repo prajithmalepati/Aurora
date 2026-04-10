@@ -17,8 +17,8 @@ function TableHeader() {
       <tr>
         <th className={`${HEADER_CLASS} w-12 text-center`}>#</th>
         <th className={HEADER_CLASS}>Title</th>
-        <th className={`${HEADER_CLASS} w-24`}>Duration</th>
-        <th className={`${HEADER_CLASS} w-40`}>Playlists</th>
+        <th className={`${HEADER_CLASS} w-24 hidden lg:table-cell`}>Duration</th>
+        <th className={`${HEADER_CLASS} w-40 hidden lg:table-cell`}>Playlists</th>
         <th className={`${HEADER_CLASS} max-w-[200px]`}>Tags</th>
         <th className={`${HEADER_CLASS} w-32 text-right`}>Actions</th>
       </tr>
@@ -44,10 +44,10 @@ export function SongTable({ songs, loading = false, onPlay }: SongTableProps) {
                     <Skeleton className="h-3 w-32" />
                   </div>
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-4 py-3 hidden lg:table-cell">
                   <Skeleton className="h-3 w-10" />
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-4 py-3 hidden lg:table-cell">
                   <Skeleton className="h-3 w-20" />
                 </td>
                 <td className="px-4 py-3">
