@@ -31,16 +31,108 @@ export function PlayerBar() {
 
   return (
     <div
-      className="aurora-keyline-top col-span-2 relative px-6 py-4"
+      className="aurora-keyline-top col-span-1 md:col-span-2 relative px-4 sm:px-6 py-3 sm:py-4"
       style={{
         background: "rgba(6,7,9,0.75)",
         backdropFilter: "blur(24px)",
         WebkitBackdropFilter: "blur(24px)",
       }}
     >
-      <div className="flex items-center gap-8 h-[72px]">
-        {/* ───── LEFT: Album art + title/artist ───── */}
-        <div className="flex items-center gap-3.5 w-[280px] min-w-[220px]">
+      {/* Mobile: stacked layout */}
+      <div className="flex flex-col sm:hidden gap-2">
+        {/* Song info row */}
+        <div className="flex items-center gap-3">
+          <div
+            className="w-10 h-10 rounded-md flex-shrink-0 aurora-rim"
+            style={{
+              background: art.background,
+              boxShadow: hasSong
+                ? `0 0 16px -4px ${art.glow}, inset 0 0 0 1px rgba(255,255,255,0.06)`
+                : "inset 0 0 0 1px rgba(255,255,255,0.05)",
+            }}
+          />
+          <div className="flex flex-col min-w-0 flex-1">
+            {hasSong ? (
+              <>
+                <span className="font-display text-[15px] leading-tight text-[var(--aurora-text)] truncate">
+                  {currentSong.title}
+                </span>
+                <span className="text-[10px] text-[var(--aurora-text-dim)] truncate">
+                  {currentSong.artist}
+                </span>
+              </>
+            ) : (
+              <span className="font-display-italic text-[13px] text-[var(--aurora-text-muted)]">
+                Nothing playing
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Controls row */}
+        <div className="flex items-center gap-3">
+          <span className="text-[10px] text-[var(--aurora-text-dim)] w-8 text-right tabular-nums">
+            {formatDuration(seek)}
+          </span>
+          <input
+            type="range"
+            min={0}
+            max={duration || 100}
+            step={0.1}
+            value={seek}
+            onChange={(e) => seekTo(Number(e.target.value))}
+            disabled={!hasSong}
+            className="aurora-range flex-1"
+            style={{ ["--aurora-range-pct" as string]: `${seekPct}%` }}
+            aria-label="Seek"
+          />
+          <span className="text-[10px] text-[var(--aurora-text-muted)] w-8 tabular-nums">
+            {formatDuration(duration)}
+          </span>
+        </div>
+
+        <div className="flex items-center justify-center gap-5">
+          <button
+            onClick={() => { if (seek > 3) seekTo(0); else previous() }}
+            disabled={!hasSong}
+            className="text-[var(--aurora-text-dim)] hover:text-[var(--aurora-text)] disabled:opacity-25 disabled:pointer-events-none transition-colors duration-150"
+            aria-label="Previous"
+          >
+            <SkipBack className="h-4 w-4" fill="currentColor" strokeWidth={0} />
+          </button>
+          <button
+            onClick={togglePlay}
+            disabled={!hasSong}
+            className={`relative h-10 w-10 rounded-full flex items-center justify-center disabled:opacity-25 disabled:pointer-events-none transition-transform duration-150 active:scale-[0.94] ${
+              hasSong && isPlaying ? "aurora-pulse" : ""
+            }`}
+            style={{
+              background: "var(--aurora-gradient)",
+              boxShadow: hasSong ? "0 0 22px -6px rgba(94, 234, 212, 0.5)" : "none",
+            }}
+            aria-label={isPlaying ? "Pause" : "Play"}
+          >
+            {isPlaying ? (
+              <Pause className="h-4 w-4 text-[#050608]" fill="#050608" strokeWidth={0} />
+            ) : (
+              <Play className="h-4 w-4 ml-[1px] text-[#050608]" fill="#050608" strokeWidth={0} />
+            )}
+          </button>
+          <button
+            onClick={next}
+            disabled={!hasSong}
+            className="text-[var(--aurora-text-dim)] hover:text-[var(--aurora-text)] disabled:opacity-25 disabled:pointer-events-none transition-colors duration-150"
+            aria-label="Next"
+          >
+            <SkipForward className="h-4 w-4" fill="currentColor" strokeWidth={0} />
+          </button>
+        </div>
+      </div>
+
+      {/* Desktop: horizontal layout */}
+      <div className="hidden sm:flex items-center gap-8 h-[72px]">
+        {/* LEFT: Album art + title/artist */}
+        <div className="flex items-center gap-3.5 w-[280px] min-w-[180px]">
           <div className="relative flex-shrink-0">
             <div
               className="w-[56px] h-[56px] rounded-md overflow-hidden aurora-rim"
@@ -51,7 +143,6 @@ export function PlayerBar() {
                   : "inset 0 0 0 1px rgba(255,255,255,0.05)",
               }}
             >
-              {/* Inner shine — a soft top-left highlight */}
               <div
                 className="absolute inset-0"
                 style={{
@@ -80,7 +171,7 @@ export function PlayerBar() {
           </div>
         </div>
 
-        {/* ───── CENTER: Controls + seek bar ───── */}
+        {/* CENTER: Controls + seek bar */}
         <div className="flex-1 flex flex-col items-center gap-2 max-w-[620px] mx-auto">
           <div className="flex items-center gap-6">
             <button
@@ -95,7 +186,6 @@ export function PlayerBar() {
               <SkipBack className="h-[18px] w-[18px]" fill="currentColor" strokeWidth={0} />
             </button>
 
-            {/* THE play button — the single saturated element */}
             <button
               onClick={togglePlay}
               disabled={!hasSong}
@@ -149,7 +239,7 @@ export function PlayerBar() {
           </div>
         </div>
 
-        {/* ───── RIGHT: Now-playing indicator + volume ───── */}
+        {/* RIGHT: Now-playing indicator + volume */}
         <div className="w-[240px] flex-shrink-0 flex items-center gap-3 justify-end">
           {hasSong && isPlaying && (
             <div className="flex items-center gap-2 flex-shrink-0">
