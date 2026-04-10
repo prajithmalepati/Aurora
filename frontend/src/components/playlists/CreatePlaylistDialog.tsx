@@ -10,6 +10,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { usePlaylistStore } from "@/stores/playlistStore"
+import { PlaylistImagePicker } from "@/components/playlists/PlaylistImagePicker"
+import { setPlaylistImage } from "@/lib/playlistImage"
 import { toast } from "sonner"
 
 // Preset color swatches — retuned to the aurora palette
@@ -33,6 +35,7 @@ export function CreatePlaylistDialog({ open, onOpenChange }: CreatePlaylistDialo
   const [name, setName] = useState("")
   const [color, setColor] = useState("")
   const [emoji, setEmoji] = useState("")
+  const [imageDataUrl, setImageDataUrl] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const createPlaylist = usePlaylistStore((state) => state.createPlaylist)
@@ -47,15 +50,21 @@ export function CreatePlaylistDialog({ open, onOpenChange }: CreatePlaylistDialo
     }
 
     try {
+      const trimmedName = name.trim()
       await createPlaylist({
-        name: name.trim(),
+        name: trimmedName,
         color: color.trim() || undefined,
         emoji: emoji.trim() || undefined,
       })
-      toast.success("Playlist created")
+      if (imageDataUrl) {
+        const playlists = usePlaylistStore.getState().playlists
+        const created = playlists.find((p) => p.name === trimmedName)
+        if (created) setPlaylistImage(created.id, imageDataUrl)
+      }
       setName("")
       setColor("")
       setEmoji("")
+      setImageDataUrl(null)
       onOpenChange(false)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to create playlist"
@@ -77,6 +86,7 @@ export function CreatePlaylistDialog({ open, onOpenChange }: CreatePlaylistDialo
           setName("")
           setColor("")
           setEmoji("")
+          setImageDataUrl(null)
           setError(null)
         }
       }}
@@ -91,6 +101,15 @@ export function CreatePlaylistDialog({ open, onOpenChange }: CreatePlaylistDialo
           </DialogHeader>
 
           <div className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <label className="label-micro text-[9.5px]">Cover</label>
+              <PlaylistImagePicker
+                name={name}
+                imageDataUrl={imageDataUrl}
+                onImageChange={setImageDataUrl}
+              />
+            </div>
+
             <div className="space-y-2">
               <label className="label-micro text-[9.5px]">Name</label>
               <Input

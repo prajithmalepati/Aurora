@@ -1,4 +1,5 @@
 import type { Playlist } from "@/types"
+import { playlistThumbnail, getPlaylistImage } from "@/lib/playlistImage"
 
 interface PlaylistItemProps {
   playlist: Playlist
@@ -7,7 +8,8 @@ interface PlaylistItemProps {
 }
 
 export function PlaylistItem({ playlist, isActive, onSelect }: PlaylistItemProps) {
-  const dotColor = playlist.color ?? "#5eead4"
+  const storedImage = getPlaylistImage(playlist.id)
+  const gradient = playlistThumbnail(playlist.name)
 
   return (
     <button
@@ -21,11 +23,11 @@ export function PlaylistItem({ playlist, isActive, onSelect }: PlaylistItemProps
       {/* Active indicator bar */}
       <span
         className={`absolute left-0 top-1/2 -translate-y-1/2 w-[2px] rounded-r-full transition-all duration-300 ${
-          isActive ? "h-4 opacity-100" : "h-0 opacity-0"
+          isActive ? "h-5 opacity-100" : "h-0 opacity-0"
         }`}
         style={{
-          background: "linear-gradient(to bottom, #5eead4, #86efac)",
-          boxShadow: isActive ? "0 0 8px rgba(94, 234, 212, 0.6)" : "none",
+          background: "linear-gradient(to bottom, #5eead4, #86efac, #a78bfa)",
+          boxShadow: isActive ? "0 0 10px rgba(94, 234, 212, 0.5), 0 0 10px rgba(167, 139, 250, 0.3)" : "none",
         }}
         aria-hidden="true"
       />
@@ -34,7 +36,7 @@ export function PlaylistItem({ playlist, isActive, onSelect }: PlaylistItemProps
           className="absolute inset-0 rounded-md pointer-events-none"
           style={{
             background:
-              "radial-gradient(ellipse at left, rgba(94,234,212,0.07) 0%, transparent 70%)",
+              "radial-gradient(ellipse at left, rgba(94,234,212,0.06) 0%, rgba(134,239,172,0.03) 40%, rgba(167,139,250,0.04) 80%, transparent 100%)",
           }}
           aria-hidden="true"
         />
@@ -46,22 +48,31 @@ export function PlaylistItem({ playlist, isActive, onSelect }: PlaylistItemProps
         aria-hidden="true"
       />
 
-      {/* Colored dot with whisper glow */}
-      <span
-        className="relative z-10 w-[6px] h-[6px] rounded-full flex-shrink-0"
-        style={{
-          backgroundColor: dotColor,
-          boxShadow: `0 0 6px ${dotColor}80`,
-        }}
-      />
-      {/* Name */}
-      <span className="relative z-10 flex-1 text-[13px] truncate leading-tight">
-        {playlist.emoji ? `${playlist.emoji} ` : ""}
-        {playlist.name}
+      {/* Thumbnail — 32x32 square */}
+      <span className="relative z-10 flex-shrink-0">
+        {storedImage ? (
+          <img
+            src={storedImage}
+            alt=""
+            className="w-8 h-8 rounded-sm object-cover"
+          />
+        ) : (
+          <span
+            className="block w-8 h-8 rounded-sm"
+            style={{ background: gradient }}
+          />
+        )}
       </span>
-      {/* Count */}
-      <span className="relative z-10 text-[10px] tabular-nums text-[var(--aurora-text-muted)] flex-shrink-0">
-        {playlist.song_count}
+
+      {/* Name + count */}
+      <span className="relative z-10 flex-1 min-w-0 flex flex-col">
+        <span className="text-[13px] truncate leading-tight font-medium">
+          {playlist.emoji ? `${playlist.emoji} ` : ""}
+          {playlist.name}
+        </span>
+        <span className="text-[10px] tabular-nums text-[var(--aurora-text-muted)]">
+          {playlist.song_count} {playlist.song_count === 1 ? "song" : "songs"}
+        </span>
       </span>
     </button>
   )
