@@ -78,8 +78,8 @@ export function SongRow({ song, index, onPlay }: SongRowProps) {
             <span
               className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-7 rounded-r-full"
               style={{
-                background: "linear-gradient(to bottom, #5eead4, #86efac)",
-                boxShadow: "0 0 10px rgba(94, 234, 212, 0.6)",
+                background: "linear-gradient(to bottom, #5eead4, #86efac, #a78bfa)",
+                boxShadow: "0 0 10px rgba(94, 234, 212, 0.4), 0 0 10px rgba(167, 139, 250, 0.3)",
               }}
               aria-hidden="true"
             />
@@ -162,7 +162,7 @@ export function SongRow({ song, index, onPlay }: SongRowProps) {
         </td>
 
         {/* Playlists */}
-        <td className="relative px-4 py-3 w-48">
+        <td className="relative px-4 py-3 w-40">
           <span
             className={`absolute inset-0 transition-colors duration-200 pointer-events-none ${
               isCurrentSong ? "" : "group-hover:bg-white/[0.025]"
@@ -171,18 +171,25 @@ export function SongRow({ song, index, onPlay }: SongRowProps) {
           />
           <div className="relative z-10">
             {song.playlists.length > 0 ? (
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-col gap-1">
                 {song.playlists.slice(0, 2).map((playlist) => (
                   <span
                     key={playlist.id}
-                    className="text-[11px] text-[var(--aurora-text-dim)] truncate max-w-[100px]"
+                    className="inline-flex items-center gap-1.5 text-[11px] text-[var(--aurora-text-dim)] truncate max-w-[140px]"
                   >
+                    <span
+                      className="w-[5px] h-[5px] rounded-sm flex-shrink-0"
+                      style={{
+                        backgroundColor: playlist.color || "#5eead4",
+                        boxShadow: `0 0 4px ${playlist.color || "#5eead4"}60`,
+                      }}
+                    />
                     {playlist.name}
                   </span>
                 ))}
                 {song.playlists.length > 2 && (
-                  <span className="text-[11px] text-[var(--aurora-text-muted)]">
-                    +{song.playlists.length - 2}
+                  <span className="text-[10px] text-[var(--aurora-text-muted)] pl-3">
+                    +{song.playlists.length - 2} more
                   </span>
                 )}
               </div>
@@ -193,7 +200,7 @@ export function SongRow({ song, index, onPlay }: SongRowProps) {
         </td>
 
         {/* Tags */}
-        <td className="relative px-4 py-3">
+        <td className="relative px-4 py-3 max-w-[200px]">
           <span
             className={`absolute inset-0 transition-colors duration-200 pointer-events-none ${
               isCurrentSong ? "" : "group-hover:bg-white/[0.025]"
