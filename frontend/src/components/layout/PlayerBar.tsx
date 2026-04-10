@@ -33,10 +33,9 @@ export function PlayerBar() {
     <div
       className="aurora-keyline-top col-span-2 relative px-6 py-4"
       style={{
-        background:
-          "linear-gradient(to bottom, rgba(5,6,8,0.92) 0%, rgba(3,4,6,0.96) 100%)",
-        backdropFilter: "blur(24px) saturate(120%)",
-        WebkitBackdropFilter: "blur(24px) saturate(120%)",
+        background: "rgba(6,7,9,0.75)",
+        backdropFilter: "blur(24px)",
+        WebkitBackdropFilter: "blur(24px)",
       }}
     >
       <div className="flex items-center gap-8 h-[72px]">
@@ -66,7 +65,7 @@ export function PlayerBar() {
           <div className="flex flex-col min-w-0 flex-1">
             {hasSong ? (
               <>
-                <span className="font-display text-[19px] leading-tight text-[var(--aurora-text)] truncate">
+                <span className="font-display text-[18px] leading-tight text-[var(--aurora-text)] truncate">
                   {currentSong.title}
                 </span>
                 <span className="text-[11px] text-[var(--aurora-text-dim)] truncate mt-0.5 tracking-wide">
@@ -151,17 +150,17 @@ export function PlayerBar() {
         </div>
 
         {/* ───── RIGHT: Now-playing indicator + volume ───── */}
-        <div className="w-[180px] flex-shrink-0 flex items-center gap-3 justify-end">
+        <div className="w-[240px] flex-shrink-0 flex items-center gap-3 justify-end">
           {hasSong && isPlaying && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-shrink-0">
               <Equalizer playing={isPlaying} />
-              <span className="label-micro text-[9.5px] text-[var(--aurora-teal-dim)]">
+              <span className="label-micro text-[9.5px] text-[var(--aurora-teal-dim)] whitespace-nowrap">
                 Playing
               </span>
             </div>
           )}
 
-          <div className="flex items-center gap-2 w-[120px]">
+          <div className="flex items-center gap-2 min-w-0 w-[110px] flex-shrink-0">
             <button
               onClick={toggleMute}
               className="text-[var(--aurora-text-dim)] hover:text-[var(--aurora-text)] transition-colors duration-150 flex-shrink-0"
@@ -180,7 +179,7 @@ export function PlayerBar() {
               step={0.01}
               value={volume}
               onChange={(e) => setVolume(Number(e.target.value))}
-              className="aurora-range flex-1"
+              className="aurora-range flex-1 min-w-0"
               style={{ ["--aurora-range-pct" as string]: `${volumePct}%` }}
               aria-label="Volume"
             />

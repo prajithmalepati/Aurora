@@ -82,12 +82,14 @@ function App() {
               <AddSongDialog />
             </div>
 
-            {/* Search — pill with inset glow on focus */}
+            {/* Search — pill with glassmorphism on focus */}
             <div
-              className="relative flex items-center rounded-full mb-6 transition-all duration-200 focus-within:shadow-[0_0_24px_-6px_rgba(94,234,212,0.3)]"
+              className="relative flex items-center rounded-full mb-6 transition-all duration-200 focus-within:shadow-[0_0_20px_-6px_rgba(94,234,212,0.2),0_0_20px_-6px_rgba(167,139,250,0.15)]"
               style={{
-                background: "rgba(255,255,255,0.02)",
+                background: "rgba(255,255,255,0.03)",
                 boxShadow: "inset 0 0 0 1px var(--aurora-rim)",
+                backdropFilter: "blur(12px)",
+                WebkitBackdropFilter: "blur(12px)",
               }}
             >
               <Search
