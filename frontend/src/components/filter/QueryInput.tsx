@@ -64,10 +64,12 @@ export function QueryInput({ error }: QueryInputProps) {
       <div
         className="relative rounded-lg overflow-hidden transition-all duration-200 focus-within:shadow-[0_0_20px_-6px_rgba(94,234,212,0.2),0_0_20px_-6px_rgba(167,139,250,0.15)]"
         style={{
-          background: "rgba(255,255,255,0.02)",
+          background: "rgba(255,255,255,0.03)",
           boxShadow: error
             ? "inset 0 0 0 1px rgba(248, 113, 113, 0.4)"
             : "inset 0 0 0 1px var(--aurora-rim)",
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
         }}
       >
         <input

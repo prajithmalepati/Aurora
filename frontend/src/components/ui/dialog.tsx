@@ -58,11 +58,11 @@ function DialogContent({
         )}
         style={{
           background:
-            "linear-gradient(180deg, rgba(14,17,22,0.98) 0%, rgba(8,10,13,0.98) 100%)",
+            "linear-gradient(180deg, rgba(14,17,22,0.82) 0%, rgba(8,10,13,0.88) 100%)",
           boxShadow:
             "inset 0 0 0 1px var(--aurora-rim), 0 40px 80px -20px rgba(0,0,0,0.8), 0 0 48px -12px rgba(94, 234, 212, 0.12)",
-          backdropFilter: "blur(24px)",
-          WebkitBackdropFilter: "blur(24px)",
+          backdropFilter: "blur(32px) saturate(120%)",
+          WebkitBackdropFilter: "blur(32px) saturate(120%)",
         }}
         {...props}
       >
