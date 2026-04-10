@@ -39,7 +39,7 @@ export function QueryBuilder() {
   const hasSearched = query.trim().length > 0
 
   return (
-    <div className="p-10 max-w-[1400px] mx-auto aurora-fade-in">
+    <div className="p-4 sm:p-10 max-w-[1400px] mx-auto aurora-fade-in">
       {/* Header */}
       <div className="mb-6">
         <h1 className="font-display text-[44px] leading-[0.95] tracking-tight text-[var(--aurora-text)]">

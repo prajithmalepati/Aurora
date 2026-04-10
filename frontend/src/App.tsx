@@ -8,7 +8,6 @@ import { Sidebar } from "@/components/layout/Sidebar"
 import { PlayerBar } from "@/components/layout/PlayerBar"
 import { Toaster } from "sonner"
 import { SongTable } from "@/components/songs/SongTable"
-import { AddSongDialog } from "@/components/songs/AddSongDialog"
 import { PlaylistDetail } from "@/components/playlists/PlaylistDetail"
 import { QueryBuilder } from "@/components/filter/QueryBuilder"
 import { Search } from "lucide-react"
@@ -67,22 +66,8 @@ function App() {
     switch (view.kind) {
       case "all-songs":
         return (
-          <div className="px-10 pt-10 pb-6 max-w-[1400px] mx-auto aurora-fade-in">
-            {/* Hero header */}
-            <div className="flex items-end justify-between gap-6 mb-8">
-              <div>
-                <p className="label-micro mb-2">Library</p>
-                <h1 className="font-display text-[52px] leading-[0.95] tracking-tight text-[var(--aurora-text)]">
-                  All Songs
-                </h1>
-                <p className="text-[12px] text-[var(--aurora-text-dim)] mt-2 tabular-nums">
-                  {songs.length} {songs.length === 1 ? "song" : "songs"} in your library
-                </p>
-              </div>
-              <AddSongDialog />
-            </div>
-
-            {/* Search — pill with glassmorphism on focus */}
+          <div className="p-4 sm:px-10 sm:pt-8 sm:pb-6 max-w-[1400px] mx-auto aurora-fade-in">
+            {/* Search bar */}
             <div
               className="relative flex items-center rounded-full mb-6 transition-all duration-200 focus-within:shadow-[0_0_20px_-6px_rgba(94,234,212,0.2),0_0_20px_-6px_rgba(167,139,250,0.15)]"
               style={{
