@@ -15,7 +15,9 @@ export function AppShell({ children }: AppShellProps) {
 
   return (
     <>
-      {/* Fixed atmospheric layers */}
+      {/* Fixed atmospheric layers — image bleed behind, veil, then radial, then noise */}
+      <div className="aurora-bg-image" aria-hidden="true" />
+      <div className="aurora-bg-veil" aria-hidden="true" />
       <div className="aurora-atmosphere" aria-hidden="true" />
       <div className="aurora-noise" aria-hidden="true" />
 
