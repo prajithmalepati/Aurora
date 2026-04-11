@@ -59,7 +59,10 @@ export function CreatePlaylistDialog({ open, onOpenChange }: CreatePlaylistDialo
       if (imageDataUrl) {
         const playlists = usePlaylistStore.getState().playlists
         const created = playlists.find((p) => p.name === trimmedName)
-        if (created) setPlaylistImage(created.id, imageDataUrl)
+        if (created) {
+          setPlaylistImage(created.id, imageDataUrl)
+          await usePlaylistStore.getState().fetchPlaylists()
+        }
       }
       setName("")
       setColor("")

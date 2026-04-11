@@ -508,7 +508,7 @@ def update_playlist(playlist_id: int, playlist: PlaylistUpdate):
     
     if playlist.emoji is not None:
         updates.append("emoji = ?")
-        params.append(playlist.emoji)
+        params.append(playlist.emoji if playlist.emoji else None)
     
     updates.append("updated_at = ?")
     params.append(now)
