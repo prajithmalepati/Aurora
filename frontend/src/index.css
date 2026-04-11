@@ -8,7 +8,7 @@
 @theme inline {
     --font-sans: 'Geist Variable', system-ui, sans-serif;
     --font-heading: var(--font-sans);
-    --font-display: 'Space Grotesk', system-ui, sans-serif;
+    --font-display: 'Fraunces', ui-serif, Georgia, serif;
 
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
@@ -189,23 +189,34 @@
    TYPOGRAPHY UTILITIES
    ============================================================ */
 
+/* Display font — Fraunces variable serif.
+   opsz pushes toward display weight at large sizes; SOFT adds curvature warmth;
+   WONK=0 keeps shapes composed (=1 would flip into playful mode). */
 .font-display {
-  font-family: 'Space Grotesk', system-ui, sans-serif;
-  font-weight: 700;
-  letter-spacing: -0.025em;
+  font-family: 'Fraunces', ui-serif, Georgia, serif;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  font-optical-sizing: auto;
+  font-variation-settings: "opsz" 144, "SOFT" 60, "WONK" 0;
 }
 
 .font-display-subtitle {
-  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-family: 'Fraunces', ui-serif, Georgia, serif;
   font-weight: 500;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.02em;
+  font-optical-sizing: auto;
+  font-variation-settings: "opsz" 36, "SOFT" 50, "WONK" 0;
 }
 
+/* Emotional italic — used for quiet copy like "Nothing playing" / empty states.
+   Italic Fraunces is soft and editorial, pairs with Geist body without clashing. */
 .font-display-italic {
-  font-family: 'Geist Variable', system-ui, sans-serif;
-  font-weight: 400;
-  font-style: normal;
-  letter-spacing: -0.005em;
+  font-family: 'Fraunces', ui-serif, Georgia, serif;
+  font-weight: 500;
+  font-style: italic;
+  letter-spacing: -0.01em;
+  font-optical-sizing: auto;
+  font-variation-settings: "opsz" 36, "SOFT" 100, "WONK" 0;
 }
 
 .label-micro {
