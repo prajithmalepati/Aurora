@@ -232,6 +232,17 @@
   background: var(--aurora-gradient);
 }
 
+/* Horizontal chip row — hides native scrollbar so the row feels seamless.
+   Scroll still works via wheel/trackpad/drag. */
+.aurora-chiprow {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  scroll-behavior: smooth;
+}
+.aurora-chiprow::-webkit-scrollbar {
+  display: none;
+}
+
 /* Pill chip with aurora gradient border (1px) and transparent fill
    --chip-bg lets dialogs override the inner fill colour */
 .aurora-chip {

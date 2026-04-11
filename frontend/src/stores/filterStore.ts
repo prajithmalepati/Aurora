@@ -1,6 +1,8 @@
 import { create } from "zustand"
 import { api } from "@/lib/api"
-import type { FilterResult, ApiResponse } from "@/types"
+import type { FilterResult, ApiResponse, Song } from "@/types"
+import { usePlayerStore } from "./playerStore"
+import { toast } from "sonner"
 
 interface FilterState {
   query: string
@@ -13,7 +15,34 @@ interface FilterState {
   appendTerm: (term: string) => void
   executeFilter: () => Promise<void>
   shuffleFilter: () => Promise<void>
+  jamFilter: () => Promise<void>
+  shuffleAndJamFilter: () => Promise<void>
   clearResults: () => void
+}
+
+function shuffleArray<T>(arr: T[]): T[] {
+  const shuffled = [...arr]
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+  }
+  return shuffled
+}
+
+function filterResultToSong(r: FilterResult): Song {
+  return {
+    id: r.id,
+    title: r.title,
+    artist: r.artist,
+    album: r.album,
+    duration: r.duration,
+    file_path: r.file_path,
+    source: r.source,
+    tags: r.tags,
+    playlists: r.playlists,
+    created_at: r.created_at,
+    updated_at: r.updated_at,
+  }
 }
 
 function friendlyFilterError(query: string, raw: string): string {
@@ -87,12 +116,53 @@ export const useFilterStore = create<FilterState>((set, get) => ({
     set({ loading: true, error: null })
     try {
       const res = await api.post<ApiResponse<FilterResult[]>>("/filter", { query })
-      const shuffled = [...res.data]
-      for (let i = shuffled.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1))
-        ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
-      }
+      const shuffled = shuffleArray(res.data)
       set({ results: shuffled, loading: false })
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Unknown error"
+      set({ error: friendlyFilterError(query, message), loading: false, results: [] })
+    }
+  },
+
+  jamFilter: async () => {
+    const query = get().query.trim()
+    if (!query) return
+
+    set({ loading: true, error: null })
+    try {
+      const res = await api.post<ApiResponse<FilterResult[]>>("/filter", { query })
+      set({ results: res.data, loading: false })
+      const playable = res.data.filter((r) => r.file_path)
+      if (playable.length === 0) {
+        toast.error("No playable songs in this mix")
+        return
+      }
+      const queue = playable.map(filterResultToSong)
+      usePlayerStore.getState().playSong(queue[0], queue)
+      toast.success(`Jamming ${queue.length} ${queue.length === 1 ? "song" : "songs"}`)
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Unknown error"
+      set({ error: friendlyFilterError(query, message), loading: false, results: [] })
+    }
+  },
+
+  shuffleAndJamFilter: async () => {
+    const query = get().query.trim()
+    if (!query) return
+
+    set({ loading: true, error: null })
+    try {
+      const res = await api.post<ApiResponse<FilterResult[]>>("/filter", { query })
+      const shuffled = shuffleArray(res.data)
+      set({ results: shuffled, loading: false })
+      const playable = shuffled.filter((r) => r.file_path)
+      if (playable.length === 0) {
+        toast.error("No playable songs in this mix")
+        return
+      }
+      const queue = playable.map(filterResultToSong)
+      usePlayerStore.getState().playSong(queue[0], queue)
+      toast.success(`Shuffled ${queue.length} ${queue.length === 1 ? "song" : "songs"}`)
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Unknown error"
       set({ error: friendlyFilterError(query, message), loading: false, results: [] })
