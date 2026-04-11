@@ -87,16 +87,16 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
     }
     try {
       const playlistStore = usePlaylistStore.getState()
-      await playlistStore.updatePlaylist(activePlaylist.id, {
-        name: editName.trim(),
-        color: editColor.trim() || undefined,
-        emoji: editEmoji.trim() || undefined,
-      })
       if (editImageDataUrl) {
         setPlaylistImage(activePlaylist.id, editImageDataUrl)
       } else {
         removePlaylistImage(activePlaylist.id)
       }
+      await playlistStore.updatePlaylist(activePlaylist.id, {
+        name: editName.trim(),
+        color: editColor.trim() || undefined,
+        emoji: editEmoji.trim(),
+      })
       toast.success("Playlist updated")
       setEditDialogOpen(false)
     } catch (err: unknown) {
@@ -361,12 +361,24 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
 
               <div className="space-y-2">
                 <label className="label-micro text-[10px]">Emoji (optional)</label>
-                <Input
-                  type="text"
-                  value={editEmoji}
-                  onChange={(e) => setEditEmoji(e.target.value)}
-                  placeholder="🎸"
-                />
+                <div className="relative">
+                  <Input
+                    type="text"
+                    value={editEmoji}
+                    onChange={(e) => setEditEmoji(e.target.value)}
+                    placeholder="🎸"
+                    className="pr-20"
+                  />
+                  {editEmoji && (
+                    <button
+                      type="button"
+                      onClick={() => setEditEmoji("")}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-medium uppercase tracking-wider text-[var(--aurora-text-muted)] hover:text-[var(--aurora-danger)] px-2 py-1 rounded transition-colors duration-150"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 
