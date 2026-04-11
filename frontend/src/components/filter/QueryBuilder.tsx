@@ -4,7 +4,7 @@ import { usePlaylistStore } from "@/stores/playlistStore"
 import { usePlayerStore } from "@/stores/playerStore"
 import { QueryInput } from "./QueryInput"
 import { SongTable } from "@/components/songs/SongTable"
-import { Search, X, Shuffle } from "lucide-react"
+import { Search, X, Shuffle, Sparkles } from "lucide-react"
 import type { Song } from "@/types"
 
 type OperatorKind = "AND" | "OR" | "NOT" | "(" | ")"
@@ -25,7 +25,8 @@ export function QueryBuilder() {
   const appendToQuery = useFilterStore((state) => state.appendToQuery)
   const appendTerm = useFilterStore((state) => state.appendTerm)
   const executeFilter = useFilterStore((state) => state.executeFilter)
-  const shuffleFilter = useFilterStore((state) => state.shuffleFilter)
+  const jamFilter = useFilterStore((state) => state.jamFilter)
+  const shuffleAndJamFilter = useFilterStore((state) => state.shuffleAndJamFilter)
   const clearResults = useFilterStore((state) => state.clearResults)
 
   const playSong = usePlayerStore((state) => state.playSong)
@@ -77,18 +78,18 @@ export function QueryBuilder() {
         })}
       </div>
 
-      {/* Tags section */}
+      {/* Tags section — compact horizontal scroll */}
       {tags.length > 0 && (
         <div className="mt-6">
-          <p className="label-micro mb-2.5">Tags</p>
-          <div className="flex gap-1.5 flex-wrap">
+          <p className="label-micro mb-2">Tags</p>
+          <div className="aurora-chiprow flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
             {tags.map((tag) => (
               <button
                 key={tag.id}
                 onClick={() =>
                   appendTerm(tag.name.includes(" ") ? `"${tag.name}"` : tag.name)
                 }
-                className="aurora-chip text-[11px] font-medium text-[var(--aurora-text-dim)] px-2.5 py-[3px] rounded-full transition-all duration-150 hover:scale-[1.03] hover:text-[var(--aurora-text)]"
+                className="aurora-chip flex-shrink-0 text-[11px] font-medium text-[var(--aurora-text-dim)] px-2.5 py-[3px] rounded-full transition-all duration-150 hover:scale-[1.03] hover:text-[var(--aurora-text)]"
               >
                 {tag.name}
               </button>
@@ -97,11 +98,11 @@ export function QueryBuilder() {
         </div>
       )}
 
-      {/* Playlists section */}
+      {/* Playlists section — compact horizontal scroll */}
       {playlists.length > 0 && (
-        <div className="mt-5">
-          <p className="label-micro mb-2.5">Playlists</p>
-          <div className="flex gap-1.5 flex-wrap">
+        <div className="mt-4">
+          <p className="label-micro mb-2">Playlists</p>
+          <div className="aurora-chiprow flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
             {playlists.map((playlist) => {
               const color = playlist.color || "#a78bfa"
               return (
@@ -114,7 +115,7 @@ export function QueryBuilder() {
                         : playlist.name.toLowerCase()
                     )
                   }
-                  className="text-[11px] font-medium px-2.5 py-[3px] rounded-full transition-all duration-150 hover:scale-[1.03] inline-flex items-center gap-1.5"
+                  className="flex-shrink-0 whitespace-nowrap text-[11px] font-medium px-2.5 py-[3px] rounded-full transition-all duration-150 hover:scale-[1.03] inline-flex items-center gap-1.5"
                   style={{
                     color: color,
                     boxShadow: `inset 0 0 0 1px ${color}38`,
@@ -140,7 +141,7 @@ export function QueryBuilder() {
       )}
 
       {/* Action bar */}
-      <div className="flex gap-2 mt-7">
+      <div className="flex gap-2 mt-7 items-center flex-wrap">
         <button
           onClick={executeFilter}
           disabled={loading}
@@ -154,20 +155,35 @@ export function QueryBuilder() {
           {loading ? "Searching..." : "Search"}
         </button>
         <button
-          onClick={shuffleFilter}
+          onClick={jamFilter}
           disabled={loading}
-          className="h-10 px-4 rounded-md text-[13px] font-medium text-[var(--aurora-text-dim)] hover:text-[var(--aurora-text)] inline-flex items-center gap-2 transition-all duration-150 disabled:opacity-50"
+          className="relative h-10 px-6 py-2 rounded-full text-[13px] font-bold text-white inline-flex items-center gap-2 transition-all duration-150 active:scale-[0.97] disabled:opacity-50 hover:scale-[1.03]"
           style={{
-            background: "rgba(255,255,255,0.02)",
-            boxShadow: "inset 0 0 0 1px var(--aurora-rim)",
+            background: "linear-gradient(135deg, #5eead4 0%, #a78bfa 100%)",
+            boxShadow:
+              "0 0 24px -6px rgba(94, 234, 212, 0.55), 0 0 24px -6px rgba(167, 139, 250, 0.5), inset 0 1px 0 rgba(255,255,255,0.25)",
+            letterSpacing: "0.02em",
           }}
         >
-          <Shuffle className="h-3.5 w-3.5" />
-          Shuffle
+          <Sparkles className="h-3.5 w-3.5" strokeWidth={2.5} />
+          Jam
+        </button>
+        <button
+          onClick={shuffleAndJamFilter}
+          disabled={loading}
+          title="Shuffle the mix and play"
+          aria-label="Shuffle and play"
+          className="h-10 w-10 rounded-full flex items-center justify-center text-[var(--aurora-text-dim)] hover:text-[var(--aurora-text)] transition-all duration-150 disabled:opacity-50 hover:scale-[1.04]"
+          style={{
+            background: "rgba(255,255,255,0.02)",
+            boxShadow: "inset 0 0 0 1px var(--aurora-rim-bright)",
+          }}
+        >
+          <Shuffle className="h-4 w-4" />
         </button>
         <button
           onClick={clearResults}
-          className="h-10 px-4 rounded-md text-[13px] font-medium text-[var(--aurora-text-dim)] hover:text-[var(--aurora-text)] inline-flex items-center gap-2 transition-all duration-150"
+          className="h-10 px-4 rounded-md text-[13px] font-medium text-[var(--aurora-text-dim)] hover:text-[var(--aurora-text)] inline-flex items-center gap-2 transition-all duration-150 ml-auto"
           style={{
             background: "rgba(255,255,255,0.02)",
             boxShadow: "inset 0 0 0 1px var(--aurora-rim)",
@@ -208,8 +224,8 @@ export function QueryBuilder() {
           </div>
         ) : (
           <>
-            <p className="text-[13px] text-[var(--aurora-text-dim)] mb-4 font-medium">
-              {results.length} {results.length === 1 ? "song matches" : "songs match"} this mix
+            <p className="label-micro mb-4 text-[var(--aurora-text-dim)]">
+              {results.length} {results.length === 1 ? "song" : "songs"}
             </p>
             <SongTable songs={results} loading={false} onPlay={handlePlaySong} />
           </>
