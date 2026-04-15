@@ -67,6 +67,15 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
   // Server-stored image URL (comes back from the API on every fetchPlaylistDetail)
   const heroImage = activePlaylist?.image_url ?? null
 
+  // Neutral dark gradient for the hero tile — no teal/violet bias.
+  // If the playlist has a custom accent colour we let a whisper of it through.
+  const heroTileGradient = useMemo(() => {
+    const accent = activePlaylist?.color
+    return accent
+      ? `linear-gradient(135deg, ${accent}22 0%, rgba(18,20,26,1) 100%)`
+      : "linear-gradient(135deg, rgba(38,38,42,1) 0%, rgba(16,17,22,1) 100%)"
+  }, [activePlaylist?.color])
+
   const totalDuration = useMemo(() => {
     if (!activePlaylist) return 0
     return activePlaylist.songs.reduce((sum, s) => sum + (s.duration ?? 0), 0)
@@ -237,7 +246,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
           <div
             className="w-[168px] h-[168px] rounded-xl flex-shrink-0 aurora-rim overflow-hidden flex items-center justify-center text-5xl"
             style={{
-              background: heroImage ? undefined : heroArt.background,
+              background: heroImage ? undefined : heroTileGradient,
               boxShadow: `0 20px 60px -20px ${heroArt.glow}, inset 0 0 0 1px rgba(255,255,255,0.06)`,
             }}
           >
