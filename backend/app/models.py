@@ -79,6 +79,7 @@ class PlaylistResponse(BaseModel):
     name: str
     color: Optional[str]
     emoji: Optional[str]
+    image_url: Optional[str] = None
     song_count: int
     created_at: str
     updated_at: str

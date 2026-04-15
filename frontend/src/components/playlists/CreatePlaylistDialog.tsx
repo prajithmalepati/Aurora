@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { PlaylistImagePicker } from "@/components/playlists/PlaylistImagePicker"
-import { setPlaylistImage } from "@/lib/playlistImage"
+import { api } from "@/lib/api"
 import { toast } from "sonner"
 
 // Preset color swatches — retuned to the aurora palette
@@ -50,19 +50,22 @@ export function CreatePlaylistDialog({ open, onOpenChange }: CreatePlaylistDialo
     }
 
     try {
-      const trimmedName = name.trim()
-      await createPlaylist({
-        name: trimmedName,
+      const newId = await createPlaylist({
+        name: name.trim(),
         color: color.trim() || undefined,
         emoji: emoji.trim() || undefined,
       })
-      if (imageDataUrl) {
-        const playlists = usePlaylistStore.getState().playlists
-        const created = playlists.find((p) => p.name === trimmedName)
-        if (created) {
-          setPlaylistImage(created.id, imageDataUrl)
-          await usePlaylistStore.getState().fetchPlaylists()
-        }
+      if (imageDataUrl?.startsWith("data:")) {
+        const blob = await fetch(imageDataUrl).then((r) => r.blob())
+        const ext =
+          blob.type === "image/png" ? "png"
+          : blob.type === "image/gif" ? "gif"
+          : blob.type === "image/webp" ? "webp"
+          : "jpg"
+        const formData = new FormData()
+        formData.append("file", blob, `image.${ext}`)
+        await api.upload(`/playlists/${newId}/image`, formData)
+        await usePlaylistStore.getState().fetchPlaylists()
       }
       setName("")
       setColor("")

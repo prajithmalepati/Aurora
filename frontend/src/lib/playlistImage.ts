@@ -19,29 +19,3 @@ function hashString(str: string): number {
 export function playlistThumbnail(name: string): string {
   return GRADIENTS[hashString(name) % GRADIENTS.length]
 }
-
-const STORAGE_KEY_PREFIX = "aurora-playlist-img-"
-
-export function getPlaylistImage(playlistId: number): string | null {
-  try {
-    return localStorage.getItem(`${STORAGE_KEY_PREFIX}${playlistId}`)
-  } catch {
-    return null
-  }
-}
-
-export function setPlaylistImage(playlistId: number, dataUrl: string): void {
-  try {
-    localStorage.setItem(`${STORAGE_KEY_PREFIX}${playlistId}`, dataUrl)
-  } catch {
-    // localStorage full or unavailable
-  }
-}
-
-export function removePlaylistImage(playlistId: number): void {
-  try {
-    localStorage.removeItem(`${STORAGE_KEY_PREFIX}${playlistId}`)
-  } catch {
-    // noop
-  }
-}

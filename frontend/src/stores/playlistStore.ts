@@ -15,7 +15,7 @@ interface PlaylistState {
     name: string
     color?: string
     emoji?: string
-  }) => Promise<void>
+  }) => Promise<number>
   updatePlaylist: (id: number, data: {
     name?: string
     color?: string
@@ -56,12 +56,14 @@ export const usePlaylistStore = create<PlaylistState>((set, get) => ({
 
   createPlaylist: async (data) => {
     try {
-      await api.post("/playlists", data)
+      const res = await api.post<{ id: number; name: string }>("/playlists", data)
       await get().fetchPlaylists()
       toast.success("Playlist created")
-    } catch (e: any) {
-      set({ error: e.message })
-      toast.error(e.message ?? "Failed to create playlist")
+      return res.id
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to create playlist"
+      set({ error: msg })
+      toast.error(msg)
       throw e
     }
   },
