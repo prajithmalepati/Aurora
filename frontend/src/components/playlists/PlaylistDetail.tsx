@@ -64,6 +64,8 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
     [activePlaylist?.name, playlistId]
   )
 
+  const heroImage = activePlaylist ? getPlaylistImage(activePlaylist.id) : null
+
   const totalDuration = useMemo(() => {
     if (!activePlaylist) return 0
     return activePlaylist.songs.reduce((sum, s) => sum + (s.duration ?? 0), 0)
@@ -97,7 +99,6 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
         color: editColor.trim() || undefined,
         emoji: editEmoji.trim(),
       })
-      toast.success("Playlist updated")
       setEditDialogOpen(false)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to update playlist"
@@ -220,13 +221,17 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
         <div className="relative flex items-end gap-7">
           {/* Hero art tile */}
           <div
-            className="w-[168px] h-[168px] rounded-xl flex-shrink-0 aurora-rim flex items-center justify-center text-5xl"
+            className="w-[168px] h-[168px] rounded-xl flex-shrink-0 aurora-rim overflow-hidden flex items-center justify-center text-5xl"
             style={{
-              background: heroArt.background,
+              background: heroImage ? undefined : heroArt.background,
               boxShadow: `0 20px 60px -20px ${heroArt.glow}, inset 0 0 0 1px rgba(255,255,255,0.06)`,
             }}
           >
-            {activePlaylist.emoji && <span>{activePlaylist.emoji}</span>}
+            {heroImage ? (
+              <img src={heroImage} alt="" className="w-full h-full object-cover" />
+            ) : (
+              activePlaylist.emoji && <span>{activePlaylist.emoji}</span>
+            )}
           </div>
 
           {/* Metadata */}
