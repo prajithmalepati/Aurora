@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS playlists (
     name       TEXT    NOT NULL UNIQUE,
     color      TEXT,
     emoji      TEXT,
+    image_url  TEXT,
     created_at TEXT    NOT NULL,
     updated_at TEXT    NOT NULL
 );
@@ -75,4 +76,10 @@ def init_db():
     """Initialize the database — create tables if they don't exist."""
     conn = get_db()
     conn.executescript(INIT_SQL)
+    # Migration: add image_url column to existing databases
+    try:
+        conn.execute("ALTER TABLE playlists ADD COLUMN image_url TEXT")
+        conn.commit()
+    except Exception:
+        pass  # Column already exists
     conn.close()

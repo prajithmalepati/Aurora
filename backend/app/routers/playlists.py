@@ -1,10 +1,17 @@
 """Playlists router."""
 import sqlite3
-from fastapi import APIRouter, HTTPException
+from pathlib import Path
+from fastapi import APIRouter, HTTPException, UploadFile, File
+
 from datetime import datetime, timezone
 
 from app.database import get_db
 from app.models import PlaylistCreate, PlaylistUpdate, PlaylistResponse, SongResponse, PlaylistSongAdd, PlaylistReorder
+
+# Playlist cover images are saved into the Vite public folder so they're
+# served at /playlist-images/<id>.<ext> by the dev server (no CORS issues).
+_PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
+IMAGES_DIR = _PROJECT_ROOT / "frontend" / "public" / "playlist-images"
 
 router = APIRouter(tags=["playlists"])
 
@@ -12,6 +19,75 @@ router = APIRouter(tags=["playlists"])
 def _get_utc_now() -> str:
     """Return current UTC timestamp in ISO format."""
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+@router.put("/playlists/{playlist_id}/image")
+async def upload_playlist_image(playlist_id: int, file: UploadFile = File(...)):
+    """Upload a cover image for a playlist. Saved to frontend/public/playlist-images/."""
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image")
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id FROM playlists WHERE id = ?", (playlist_id,))
+    if not cursor.fetchone():
+        conn.close()
+        raise HTTPException(status_code=404, detail="Playlist not found")
+    conn.close()
+
+    # Derive extension from MIME type
+    mime = file.content_type or "image/jpeg"
+    ext = {"image/png": "png", "image/gif": "gif", "image/webp": "webp"}.get(mime, "jpg")
+
+    IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Remove any existing image files for this playlist
+    for old in IMAGES_DIR.glob(f"{playlist_id}.*"):
+        old.unlink()
+
+    filename = f"{playlist_id}.{ext}"
+    with open(IMAGES_DIR / filename, "wb") as f:
+        f.write(await file.read())
+
+    image_url = f"/playlist-images/{filename}"
+
+    conn = get_db()
+    conn.execute(
+        "UPDATE playlists SET image_url = ?, updated_at = ? WHERE id = ?",
+        (image_url, _get_utc_now(), playlist_id),
+    )
+    conn.commit()
+    conn.close()
+
+    return {"image_url": image_url}
+
+
+@router.delete("/playlists/{playlist_id}/image", status_code=200)
+def delete_playlist_image(playlist_id: int):
+    """Remove the cover image for a playlist."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, image_url FROM playlists WHERE id = ?", (playlist_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(status_code=404, detail="Playlist not found")
+
+    if row["image_url"]:
+        filename = row["image_url"].split("/")[-1]
+        file_path = IMAGES_DIR / filename
+        if file_path.exists():
+            file_path.unlink()
+
+    conn = get_db()
+    conn.execute(
+        "UPDATE playlists SET image_url = NULL, updated_at = ? WHERE id = ?",
+        (_get_utc_now(), playlist_id),
+    )
+    conn.commit()
+    conn.close()
+
+    return {"message": "Image removed"}
 
 
 @router.post("/playlists", status_code=201)
@@ -59,11 +135,12 @@ def list_playlists():
     cursor = conn.cursor()
     
     query = """
-        SELECT 
+        SELECT
             p.id,
             p.name,
             p.color,
             p.emoji,
+            p.image_url,
             COUNT(ps.song_id) as song_count,
             p.created_at,
             p.updated_at
@@ -72,17 +149,18 @@ def list_playlists():
         GROUP BY p.id
         ORDER BY p.name ASC
     """
-    
+
     cursor.execute(query)
     rows = cursor.fetchall()
     conn.close()
-    
+
     data = [
         PlaylistResponse(
             id=row["id"],
             name=row["name"],
             color=row["color"],
             emoji=row["emoji"],
+            image_url=row["image_url"],
             song_count=row["song_count"],
             created_at=row["created_at"],
             updated_at=row["updated_at"],
@@ -203,7 +281,7 @@ def reorder_playlist_songs(playlist_id: int, reorder: PlaylistReorder):
 
     cursor.execute(
         """
-        SELECT id, name, color, emoji, created_at, updated_at
+        SELECT id, name, color, emoji, image_url, created_at, updated_at
         FROM playlists
         WHERE id = ?
         """,
@@ -220,6 +298,7 @@ def reorder_playlist_songs(playlist_id: int, reorder: PlaylistReorder):
             "name": row["name"],
             "color": row["color"],
             "emoji": row["emoji"],
+            "image_url": row["image_url"],
             "song_count": song_count,
             "songs": songs,
             "created_at": row["created_at"],
@@ -347,7 +426,7 @@ def delete_song_from_playlist(playlist_id: int, song_id: int):
 
     cursor.execute(
         """
-        SELECT id, name, color, emoji, created_at, updated_at
+        SELECT id, name, color, emoji, image_url, created_at, updated_at
         FROM playlists
         WHERE id = ?
         """,
@@ -364,6 +443,7 @@ def delete_song_from_playlist(playlist_id: int, song_id: int):
             "name": row["name"],
             "color": row["color"],
             "emoji": row["emoji"],
+            "image_url": row["image_url"],
             "song_count": song_count,
             "songs": songs,
             "created_at": row["created_at"],
@@ -382,7 +462,7 @@ def get_playlist(playlist_id: int):
     # Fetch playlist metadata
     cursor.execute(
         """
-        SELECT id, name, color, emoji, created_at, updated_at
+        SELECT id, name, color, emoji, image_url, created_at, updated_at
         FROM playlists
         WHERE id = ?
         """,
@@ -390,7 +470,7 @@ def get_playlist(playlist_id: int):
     )
     row = cursor.fetchone()
     conn.close()
-    
+
     if not row:
         raise HTTPException(status_code=404, detail="Playlist not found")
     
@@ -454,6 +534,7 @@ def get_playlist(playlist_id: int):
             "name": row["name"],
             "color": row["color"],
             "emoji": row["emoji"],
+            "image_url": row["image_url"],
             "song_count": song_count,
             "songs": songs,
             "created_at": row["created_at"],
@@ -527,11 +608,12 @@ def update_playlist(playlist_id: int, playlist: PlaylistUpdate):
     
     cursor.execute(
         """
-        SELECT 
+        SELECT
             p.id,
             p.name,
             p.color,
             p.emoji,
+            p.image_url,
             COUNT(ps.song_id) as song_count,
             p.created_at,
             p.updated_at
@@ -544,12 +626,13 @@ def update_playlist(playlist_id: int, playlist: PlaylistUpdate):
     )
     row = cursor.fetchone()
     conn.close()
-    
+
     return PlaylistResponse(
         id=row["id"],
         name=row["name"],
         color=row["color"],
         emoji=row["emoji"],
+        image_url=row["image_url"],
         song_count=row["song_count"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
@@ -699,10 +782,10 @@ def add_song_to_playlist(playlist_id: int, song_add: PlaylistSongAdd):
     # Fetch playlist metadata
     conn = get_db()
     cursor = conn.cursor()
-    
+
     cursor.execute(
         """
-        SELECT id, name, color, emoji, created_at, updated_at
+        SELECT id, name, color, emoji, image_url, created_at, updated_at
         FROM playlists
         WHERE id = ?
         """,
@@ -710,15 +793,16 @@ def add_song_to_playlist(playlist_id: int, song_add: PlaylistSongAdd):
     )
     row = cursor.fetchone()
     conn.close()
-    
+
     song_count = len(songs)
-    
+
     return {
         "data": {
             "id": row["id"],
             "name": row["name"],
             "color": row["color"],
             "emoji": row["emoji"],
+            "image_url": row["image_url"],
             "song_count": song_count,
             "songs": songs,
             "created_at": row["created_at"],

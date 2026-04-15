@@ -31,7 +31,7 @@ import { TagList } from "@/components/tags/TagList"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Equalizer } from "@/components/ui/Equalizer"
 import { PlaylistImagePicker } from "@/components/playlists/PlaylistImagePicker"
-import { getPlaylistImage, setPlaylistImage, removePlaylistImage } from "@/lib/playlistImage"
+import { api } from "@/lib/api"
 
 interface PlaylistDetailProps {
   playlistId: number
@@ -64,7 +64,8 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
     [activePlaylist?.name, playlistId]
   )
 
-  const heroImage = activePlaylist ? getPlaylistImage(activePlaylist.id) : null
+  // Server-stored image URL (comes back from the API on every fetchPlaylistDetail)
+  const heroImage = activePlaylist?.image_url ?? null
 
   const totalDuration = useMemo(() => {
     if (!activePlaylist) return 0
@@ -76,7 +77,8 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
       setEditName(activePlaylist.name)
       setEditColor(activePlaylist.color || "")
       setEditEmoji(activePlaylist.emoji || "")
-      setEditImageDataUrl(getPlaylistImage(activePlaylist.id))
+      // Seed picker with the current server URL (displays as <img src>)
+      setEditImageDataUrl(activePlaylist.image_url || null)
       setEditDialogOpen(true)
     }
   }
@@ -89,11 +91,23 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
     }
     try {
       const playlistStore = usePlaylistStore.getState()
-      if (editImageDataUrl) {
-        setPlaylistImage(activePlaylist.id, editImageDataUrl)
-      } else {
-        removePlaylistImage(activePlaylist.id)
+
+      if (editImageDataUrl?.startsWith("data:")) {
+        // New file was picked — convert base64 preview to Blob and upload
+        const blob = await fetch(editImageDataUrl).then((r) => r.blob())
+        const ext =
+          blob.type === "image/png" ? "png"
+          : blob.type === "image/gif" ? "gif"
+          : blob.type === "image/webp" ? "webp"
+          : "jpg"
+        const formData = new FormData()
+        formData.append("file", blob, `image.${ext}`)
+        await api.upload(`/playlists/${activePlaylist.id}/image`, formData)
+      } else if (editImageDataUrl === null && activePlaylist.image_url) {
+        // User removed the existing image
+        await api.delete(`/playlists/${activePlaylist.id}/image`)
       }
+
       await playlistStore.updatePlaylist(activePlaylist.id, {
         name: editName.trim(),
         color: editColor.trim() || undefined,

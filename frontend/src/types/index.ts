@@ -18,6 +18,7 @@ export interface Playlist {
   name: string
   color: string | null
   emoji: string | null
+  image_url: string | null
   song_count: number
   created_at: string
   updated_at: string
