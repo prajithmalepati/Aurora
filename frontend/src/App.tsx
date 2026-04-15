@@ -63,9 +63,10 @@ function App() {
   }
 
   const renderMainContent = () => {
-    switch (view.kind) {
-      case "all-songs":
-        return (
+    return (
+      <>
+        {/* All Songs — always mounted so re-entry is instant */}
+        <div className={view.kind === "all-songs" ? undefined : "hidden"}>
           <div className="p-4 sm:px-10 sm:pt-8 sm:pb-6 max-w-[1400px] mx-auto aurora-fade-in">
             {/* Search bar */}
             <div
@@ -92,12 +93,17 @@ function App() {
 
             <SongTable songs={songs} loading={songsLoading} onPlay={handlePlaySong} />
           </div>
-        )
-      case "filter":
-        return <QueryBuilder />
-      case "playlist":
-        return <PlaylistDetail playlistId={view.playlistId} />
-    }
+        </div>
+
+        {/* Mix — always mounted so re-entry is instant */}
+        <div className={view.kind === "filter" ? undefined : "hidden"}>
+          <QueryBuilder />
+        </div>
+
+        {/* Playlist — conditionally mounted (depends on playlistId) */}
+        {view.kind === "playlist" && <PlaylistDetail playlistId={view.playlistId} />}
+      </>
+    )
   }
 
   return (
