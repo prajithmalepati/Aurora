@@ -358,9 +358,9 @@
    BACKGROUND ATMOSPHERE — image bleed + radial + noise overlay
    ============================================================ */
 
-/* Aurora photograph as an atmospheric bleed.
-   Loaded at 10% opacity so it reads as "a feeling in the room",
-   not as a recognizable photo. OLED blacks win the composition. */
+/* Aurora photograph as atmospheric ambient light.
+   19% opacity — clearly visible as colour in the centre/upper area,
+   fading to pure black at the edges through the veil layer. */
 .aurora-bg-image {
   position: fixed;
   inset: 0;
@@ -370,12 +370,12 @@
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  opacity: 0.10;
-  filter: saturate(0.85) contrast(1.05);
+  opacity: 0.19;
+  filter: saturate(0.9) contrast(1.05);
 }
 
-/* Heavy black veil sits on top of the image so the OLED blacks
-   stay true black everywhere except the faintest aurora tint. */
+/* Radial veil keeps edges OLED-black while letting the aurora
+   breathe through the centre. */
 .aurora-bg-veil {
   position: fixed;
   inset: 0;
@@ -384,9 +384,9 @@
   background:
     radial-gradient(
       ellipse 120% 80% at 50% 55%,
-      rgba(0, 0, 0, 0.55) 0%,
-      rgba(0, 0, 0, 0.78) 55%,
-      rgba(0, 0, 0, 0.92) 100%
+      rgba(0, 0, 0, 0.45) 0%,
+      rgba(0, 0, 0, 0.74) 55%,
+      rgba(0, 0, 0, 0.90) 100%
     );
 }
 
