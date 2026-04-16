@@ -19,6 +19,7 @@ export function PlayerBar() {
   const next = usePlayerStore((state) => state.next)
   const previous = usePlayerStore((state) => state.previous)
 
+  const isExpanded = currentSong !== null
   const hasSong = currentSong !== null && currentSong.file_path !== null
 
   const seekPct = duration > 0 ? Math.min(100, (seek / duration) * 100) : 0
@@ -31,251 +32,267 @@ export function PlayerBar() {
 
   return (
     <div
-      className="aurora-keyline-top col-span-1 md:col-span-2 relative px-4 sm:px-6 py-3 sm:py-4"
+      className="aurora-keyline-top col-span-1 md:col-span-2 relative"
       style={{
-        background: "rgba(6,7,9,0.75)",
-        backdropFilter: "blur(24px)",
-        WebkitBackdropFilter: "blur(24px)",
+        background: "rgba(6,7,9,0.80)",
+        backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)",
       }}
     >
-      {/* Mobile: stacked layout */}
-      <div className="flex flex-col sm:hidden gap-2">
-        {/* Song info row */}
-        <div className="flex items-center gap-3">
+      {!isExpanded ? (
+        /* ── COLLAPSED: quiet presence ── */
+        <div className="flex items-center h-[44px] px-4 sm:px-6 gap-3">
           <div
-            className="w-10 h-10 rounded-md flex-shrink-0 aurora-rim"
+            className="w-8 h-8 rounded-sm flex-shrink-0"
             style={{
-              background: art.background,
-              boxShadow: hasSong
-                ? `0 0 16px -4px ${art.glow}, inset 0 0 0 1px rgba(255,255,255,0.06)`
-                : "inset 0 0 0 1px rgba(255,255,255,0.05)",
+              background: "linear-gradient(135deg, rgba(77,184,164,0.12), rgba(138,117,200,0.12))",
+              boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.05)",
             }}
           />
-          <div className="flex flex-col min-w-0 flex-1">
-            {hasSong ? (
-              <>
-                <span className="font-display text-[15px] leading-tight text-[var(--aurora-text)] truncate">
-                  {currentSong.title}
-                </span>
-                <span className="text-[10px] text-[var(--aurora-text-dim)] truncate">
-                  {currentSong.artist}
-                </span>
-              </>
-            ) : (
-              <span className="font-display-italic text-[13px] text-[var(--aurora-text-muted)]">
-                Nothing playing
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Controls row */}
-        <div className="flex items-center gap-3">
-          <span className="text-[10px] text-[var(--aurora-text-dim)] w-8 text-right tabular-nums">
-            {formatDuration(seek)}
-          </span>
-          <input
-            type="range"
-            min={0}
-            max={duration || 100}
-            step={0.1}
-            value={seek}
-            onChange={(e) => seekTo(Number(e.target.value))}
-            disabled={!hasSong}
-            className="aurora-range flex-1"
-            style={{ ["--aurora-range-pct" as string]: `${seekPct}%` }}
-            aria-label="Seek"
-          />
-          <span className="text-[10px] text-[var(--aurora-text-muted)] w-8 tabular-nums">
-            {formatDuration(duration)}
+          <span className="font-display-italic text-[13px] text-[var(--aurora-text-tertiary)]">
+            Play something
           </span>
         </div>
-
-        <div className="flex items-center justify-center gap-5">
-          <button
-            onClick={() => { if (seek > 3) seekTo(0); else previous() }}
-            disabled={!hasSong}
-            className="text-[var(--aurora-text-dim)] hover:text-[var(--aurora-text)] disabled:opacity-25 disabled:pointer-events-none transition-colors duration-150"
-            aria-label="Previous"
-          >
-            <SkipBack className="h-4 w-4" fill="currentColor" strokeWidth={0} />
-          </button>
-          <button
-            onClick={togglePlay}
-            disabled={!hasSong}
-            className={`relative h-10 w-10 rounded-full flex items-center justify-center disabled:opacity-25 disabled:pointer-events-none transition-transform duration-150 active:scale-[0.94] ${
-              hasSong && isPlaying ? "aurora-pulse" : ""
-            }`}
-            style={{
-              background: "var(--aurora-gradient)",
-              boxShadow: hasSong ? "0 0 22px -6px rgba(94, 234, 212, 0.5)" : "none",
-            }}
-            aria-label={isPlaying ? "Pause" : "Play"}
-          >
-            {isPlaying ? (
-              <Pause className="h-4 w-4 text-[#050608]" fill="#050608" strokeWidth={0} />
-            ) : (
-              <Play className="h-4 w-4 ml-[1px] text-[#050608]" fill="#050608" strokeWidth={0} />
-            )}
-          </button>
-          <button
-            onClick={next}
-            disabled={!hasSong}
-            className="text-[var(--aurora-text-dim)] hover:text-[var(--aurora-text)] disabled:opacity-25 disabled:pointer-events-none transition-colors duration-150"
-            aria-label="Next"
-          >
-            <SkipForward className="h-4 w-4" fill="currentColor" strokeWidth={0} />
-          </button>
-        </div>
-      </div>
-
-      {/* Desktop: horizontal layout */}
-      <div className="hidden sm:flex items-center gap-8 h-[72px]">
-        {/* LEFT: Album art + title/artist */}
-        <div className="flex items-center gap-3.5 w-[280px] min-w-[180px]">
-          <div className="relative flex-shrink-0">
-            <div
-              className="w-[56px] h-[56px] rounded-md overflow-hidden aurora-rim"
-              style={{
-                background: art.background,
-                boxShadow: hasSong
-                  ? `0 0 24px -6px ${art.glow}, inset 0 0 0 1px rgba(255,255,255,0.06)`
-                  : "inset 0 0 0 1px rgba(255,255,255,0.05)",
-              }}
-            >
+      ) : (
+        /* ── EXPANDED: full controls ── */
+        <div className="aurora-view-enter">
+          {/* Mobile: stacked layout */}
+          <div className="flex flex-col sm:hidden gap-2 px-4 py-3">
+            {/* Song info row */}
+            <div className="flex items-center gap-3">
               <div
-                className="absolute inset-0"
+                className="w-10 h-10 rounded-md flex-shrink-0"
                 style={{
-                  background:
-                    "radial-gradient(circle at 25% 15%, rgba(255,255,255,0.08) 0%, transparent 50%)",
+                  background: art.background,
+                  boxShadow: hasSong
+                    ? `0 0 16px -4px ${art.glow}, inset 0 0 0 1px rgba(255,255,255,0.06)`
+                    : "inset 0 0 0 1px rgba(255,255,255,0.05)",
                 }}
               />
+              <div className="flex flex-col min-w-0 flex-1">
+                {hasSong ? (
+                  <>
+                    <span className="font-display text-[15px] leading-tight text-[var(--aurora-text)] truncate">
+                      {currentSong.title}
+                    </span>
+                    <span className="text-[10px] text-[var(--aurora-text-secondary)] truncate">
+                      {currentSong.artist}
+                    </span>
+                  </>
+                ) : (
+                  <span className="font-display-italic text-[13px] text-[var(--aurora-text-tertiary)]">
+                    Nothing playing
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Seek bar row */}
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] text-[var(--aurora-text-secondary)] w-8 text-right tabular-nums">
+                {formatDuration(seek)}
+              </span>
+              <input
+                type="range"
+                min={0}
+                max={duration || 100}
+                step={0.1}
+                value={seek}
+                onChange={(e) => seekTo(Number(e.target.value))}
+                disabled={!hasSong}
+                className="aurora-range flex-1"
+                style={{ ["--aurora-range-pct" as string]: `${seekPct}%` }}
+                aria-label="Seek"
+              />
+              <span className="text-[10px] text-[var(--aurora-text-tertiary)] w-8 tabular-nums">
+                {formatDuration(duration)}
+              </span>
+            </div>
+
+            {/* Controls row */}
+            <div className="flex items-center justify-center gap-5">
+              <button
+                onClick={() => { if (seek > 3) seekTo(0); else previous() }}
+                disabled={!hasSong}
+                className="text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] disabled:opacity-25 disabled:pointer-events-none transition-colors duration-150"
+                aria-label="Previous"
+              >
+                <SkipBack className="h-4 w-4" fill="currentColor" strokeWidth={0} />
+              </button>
+              <button
+                onClick={togglePlay}
+                disabled={!hasSong}
+                className="relative h-10 w-10 rounded-full flex items-center justify-center disabled:opacity-25 disabled:pointer-events-none aurora-btn-press"
+                style={{
+                  background: "var(--aurora-primary)",
+                  boxShadow: hasSong ? "0 0 20px -6px var(--aurora-primary-glow)" : "none",
+                }}
+                aria-label={isPlaying ? "Pause" : "Play"}
+              >
+                {isPlaying ? (
+                  <Pause className="h-4 w-4 text-[#050608]" fill="#050608" strokeWidth={0} />
+                ) : (
+                  <Play className="h-4 w-4 ml-[1px] text-[#050608]" fill="#050608" strokeWidth={0} />
+                )}
+              </button>
+              <button
+                onClick={next}
+                disabled={!hasSong}
+                className="text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] disabled:opacity-25 disabled:pointer-events-none transition-colors duration-150"
+                aria-label="Next"
+              >
+                <SkipForward className="h-4 w-4" fill="currentColor" strokeWidth={0} />
+              </button>
             </div>
           </div>
 
-          <div className="flex flex-col min-w-0 flex-1">
-            {hasSong ? (
-              <>
-                <span className="font-display text-[18px] leading-tight text-[var(--aurora-text)] truncate">
-                  {currentSong.title}
-                </span>
-                <span className="text-[11px] text-[var(--aurora-text-dim)] truncate mt-0.5 tracking-wide">
-                  {currentSong.artist}
-                </span>
-              </>
-            ) : (
-              <span className="font-display-italic text-[15px] text-[var(--aurora-text-muted)]">
-                Nothing playing
-              </span>
-            )}
-          </div>
-        </div>
+          {/* Desktop: horizontal layout */}
+          <div className="hidden sm:flex items-center gap-8 h-[72px] px-6">
+            {/* LEFT: Album art + title/artist */}
+            <div className="flex items-center gap-3.5 w-[280px] min-w-[180px]">
+              <div className="relative flex-shrink-0">
+                <div
+                  className="w-[56px] h-[56px] rounded-md overflow-hidden"
+                  style={{
+                    background: art.background,
+                    boxShadow: hasSong
+                      ? `0 0 24px -6px ${art.glow}, inset 0 0 0 1px rgba(255,255,255,0.06)`
+                      : "inset 0 0 0 1px rgba(255,255,255,0.05)",
+                  }}
+                >
+                  <div
+                    className="absolute inset-0"
+                    style={{
+                      background:
+                        "radial-gradient(circle at 25% 15%, rgba(255,255,255,0.08) 0%, transparent 50%)",
+                    }}
+                  />
+                </div>
+              </div>
 
-        {/* CENTER: Controls + seek bar */}
-        <div className="flex-1 flex flex-col items-center gap-2 max-w-[620px] mx-auto">
-          <div className="flex items-center gap-6">
-            <button
-              onClick={() => {
-                if (seek > 3) seekTo(0)
-                else previous()
-              }}
-              disabled={!hasSong}
-              className="text-[var(--aurora-text-dim)] hover:text-[var(--aurora-text)] disabled:opacity-25 disabled:pointer-events-none transition-colors duration-150"
-              aria-label="Previous"
-            >
-              <SkipBack className="h-[18px] w-[18px]" fill="currentColor" strokeWidth={0} />
-            </button>
-
-            <button
-              onClick={togglePlay}
-              disabled={!hasSong}
-              className={`relative h-11 w-11 rounded-full flex items-center justify-center disabled:opacity-25 disabled:pointer-events-none transition-transform duration-150 active:scale-[0.94] ${
-                hasSong && isPlaying ? "aurora-pulse" : ""
-              }`}
-              style={{
-                background: "var(--aurora-gradient)",
-                boxShadow: hasSong
-                  ? "0 0 28px -6px rgba(94, 234, 212, 0.5), inset 0 1px 0 rgba(255,255,255,0.3)"
-                  : "none",
-              }}
-              aria-label={isPlaying ? "Pause" : "Play"}
-            >
-              {isPlaying ? (
-                <Pause className="h-[18px] w-[18px] text-[#050608]" fill="#050608" strokeWidth={0} />
-              ) : (
-                <Play className="h-[18px] w-[18px] ml-[2px] text-[#050608]" fill="#050608" strokeWidth={0} />
-              )}
-            </button>
-
-            <button
-              onClick={next}
-              disabled={!hasSong}
-              className="text-[var(--aurora-text-dim)] hover:text-[var(--aurora-text)] disabled:opacity-25 disabled:pointer-events-none transition-colors duration-150"
-              aria-label="Next"
-            >
-              <SkipForward className="h-[18px] w-[18px]" fill="currentColor" strokeWidth={0} />
-            </button>
-          </div>
-
-          <div className="flex items-center gap-3 w-full">
-            <span className="text-[10.5px] text-[var(--aurora-text-dim)] w-9 text-right tabular-nums font-medium">
-              {formatDuration(seek)}
-            </span>
-            <input
-              type="range"
-              min={0}
-              max={duration || 100}
-              step={0.1}
-              value={seek}
-              onChange={(e) => seekTo(Number(e.target.value))}
-              disabled={!hasSong}
-              className="aurora-range flex-1"
-              style={{ ["--aurora-range-pct" as string]: `${seekPct}%` }}
-              aria-label="Seek"
-            />
-            <span className="text-[10.5px] text-[var(--aurora-text-muted)] w-9 tabular-nums font-medium">
-              {formatDuration(duration)}
-            </span>
-          </div>
-        </div>
-
-        {/* RIGHT: Now-playing indicator + volume */}
-        <div className="w-[240px] flex-shrink-0 flex items-center gap-3 justify-end">
-          {hasSong && isPlaying && (
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <Equalizer playing={isPlaying} />
-              <span className="label-micro text-[9.5px] text-[var(--aurora-teal-dim)] whitespace-nowrap">
-                Playing
-              </span>
+              <div className="flex flex-col min-w-0 flex-1">
+                {hasSong ? (
+                  <>
+                    <span className="font-display text-[18px] leading-tight text-[var(--aurora-text)] truncate">
+                      {currentSong.title}
+                    </span>
+                    <span className="text-[11px] text-[var(--aurora-text-secondary)] truncate mt-0.5 tracking-wide">
+                      {currentSong.artist}
+                    </span>
+                  </>
+                ) : (
+                  <span className="font-display-italic text-[15px] text-[var(--aurora-text-tertiary)]">
+                    Nothing playing
+                  </span>
+                )}
+              </div>
             </div>
-          )}
 
-          <div className="flex items-center gap-2 min-w-0 w-[110px] flex-shrink-0">
-            <button
-              onClick={toggleMute}
-              className="text-[var(--aurora-text-dim)] hover:text-[var(--aurora-text)] transition-colors duration-150 flex-shrink-0"
-              aria-label={volume > 0 ? "Mute" : "Unmute"}
-            >
-              {volume > 0 ? (
-                <Volume2 className="h-4 w-4" strokeWidth={2} />
-              ) : (
-                <VolumeX className="h-4 w-4" strokeWidth={2} />
+            {/* CENTER: Controls + seek bar */}
+            <div className="flex-1 flex flex-col items-center gap-2 max-w-[620px] mx-auto">
+              <div className="flex items-center gap-6">
+                <button
+                  onClick={() => {
+                    if (seek > 3) seekTo(0)
+                    else previous()
+                  }}
+                  disabled={!hasSong}
+                  className="text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] disabled:opacity-25 disabled:pointer-events-none transition-colors duration-150"
+                  aria-label="Previous"
+                >
+                  <SkipBack className="h-[18px] w-[18px]" fill="currentColor" strokeWidth={0} />
+                </button>
+
+                <button
+                  onClick={togglePlay}
+                  disabled={!hasSong}
+                  className="relative h-11 w-11 rounded-full flex items-center justify-center disabled:opacity-25 disabled:pointer-events-none aurora-btn-press"
+                  style={{
+                    background: "var(--aurora-primary)",
+                    boxShadow: hasSong
+                      ? "0 0 24px -6px var(--aurora-primary-glow)"
+                      : "none",
+                  }}
+                  aria-label={isPlaying ? "Pause" : "Play"}
+                >
+                  {isPlaying ? (
+                    <Pause className="h-[18px] w-[18px] text-[#050608]" fill="#050608" strokeWidth={0} />
+                  ) : (
+                    <Play className="h-[18px] w-[18px] ml-[2px] text-[#050608]" fill="#050608" strokeWidth={0} />
+                  )}
+                </button>
+
+                <button
+                  onClick={next}
+                  disabled={!hasSong}
+                  className="text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] disabled:opacity-25 disabled:pointer-events-none transition-colors duration-150"
+                  aria-label="Next"
+                >
+                  <SkipForward className="h-[18px] w-[18px]" fill="currentColor" strokeWidth={0} />
+                </button>
+              </div>
+
+              <div className="flex items-center gap-3 w-full">
+                <span className="text-[10.5px] text-[var(--aurora-text-secondary)] w-9 text-right tabular-nums font-medium">
+                  {formatDuration(seek)}
+                </span>
+                <input
+                  type="range"
+                  min={0}
+                  max={duration || 100}
+                  step={0.1}
+                  value={seek}
+                  onChange={(e) => seekTo(Number(e.target.value))}
+                  disabled={!hasSong}
+                  className="aurora-range flex-1"
+                  style={{ ["--aurora-range-pct" as string]: `${seekPct}%` }}
+                  aria-label="Seek"
+                />
+                <span className="text-[10.5px] text-[var(--aurora-text-tertiary)] w-9 tabular-nums font-medium">
+                  {formatDuration(duration)}
+                </span>
+              </div>
+            </div>
+
+            {/* RIGHT: Now-playing indicator + volume */}
+            <div className="w-[240px] flex-shrink-0 flex items-center gap-3 justify-end">
+              {hasSong && isPlaying && (
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <Equalizer playing={isPlaying} />
+                  <span className="label-micro text-[9.5px] text-[var(--aurora-primary)] whitespace-nowrap opacity-70">
+                    Playing
+                  </span>
+                </div>
               )}
-            </button>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.01}
-              value={volume}
-              onChange={(e) => setVolume(Number(e.target.value))}
-              className="aurora-range flex-1 min-w-0"
-              style={{ ["--aurora-range-pct" as string]: `${volumePct}%` }}
-              aria-label="Volume"
-            />
+
+              <div className="flex items-center gap-2 min-w-0 w-[110px] flex-shrink-0">
+                <button
+                  onClick={toggleMute}
+                  className="text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] transition-colors duration-150 flex-shrink-0"
+                  aria-label={volume > 0 ? "Mute" : "Unmute"}
+                >
+                  {volume > 0 ? (
+                    <Volume2 className="h-4 w-4" strokeWidth={2} />
+                  ) : (
+                    <VolumeX className="h-4 w-4" strokeWidth={2} />
+                  )}
+                </button>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={volume}
+                  onChange={(e) => setVolume(Number(e.target.value))}
+                  className="aurora-range flex-1 min-w-0"
+                  style={{ ["--aurora-range-pct" as string]: `${volumePct}%` }}
+                  aria-label="Volume"
+                />
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
