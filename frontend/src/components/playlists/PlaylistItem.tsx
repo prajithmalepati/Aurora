@@ -17,34 +17,34 @@ export function PlaylistItem({ playlist, isActive, onSelect }: PlaylistItemProps
       className={`group relative w-full flex items-center gap-2.5 px-3 py-[7px] rounded-md text-left transition-all duration-200 ${
         isActive
           ? "text-[var(--aurora-text)]"
-          : "text-[var(--aurora-text-dim)] hover:text-[var(--aurora-text)]"
+          : "text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)]"
       }`}
     >
-      {/* Active indicator bar */}
+      {/* Active indicator — 3px left bar, solid primary */}
       <span
-        className={`absolute left-0 top-1/2 -translate-y-1/2 w-[2px] rounded-r-full transition-all duration-300 ${
+        className={`absolute left-0 top-1/2 -translate-y-1/2 w-[3px] rounded-r-full transition-all duration-300 ${
           isActive ? "h-5 opacity-100" : "h-0 opacity-0"
         }`}
         style={{
-          background: "linear-gradient(to bottom, #5eead4, #86efac, #a78bfa)",
-          boxShadow: isActive ? "0 0 10px rgba(94, 234, 212, 0.5), 0 0 10px rgba(167, 139, 250, 0.3)" : "none",
+          background: "var(--aurora-primary)",
+          boxShadow: isActive ? "0 0 8px var(--aurora-primary-glow)" : "none",
         }}
         aria-hidden="true"
       />
+      {/* Active background */}
       {isActive && (
         <span
           className="absolute inset-0 rounded-md pointer-events-none"
-          style={{
-            background:
-              "radial-gradient(ellipse at left, rgba(94,234,212,0.06) 0%, rgba(134,239,172,0.03) 40%, rgba(167,139,250,0.04) 80%, transparent 100%)",
-          }}
+          style={{ background: "var(--aurora-surface)" }}
           aria-hidden="true"
         />
       )}
+      {/* Hover background */}
       <span
-        className={`absolute inset-0 rounded-md bg-white/[0.02] transition-opacity duration-200 pointer-events-none ${
+        className={`absolute inset-0 rounded-md transition-opacity duration-200 pointer-events-none ${
           isActive ? "opacity-0" : "opacity-0 group-hover:opacity-100"
         }`}
+        style={{ background: "var(--aurora-surface-hover)" }}
         aria-hidden="true"
       />
 
@@ -54,11 +54,11 @@ export function PlaylistItem({ playlist, isActive, onSelect }: PlaylistItemProps
           <img
             src={storedImage}
             alt=""
-            className="w-8 h-8 rounded-sm object-cover"
+            className="w-8 h-8 rounded object-cover"
           />
         ) : (
           <span
-            className="block w-8 h-8 rounded-sm"
+            className="block w-8 h-8 rounded"
             style={{ background: gradient }}
           />
         )}
@@ -70,7 +70,7 @@ export function PlaylistItem({ playlist, isActive, onSelect }: PlaylistItemProps
           {playlist.emoji ? `${playlist.emoji} ` : ""}
           {playlist.name}
         </span>
-        <span className="text-[10px] tabular-nums text-[var(--aurora-text-muted)]">
+        <span className="text-[10px] tabular-nums text-[var(--aurora-text-tertiary)]">
           {playlist.song_count} {playlist.song_count === 1 ? "song" : "songs"}
         </span>
       </span>
