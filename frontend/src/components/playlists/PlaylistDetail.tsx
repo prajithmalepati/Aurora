@@ -230,7 +230,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
   }
 
   return (
-    <div className="aurora-fade-in">
+    <div className="aurora-view-enter">
       {/* ── HERO HEADER ── */}
       <div className="relative px-10 pt-10 pb-8 overflow-hidden">
         {/* Background halo derived from playlist art */}
@@ -259,7 +259,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
 
           {/* Metadata */}
           <div className="flex-1 min-w-0 pb-2">
-            <p className="label-micro mb-3">Playlist</p>
+            <p className="label-micro mb-3 tracking-[0.2em]">Playlist</p>
             <h1 className="font-display text-[64px] leading-[0.95] tracking-tight text-[var(--aurora-text)] truncate">
               {activePlaylist.name}
             </h1>
@@ -484,10 +484,10 @@ function PlaylistSongRow({ song, index, total, onRemove, onReorder, onPlay }: Pl
       <td className="relative px-4 py-3 w-12 text-center">
         {isCurrent && (
           <span
-            className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-7 rounded-r-full"
+            className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-7 rounded-r-full"
             style={{
-              background: "linear-gradient(to bottom, #5eead4, #86efac)",
-              boxShadow: "0 0 10px rgba(94, 234, 212, 0.6)",
+              background: "var(--aurora-primary)",
+              boxShadow: "0 0 8px var(--aurora-primary-glow)",
             }}
             aria-hidden="true"
           />
