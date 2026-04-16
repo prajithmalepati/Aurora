@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
-import { Pencil, Trash2, ChevronUp, ChevronDown, X, Play } from "lucide-react"
+import { Pencil, Trash2, ChevronUp, ChevronDown, X, Play, Search } from "lucide-react"
 import { TagList } from "@/components/tags/TagList"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Equalizer } from "@/components/ui/Equalizer"
@@ -54,10 +54,22 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
   const [editColor, setEditColor] = useState("")
   const [editEmoji, setEditEmoji] = useState("")
   const [editImageDataUrl, setEditImageDataUrl] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState("")
 
   useEffect(() => {
     fetchPlaylistDetail(playlistId)
   }, [playlistId, fetchPlaylistDetail])
+
+  const filteredSongs = useMemo(() => {
+    if (!activePlaylist) return []
+    const q = searchQuery.trim().toLowerCase()
+    if (!q) return activePlaylist.songs
+    return activePlaylist.songs.filter(
+      (s) =>
+        s.title.toLowerCase().includes(q) ||
+        (s.artist ?? "").toLowerCase().includes(q)
+    )
+  }, [activePlaylist, searchQuery])
 
   const heroArt = useMemo(
     () => albumGradient(activePlaylist?.name ?? `playlist-${playlistId}`),
@@ -303,10 +315,40 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
 
       {/* ── SONG LIST ── */}
       <div className="px-6 py-4">
+        {activePlaylist.songs.length > 0 && (
+          <div
+            className="relative flex items-center rounded-full mb-4 transition-all duration-200 focus-within:shadow-[0_0_20px_-6px_var(--aurora-glow)]"
+            style={{
+              background: "var(--aurora-surface)",
+              boxShadow: "inset 0 0 0 1px var(--aurora-surface-border)",
+              backdropFilter: "blur(12px)",
+              WebkitBackdropFilter: "blur(12px)",
+            }}
+          >
+            <Search
+              className="absolute left-4 h-3.5 w-3.5 text-[var(--aurora-text-tertiary)] pointer-events-none"
+              strokeWidth={2}
+            />
+            <input
+              type="text"
+              placeholder="Search in playlist..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-transparent border-0 outline-none pl-11 pr-5 py-2.5 text-[13px] text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-tertiary)] placeholder:font-display-italic placeholder:text-[14px]"
+            />
+          </div>
+        )}
+
         {activePlaylist.songs.length === 0 ? (
           <div className="py-16 text-center">
             <p className="font-display-italic text-[22px] text-[var(--aurora-text-muted)]">
               This playlist is empty
+            </p>
+          </div>
+        ) : filteredSongs.length === 0 ? (
+          <div className="py-12 text-center">
+            <p className="font-display-italic text-[18px] text-[var(--aurora-text-tertiary)]">
+              No songs match &ldquo;{searchQuery}&rdquo;
             </p>
           </div>
         ) : (
@@ -331,17 +373,20 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
               </tr>
             </thead>
             <tbody>
-              {activePlaylist.songs.map((song, index) => (
-                <PlaylistSongRow
-                  key={song.id}
-                  song={song}
-                  index={index}
-                  total={activePlaylist.songs.length}
-                  onRemove={() => handleRemoveSong(song.id)}
-                  onReorder={(direction) => handleReorder(song.id, direction)}
-                  onPlay={handlePlaySong}
-                />
-              ))}
+              {filteredSongs.map((song) => {
+                const originalIndex = activePlaylist.songs.findIndex((s) => s.id === song.id)
+                return (
+                  <PlaylistSongRow
+                    key={song.id}
+                    song={song}
+                    index={originalIndex}
+                    total={activePlaylist.songs.length}
+                    onRemove={() => handleRemoveSong(song.id)}
+                    onReorder={(direction) => handleReorder(song.id, direction)}
+                    onPlay={handlePlaySong}
+                  />
+                )
+              })}
             </tbody>
           </table>
         )}
