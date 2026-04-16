@@ -176,7 +176,7 @@ function App() {
         </div>
 
         {/* Playlist — conditionally mounted (depends on playlistId) */}
-        {view.kind === "playlist" && <PlaylistDetail playlistId={view.playlistId} />}
+        {view.kind === "playlist" && <PlaylistDetail key={view.playlistId} playlistId={view.playlistId} />}
       </>
     )
   }
