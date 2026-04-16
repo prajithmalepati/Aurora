@@ -88,16 +88,12 @@ export function TagEditor({ songId, songTitle, currentTags, open, onOpenChange }
               {currentTags.map((tag) => (
                 <span
                   key={tag}
-                  className="inline-flex items-center gap-1 text-[10.5px] font-medium text-[var(--aurora-teal)] px-2 py-[2px] rounded-full"
-                  style={{
-                    boxShadow: "inset 0 0 0 1px rgba(94, 234, 212, 0.28)",
-                    background: "rgba(94, 234, 212, 0.05)",
-                  }}
+                  className="aurora-chip inline-flex items-center gap-1 text-[10px] font-medium text-[var(--aurora-text-dim)] px-2 py-[1.5px] rounded-full"
                 >
                   {tag}
                   <button
                     onClick={() => handleRemoveTag(tag)}
-                    className="text-[var(--aurora-teal)]/60 hover:text-[var(--aurora-danger)] transition-colors duration-150"
+                    className="text-[var(--aurora-text-muted)] hover:text-[var(--aurora-danger)] transition-colors duration-150"
                   >
                     <X className="h-3 w-3" />
                   </button>

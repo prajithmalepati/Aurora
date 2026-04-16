@@ -76,10 +76,10 @@ export function SongRow({ song, index, onPlay }: SongRowProps) {
           {/* Left accent bar — only on currently playing */}
           {isCurrentSong && (
             <span
-              className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-7 rounded-r-full"
+              className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-7 rounded-r-full"
               style={{
-                background: "linear-gradient(to bottom, #5eead4, #86efac, #a78bfa)",
-                boxShadow: "0 0 10px rgba(94, 234, 212, 0.4), 0 0 10px rgba(167, 139, 250, 0.3)",
+                background: "var(--aurora-primary)",
+                boxShadow: "0 0 8px var(--aurora-primary-glow)",
               }}
               aria-hidden="true"
             />
