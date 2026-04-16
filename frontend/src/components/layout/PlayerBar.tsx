@@ -147,9 +147,9 @@ export function PlayerBar() {
           </div>
 
           {/* Desktop: horizontal layout */}
-          <div className="hidden sm:flex items-center gap-8 h-[72px] px-6">
+          <div className="hidden sm:flex items-center gap-8 h-[80px] px-6">
             {/* LEFT: Album art + title/artist */}
-            <div className="flex items-center gap-3.5 w-[280px] min-w-[180px]">
+            <div className="flex items-center gap-3.5 w-[280px] min-w-[180px] flex-shrink-0">
               <div className="relative flex-shrink-0">
                 <div
                   className="w-[56px] h-[56px] rounded-md overflow-hidden"
