@@ -43,7 +43,6 @@ export function useAudioPlayer() {
       src: `http://localhost:8000/api/songs/${songId}/stream`,
       html5: true,
       preload: true,
-      autoplay: true,
       onplay: () => {
         // Start seeking interval on play
         intervalRef.current = window.setInterval(() => {
@@ -98,6 +97,7 @@ export function useAudioPlayer() {
         intervalRef.current = null
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentSong?.id])
 
   // Sync isPlaying state
