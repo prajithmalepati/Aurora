@@ -3,9 +3,9 @@
 ## Current State (April 16, 2026)
 Backend: 100% complete. All endpoints working — Songs CRUD, Tags CRUD + assignment, Playlists CRUD + song management + reorder, Filter (boolean AND/OR/NOT with parentheses), Scanner (folder scan with mutagen), Audio streaming.
 
-Frontend: Full UI overhaul complete. "Northern Lights Over OLED Black" design system applied across all views. Mix page redesigned as compact command zone. PlayerBar collapse/expand with glassmorphism. Sidebar polished. Global keyboard shortcuts. Wake lock, error boundary, view transitions.
+Frontend: Full UI overhaul complete. "Northern Lights Over OLED Black" design system applied across all views. Mix page redesigned as compact command zone. PlayerBar collapse/expand with glassmorphism. Sidebar polished. Global keyboard shortcuts. Wake lock, error boundary, view transitions. Bug fixes and playlist search added this session.
 
-CORS: Currently `allow_origins=["*"]` — was `["http://localhost:5173"]` but caused OPTIONS 400 errors. Lock down in polish.
+CORS: `allow_origins` now covers ports 5173, 5174, 5175.
 
 ## Design System — "Northern Lights Over OLED Black"
 
@@ -33,6 +33,7 @@ CORS: Currently `allow_origins=["*"]` — was `["http://localhost:5173"]` but ca
 | `--aurora-text-disabled` | `#2a2f3a` | Disabled elements |
 | `--aurora-danger` | `#f87171` | Destructive actions, errors |
 | `--aurora-warning` | `#fbbf24` | Warnings |
+| `--aurora-rim` | `rgba(255,255,255,0.06)` | Inset keyline borders on glass surfaces |
 
 Legacy aliases (`--aurora-text-dim` → `--aurora-text-secondary`, `--aurora-text-muted` → `--aurora-text-tertiary`) are preserved in CSS for backward compatibility.
 
@@ -54,74 +55,64 @@ Legacy aliases (`--aurora-text-dim` → `--aurora-text-secondary`, `--aurora-tex
 
 Registered in `App.tsx` via `useCallback` + `window.addEventListener("keydown", ...)`. All shortcuts check `document.activeElement.tagName` to avoid firing while typing.
 
-## Completed This Session (April 16 — Session 3)
+## Completed This Session (April 16 — Session 7)
 
-### Phase 0: Color Token System
-Complete aurora palette defined as CSS custom properties in `index.css`. Three accent voices: teal (primary), violet (secondary), warm amber (tertiary). Surface, muted, and glow tokens for consistent glass-panel styling. Text hierarchy warmed from `#f5f7fa` to `#e8e6e3`.
+### Bug 1: PlayerBar overflow fixed
+Desktop container height increased from 72px → 80px. LEFT section (album art + song info) given `flex-shrink-0` to prevent squeezing at narrow widths. Root cause: the center column (44px play button + 8px gap + ~20px seek bar = ~72px) exactly filled the 72px container with zero breathing room.
 
-### Phase 1: Mix Page Command Zone
-QueryBuilder restructured. All interactive elements now live in a tight 2-row band:
-- Row 1: "Mix" title + pill-shaped Search/Jam/Shuffle/Clear buttons.
-- Row 2: Single glass container with query input on top, chip tray below. Tag chips (left), operator keys (center), playlist chips (right) separated by vertical dividers. Everything clickable inserts at cursor.
+### Bug 2: Duplicate song playback fixed
+Removed `autoplay: true` from the Howl constructor in `useAudioPlayer.ts`. Root cause: `autoplay: true` triggered an internal `.play()` call asynchronously (after `canplaythrough`), while the `isPlaying` sync effect also called `.play()` synchronously. In Howler v2, multiple `.play()` calls on the same Howl instance create multiple simultaneous sound sprites. Removing `autoplay` makes the `isPlaying` effect the single source of `.play()` calls.
 
-### Phase 2: PlayerBar Collapse/Expand
-- **Collapsed** (no song loaded): 44px tall, aurora gradient placeholder + "Play something" in tertiary text. Minimal presence.
-- **Expanded** (song loaded): 72px tall desktop layout with album art, transport controls, seek bar, volume. Glassmorphism backdrop (`blur(12px)`, 80% opacity surface).
-- Play button: solid `--aurora-primary` fill (muted teal) instead of bright gradient. More refined.
-- Seek/volume bars: `--aurora-primary` fill with muted glow thumbs.
+### Feature: Playlist search bar
+Client-side search input added to PlaylistDetail above the song table. Filters by title or artist match (case-insensitive). Glass surface styling matches All Songs search bar. Shows "No songs match" empty state when query has no results. `key={view.playlistId}` added to `<PlaylistDetail>` in App.tsx so all local state (including search query) resets automatically when switching playlists.
 
-### Phase 3: Sidebar Polish
-- "YOUR LIBRARY" text replaced with a thin aurora gradient line beneath the logo.
-- NavItem active state: 3px solid primary left bar + surface background. Hover: surface-hover background.
-- Tag sidebar dots: `--aurora-muted` instead of bright teal gradient.
-- Footer actions: ghost button style with surface-hover on hover.
-- PlaylistItem: matching 3px left accent bar + surface active background.
+### CORS: Port 5175 added
+`backend/app/main.py` now allows `http://localhost:5175`.
 
-### Phase 4–5: Playlist Detail + All Songs
-- Consistent token application across all views.
-- Active song row left bar: 3px solid primary (was 2px gradient).
-- "All Songs" header: display font title + song count.
-- View transition fade (`aurora-view-enter`) on all view containers.
-- Toaster border updated to `--aurora-muted`.
-
-### Phase 6: Keyboard Shortcuts
-Six global shortcuts registered (see table above). `/` navigates to Mix and auto-focuses the query input.
-
-### Phase 7: Micro-interactions & Motion
-- `aurora-view-enter`: 200ms opacity fade on view switch.
-- `aurora-btn-press`: scale(0.97) on mousedown for tactile feedback.
-- `aurora-btn-glow`: hover box-shadow using `--aurora-glow`.
-- Chip hover: border brightens, surface background appears.
-- Range slider: thumb reveals on hover, track thickens 3→5px.
-
-### Phase 8: Small Details
-- **Wake lock**: Requests `navigator.wakeLock` while audio is playing to prevent tab suspension.
-- **Error boundary**: `ErrorBoundary` component wraps main content. Shows "Something went wrong" + Reload button on crash.
-- **Empty states**: Mix page shows centered icon + italic prompt. All Songs shows Music icon + "Nothing here yet" + call-to-action. Playlist detail shows "This playlist is empty".
+### Visual QA Pass
+All views checked via code review + clean dev server build:
+- AppShell grid layout ✓
+- Sidebar nav states, tags, footer actions ✓
+- PlayerBar collapsed/expanded ✓
+- PlaylistDetail hero, song list, search ✓
+- Mix / QueryBuilder command zone ✓
+- SongTable / All Songs ✓
+- All CSS aurora tokens defined ✓
+- No HMR errors in dev server ✓
 
 ## Completed Prior Sessions
 
-### Session 2 (April 16)
-Mix page command-palette redesign, muted aurora accent palette (`--aurora-primary`/`--aurora-secondary`), keyboard-key operator buttons, QueryInput simplified, Fraunces display font, aurora atmospheric background.
+### Session 6 (Claude Code with Opus — full UI overhaul)
+Complete aurora color token system, Mix page command zone, PlayerBar collapse/expand, sidebar polish, Playlist detail restyled, All Songs restyled, keyboard shortcuts, view fade transitions, row hover states, button micro-interactions, Wake Lock API, Error boundary, empty states.
 
-### Session 1 (April 11)
-Playlist emoji clearable, playlist image display bug fixed, Mix page initial redesign, Jam button, Shuffle, Tags panel in sidebar, aurora atmospheric background.
+### Session 5 (Claude Code with Opus — Mix page redesign)
+Mix page QueryBuilder compacted from ~530px to ~210px vertical. New color tokens. Operator keys restyled as keyboard keys. Search/Jam buttons moved to header row.
+
+### Session 4 (Claude Code with Opus — bug fixes)
+Playlist image upload pipeline working. Double toast fixed. Aurora background opacity 19%. Neutral default hero gradient. Logo click delay fixed. python-multipart added.
+
+### Session 3 (Claude Code with Cline/Qwen)
+OLED black theme, glassmorphism, Fraunces font, aurora background image.
+
+### Sessions 1–2
+App shell, song table, filter/Mix view, audio playback, file scanner dialog, initial Mix redesign.
 
 ## Known Gaps
-- **Tertiary color (`#c49a6c`) unused in UI** — The warm amber token is defined but not yet applied to any component. It's available for future use (e.g., special badges, warning states, decorative accents).
-- **No autocomplete on query input** — The input supports typed queries but doesn't offer autocomplete suggestions.
-- **Mobile compactness** — The header row (title + 4 buttons) on Mix page is tight on screens under 400px.
-- **PlayerBar height transition** — Currently uses conditional rendering with fade-in (`aurora-view-enter`). A true height animation via CSS grid `grid-template-rows` would be smoother but adds complexity.
+- **Tertiary color (`#c49a6c`) unused in UI** — defined but not yet applied. Available for future use (badges, warnings, decorative accents).
+- **No autocomplete on query input** — supports typed queries but no suggestions.
+- **Mobile compactness** — Mix page header row is tight on screens under 400px.
+- **Filter is case-sensitive** — `rock` returns nothing, `Rock` works. Fix: lowercase both sides in `backend/app/services/filter_engine.py` during comparison.
+- **Duplicate key warnings in console** — possible id collision between manual test songs and scanned songs.
+- **PlayerBar height transition** — currently uses conditional rendering with fade-in. A CSS grid `grid-template-rows` height animation would be smoother but adds complexity.
 
 ## Known Bugs
-1. **Filter is case-sensitive** — `rock` returns nothing, `Rock` works. Root cause is in `backend/app/services/filter_engine.py`. Fix: lowercase both the query terms and the tag/playlist names during comparison.
-2. **Duplicate key warnings in console** — possible id collision between manual test songs and scanned songs.
+_(All critical bugs from the Session 7 brief are now fixed.)_
 
 ## Technical Decisions
 - Audio sliders use plain HTML `<input type="range">` — shadcn Slider had compatibility issues. Don't replace them.
 - View switching uses Zustand store (`songStore.view`), no React Router.
 - `playSong()` needs the song list as second argument for queue/next/previous to work.
-- Howler.js uses `html5: true` mode — required for streaming large files.
+- Howler.js uses `html5: true` mode — required for streaming large files. NO `autoplay: true` — the `isPlaying` sync effect in `useAudioPlayer` is the single caller of `.play()`.
 - Display font (Fraunces) loaded via Google Fonts with the full `opsz,wght,SOFT,WONK` axis range.
 - Playlist images stored server-side via `POST /playlists/{id}/image`. Create flow must `await fetchPlaylists()` *after* upload.
 - Sidebar responsive state is local to AppShell (useState), not in Zustand.
@@ -134,6 +125,10 @@ Playlist emoji clearable, playlist image display bug fixed, Mix page initial red
 - ErrorBoundary is a class component wrapping the main content area.
 - `aurora-chip` class uses simple `--aurora-muted` border instead of gradient border (Session 3 change — more refined).
 - Play button uses solid `--aurora-primary` instead of gradient (Session 3 change — more premium feel).
+- PlaylistDetail uses `key={view.playlistId}` in App.tsx — forces full remount (and state reset) when switching playlists.
 
 ## Next Steps
-See `features.json` for the remaining task list. Priority order: case-sensitivity fix → CORS lockdown.
+See `features.json` for the remaining task list. Priority order:
+1. Case-sensitivity fix in filter engine
+2. Custom playback times per playlist (start_time_ms / end_time_ms on playlist_songs)
+3. Crossfade between songs
