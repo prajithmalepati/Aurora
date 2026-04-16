@@ -2,10 +2,6 @@ import { useFilterStore } from "@/stores/filterStore"
 import { useMemo } from "react"
 import { Check, X } from "lucide-react"
 
-interface QueryInputProps {
-  error?: string | null
-}
-
 function validateQuery(query: string): boolean {
   const trimmed = query.trim()
   if (!trimmed) return false
@@ -45,7 +41,7 @@ function validateQuery(query: string): boolean {
   return depth === 0 && !expectTerm
 }
 
-export function QueryInput({ error }: QueryInputProps) {
+export function QueryInput() {
   const query = useFilterStore((state) => state.query)
   const setQuery = useFilterStore((state) => state.setQuery)
   const executeFilter = useFilterStore((state) => state.executeFilter)
@@ -60,41 +56,24 @@ export function QueryInput({ error }: QueryInputProps) {
   const showIndicator = query.trim().length > 0
 
   return (
-    <div className="space-y-2">
-      <div
-        className="relative rounded-lg overflow-hidden transition-all duration-200 focus-within:shadow-[0_0_20px_-6px_rgba(94,234,212,0.2),0_0_20px_-6px_rgba(167,139,250,0.15)]"
-        style={{
-          background: "rgba(255,255,255,0.03)",
-          boxShadow: error
-            ? "inset 0 0 0 1px rgba(248, 113, 113, 0.4)"
-            : "inset 0 0 0 1px var(--aurora-rim)",
-          backdropFilter: "blur(12px)",
-          WebkitBackdropFilter: "blur(12px)",
-        }}
-      >
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="slow AND (rock OR anime) NOT sad"
-          className="w-full bg-transparent border-0 outline-none pl-5 pr-12 py-4 text-[16px] font-mono text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-muted)] placeholder:font-display-italic placeholder:text-[15px]"
-          style={{ fontFamily: "ui-monospace, 'SF Mono', 'Menlo', monospace" }}
-        />
-        {showIndicator && (
-          <span className="absolute right-4 top-1/2 -translate-y-1/2">
-            {isValid ? (
-              <Check className="h-4 w-4 text-[var(--aurora-mint)]" strokeWidth={2.5} />
-            ) : (
-              <X className="h-4 w-4 text-[var(--aurora-danger)]" strokeWidth={2.5} />
-            )}
-          </span>
-        )}
-      </div>
-      {error && (
-        <div className="text-[var(--aurora-danger)] text-[12px] px-1">
-          {error}
-        </div>
+    <div className="relative flex-1 flex items-center min-w-0">
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        onKeyDown={handleKeyDown}
+        placeholder="slow AND (rock OR anime) NOT sad"
+        className="w-full bg-transparent border-0 outline-none pl-4 pr-9 py-2.5 text-[14px] text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-muted)] placeholder:font-display-italic placeholder:text-[13px]"
+        style={{ fontFamily: "ui-monospace, 'SF Mono', 'Menlo', monospace" }}
+      />
+      {showIndicator && (
+        <span className="absolute right-2.5 top-1/2 -translate-y-1/2">
+          {isValid ? (
+            <Check className="h-3.5 w-3.5 text-[var(--aurora-primary)]" strokeWidth={2.5} />
+          ) : (
+            <X className="h-3.5 w-3.5 text-[var(--aurora-danger)]" strokeWidth={2.5} />
+          )}
+        </span>
       )}
     </div>
   )
