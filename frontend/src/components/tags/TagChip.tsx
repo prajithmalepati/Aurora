@@ -20,13 +20,9 @@ export function TagChip({ name, onRemove, onClick }: TagChipProps) {
   const chipContent = (
     <span
       onClick={onClick ? handleClick : undefined}
-      className={`inline-flex items-center text-[10.5px] font-medium tracking-wide text-[var(--aurora-teal)] px-2 py-[2px] rounded-full transition-all duration-150 ${
-        onClick ? "cursor-pointer hover:text-[#7ef2dd]" : "cursor-default"
+      className={`aurora-chip inline-flex items-center text-[10px] font-medium tracking-wide text-[var(--aurora-text-secondary)] px-2 py-[1.5px] rounded-full transition-all duration-150 ${
+        onClick ? "cursor-pointer hover:text-[var(--aurora-text)]" : "cursor-default"
       }`}
-      style={{
-        boxShadow: "inset 0 0 0 1px rgba(94, 234, 212, 0.22)",
-        background: "rgba(94, 234, 212, 0.04)",
-      }}
     >
       {name}
     </span>

@@ -88,9 +88,11 @@
   --aurora-gradient-soft: linear-gradient(135deg, rgba(94, 234, 212, 0.16) 0%, rgba(134, 239, 172, 0.12) 55%, rgba(167, 139, 250, 0.16) 100%);
 
   /* Text hierarchy — warm near-white to dim steel */
-  --aurora-text: #f5f7fa;
-  --aurora-text-dim: #8b95a7;
-  --aurora-text-muted: #4b5563;
+  --aurora-text: #e8e6e3;
+  --aurora-text-secondary: #8b95a7;
+  --aurora-text-tertiary: #4b5563;
+  --aurora-text-dim: #8b95a7;              /* legacy alias */
+  --aurora-text-muted: #4b5563;            /* legacy alias */
   --aurora-text-disabled: #2a2f3a;
 
   /* Semantic */
@@ -100,6 +102,29 @@
   /* Legacy border aliases */
   --aurora-border: var(--aurora-rim);
   --aurora-border-bright: var(--aurora-rim-bright);
+
+  /* ── Aurora accent palette — the three voices ──
+     Teal (common aurora), violet (common), amber (rarest light). */
+  --aurora-primary: #4db8a4;                       /* smoked teal  */
+  --aurora-primary-hover: #5ec9b5;
+  --aurora-primary-glow: rgba(77, 184, 164, 0.18);
+  --aurora-secondary: #8a75c8;                     /* twilight violet */
+  --aurora-secondary-hover: #9b88d6;
+  --aurora-secondary-glow: rgba(138, 117, 200, 0.15);
+  --aurora-tertiary: #c49a6c;                      /* warm amber — golden-hour aurora */
+  --aurora-tertiary-hover: #d4aa7c;
+  --aurora-tertiary-glow: rgba(196, 154, 108, 0.12);
+
+  /* Glow — subtle ambient light for hover and focus halos */
+  --aurora-glow: rgba(77, 184, 164, 0.12);
+
+  /* Surfaces — glass panels, cards, elevated containers */
+  --aurora-surface: rgba(255, 255, 255, 0.04);
+  --aurora-surface-hover: rgba(255, 255, 255, 0.065);
+  --aurora-surface-border: rgba(255, 255, 255, 0.07);
+
+  /* Muted — borders, dividers, inactive chips, disabled outlines */
+  --aurora-muted: rgba(255, 255, 255, 0.14);
 }
 
 :root {
@@ -257,16 +282,13 @@
 /* Pill chip with aurora gradient border (1px) and transparent fill
    --chip-bg lets dialogs override the inner fill colour */
 .aurora-chip {
-  --chip-bg: var(--aurora-obsidian);
-  border: 1px solid transparent;
-  background:
-    linear-gradient(var(--chip-bg), var(--chip-bg)) padding-box,
-    linear-gradient(135deg, rgba(94,234,212,0.35), rgba(134,239,172,0.3), rgba(167,139,250,0.35)) border-box;
+  border: 1px solid var(--aurora-muted);
+  background: transparent;
+  transition: all 150ms ease;
 }
 .aurora-chip:hover {
-  background:
-    linear-gradient(135deg, rgba(94,234,212,0.08), rgba(134,239,172,0.05), rgba(167,139,250,0.08)) padding-box,
-    linear-gradient(135deg, rgba(94,234,212,0.5), rgba(134,239,172,0.4), rgba(167,139,250,0.5)) border-box;
+  border-color: rgba(255, 255, 255, 0.22);
+  background: var(--aurora-surface);
 }
 
 .aurora-glow-sm {
@@ -478,7 +500,7 @@
   height: 3px;
   border-radius: 999px;
   background:
-    linear-gradient(to right, #5eead4 0%, #86efac var(--aurora-range-pct), rgba(255,255,255,0.08) var(--aurora-range-pct), rgba(255,255,255,0.08) 100%);
+    linear-gradient(to right, var(--aurora-primary) 0%, var(--aurora-primary) var(--aurora-range-pct), rgba(255,255,255,0.08) var(--aurora-range-pct), rgba(255,255,255,0.08) 100%);
   outline: none;
   cursor: pointer;
   transition: height 180ms ease;
@@ -495,7 +517,7 @@
   border-radius: 50%;
   background: #ffffff;
   border: 0;
-  box-shadow: 0 0 12px 2px rgba(94, 234, 212, 0.6);
+  box-shadow: 0 0 12px 2px rgba(77, 184, 164, 0.5);
   cursor: pointer;
   opacity: 0;
   transition: opacity 180ms ease, transform 150ms ease;
@@ -513,7 +535,7 @@
   border-radius: 50%;
   background: #ffffff;
   border: 0;
-  box-shadow: 0 0 12px 2px rgba(94, 234, 212, 0.6);
+  box-shadow: 0 0 12px 2px rgba(77, 184, 164, 0.5);
   cursor: pointer;
   opacity: 0;
   transition: opacity 180ms ease;
@@ -583,4 +605,142 @@
 
 .aurora-pulse {
   animation: aurora-pulse-glow 3.2s ease-in-out infinite;
+}
+
+/* ============================================================
+   MIX PAGE — command-palette filter bar
+   ============================================================ */
+
+/* Unified glass query bar — input + operator keys in one container */
+.mix-query-bar {
+  background: rgba(255, 255, 255, 0.025);
+  box-shadow: inset 0 0 0 1px var(--aurora-rim);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: box-shadow 200ms ease;
+}
+.mix-query-bar:focus-within {
+  box-shadow: inset 0 0 0 1px var(--aurora-rim-bright),
+              0 0 20px -6px var(--aurora-primary-glow),
+              0 0 20px -6px var(--aurora-secondary-glow);
+}
+.mix-query-bar--error,
+.mix-query-bar--error:focus-within {
+  box-shadow: inset 0 0 0 1px rgba(248, 113, 113, 0.4);
+}
+
+/* Keyboard-key styled operator buttons */
+.mix-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  padding: 0 7px;
+  border-radius: 4px;
+  font-family: ui-monospace, 'SF Mono', 'Menlo', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--aurora-text-dim);
+  background: var(--aurora-surface);
+  border: 1px solid var(--aurora-surface-border);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+  transition: all 150ms ease;
+  flex-shrink: 0;
+}
+.mix-kbd:hover {
+  color: var(--aurora-text);
+  background: var(--aurora-surface-hover);
+  border-color: var(--aurora-rim-bright);
+}
+.mix-kbd:active {
+  box-shadow: none;
+  transform: translateY(1px);
+}
+
+/* Search button — muted teal fill, dark text */
+.mix-btn-search {
+  background: var(--aurora-primary);
+  color: var(--aurora-slate);
+  box-shadow: 0 0 16px -6px var(--aurora-primary-glow);
+  transition: all 150ms ease;
+}
+.mix-btn-search:hover:not(:disabled) {
+  background: var(--aurora-primary-hover);
+  box-shadow: 0 0 22px -4px var(--aurora-primary-glow);
+}
+
+/* Jam button — muted teal→violet gradient, white text */
+.mix-btn-jam {
+  background: linear-gradient(135deg, var(--aurora-primary) 0%, var(--aurora-secondary) 100%);
+  color: #fff;
+  box-shadow: 0 0 18px -8px var(--aurora-primary-glow);
+  letter-spacing: 0.02em;
+  transition: all 150ms ease;
+}
+.mix-btn-jam:hover:not(:disabled) {
+  box-shadow: 0 0 24px -5px var(--aurora-primary-glow),
+              0 0 24px -5px var(--aurora-secondary-glow);
+}
+
+/* ============================================================
+   PLAYERBAR — collapsed / expanded breathing transition
+   ============================================================ */
+
+.playerbar {
+  transition: height 300ms cubic-bezier(0.2, 0.7, 0.2, 1),
+              padding 300ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  will-change: height;
+}
+
+.playerbar-collapsed {
+  height: 44px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.playerbar-expanded {
+  height: 80px;
+}
+
+.playerbar-children {
+  transition: opacity 250ms ease 80ms;
+}
+
+.playerbar-collapsed .playerbar-children {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.playerbar-expanded .playerbar-children {
+  opacity: 1;
+}
+
+/* ============================================================
+   VIEW TRANSITIONS — quiet opacity fade between views
+   ============================================================ */
+
+@keyframes aurora-view-enter {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.aurora-view-enter {
+  animation: aurora-view-enter 200ms ease both;
+}
+
+/* ============================================================
+   BUTTON MICRO-INTERACTIONS
+   ============================================================ */
+
+.aurora-btn-press {
+  transition: transform 100ms ease;
+}
+.aurora-btn-press:active {
+  transform: scale(0.97);
+}
+
+.aurora-btn-glow:hover {
+  box-shadow: 0 0 20px -4px var(--aurora-glow);
 }
