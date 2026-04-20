@@ -15,22 +15,22 @@ export function useAudioPlayer() {
   const setDuration = usePlayerStore((state) => state.setDuration)
   const next = usePlayerStore((state) => state.next)
 
-  // Initialize Howl when song changes
+  // Single chokepoint: ALL Howl creation and initial playback goes through here.
+  // Fires only when the song ID changes. Stops/unloads the previous Howl before
+  // creating a new one, then plays immediately if the store says isPlaying=true.
   useEffect(() => {
-    // Destroy old Howl if exists
+    // Always unload any previous Howl before creating a new one
     if (howlRef.current) {
       howlRef.current.stop()
       howlRef.current.unload()
       howlRef.current = null
     }
-
     if (intervalRef.current) {
       window.clearInterval(intervalRef.current)
       intervalRef.current = null
     }
 
-    // Don't create Howl if no song
-    if (!currentSong || !currentSong.file_path) {
+    if (!currentSong?.file_path) {
       currentSongRef.current = null
       return
     }
@@ -38,13 +38,11 @@ export function useAudioPlayer() {
     const songId = String(currentSong.id)
     currentSongRef.current = songId
 
-    // Create new Howl instance with html5: true for streaming
     const howl = new Howl({
       src: `http://localhost:8000/api/songs/${songId}/stream`,
       html5: true,
       preload: true,
       onplay: () => {
-        // Start seeking interval on play
         intervalRef.current = window.setInterval(() => {
           if (!seekingRef.current && howlRef.current) {
             updateSeek(howlRef.current.seek())
@@ -52,14 +50,12 @@ export function useAudioPlayer() {
         }, 1000)
       },
       onpause: () => {
-        // Clear seeking interval on pause
         if (intervalRef.current) {
           window.clearInterval(intervalRef.current)
           intervalRef.current = null
         }
       },
       onend: () => {
-        // Clear interval and go to next song
         if (intervalRef.current) {
           window.clearInterval(intervalRef.current)
           intervalRef.current = null
@@ -67,7 +63,6 @@ export function useAudioPlayer() {
         next()
       },
       onload: () => {
-        // Set duration when loaded
         if (howlRef.current) {
           setDuration(howlRef.current.duration())
         }
@@ -81,15 +76,20 @@ export function useAudioPlayer() {
     })
 
     howlRef.current = howl
-
-    // Set initial volume
     howl.volume(volume)
 
+    // Read current isPlaying from store directly — not from closure —
+    // to avoid stale-value issues when this effect runs due to song change
+    // while isPlaying hasn't changed (the isPlaying effect won't re-run then).
+    if (usePlayerStore.getState().isPlaying) {
+      howl.play()
+    }
+
     return () => {
-      // Cleanup on unmount or song change
-      if (howlRef.current) {
-        howlRef.current.stop()
-        howlRef.current.unload()
+      // Use the local howl reference so we always clean up the correct instance
+      howl.stop()
+      howl.unload()
+      if (howlRef.current === howl) {
         howlRef.current = null
       }
       if (intervalRef.current) {
@@ -100,18 +100,18 @@ export function useAudioPlayer() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentSong?.id])
 
-  // Sync isPlaying state
+  // Pause / resume effect: fires ONLY when isPlaying toggles.
+  // Does NOT depend on currentSong — song switches are handled entirely above.
   useEffect(() => {
-    if (!howlRef.current || !currentSong) return
-
+    if (!howlRef.current) return
     if (isPlaying) {
       howlRef.current.play()
     } else {
       howlRef.current.pause()
     }
-  }, [isPlaying, currentSong])
+  }, [isPlaying])
 
-  // Sync volume state
+  // Volume sync
   useEffect(() => {
     if (!howlRef.current) return
     howlRef.current.volume(volume)
