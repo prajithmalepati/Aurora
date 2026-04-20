@@ -147,9 +147,9 @@ export function PlayerBar() {
           </div>
 
           {/* Desktop: horizontal layout */}
-          <div className="hidden sm:flex items-center gap-8 h-[80px] px-6">
+          <div className="hidden sm:flex items-center h-[80px] px-8 gap-8">
             {/* LEFT: Album art + title/artist */}
-            <div className="flex items-center gap-3.5 w-[280px] min-w-[180px] flex-shrink-0">
+            <div className="flex items-center gap-3.5 w-[240px] min-w-[160px] flex-shrink-0">
               <div className="relative flex-shrink-0">
                 <div
                   className="w-[56px] h-[56px] rounded-md overflow-hidden"
@@ -189,8 +189,8 @@ export function PlayerBar() {
             </div>
 
             {/* CENTER: Controls + seek bar */}
-            <div className="flex-1 flex flex-col items-center gap-2 max-w-[620px] mx-auto">
-              <div className="flex items-center gap-6">
+            <div className="flex-1 flex flex-col items-center gap-2 max-w-[580px] mx-auto min-w-0">
+              <div className="flex items-center gap-3">
                 <button
                   onClick={() => {
                     if (seek > 3) seekTo(0)
@@ -255,7 +255,7 @@ export function PlayerBar() {
             </div>
 
             {/* RIGHT: Now-playing indicator + volume */}
-            <div className="w-[240px] flex-shrink-0 flex items-center gap-3 justify-end">
+            <div className="w-[200px] flex-shrink-0 flex items-center gap-3 justify-end">
               {hasSong && isPlaying && (
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <Equalizer playing={isPlaying} />
