@@ -1,3 +1,4 @@
+import { useRef, useEffect, useState } from "react"
 import { useFilterStore } from "@/stores/filterStore"
 import { useTagStore } from "@/stores/tagStore"
 import { usePlaylistStore } from "@/stores/playlistStore"
@@ -12,6 +13,7 @@ const OPERATORS = ["AND", "OR", "NOT", "(", ")"] as const
 export function QueryBuilder() {
   const query = useFilterStore((state) => state.query)
   const results = useFilterStore((state) => state.results)
+  const resultsVersion = useFilterStore((state) => state.resultsVersion)
   const error = useFilterStore((state) => state.error)
   const loading = useFilterStore((state) => state.loading)
   const isQuickTagView = useFilterStore((state) => state.isQuickTagView)
@@ -27,6 +29,21 @@ export function QueryBuilder() {
   const playSong = usePlayerStore((state) => state.playSong)
   const tags = useTagStore((state) => state.tags)
   const playlists = usePlaylistStore((state) => state.playlists)
+
+  // Floating action zone: appears once user scrolls past the query bar
+  const sentinelRef = useRef<HTMLDivElement>(null)
+  const [showFloat, setShowFloat] = useState(false)
+
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el) return
+    const obs = new IntersectionObserver(
+      ([entry]) => setShowFloat(!entry.isIntersecting),
+      { threshold: 0 }
+    )
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [])
 
   const handlePlaySong = (song: Song) => {
     playSong(song, results)
@@ -94,13 +111,9 @@ export function QueryBuilder() {
               <p className="font-display-italic text-[18px] text-[var(--aurora-danger)]">{error}</p>
             </div>
           ) : results.length === 0 ? (
-            <div className="py-16 text-center">
-              <p className="font-display-italic text-[20px] text-[var(--aurora-text-tertiary)]">
-                No songs match this query
-              </p>
-            </div>
+            <MixEmptyState />
           ) : (
-            <SongTable songs={results} loading={false} onPlay={handlePlaySong} />
+            <SongTable songs={results} loading={false} onPlay={handlePlaySong} animKey={resultsVersion} />
           )}
         </div>
       </div>
@@ -110,7 +123,7 @@ export function QueryBuilder() {
   /* ── FULL QUERY BUILDER (manual mode or after "Edit query") ─────────────── */
   return (
     <div className="p-4 sm:px-10 sm:pt-6 max-w-[1400px] mx-auto aurora-view-enter">
-      {/* Row 1 — Title + action buttons */}
+      {/* Row 1 — Title + compact action buttons (Search, Shuffle, Clear) */}
       <div className="flex items-center justify-between mb-4 gap-4">
         <h1 className="font-display text-[28px] leading-none tracking-tight text-[var(--aurora-text)]">
           Mix
@@ -123,14 +136,6 @@ export function QueryBuilder() {
           >
             <Search className="h-3 w-3" strokeWidth={2.5} />
             {loading ? "..." : "Search"}
-          </button>
-          <button
-            onClick={jamFilter}
-            disabled={loading}
-            className="mix-btn-jam h-8 px-5 rounded-full text-[12px] font-bold inline-flex items-center gap-1.5 aurora-btn-press disabled:opacity-50"
-          >
-            <Sparkles className="h-3 w-3" strokeWidth={2.5} />
-            Jam
           </button>
           <button
             onClick={shuffleAndJamFilter}
@@ -252,6 +257,21 @@ export function QueryBuilder() {
         <p className="text-[var(--aurora-danger)] text-[11px] px-1 mt-1.5">{error}</p>
       )}
 
+      {/* Row 3 — Primary Jam button (inline, between query bar and results) */}
+      <div className="flex items-center justify-end mt-4">
+        <button
+          onClick={jamFilter}
+          disabled={loading || !query.trim()}
+          className="mix-jam-primary aurora-btn-press"
+        >
+          <Sparkles className="h-[18px] w-[18px]" strokeWidth={2} />
+          <span className="font-display text-[18px] font-medium leading-none">Jam</span>
+        </button>
+      </div>
+
+      {/* Sentinel — IntersectionObserver watches this to trigger floating zone */}
+      <div ref={sentinelRef} aria-hidden />
+
       {/* Results */}
       <div className="mt-5">
         {!hasSearched ? (
@@ -273,19 +293,91 @@ export function QueryBuilder() {
         ) : loading ? (
           <SongTable songs={[]} loading={true} />
         ) : results.length === 0 ? (
-          <div className="py-16 text-center">
-            <p className="font-display-italic text-[20px] text-[var(--aurora-text-tertiary)]">
-              No songs match this query
-            </p>
-          </div>
+          <MixEmptyState />
         ) : (
           <>
             <p className="label-micro mb-3 text-[var(--aurora-text-secondary)]">
               {results.length} {results.length === 1 ? "song" : "songs"}
             </p>
-            <SongTable songs={results} loading={false} onPlay={handlePlaySong} />
+            <SongTable songs={results} loading={false} onPlay={handlePlaySong} animKey={resultsVersion} />
           </>
         )}
+      </div>
+
+      {/* Floating action zone — fades in once user scrolls past the query bar */}
+      <div
+        className="mix-float-zone"
+        style={{
+          opacity: showFloat ? 1 : 0,
+          pointerEvents: showFloat ? "auto" : "none",
+          transform: showFloat ? "translateY(0)" : "translateY(6px)",
+        }}
+        aria-hidden={!showFloat}
+      >
+        <button
+          onClick={executeFilter}
+          disabled={loading || !query.trim()}
+          className="mix-float-search aurora-btn-press"
+        >
+          <Search className="h-3 w-3" strokeWidth={2.5} />
+          {loading ? "…" : "Search"}
+        </button>
+        <button
+          onClick={jamFilter}
+          disabled={loading || !query.trim()}
+          className="mix-float-jam aurora-btn-press"
+        >
+          <Sparkles className="h-[17px] w-[17px]" strokeWidth={2} />
+          <span className="font-display text-[17px] font-medium leading-none">Jam</span>
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/* ── Empty state for Mix (0 results after search) ──────────────────────── */
+function MixEmptyState() {
+  return (
+    <div className="py-16 flex flex-col items-center gap-4">
+      {/* Aurora wave SVG — abstract, no external assets */}
+      <svg
+        width="96"
+        height="52"
+        viewBox="0 0 96 52"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        aria-hidden="true"
+      >
+        <path
+          d="M4 38 C18 14, 30 42, 48 26 C66 10, 78 44, 92 20"
+          stroke="rgba(77,184,164,0.30)"
+          strokeWidth="2"
+          strokeLinecap="round"
+          fill="none"
+        />
+        <path
+          d="M4 44 C20 22, 32 48, 48 34 C64 20, 76 48, 92 28"
+          stroke="rgba(138,117,200,0.22)"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          fill="none"
+        />
+        <path
+          d="M4 30 C16 8, 28 36, 48 18 C68 2, 80 38, 92 12"
+          stroke="rgba(77,184,164,0.14)"
+          strokeWidth="1"
+          strokeLinecap="round"
+          fill="none"
+        />
+      </svg>
+
+      <div className="text-center">
+        <p className="font-display-italic text-[22px] text-[var(--aurora-text-secondary)]">
+          No songs match this query
+        </p>
+        <p className="text-[12px] text-[var(--aurora-text-tertiary)] mt-2">
+          Try relaxing a filter, or combine fewer tags
+        </p>
       </div>
     </div>
   )
