@@ -42,7 +42,7 @@ export function QueryBuilder() {
     return (
       <div className="p-4 sm:px-10 sm:pt-6 max-w-[1400px] mx-auto aurora-view-enter">
         <div className="flex items-center justify-between mb-5 gap-4">
-          <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex items-center gap-3 min-w-0">
             <Tag
               className="h-[18px] w-[18px] flex-shrink-0"
               style={{ color: "var(--aurora-primary)" }}
