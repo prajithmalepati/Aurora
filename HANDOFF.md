@@ -56,7 +56,67 @@ Legacy aliases (`--aurora-text-dim` → `--aurora-text-secondary`, `--aurora-tex
 
 Registered in `App.tsx` via `useCallback` + `window.addEventListener("keydown", ...)`. All shortcuts check `document.activeElement.tagName` to avoid firing while typing.
 
-## Completed This Session (April 21 — Session 10)
+## Completed This Session (April 21 — Session 11)
+
+### Feature 1: Jam as primary gradient CTA + floating action zone
+
+**Goal:** Elevate Jam from a cluster button to the headline feature. Add a scroll-aware floating zone so Search + Jam are reachable from anywhere in Mix results.
+
+**Jam button redesign:**
+- Removed from the top-right button cluster.
+- Inline position: right-aligned row between the query bar and results (always visible in full QueryBuilder mode).
+- Size: 50px height, `28px` horizontal padding, `border-radius: 999px`.
+- Fill: `linear-gradient(135deg, --aurora-primary → --aurora-secondary)` diagonal.
+- Label: "Jam" in Fraunces display font (`font-display text-[18px] font-medium`).
+- Icon: `Sparkles` at `18×18px`.
+- Hover: `scale(1.02)` + expanded teal/violet glow.
+- CSS class: `.mix-jam-primary`.
+
+**Floating action zone:**
+- `position: fixed; bottom: 112px; right: 32px; z-index: 30` — 32px above the 80px PlayerBar.
+- Glass pill: `rgba(15,15,18,0.9)` + `backdrop-filter: blur(20px)` + 1px `rgba(77,184,164,0.18)` border.
+- Contents: compact "Search" (transparent, 34px) on left + gradient "Jam" pill (48px) on right.
+- Visibility: `IntersectionObserver` on `sentinelRef` div placed below the query bar. Fades in (`opacity 200ms ease`) once user scrolls the query bar out of view. Hidden in quick-tag compact mode.
+- CSS classes: `.mix-float-zone`, `.mix-float-search`, `.mix-float-jam`.
+- Top-right cluster now has: Search + Shuffle + Clear.
+
+**Files:** `QueryBuilder.tsx`, `index.css`
+
+---
+
+### Feature 2: Row hover interactions
+
+**Goal:** Results rows should feel alive and responsive.
+
+- Row hover background: `group-hover:bg-[var(--aurora-surface-1)]` (`#0a0a0c`) across all cells, 150ms transition.
+- Circular play button: in `#` column on hover, row number fades to 0 and a 40×40px round `.aurora-play-btn` fades in. `absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2` relative to the `<td>`. Hover: `scale(1.05)` + full `--aurora-primary`. Click: `e.stopPropagation()` + `handlePlay()`.
+- Tag chip hover: `hover:scale-[1.03]` + `title="Filter by this tag"` tooltip when `onClick` prop present.
+
+**Files:** `SongRow.tsx`, `TagChip.tsx`
+
+---
+
+### Feature 3: Staggered query-change animation + empty state polish
+
+- `@keyframes aurora-row-in`: `opacity 0→1`, `translateY(4px→0)`, 220ms cubic-bezier. Applied via `.aurora-row-in` class on every `<tr>`.
+- Stagger: `animIndex < 16 ? animIndex * 25 : 0` ms delay. First 16 rows stagger at 25ms/row (max 375ms lead); rows 16+ instant.
+- `filterStore.ts`: `resultsVersion: number` increments on every result update. `QueryBuilder.tsx` passes it as `animKey={resultsVersion}` to `SongTable`. `SongTable` keys `<tbody key={animKey}>` to force remount and re-trigger animations on new queries.
+- Empty state: `<MixEmptyState />` shows aurora wave SVG (three sine paths, teal/violet, no external assets) + "No songs match this query" (italic Fraunces 22px) + "Try relaxing a filter" (12px).
+
+**Files:** `filterStore.ts`, `SongTable.tsx`, `SongRow.tsx`, `QueryBuilder.tsx`, `index.css`
+
+---
+
+### Visual QA Pass
+- TypeScript build: clean (only pre-existing `baseUrl` deprecation warning).
+- Floating zone: `bottom: 112px` = 32px gap above 80px PlayerBar at all window heights. ✓
+- Circular play button: 40px centered in 48px `w-12` td, 4px clearance each side. ✓
+- Stagger cap at 16 rows (375ms max lead + 220ms animation = ≈595ms total). ✓
+- `resultsVersion` → `animKey` → `tbody key` → `SongRow animIndex` fully wired. ✓
+
+---
+
+## Completed Prior Sessions (April 21 — Session 10)
 
 ### Feature 1: Mix quick-tag header icon spacing
 
