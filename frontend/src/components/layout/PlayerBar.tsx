@@ -121,9 +121,8 @@ export function PlayerBar() {
               <button
                 onClick={togglePlay}
                 disabled={!hasSong}
-                className="relative h-10 w-10 rounded-full flex items-center justify-center disabled:opacity-25 disabled:pointer-events-none aurora-btn-press"
+                className="relative h-10 w-10 rounded-full flex items-center justify-center disabled:opacity-25 disabled:pointer-events-none aurora-btn-press aurora-play-btn"
                 style={{
-                  background: "var(--aurora-primary)",
                   boxShadow: hasSong ? "0 0 20px -6px var(--aurora-primary-glow)" : "none",
                 }}
                 aria-label={isPlaying ? "Pause" : "Play"}
@@ -229,9 +228,8 @@ export function PlayerBar() {
                 <button
                   onClick={togglePlay}
                   disabled={!hasSong}
-                  className="relative h-11 w-11 rounded-full flex items-center justify-center disabled:opacity-25 disabled:pointer-events-none aurora-btn-press"
+                  className="relative h-11 w-11 rounded-full flex items-center justify-center disabled:opacity-25 disabled:pointer-events-none aurora-btn-press aurora-play-btn"
                   style={{
-                    background: "var(--aurora-primary)",
                     boxShadow: hasSong
                       ? "0 0 24px -6px var(--aurora-primary-glow)"
                       : "none",
