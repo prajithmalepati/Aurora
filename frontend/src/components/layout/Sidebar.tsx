@@ -28,10 +28,12 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
   const tagsLoading = useTagStore((state) => state.loading)
   const setQuery = useFilterStore((state) => state.setQuery)
   const executeFilter = useFilterStore((state) => state.executeFilter)
+  const setIsQuickTagView = useFilterStore((state) => state.setIsQuickTagView)
 
   const handleTagClick = (tagName: string) => {
     const term = tagName.includes(" ") ? `"${tagName}"` : tagName
     setQuery(term)
+    setIsQuickTagView(true)
     onViewChange({ kind: "filter" })
     setTimeout(() => {
       executeFilter()
@@ -78,7 +80,10 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
             icon={<SlidersHorizontal className="h-4 w-4" />}
             label="Mix"
             active={isActive({ kind: "filter" })}
-            onClick={() => onViewChange({ kind: "filter" })}
+            onClick={() => {
+              setIsQuickTagView(false)
+              onViewChange({ kind: "filter" })
+            }}
           />
         </nav>
 
