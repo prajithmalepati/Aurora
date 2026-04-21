@@ -9,6 +9,11 @@ interface FilterState {
   results: FilterResult[]
   loading: boolean
   error: string | null
+  // True when Mix was opened by clicking a sidebar tag (shows compact header).
+  // False when opened via the Mix nav item (shows full QueryBuilder).
+  isQuickTagView: boolean
+  // True when the user has clicked "Edit query" in quick-tag compact view.
+  quickTagEditorOpen: boolean
 
   setQuery: (query: string) => void
   appendToQuery: (text: string) => void
@@ -18,6 +23,8 @@ interface FilterState {
   jamFilter: () => Promise<void>
   shuffleAndJamFilter: () => Promise<void>
   clearResults: () => void
+  setIsQuickTagView: (v: boolean) => void
+  setQuickTagEditorOpen: (v: boolean) => void
 }
 
 function shuffleArray<T>(arr: T[]): T[] {
@@ -71,8 +78,12 @@ export const useFilterStore = create<FilterState>((set, get) => ({
   results: [],
   loading: false,
   error: null,
+  isQuickTagView: false,
+  quickTagEditorOpen: false,
 
   setQuery: (query) => set({ query }),
+  setIsQuickTagView: (v) => set({ isQuickTagView: v, quickTagEditorOpen: false }),
+  setQuickTagEditorOpen: (v) => set({ quickTagEditorOpen: v }),
 
   appendToQuery: (text) => {
     const current = get().query.trim()

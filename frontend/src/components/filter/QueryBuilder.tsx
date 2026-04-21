@@ -4,7 +4,7 @@ import { usePlaylistStore } from "@/stores/playlistStore"
 import { usePlayerStore } from "@/stores/playerStore"
 import { QueryInput } from "./QueryInput"
 import { SongTable } from "@/components/songs/SongTable"
-import { Search, X, Shuffle, Sparkles, SlidersHorizontal } from "lucide-react"
+import { Search, X, Shuffle, Sparkles, SlidersHorizontal, Tag } from "lucide-react"
 import type { Song } from "@/types"
 
 const OPERATORS = ["AND", "OR", "NOT", "(", ")"] as const
@@ -14,12 +14,15 @@ export function QueryBuilder() {
   const results = useFilterStore((state) => state.results)
   const error = useFilterStore((state) => state.error)
   const loading = useFilterStore((state) => state.loading)
+  const isQuickTagView = useFilterStore((state) => state.isQuickTagView)
+  const quickTagEditorOpen = useFilterStore((state) => state.quickTagEditorOpen)
   const appendToQuery = useFilterStore((state) => state.appendToQuery)
   const appendTerm = useFilterStore((state) => state.appendTerm)
   const executeFilter = useFilterStore((state) => state.executeFilter)
   const jamFilter = useFilterStore((state) => state.jamFilter)
   const shuffleAndJamFilter = useFilterStore((state) => state.shuffleAndJamFilter)
   const clearResults = useFilterStore((state) => state.clearResults)
+  const setQuickTagEditorOpen = useFilterStore((state) => state.setQuickTagEditorOpen)
 
   const playSong = usePlayerStore((state) => state.playSong)
   const tags = useTagStore((state) => state.tags)
@@ -31,6 +34,80 @@ export function QueryBuilder() {
 
   const hasSearched = query.trim().length > 0
 
+  // Strip surrounding quotes to get a clean display name for the compact header.
+  const displayTagName = query.replace(/^"|"$/g, "").trim()
+
+  /* ── COMPACT HEADER (quick-tag mode, editor hidden) ─────────────────────── */
+  if (isQuickTagView && !quickTagEditorOpen) {
+    return (
+      <div className="p-4 sm:px-10 sm:pt-6 max-w-[1400px] mx-auto aurora-view-enter">
+        <div className="flex items-center justify-between mb-5 gap-4">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <Tag
+              className="h-[18px] w-[18px] flex-shrink-0"
+              style={{ color: "var(--aurora-primary)" }}
+              strokeWidth={2}
+            />
+            <span className="font-display text-[26px] leading-none tracking-tight text-[var(--aurora-text)] truncate">
+              {displayTagName}
+            </span>
+            {!loading && results.length > 0 && (
+              <span className="text-[14px] text-[var(--aurora-text-tertiary)] mt-[3px] flex-shrink-0">
+                · {results.length} {results.length === 1 ? "song" : "songs"}
+              </span>
+            )}
+            {loading && (
+              <span className="text-[13px] text-[var(--aurora-text-tertiary)] mt-[3px] flex-shrink-0">
+                …
+              </span>
+            )}
+          </div>
+
+          <button
+            onClick={() => setQuickTagEditorOpen(true)}
+            className="h-8 px-4 rounded-full text-[12px] font-semibold inline-flex items-center gap-1.5 flex-shrink-0 transition-all duration-150 aurora-btn-press"
+            style={{
+              background: "var(--aurora-surface)",
+              boxShadow: "inset 0 0 0 1px var(--aurora-surface-border)",
+              color: "var(--aurora-text-secondary)",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = "var(--aurora-text)"
+              e.currentTarget.style.background = "var(--aurora-surface-hover)"
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = "var(--aurora-text-secondary)"
+              e.currentTarget.style.background = "var(--aurora-surface)"
+            }}
+          >
+            <SlidersHorizontal className="h-3 w-3" strokeWidth={2} />
+            Edit query
+          </button>
+        </div>
+
+        {/* Results */}
+        <div>
+          {loading ? (
+            <SongTable songs={[]} loading={true} />
+          ) : error ? (
+            <div className="py-16 text-center">
+              <p className="font-display-italic text-[18px] text-[var(--aurora-danger)]">{error}</p>
+            </div>
+          ) : results.length === 0 ? (
+            <div className="py-16 text-center">
+              <p className="font-display-italic text-[20px] text-[var(--aurora-text-tertiary)]">
+                No songs match this query
+              </p>
+            </div>
+          ) : (
+            <SongTable songs={results} loading={false} onPlay={handlePlaySong} />
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  /* ── FULL QUERY BUILDER (manual mode or after "Edit query") ─────────────── */
   return (
     <div className="p-4 sm:px-10 sm:pt-6 max-w-[1400px] mx-auto aurora-view-enter">
       {/* Row 1 — Title + action buttons */}
