@@ -597,14 +597,17 @@ function PlaylistSongRow({ song, index, total, onRemove, onReorder, onPlay }: Pl
         </div>
       </td>
 
-      <td className="relative px-4 py-3 w-24 text-[12px] text-[var(--aurora-text-dim)] tabular-nums">
+      <td className="relative px-4 py-3 w-28 text-[12px] text-[var(--aurora-text-dim)] tabular-nums">
         <span
           className={`absolute inset-0 transition-colors duration-200 pointer-events-none ${
             isCurrent ? "" : "group-hover:bg-white/[0.025]"
           }`}
           aria-hidden="true"
         />
-        <span className="relative z-10">{formatDuration(song.duration)}</span>
+        <span className="relative z-10">
+          {formatDuration(song.duration)}
+          {song.file_format && <> · {song.file_format.toUpperCase()}</>}
+        </span>
       </td>
 
       <td className="relative px-4 py-3">

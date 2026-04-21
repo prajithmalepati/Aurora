@@ -5,6 +5,7 @@ export interface Song {
   album: string | null
   duration: number | null
   file_path: string | null
+  file_format?: string | null
   source: string
   external_id?: string | null
   tags: string[]
@@ -35,6 +36,7 @@ export interface PlaylistSong {
   album: string | null
   duration: number | null
   file_path: string | null
+  file_format?: string | null
   tags: string[]
   position: number
 }
@@ -53,6 +55,7 @@ export interface FilterResult {
   album: string | null
   duration: number | null
   file_path: string | null
+  file_format?: string | null
   source: string
   tags: string[]
   playlists: Playlist[]

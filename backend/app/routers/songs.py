@@ -44,6 +44,7 @@ def song_row_to_dict(row: sqlite3.Row) -> dict:
         "album": row["album"],
         "duration": row["duration"],
         "file_path": row["file_path"],
+        "file_format": row["file_format"] if "file_format" in row.keys() else None,
         "source": row["source"],
         "tags": tags,
         "playlists": playlists,
@@ -65,13 +66,14 @@ def list_songs(
     
     # Build the query with LEFT JOINs for tags and playlists
     query = """
-        SELECT 
+        SELECT
             s.id,
             s.title,
             s.artist,
             s.album,
             s.duration,
             s.file_path,
+            s.file_format,
             s.source,
             GROUP_CONCAT(t.name) as tags,
             GROUP_CONCAT(p.id || ':' || p.name) as playlists,
@@ -147,13 +149,14 @@ def get_song(song_id: int):
     
     # Build the query with LEFT JOINs for tags and playlists
     query = """
-        SELECT 
+        SELECT
             s.id,
             s.title,
             s.artist,
             s.album,
             s.duration,
             s.file_path,
+            s.file_format,
             s.source,
             GROUP_CONCAT(t.name) as tags,
             GROUP_CONCAT(p.id || ':' || p.name) as playlists,
@@ -200,13 +203,14 @@ def stream_song(song_id: int):
     
     # Get the song by ID
     query = """
-        SELECT 
+        SELECT
             s.id,
             s.title,
             s.artist,
             s.album,
             s.duration,
             s.file_path,
+            s.file_format,
             s.source,
             GROUP_CONCAT(t.name) as tags,
             GROUP_CONCAT(p.id || ':' || p.name) as playlists,
@@ -298,6 +302,8 @@ def create_song(song: SongCreate):
         raise HTTPException(status_code=409, detail="file_path already exists")
 
     # Return the created song with empty tags and playlists
+    import os as _os
+    file_fmt = _os.path.splitext(song.file_path)[1].lstrip(".").lower() if song.file_path else None
     conn.close()
     return SongResponse(
         id=song_id,
@@ -306,6 +312,7 @@ def create_song(song: SongCreate):
         album=song.album,
         duration=song.duration,
         file_path=song.file_path,
+        file_format=file_fmt,
         source="manual",
         tags=[],
         playlists=[],
@@ -366,13 +373,14 @@ def update_song(song_id: int, song_update: SongUpdate):
     
     # Fetch the updated song with joined query
     query = """
-        SELECT 
+        SELECT
             s.id,
             s.title,
             s.artist,
             s.album,
             s.duration,
             s.file_path,
+            s.file_format,
             s.source,
             GROUP_CONCAT(t.name) as tags,
             GROUP_CONCAT(p.id || ':' || p.name) as playlists,

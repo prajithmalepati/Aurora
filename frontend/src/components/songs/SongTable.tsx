@@ -18,7 +18,7 @@ function TableHeader() {
       <tr>
         <th className={`${HEADER_CLASS} w-12 text-center`}>#</th>
         <th className={HEADER_CLASS}>Title</th>
-        <th className={`${HEADER_CLASS} w-24 hidden lg:table-cell`}>Duration</th>
+        <th className={`${HEADER_CLASS} w-28 hidden lg:table-cell`}>Duration</th>
         <th className={`${HEADER_CLASS} w-40 hidden lg:table-cell`}>Playlists</th>
         <th className={`${HEADER_CLASS} max-w-[200px]`}>Tags</th>
         <th className={`${HEADER_CLASS} w-32 text-right`}>Actions</th>
