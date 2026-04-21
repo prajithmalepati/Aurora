@@ -106,27 +106,27 @@ export function SongRow({ song, index, animIndex, onPlay }: SongRowProps) {
             }
             aria-hidden="true"
           />
+          {/* Static content (row number / equalizer) */}
           <span className="relative z-10 flex items-center justify-center">
             {isCurrentSong ? (
               <Equalizer playing={isPlaying} />
             ) : (
-              <>
-                {/* Row number fades out on hover */}
-                <span className="text-xs tabular-nums transition-opacity duration-150 group-hover:opacity-0 select-none">
-                  {index + 1}
-                </span>
-                {/* Circular play button fades in on hover */}
-                <button
-                  className="aurora-play-btn absolute w-10 h-10 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-150 hover:scale-105"
-                  onClick={(e) => { e.stopPropagation(); handlePlay() }}
-                  aria-label={`Play ${song.title}`}
-                  tabIndex={-1}
-                >
-                  <Play className="h-4 w-4 text-white ml-[2px]" fill="currentColor" strokeWidth={0} />
-                </button>
-              </>
+              <span className="text-xs tabular-nums transition-opacity duration-150 group-hover:opacity-0 select-none">
+                {index + 1}
+              </span>
             )}
           </span>
+          {/* Circular play button — positioned in td (td has relative), fades in on hover */}
+          {!isCurrentSong && (
+            <button
+              className="aurora-play-btn absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-150 hover:scale-105"
+              onClick={(e) => { e.stopPropagation(); handlePlay() }}
+              aria-label={`Play ${song.title}`}
+              tabIndex={-1}
+            >
+              <Play className="h-4 w-4 text-white ml-[2px]" fill="currentColor" strokeWidth={0} />
+            </button>
+          )}
         </td>
 
         {/* Title / Artist + art thumbnail */}
