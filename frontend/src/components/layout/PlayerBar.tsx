@@ -19,7 +19,9 @@ export function PlayerBar() {
   const next = usePlayerStore((state) => state.next)
   const previous = usePlayerStore((state) => state.previous)
 
-  const isExpanded = currentSong !== null
+  // isIdle = no song ever selected (initial app load only).
+  // Once currentSong is set it never returns to null, so this only fires once.
+  const isIdle = currentSong === null
   const hasSong = currentSong !== null && currentSong.file_path !== null
 
   const seekPct = duration > 0 ? Math.min(100, (seek / duration) * 100) : 0
@@ -39,25 +41,22 @@ export function PlayerBar() {
         WebkitBackdropFilter: "blur(12px)",
       }}
     >
-      {!isExpanded ? (
-        /* ── COLLAPSED: quiet presence ── */
-        <div className="flex items-center h-[44px] px-4 sm:px-6 gap-3">
-          <div
-            className="w-8 h-8 rounded-sm flex-shrink-0"
-            style={{
-              background: "linear-gradient(135deg, rgba(77,184,164,0.12), rgba(138,117,200,0.12))",
-              boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.05)",
-            }}
-          />
-          <span className="font-display-italic text-[13px] text-[var(--aurora-text-tertiary)]">
-            Play something
-          </span>
-        </div>
-      ) : (
-        /* ── EXPANDED: full controls ── */
-        <div className="aurora-view-enter">
-          {/* Mobile: stacked layout */}
-          <div className="flex flex-col sm:hidden gap-2 px-4 py-3">
+      {/* ── MOBILE layout ── */}
+      <div className="sm:hidden">
+        {isIdle ? (
+          <div className="flex items-center h-[44px] px-4 gap-3">
+            <div className="w-8 h-8 rounded-sm flex-shrink-0 aurora-idle-shimmer" />
+            <div className="flex flex-col gap-px">
+              <span className="font-display-italic text-[12px] leading-tight text-[var(--aurora-text-secondary)]">
+                Nothing playing
+              </span>
+              <span className="text-[10px] text-[var(--aurora-text-muted)]">
+                Pick a song or hit Jam
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2 px-4 py-3">
             {/* Song info row */}
             <div className="flex items-center gap-3">
               <div
@@ -145,9 +144,33 @@ export function PlayerBar() {
               </button>
             </div>
           </div>
+        )}
+      </div>
 
-          {/* Desktop: horizontal layout */}
-          <div className="hidden sm:flex items-center h-[80px] px-8 gap-8">
+      {/* ── DESKTOP layout — height transitions between idle (52px) and playing (80px) ── */}
+      <div
+        className="hidden sm:block overflow-hidden"
+        style={{
+          height: isIdle ? "52px" : "80px",
+          transition: "height 300ms cubic-bezier(0.2, 0.7, 0.2, 1)",
+        }}
+      >
+        {isIdle ? (
+          /* Idle: shimmer + text, no controls */
+          <div className="flex items-center h-[52px] px-8 gap-4">
+            <div className="w-[42px] h-[42px] rounded-md flex-shrink-0 aurora-idle-shimmer" />
+            <div className="flex flex-col gap-0.5">
+              <span className="font-display-italic text-[15px] leading-tight text-[var(--aurora-text)]">
+                Nothing playing
+              </span>
+              <span className="text-[11px] text-[var(--aurora-text-muted)] tracking-wide">
+                Pick a song or hit Jam
+              </span>
+            </div>
+          </div>
+        ) : (
+          /* Playing / paused: full controls fade in as bar opens */
+          <div className="flex items-center h-[80px] px-8 gap-8 aurora-view-enter">
             {/* LEFT: Album art + title/artist */}
             <div className="flex items-center gap-3.5 w-[240px] min-w-[160px] flex-shrink-0">
               <div className="relative flex-shrink-0">
@@ -291,8 +314,8 @@ export function PlayerBar() {
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }

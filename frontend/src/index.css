@@ -125,6 +125,18 @@
 
   /* Muted — borders, dividers, inactive chips, disabled outlines */
   --aurora-muted: rgba(255, 255, 255, 0.14);
+
+  /* ── Surface elevation scale — OLED depth tokens ──────────────────────────
+     Solid hex values keep OLED pixels off; use these instead of glass surfaces
+     when you need stacked opaque layers (sidebars over content, modals, etc.).
+     Do NOT mix with the glass --aurora-surface tokens on the same layer. */
+  --aurora-surface-0: #000000;       /* page base — OLED pure black */
+  --aurora-surface-1: #0a0a0c;       /* cards, drawers — subtle lift from void */
+  --aurora-surface-2: #111114;       /* popovers, dropdowns — elevated layer */
+  --aurora-surface-3: #17171b;       /* modals, sheets — highest elevation */
+  --aurora-surface-pressed: rgba(255, 255, 255, 0.035); /* pressed state for surface-1 items */
+  /* Note: --aurora-surface-hover is already defined above as the glass hover value
+     (rgba(255,255,255,0.065)) and serves the hover role for surface-1 items as well. */
 }
 
 :root {
@@ -682,6 +694,29 @@
 .mix-btn-jam:hover:not(:disabled) {
   box-shadow: 0 0 24px -5px var(--aurora-primary-glow),
               0 0 24px -5px var(--aurora-secondary-glow);
+}
+
+/* ============================================================
+   PLAYERBAR — idle shimmer + collapsed / expanded transition
+   ============================================================ */
+
+/* Idle placeholder — slow aurora gradient pulse between primary and secondary.
+   Only visible before any song has ever been selected (initial app load). */
+@keyframes aurora-idle-pulse {
+  0%, 100% { background-position: 0% 50%; }
+  50%       { background-position: 100% 50%; }
+}
+
+.aurora-idle-shimmer {
+  background: linear-gradient(
+    135deg,
+    rgba(77, 184, 164, 0.12) 0%,
+    rgba(138, 117, 200, 0.22) 50%,
+    rgba(77, 184, 164, 0.10) 100%
+  );
+  background-size: 200% 200%;
+  animation: aurora-idle-pulse 3.5s ease-in-out infinite;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 
 /* ============================================================
