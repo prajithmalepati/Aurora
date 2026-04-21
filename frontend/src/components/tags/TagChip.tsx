@@ -20,8 +20,11 @@ export function TagChip({ name, onRemove, onClick }: TagChipProps) {
   const chipContent = (
     <span
       onClick={onClick ? handleClick : undefined}
+      title={onClick ? "Filter by this tag" : undefined}
       className={`aurora-chip inline-flex items-center text-[10px] font-medium tracking-wide text-[var(--aurora-text-secondary)] px-2 py-[1.5px] rounded-full transition-all duration-150 ${
-        onClick ? "cursor-pointer hover:text-[var(--aurora-text)]" : "cursor-default"
+        onClick
+          ? "cursor-pointer hover:text-[var(--aurora-text)] hover:scale-[1.03]"
+          : "cursor-default"
       }`}
     >
       {name}

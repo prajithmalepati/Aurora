@@ -23,10 +23,11 @@ import { TagEditor } from "@/components/tags/TagEditor"
 interface SongRowProps {
   song: Song
   index: number
+  animIndex?: number
   onPlay?: (song: Song, index: number) => void
 }
 
-export function SongRow({ song, index, onPlay }: SongRowProps) {
+export function SongRow({ song, index, animIndex, onPlay }: SongRowProps) {
   const deleteSong = useSongStore((state) => state.deleteSong)
   const playSong = usePlayerStore((state) => state.playSong)
   const currentSong = usePlayerStore((state) => state.currentSong)
@@ -59,13 +60,17 @@ export function SongRow({ song, index, onPlay }: SongRowProps) {
   const isCurrentSong = currentSong?.id === song.id
   const hasFile = song.file_path !== null
 
+  // Stagger delay: first 16 rows get 25ms per-row delay, rest appear instantly
+  const animDelay = animIndex !== undefined && animIndex < 16 ? animIndex * 25 : 0
+
   return (
     <>
       <tr
         onClick={handlePlay}
-        className={`group relative transition-colors duration-200 ${
+        className={`aurora-row-in group relative transition-colors duration-150 ${
           hasFile ? "cursor-pointer" : "cursor-not-allowed opacity-40"
         }`}
+        style={{ animationDelay: `${animDelay}ms` }}
       >
         {/* # column / play indicator */}
         <td
@@ -86,10 +91,10 @@ export function SongRow({ song, index, onPlay }: SongRowProps) {
           )}
           {/* Row-level hover background */}
           <span
-            className={`absolute inset-0 transition-colors duration-200 pointer-events-none ${
+            className={`absolute inset-0 transition-colors duration-150 pointer-events-none ${
               isCurrentSong
                 ? ""
-                : "group-hover:bg-white/[0.025]"
+                : "group-hover:bg-[var(--aurora-surface-1)]"
             }`}
             style={
               isCurrentSong
@@ -106,14 +111,19 @@ export function SongRow({ song, index, onPlay }: SongRowProps) {
               <Equalizer playing={isPlaying} />
             ) : (
               <>
-                <span className="text-xs tabular-nums group-hover:hidden">
+                {/* Row number fades out on hover */}
+                <span className="text-xs tabular-nums transition-opacity duration-150 group-hover:opacity-0 select-none">
                   {index + 1}
                 </span>
-                <Play
-                  className="h-3.5 w-3.5 hidden group-hover:block text-[var(--aurora-text)]"
-                  fill="currentColor"
-                  strokeWidth={0}
-                />
+                {/* Circular play button fades in on hover */}
+                <button
+                  className="aurora-play-btn absolute w-10 h-10 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-150 hover:scale-105"
+                  onClick={(e) => { e.stopPropagation(); handlePlay() }}
+                  aria-label={`Play ${song.title}`}
+                  tabIndex={-1}
+                >
+                  <Play className="h-4 w-4 text-white ml-[2px]" fill="currentColor" strokeWidth={0} />
+                </button>
               </>
             )}
           </span>
@@ -122,8 +132,8 @@ export function SongRow({ song, index, onPlay }: SongRowProps) {
         {/* Title / Artist + art thumbnail */}
         <td className="relative px-4 py-3">
           <span
-            className={`absolute inset-0 transition-colors duration-200 pointer-events-none ${
-              isCurrentSong ? "" : "group-hover:bg-white/[0.025]"
+            className={`absolute inset-0 transition-colors duration-150 pointer-events-none ${
+              isCurrentSong ? "" : "group-hover:bg-[var(--aurora-surface-1)]"
             }`}
             aria-hidden="true"
           />
@@ -153,8 +163,8 @@ export function SongRow({ song, index, onPlay }: SongRowProps) {
         {/* Duration · Format */}
         <td className="relative px-4 py-3 w-28 text-[12px] text-[var(--aurora-text-dim)] tabular-nums hidden lg:table-cell">
           <span
-            className={`absolute inset-0 transition-colors duration-200 pointer-events-none ${
-              isCurrentSong ? "" : "group-hover:bg-white/[0.025]"
+            className={`absolute inset-0 transition-colors duration-150 pointer-events-none ${
+              isCurrentSong ? "" : "group-hover:bg-[var(--aurora-surface-1)]"
             }`}
             aria-hidden="true"
           />
@@ -167,8 +177,8 @@ export function SongRow({ song, index, onPlay }: SongRowProps) {
         {/* Playlists */}
         <td className="relative px-4 py-3 w-40 hidden lg:table-cell">
           <span
-            className={`absolute inset-0 transition-colors duration-200 pointer-events-none ${
-              isCurrentSong ? "" : "group-hover:bg-white/[0.025]"
+            className={`absolute inset-0 transition-colors duration-150 pointer-events-none ${
+              isCurrentSong ? "" : "group-hover:bg-[var(--aurora-surface-1)]"
             }`}
             aria-hidden="true"
           />
@@ -205,8 +215,8 @@ export function SongRow({ song, index, onPlay }: SongRowProps) {
         {/* Tags */}
         <td className="relative px-4 py-3 max-w-[200px]">
           <span
-            className={`absolute inset-0 transition-colors duration-200 pointer-events-none ${
-              isCurrentSong ? "" : "group-hover:bg-white/[0.025]"
+            className={`absolute inset-0 transition-colors duration-150 pointer-events-none ${
+              isCurrentSong ? "" : "group-hover:bg-[var(--aurora-surface-1)]"
             }`}
             aria-hidden="true"
           />
@@ -218,8 +228,8 @@ export function SongRow({ song, index, onPlay }: SongRowProps) {
         {/* Actions */}
         <td className="relative px-4 py-3 w-32">
           <span
-            className={`absolute inset-0 transition-colors duration-200 pointer-events-none ${
-              isCurrentSong ? "" : "group-hover:bg-white/[0.025]"
+            className={`absolute inset-0 transition-colors duration-150 pointer-events-none ${
+              isCurrentSong ? "" : "group-hover:bg-[var(--aurora-surface-1)]"
             }`}
             aria-hidden="true"
           />
