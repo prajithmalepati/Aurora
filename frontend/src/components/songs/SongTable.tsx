@@ -7,6 +7,7 @@ interface SongTableProps {
   songs: Song[]
   loading?: boolean
   onPlay?: (song: Song, index: number) => void
+  animKey?: number
 }
 
 const HEADER_CLASS =
@@ -27,7 +28,7 @@ function TableHeader() {
   )
 }
 
-export function SongTable({ songs, loading = false, onPlay }: SongTableProps) {
+export function SongTable({ songs, loading = false, onPlay, animKey }: SongTableProps) {
   if (loading) {
     return (
       <div className="w-full overflow-auto aurora-fade-in">
@@ -94,9 +95,9 @@ export function SongTable({ songs, loading = false, onPlay }: SongTableProps) {
     <div className="w-full overflow-auto aurora-fade-in">
       <table className="w-full border-separate border-spacing-0">
         <TableHeader />
-        <tbody>
+        <tbody key={animKey}>
           {songs.map((song, index) => (
-            <SongRow key={song.id} song={song} index={index} onPlay={onPlay} />
+            <SongRow key={song.id} song={song} index={index} onPlay={onPlay} animIndex={index} />
           ))}
         </tbody>
       </table>
