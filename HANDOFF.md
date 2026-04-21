@@ -1,9 +1,9 @@
 # Aurora — Session Handoff
 
-## Current State (April 16, 2026)
+## Current State (April 21, 2026)
 Backend: 100% complete. All endpoints working — Songs CRUD, Tags CRUD + assignment, Playlists CRUD + song management + reorder, Filter (boolean AND/OR/NOT with parentheses), Scanner (folder scan with mutagen), Audio streaming.
 
-Frontend: Full UI overhaul complete. "Northern Lights Over OLED Black" design system applied across all views. Mix page redesigned as compact command zone. PlayerBar collapse/expand with glassmorphism. Sidebar polished. Global keyboard shortcuts. Wake lock, error boundary, view transitions. Bug fixes and playlist search added this session.
+Frontend: Full UI overhaul complete. "Northern Lights Over OLED Black" design system applied across all views. Mix page redesigned as compact command zone. PlayerBar idle/playing states with breathing-open transition. Tag-entry vs manual-entry modes in Mix. Surface elevation token scale added. Sidebar polished. Global keyboard shortcuts. Wake lock, error boundary, view transitions.
 
 CORS: `allow_origins` now covers ports 5173, 5174, 5175.
 
@@ -55,7 +55,97 @@ Legacy aliases (`--aurora-text-dim` → `--aurora-text-secondary`, `--aurora-tex
 
 Registered in `App.tsx` via `useCallback` + `window.addEventListener("keydown", ...)`. All shortcuts check `document.activeElement.tagName` to avoid firing while typing.
 
-## Completed This Session (April 16 — Session 7)
+## Completed This Session (April 21 — Session 9)
+
+### Feature 1: PlayerBar persistent idle state
+
+**Goal:** Match Spotify/Apple Music "nothing playing" UX — persistent bar that grows on first play.
+
+**Implementation:**
+- Desktop idle: 52px bar with aurora gradient shimmer (animated `background-position` pulse, 3.5s ease-in-out) in the album-art position, "Nothing playing" in italic Fraunces, "Pick a song or hit Jam" in `--aurora-text-muted`.
+- Desktop playing: 80px bar with full controls. Height transitions smoothly via `transition: height 300ms cubic-bezier(0.2, 0.7, 0.2, 1)` on the desktop container.
+- Mobile idle: 44px with shimmer + same text. Mobile playing: stacked layout unchanged.
+- `isIdle = currentSong === null`. Once `playSong()` fires, `currentSong` is never set back to null (confirmed in playerStore — `next()` at end of queue only sets `isPlaying: false`). So idle state is strictly initial app load.
+- No transport controls in idle. No seek bar, volume, or queue button.
+- `.aurora-idle-shimmer` CSS class added to `index.css` with `aurora-idle-pulse` keyframe.
+
+**Files:** `PlayerBar.tsx`, `index.css`
+
+### Feature 2: Mix page tag-entry vs manual-entry modes
+
+**Goal:** Clicking a sidebar tag goes straight to results with compact header. "Mix" nav item opens full QueryBuilder.
+
+**Implementation:**
+- `filterStore.ts`: Added `isQuickTagView: boolean` (default `false`), `quickTagEditorOpen: boolean` (default `false`), `setIsQuickTagView(v)` (also resets `quickTagEditorOpen` to `false`), `setQuickTagEditorOpen(v)`.
+- `Sidebar.tsx`: `handleTagClick` calls `setIsQuickTagView(true)` before navigating. Mix NavItem click calls `setIsQuickTagView(false)`.
+- `QueryBuilder.tsx`: When `isQuickTagView && !quickTagEditorOpen`, renders compact header: `[Tag icon] tagName · N songs` + "Edit query" button. Results shown directly below. When `quickTagEditorOpen` is `true`, falls through to the full QueryBuilder (same as manual mode). `displayTagName` strips surrounding quotes from the raw query string.
+- No `useEffect`/setState-in-effect — editor open/closed state lives in filterStore and is reset in event handlers.
+
+**Files:** `filterStore.ts`, `Sidebar.tsx`, `QueryBuilder.tsx`
+
+### Feature 3: Surface elevation token scale
+
+**Goal:** Add intermediate OLED depth tokens without touching any existing component.
+
+**Tokens added to `index.css` `:root`:**
+- `--aurora-surface-0: #000000` — page base, OLED pure black
+- `--aurora-surface-1: #0a0a0c` — cards, drawers, subtle lift
+- `--aurora-surface-2: #111114` — popovers, dropdowns
+- `--aurora-surface-3: #17171b` — modals, sheets, highest elevation
+- `--aurora-surface-pressed: rgba(255,255,255,0.035)` — active/pressed state for surface-1 items
+- Note: `--aurora-surface-hover` already existed (`rgba(255,255,255,0.065)`) and serves the elevation hover role.
+- No existing component was modified to use these tokens.
+
+**Files:** `index.css`
+
+### Visual QA Pass
+- TypeScript build: clean (only pre-existing `baseUrl` deprecation warning, unrelated to this session).
+- Dev server: started, no new HMR/compilation errors. Only pre-existing duplicate-key console warnings.
+- All views checked via code review: PlayerBar idle state, PlayerBar expanded state (with controls), Mix compact tag header, Mix full QueryBuilder, All Songs, Playlist detail — no regressions observed.
+- Dev server stopped before session end.
+
+---
+
+## Completed Prior Sessions
+
+### Session 8 (April 20 — audio architecture + PlayerBar spacing)
+
+### Bug 1 (re-fix): Audio double-play — single chokepoint architecture
+
+**Root cause:** The previous fix (removing `autoplay: true`) was insufficient. The real issue was architectural: the `isPlaying` effect had `[isPlaying, currentSong]` as deps, meaning it re-ran on every song change. When switching from Song A → Song B while playing, both the song-change effect (creates HowlB) and the isPlaying effect (plays it) fired in sequence. React effects run after the browser paint — there's a window where both Howls coexist in the HTML5 audio pipeline.
+
+**Fix:** Restructured `useAudioPlayer.ts` so the **song-change effect is the single chokepoint** for all Howl lifecycle management. It stops/unloads the old Howl, creates the new one, and calls `howl.play()` directly (reading `getState().isPlaying` imperatively). The `isPlaying` effect now has only `[isPlaying]` in its deps — it fires only on pause/resume toggling, never on song changes. This makes the stop-create-play sequence atomic within one effect run.
+
+**Path verification:**
+- Click song in SongTable → `onPlay(song, queue)` → `playSong()` → `currentSong?.id` changes → song-change effect fires. isPlaying effect does NOT fire (isPlaying unchanged). ✓
+- Next/Prev buttons → store's `next()`/`previous()` → `currentSong?.id` changes → same path. ✓
+- Jam/Shuffle-Jam buttons in filterStore → `usePlayerStore.getState().playSong()` → same. ✓
+- `onend` auto-advance → `next()` callback → same. ✓
+- Spacebar / Play button → `togglePlay()` → only `isPlaying` changes → only isPlaying effect fires. ✓
+- Volume slider → only volume effect fires. ✓
+
+**Cleanup improvement:** The return cleanup now captures the local `howl` variable (not `howlRef.current`), so it always cleans up the correct instance even if the ref is reassigned.
+
+### Bug 2 (re-fix): PlayerBar spacing
+
+**Root cause:** Previous height fix made the bar 80px but didn't address inter-section spacing. The outer container used `px-6 gap-8`, and fixed section widths (left: 280px, right: 240px) left insufficient room for the center at 1280px widths. The transport cluster `gap-6` (24px) between skip/play/skip buttons made the play button appear visually isolated and close to section edges.
+
+**Fix:**
+- Container: `px-6` → `px-8` (more outer breathing room)
+- Left section: `w-[280px]` → `w-[240px]`; right section: `w-[240px]` → `w-[200px]` (40px freed from each side)
+- Center: `max-w-[620px]` → `max-w-[580px]`, added `min-w-0`
+- Transport cluster: `gap-6` → `gap-3` (tighter, more cohesive button cluster)
+
+**Layout verification at target widths:**
+- 1280px: 98px gap between center content and right section. ✓
+- 1440px: 178px gap. ✓
+- 1920px: 418px gap. ✓
+
+**Browser verification:** Dev server was running during session (both servers up, 50 songs confirmed). Code review shows no regressions. Manual browser test recommended before claiming fully resolved.
+
+## Completed Prior Sessions
+
+### Session 7 (April 16 — bug fixes + playlist search)
 
 ### Bug 1: PlayerBar overflow fixed
 Desktop container height increased from 72px → 80px. LEFT section (album art + song info) given `flex-shrink-0` to prevent squeezing at narrow widths. Root cause: the center column (44px play button + 8px gap + ~20px seek bar = ~72px) exactly filled the 72px container with zero breathing room.
@@ -79,8 +169,6 @@ All views checked via code review + clean dev server build:
 - SongTable / All Songs ✓
 - All CSS aurora tokens defined ✓
 - No HMR errors in dev server ✓
-
-## Completed Prior Sessions
 
 ### Session 6 (Claude Code with Opus — full UI overhaul)
 Complete aurora color token system, Mix page command zone, PlayerBar collapse/expand, sidebar polish, Playlist detail restyled, All Songs restyled, keyboard shortcuts, view fade transitions, row hover states, button micro-interactions, Wake Lock API, Error boundary, empty states.
@@ -106,13 +194,14 @@ App shell, song table, filter/Mix view, audio playback, file scanner dialog, ini
 - **PlayerBar height transition** — currently uses conditional rendering with fade-in. A CSS grid `grid-template-rows` height animation would be smoother but adds complexity.
 
 ## Known Bugs
-_(All critical bugs from the Session 7 brief are now fixed.)_
+- **Audio double-play (needs browser confirmation):** The Session 8 single-chokepoint rewrite is architecturally sound, but manual A→B song switch testing in the browser is the only way to confirm it's actually fixed.
+- **PlayerBar spacing (needs browser confirmation):** Layout math confirmed correct at 1280/1440/1920px. Manual resize test recommended.
 
 ## Technical Decisions
 - Audio sliders use plain HTML `<input type="range">` — shadcn Slider had compatibility issues. Don't replace them.
 - View switching uses Zustand store (`songStore.view`), no React Router.
 - `playSong()` needs the song list as second argument for queue/next/previous to work.
-- Howler.js uses `html5: true` mode — required for streaming large files. NO `autoplay: true` — the `isPlaying` sync effect in `useAudioPlayer` is the single caller of `.play()`.
+- Howler.js uses `html5: true` mode — required for streaming large files. The song-change effect (`[currentSong?.id]`) is the SINGLE CHOKEPOINT for Howl creation and initial play. The isPlaying effect (`[isPlaying]` only) handles pause/resume toggling. Never add `currentSong` back to the isPlaying effect deps — that was the root cause of dual-audio.
 - Display font (Fraunces) loaded via Google Fonts with the full `opsz,wght,SOFT,WONK` axis range.
 - Playlist images stored server-side via `POST /playlists/{id}/image`. Create flow must `await fetchPlaylists()` *after* upload.
 - Sidebar responsive state is local to AppShell (useState), not in Zustand.
