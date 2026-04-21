@@ -7,6 +7,7 @@ import { toast } from "sonner"
 interface FilterState {
   query: string
   results: FilterResult[]
+  resultsVersion: number
   loading: boolean
   error: string | null
   // True when Mix was opened by clicking a sidebar tag (shows compact header).
@@ -76,6 +77,7 @@ function friendlyFilterError(query: string, raw: string): string {
 export const useFilterStore = create<FilterState>((set, get) => ({
   query: "",
   results: [],
+  resultsVersion: 0,
   loading: false,
   error: null,
   isQuickTagView: false,
@@ -113,10 +115,10 @@ export const useFilterStore = create<FilterState>((set, get) => ({
     set({ loading: true, error: null })
     try {
       const res = await api.post<ApiResponse<FilterResult[]>>("/filter", { query })
-      set({ results: res.data, loading: false })
+      set({ results: res.data, loading: false, resultsVersion: get().resultsVersion + 1 })
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Unknown error"
-      set({ error: friendlyFilterError(query, message), loading: false, results: [] })
+      set({ error: friendlyFilterError(query, message), loading: false, results: [], resultsVersion: get().resultsVersion + 1 })
     }
   },
 
@@ -128,10 +130,10 @@ export const useFilterStore = create<FilterState>((set, get) => ({
     try {
       const res = await api.post<ApiResponse<FilterResult[]>>("/filter", { query })
       const shuffled = shuffleArray(res.data)
-      set({ results: shuffled, loading: false })
+      set({ results: shuffled, loading: false, resultsVersion: get().resultsVersion + 1 })
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Unknown error"
-      set({ error: friendlyFilterError(query, message), loading: false, results: [] })
+      set({ error: friendlyFilterError(query, message), loading: false, results: [], resultsVersion: get().resultsVersion + 1 })
     }
   },
 
@@ -142,7 +144,7 @@ export const useFilterStore = create<FilterState>((set, get) => ({
     set({ loading: true, error: null })
     try {
       const res = await api.post<ApiResponse<FilterResult[]>>("/filter", { query })
-      set({ results: res.data, loading: false })
+      set({ results: res.data, loading: false, resultsVersion: get().resultsVersion + 1 })
       const playable = res.data.filter((r) => r.file_path)
       if (playable.length === 0) {
         toast.error("No playable songs in this mix")
@@ -165,7 +167,7 @@ export const useFilterStore = create<FilterState>((set, get) => ({
     try {
       const res = await api.post<ApiResponse<FilterResult[]>>("/filter", { query })
       const shuffled = shuffleArray(res.data)
-      set({ results: shuffled, loading: false })
+      set({ results: shuffled, loading: false, resultsVersion: get().resultsVersion + 1 })
       const playable = shuffled.filter((r) => r.file_path)
       if (playable.length === 0) {
         toast.error("No playable songs in this mix")
@@ -180,5 +182,5 @@ export const useFilterStore = create<FilterState>((set, get) => ({
     }
   },
 
-  clearResults: () => set({ query: "", results: [], error: null }),
+  clearResults: () => set({ query: "", results: [], error: null, resultsVersion: 0 }),
 }))
