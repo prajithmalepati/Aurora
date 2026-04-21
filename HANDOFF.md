@@ -1,9 +1,9 @@
 # Aurora — Session Handoff
 
 ## Current State (April 21, 2026)
-Backend: 100% complete. All endpoints working — Songs CRUD, Tags CRUD + assignment, Playlists CRUD + song management + reorder, Filter (boolean AND/OR/NOT with parentheses), Scanner (folder scan with mutagen), Audio streaming.
+Backend: 100% complete. All endpoints working — Songs CRUD, Tags CRUD + assignment, Playlists CRUD + song management + reorder, Filter (boolean AND/OR/NOT with parentheses), Scanner (folder scan with mutagen), Audio streaming. `file_format` column added to songs table (backfilled from file_path extension on startup).
 
-Frontend: Full UI overhaul complete. "Northern Lights Over OLED Black" design system applied across all views. Mix page redesigned as compact command zone. PlayerBar idle/playing states with breathing-open transition. Tag-entry vs manual-entry modes in Mix. Surface elevation token scale added. Sidebar polished. Global keyboard shortcuts. Wake lock, error boundary, view transitions.
+Frontend: Full UI overhaul complete. "Northern Lights Over OLED Black" design system applied across all views. Mix page redesigned as compact command zone. PlayerBar idle/playing states with breathing-open transition. Tag-entry vs manual-entry modes in Mix. Surface elevation token scale added. Sidebar polished. Global keyboard shortcuts. Wake lock, error boundary, view transitions. File format displayed inline after duration in all song lists.
 
 CORS: `allow_origins` now covers ports 5173, 5174, 5175.
 
@@ -34,6 +34,7 @@ CORS: `allow_origins` now covers ports 5173, 5174, 5175.
 | `--aurora-danger` | `#f87171` | Destructive actions, errors |
 | `--aurora-warning` | `#fbbf24` | Warnings |
 | `--aurora-rim` | `rgba(255,255,255,0.06)` | Inset keyline borders on glass surfaces |
+| `--aurora-accent-muted` | `#459687` | Muted teal — play button fill, seek/volume bar fill, equalizer bars at rest. Same hue as `--aurora-primary`, ~15% less saturated/bright. Hover on play button transitions to full `--aurora-primary` (200ms). |
 
 Legacy aliases (`--aurora-text-dim` → `--aurora-text-secondary`, `--aurora-text-muted` → `--aurora-text-tertiary`) are preserved in CSS for backward compatibility.
 
@@ -55,7 +56,60 @@ Legacy aliases (`--aurora-text-dim` → `--aurora-text-secondary`, `--aurora-tex
 
 Registered in `App.tsx` via `useCallback` + `window.addEventListener("keydown", ...)`. All shortcuts check `document.activeElement.tagName` to avoid firing while typing.
 
-## Completed This Session (April 21 — Session 9)
+## Completed This Session (April 21 — Session 10)
+
+### Feature 1: Mix quick-tag header icon spacing
+
+`gap-2.5` → `gap-3` on the flex container holding the `<Tag>` icon and tag name in the compact header of `QueryBuilder.tsx`. Fixes clipping between icon and text at all tag name lengths.
+
+**Files:** `QueryBuilder.tsx`
+
+### Feature 2: PlayerBar accent softened
+
+New token `--aurora-accent-muted: #459687` (HSL 169°, 37%, 43% — same hue as `--aurora-primary` but ~15% less saturated/bright). Applied to:
+- Play button fill (both mobile h-10 and desktop h-11). Inline `background` style removed; new `.aurora-play-btn` CSS class handles default muted fill + 200ms hover transition to full `--aurora-primary`.
+- Seek bar and volume slider filled portion (`.aurora-range` background gradient updated).
+- Equalizer bars (`.aurora-eq > span` gradient updated to `--aurora-accent-muted` → muted mint).
+
+Full `--aurora-primary` teal is now reserved for hover state — conveys interactivity without neon harshness on OLED.
+
+**Files:** `index.css`, `PlayerBar.tsx`
+
+### Feature 3: File format display inline with duration
+
+Shows `6:07 · FLAC` (uppercase) inline after duration in all song list views. Missing/null format gracefully degrades to duration alone.
+
+**Backend:**
+- `database.py`: `ALTER TABLE songs ADD COLUMN file_format TEXT` migration on startup. Python backfill loop derives format from `file_path` extension for existing rows.
+- `file_scanner.py`: `extract_metadata()` returns `file_format: path.suffix.lstrip('.').lower()`. INSERT in `import_scanned_songs()` stores it.
+- `songs.py`: All SELECT queries include `s.file_format`. `song_row_to_dict()` maps it. `create_song` derives format from `file_path` on manual creation.
+- `models.py`: `SongResponse.file_format: Optional[str] = None`.
+- `filter_engine.py`: SELECT and results dict include `file_format`.
+- `playlists.py`: All 4 song SELECT queries include `s.file_format`. All `SongResponse` constructors pass it.
+
+**Frontend:**
+- `types/index.ts`: `file_format?: string | null` added to `Song`, `FilterResult`, `PlaylistSong`.
+- `SongRow.tsx`: Duration cell shows `{formatDuration(song.duration)}{song.file_format && <> · {song.file_format.toUpperCase()}</>}`. Column width `w-24` → `w-28`.
+- `SongTable.tsx`: Duration header width `w-24` → `w-28`.
+- `PlaylistDetail.tsx`: Same inline format in `PlaylistSongRow` duration cell.
+
+**Verification:** `/api/songs` and `/api/filter` both return `file_format: "mp3"` for scanned songs. Songs with no `file_path` correctly return `file_format: null` and show duration only.
+
+**Files:** `database.py`, `models.py`, `songs.py`, `file_scanner.py`, `filter_engine.py`, `playlists.py`, `types/index.ts`, `SongRow.tsx`, `SongTable.tsx`, `PlaylistDetail.tsx`
+
+### Feature 4: Mix queue auto-starts from filtered results (verified)
+
+**Verified existing implementation is correct.** `QueryBuilder.tsx` already calls `playSong(song, results)` where `results` is the current filter output. `playerStore.playSong()` uses `findIndex(s => s.id === song.id)` to position the cursor in the queue, so clicking result #3 sets `queueIndex=2` and Next/Prev navigate within the filtered list. Jam and Shuffle-Jam buttons in `filterStore.ts` also correctly build queues from filtered results only. No code changes needed.
+
+### Visual QA Pass
+- TypeScript build: clean (only pre-existing `baseUrl` deprecation warning).
+- Backend `/api/songs` and `/api/filter`: `file_format` field present and correctly backfilled.
+- Playlist endpoint: Songs with `file_path: null` correctly return `file_format: null`.
+- Frontend dev server: compiled with no HMR errors.
+
+---
+
+## Completed Prior Sessions (April 21 — Session 9)
 
 ### Feature 1: PlayerBar persistent idle state
 
