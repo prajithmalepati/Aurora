@@ -74,6 +74,7 @@ def get_db() -> sqlite3.Connection:
 
 def init_db():
     """Initialize the database — create tables if they don't exist."""
+    import os
     conn = get_db()
     conn.executescript(INIT_SQL)
     # Migration: add image_url column to existing databases
@@ -82,4 +83,20 @@ def init_db():
         conn.commit()
     except Exception:
         pass  # Column already exists
+    # Migration: add file_format column to songs table
+    try:
+        conn.execute("ALTER TABLE songs ADD COLUMN file_format TEXT")
+        conn.commit()
+    except Exception:
+        pass  # Column already exists
+    # Backfill file_format from file_path extension for existing rows
+    rows = conn.execute(
+        "SELECT id, file_path FROM songs WHERE file_format IS NULL AND file_path IS NOT NULL"
+    ).fetchall()
+    for row in rows:
+        ext = os.path.splitext(row["file_path"])[1].lstrip(".").lower()
+        if ext:
+            conn.execute("UPDATE songs SET file_format = ? WHERE id = ?", (ext, row["id"]))
+    if rows:
+        conn.commit()
     conn.close()

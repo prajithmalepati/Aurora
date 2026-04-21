@@ -27,6 +27,7 @@ class SongResponse(BaseModel):
     album: Optional[str]
     duration: Optional[int]
     file_path: Optional[str]
+    file_format: Optional[str] = None
     source: str
     tags: list[str]
     playlists: list[str]

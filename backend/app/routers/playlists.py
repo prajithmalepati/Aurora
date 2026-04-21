@@ -229,13 +229,14 @@ def reorder_playlist_songs(playlist_id: int, reorder: PlaylistReorder):
     cursor = conn.cursor()
     
     query = """
-        SELECT 
+        SELECT
             s.id,
             s.title,
             s.artist,
             s.album,
             s.duration,
             s.file_path,
+            s.file_format,
             s.source,
             GROUP_CONCAT(t.name) as tags,
             ps.position
@@ -266,6 +267,7 @@ def reorder_playlist_songs(playlist_id: int, reorder: PlaylistReorder):
                 album=song_row["album"],
                 duration=song_row["duration"],
                 file_path=song_row["file_path"],
+                file_format=song_row["file_format"] if "file_format" in song_row.keys() else None,
                 source=song_row["source"],
                 tags=tags,
                 playlists=[],
@@ -374,13 +376,14 @@ def delete_song_from_playlist(playlist_id: int, song_id: int):
     cursor = conn.cursor()
     
     query = """
-        SELECT 
+        SELECT
             s.id,
             s.title,
             s.artist,
             s.album,
             s.duration,
             s.file_path,
+            s.file_format,
             s.source,
             GROUP_CONCAT(t.name) as tags,
             ps.position
@@ -411,6 +414,7 @@ def delete_song_from_playlist(playlist_id: int, song_id: int):
                 album=song_row["album"],
                 duration=song_row["duration"],
                 file_path=song_row["file_path"],
+                file_format=song_row["file_format"] if "file_format" in song_row.keys() else None,
                 source=song_row["source"],
                 tags=tags,
                 playlists=[],
@@ -479,13 +483,14 @@ def get_playlist(playlist_id: int):
     cursor = conn.cursor()
     
     query = """
-        SELECT 
+        SELECT
             s.id,
             s.title,
             s.artist,
             s.album,
             s.duration,
             s.file_path,
+            s.file_format,
             s.source,
             GROUP_CONCAT(t.name) as tags,
             ps.position
@@ -516,6 +521,7 @@ def get_playlist(playlist_id: int):
                 album=song_row["album"],
                 duration=song_row["duration"],
                 file_path=song_row["file_path"],
+                file_format=song_row["file_format"] if "file_format" in song_row.keys() else None,
                 source=song_row["source"],
                 tags=tags,
                 playlists=[],
@@ -733,13 +739,14 @@ def add_song_to_playlist(playlist_id: int, song_add: PlaylistSongAdd):
     cursor = conn.cursor()
     
     query = """
-        SELECT 
+        SELECT
             s.id,
             s.title,
             s.artist,
             s.album,
             s.duration,
             s.file_path,
+            s.file_format,
             s.source,
             GROUP_CONCAT(t.name) as tags,
             ps.position
@@ -770,6 +777,7 @@ def add_song_to_playlist(playlist_id: int, song_add: PlaylistSongAdd):
                 album=song_row["album"],
                 duration=song_row["duration"],
                 file_path=song_row["file_path"],
+                file_format=song_row["file_format"] if "file_format" in song_row.keys() else None,
                 source=song_row["source"],
                 tags=tags,
                 playlists=[],

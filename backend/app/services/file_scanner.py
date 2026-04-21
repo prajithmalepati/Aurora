@@ -63,6 +63,7 @@ def extract_metadata(file_path: str) -> dict | None:
         "album": album.strip() if album else None,
         "duration": duration,
         "file_path": str(path.resolve()),  # absolute path
+        "file_format": path.suffix.lstrip(".").lower(),
     }
 
 
@@ -134,10 +135,10 @@ def import_scanned_songs(
         
         # Insert song
         cursor = db_connection.execute(
-            """INSERT INTO songs (title, artist, album, duration, file_path, source, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, 'local_scan', ?, ?)""",
+            """INSERT INTO songs (title, artist, album, duration, file_path, file_format, source, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, 'local_scan', ?, ?)""",
             (metadata["title"], metadata["artist"], metadata["album"],
-             metadata["duration"], metadata["file_path"], now, now)
+             metadata["duration"], metadata["file_path"], metadata.get("file_format"), now, now)
         )
         
         song_id = cursor.lastrowid
