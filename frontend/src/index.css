@@ -115,6 +115,11 @@
   --aurora-tertiary-hover: #d4aa7c;
   --aurora-tertiary-glow: rgba(196, 154, 108, 0.12);
 
+  /* Muted accent — same hue as primary, ~15% less saturated/bright.
+     Used for play button fill, seek bar fill, and equalizer bars at rest.
+     Hover on interactive elements transitions to full --aurora-primary. */
+  --aurora-accent-muted: #459687;
+
   /* Glow — subtle ambient light for hover and focus halos */
   --aurora-glow: rgba(77, 184, 164, 0.12);
 
@@ -488,7 +493,7 @@
 .aurora-eq > span {
   display: block;
   width: 2px;
-  background: linear-gradient(to top, #5eead4, #86efac);
+  background: linear-gradient(to top, var(--aurora-accent-muted), rgba(134, 239, 172, 0.65));
   border-radius: 1px;
   transform-origin: bottom;
 }
@@ -502,6 +507,18 @@
 }
 
 /* ============================================================
+   PLAY BUTTON — muted fill at rest, full primary on hover
+   ============================================================ */
+
+.aurora-play-btn {
+  background: var(--aurora-accent-muted) !important;
+  transition: background 200ms ease;
+}
+.aurora-play-btn:not(:disabled):hover {
+  background: var(--aurora-primary) !important;
+}
+
+/* ============================================================
    RANGE INPUT — seek & volume sliders (aurora gradient fill)
    ============================================================ */
 
@@ -512,7 +529,7 @@
   height: 3px;
   border-radius: 999px;
   background:
-    linear-gradient(to right, var(--aurora-primary) 0%, var(--aurora-primary) var(--aurora-range-pct), rgba(255,255,255,0.08) var(--aurora-range-pct), rgba(255,255,255,0.08) 100%);
+    linear-gradient(to right, var(--aurora-accent-muted) 0%, var(--aurora-accent-muted) var(--aurora-range-pct), rgba(255,255,255,0.08) var(--aurora-range-pct), rgba(255,255,255,0.08) 100%);
   outline: none;
   cursor: pointer;
   transition: height 180ms ease;
