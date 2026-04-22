@@ -17,6 +17,9 @@ build/
 *.db-wal
 *.db-shm
 
+# Extracted album art cache
+backend/album-art/
+
 # IDE
 .vscode/
 .idea/

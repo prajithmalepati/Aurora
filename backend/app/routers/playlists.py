@@ -237,6 +237,7 @@ def reorder_playlist_songs(playlist_id: int, reorder: PlaylistReorder):
             s.duration,
             s.file_path,
             s.file_format,
+            s.album_art_path,
             s.source,
             GROUP_CONCAT(t.name) as tags,
             ps.position
@@ -268,6 +269,7 @@ def reorder_playlist_songs(playlist_id: int, reorder: PlaylistReorder):
                 duration=song_row["duration"],
                 file_path=song_row["file_path"],
                 file_format=song_row["file_format"] if "file_format" in song_row.keys() else None,
+                album_art_path=(song_row["album_art_path"] or None) if "album_art_path" in song_row.keys() else None,
                 source=song_row["source"],
                 tags=tags,
                 playlists=[],
@@ -384,6 +386,7 @@ def delete_song_from_playlist(playlist_id: int, song_id: int):
             s.duration,
             s.file_path,
             s.file_format,
+            s.album_art_path,
             s.source,
             GROUP_CONCAT(t.name) as tags,
             ps.position
@@ -415,6 +418,7 @@ def delete_song_from_playlist(playlist_id: int, song_id: int):
                 duration=song_row["duration"],
                 file_path=song_row["file_path"],
                 file_format=song_row["file_format"] if "file_format" in song_row.keys() else None,
+                album_art_path=(song_row["album_art_path"] or None) if "album_art_path" in song_row.keys() else None,
                 source=song_row["source"],
                 tags=tags,
                 playlists=[],
@@ -491,6 +495,7 @@ def get_playlist(playlist_id: int):
             s.duration,
             s.file_path,
             s.file_format,
+            s.album_art_path,
             s.source,
             GROUP_CONCAT(t.name) as tags,
             ps.position
@@ -522,6 +527,7 @@ def get_playlist(playlist_id: int):
                 duration=song_row["duration"],
                 file_path=song_row["file_path"],
                 file_format=song_row["file_format"] if "file_format" in song_row.keys() else None,
+                album_art_path=(song_row["album_art_path"] or None) if "album_art_path" in song_row.keys() else None,
                 source=song_row["source"],
                 tags=tags,
                 playlists=[],
@@ -747,6 +753,7 @@ def add_song_to_playlist(playlist_id: int, song_add: PlaylistSongAdd):
             s.duration,
             s.file_path,
             s.file_format,
+            s.album_art_path,
             s.source,
             GROUP_CONCAT(t.name) as tags,
             ps.position
@@ -778,6 +785,7 @@ def add_song_to_playlist(playlist_id: int, song_add: PlaylistSongAdd):
                 duration=song_row["duration"],
                 file_path=song_row["file_path"],
                 file_format=song_row["file_format"] if "file_format" in song_row.keys() else None,
+                album_art_path=(song_row["album_art_path"] or None) if "album_art_path" in song_row.keys() else None,
                 source=song_row["source"],
                 tags=tags,
                 playlists=[],
