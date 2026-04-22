@@ -46,7 +46,10 @@ def scan_folder(request: ScanRequest):
         result = import_scanned_songs(conn, request.folder_path, request.playlist_name)
         
         # Build message
+        art_count = result.get("art_extracted", 0)
         message = f"Scan complete: {result['imported']} songs imported, {result['skipped']} skipped"
+        if art_count:
+            message += f", extracted album art for {art_count} songs"
         
         return {
             "data": result,

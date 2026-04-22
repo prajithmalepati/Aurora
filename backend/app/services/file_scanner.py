@@ -1,4 +1,5 @@
 """File scanner for audio files using mutagen."""
+import hashlib
 import sqlite3
 import mutagen
 from mutagen.easyid3 import EasyID3
@@ -7,12 +8,88 @@ from pathlib import Path
 from datetime import datetime, timezone
 from typing import Any
 
+# Extracted art is stored here; deduplicated by SHA-1 hash.
+ALBUM_ART_DIR = Path(__file__).parent.parent.parent / "album-art"
+
 
 AUDIO_EXTENSIONS = {
     ".mp3", ".flac", ".m4a", ".ogg", ".opus",
     ".wav", ".wma", ".aac", ".aiff", ".ape",
     ".wv",  # WavPack
 }
+
+
+def extract_album_art(file_path: str, art_dir: Path) -> str | None:
+    """
+    Extract embedded album art from an audio file and save to art_dir.
+    Returns the saved filename (e.g. 'abc123.jpg') or None.
+    Deduplicates by SHA-1: if the same image bytes already exist, reuses the file.
+    Supports ID3/APIC (MP3), FLAC pictures, MP4/M4A covr, and OGG METADATA_BLOCK_PICTURE.
+    """
+    art_data: bytes | None = None
+    art_mime = "image/jpeg"
+
+    try:
+        audio = mutagen.File(file_path)
+        if audio is None:
+            return None
+
+        # FLAC — exposes .pictures list directly
+        if hasattr(audio, "pictures") and audio.pictures:
+            pic = audio.pictures[0]
+            art_data = pic.data
+            art_mime = pic.mime or "image/jpeg"
+
+        elif audio.tags is not None:
+            tags = audio.tags
+
+            # ID3 APIC frames (MP3, WAV+ID3, AIFF)
+            for key in list(tags.keys()):
+                if key.startswith("APIC"):
+                    apic = tags[key]
+                    art_data = apic.data
+                    art_mime = getattr(apic, "mime", "image/jpeg") or "image/jpeg"
+                    break
+
+            # MP4/M4A covr atom
+            if art_data is None and "covr" in tags:
+                covr = tags["covr"]
+                if covr:
+                    item = covr[0]
+                    art_data = bytes(item)
+                    # imageformat 13 = JPEG, 14 = PNG
+                    fmt = getattr(item, "imageformat", 13)
+                    art_mime = "image/png" if fmt == 14 else "image/jpeg"
+
+            # OGG/Opus — base64-encoded FLAC Picture blocks in Vorbis comments
+            if art_data is None and "metadata_block_picture" in tags:
+                import base64
+                from mutagen.flac import Picture
+                for b64 in tags["metadata_block_picture"]:
+                    try:
+                        pic = Picture(base64.b64decode(b64))
+                        art_data = pic.data
+                        art_mime = pic.mime or "image/jpeg"
+                        break
+                    except Exception:
+                        pass
+
+    except Exception:
+        return None
+
+    if not art_data:
+        return None
+
+    ext = "png" if "png" in art_mime.lower() else "jpg"
+    art_hash = hashlib.sha1(art_data).hexdigest()
+    filename = f"{art_hash}.{ext}"
+    dest = art_dir / filename
+
+    if not dest.exists():
+        art_dir.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(art_data)
+
+    return filename
 
 
 def _first_or_none(value: Any) -> str | None:
@@ -118,9 +195,10 @@ def import_scanned_songs(
     scanned_count = len(found_songs) + len(scan_errors)
     imported = []
     skipped = 0
-    
+    art_extracted = 0
+
     now = datetime.now(timezone.utc).isoformat()
-    
+
     # 2. Import each song
     for metadata in found_songs:
         # Check for duplicate by file_path
@@ -128,19 +206,30 @@ def import_scanned_songs(
             "SELECT id FROM songs WHERE file_path = ?",
             (metadata["file_path"],)
         ).fetchone()
-        
+
         if existing:
             skipped += 1
             continue
-        
+
+        # Extract album art (best-effort; never blocks the import)
+        album_art_path = None
+        try:
+            filename = extract_album_art(metadata["file_path"], ALBUM_ART_DIR)
+            if filename:
+                album_art_path = filename
+                art_extracted += 1
+        except Exception:
+            pass
+
         # Insert song
         cursor = db_connection.execute(
-            """INSERT INTO songs (title, artist, album, duration, file_path, file_format, source, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, 'local_scan', ?, ?)""",
+            """INSERT INTO songs (title, artist, album, duration, file_path, file_format, album_art_path, source, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, 'local_scan', ?, ?)""",
             (metadata["title"], metadata["artist"], metadata["album"],
-             metadata["duration"], metadata["file_path"], metadata.get("file_format"), now, now)
+             metadata["duration"], metadata["file_path"], metadata.get("file_format"),
+             album_art_path, now, now)
         )
-        
+
         song_id = cursor.lastrowid
         imported.append({
             "id": song_id,
@@ -187,4 +276,5 @@ def import_scanned_songs(
         "skipped": skipped,
         "errors": scan_errors,
         "songs": imported,
+        "art_extracted": art_extracted,
     }
