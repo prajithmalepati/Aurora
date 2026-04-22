@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { useSongStore } from "@/stores/songStore"
 import { usePlayerStore } from "@/stores/playerStore"
-import { toast } from "sonner"
+import { toast } from "@/lib/toast"
 import { useState } from "react"
 import { TagList } from "@/components/tags/TagList"
 import { TagEditor } from "@/components/tags/TagEditor"

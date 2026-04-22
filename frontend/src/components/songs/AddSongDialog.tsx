@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { useSongStore } from "@/stores/songStore"
-import { toast } from "sonner"
+import { toast } from "@/lib/toast"
 
 interface AddSongDialogProps {
   onAdd?: () => void

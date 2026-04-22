@@ -2,7 +2,7 @@ import { create } from "zustand"
 import { api } from "@/lib/api"
 import type { FilterResult, ApiResponse, Song } from "@/types"
 import { usePlayerStore } from "./playerStore"
-import { toast } from "sonner"
+import { toast } from "@/lib/toast"
 
 interface FilterState {
   query: string

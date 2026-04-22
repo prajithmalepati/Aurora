@@ -1,7 +1,7 @@
 import { create } from "zustand"
 import { api } from "@/lib/api"
 import type { Tag, ApiResponse } from "@/types"
-import { toast } from "sonner"
+import { toast } from "@/lib/toast"
 
 interface TagState {
   tags: Tag[]

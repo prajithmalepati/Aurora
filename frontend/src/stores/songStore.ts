@@ -3,7 +3,7 @@ import { api } from "@/lib/api"
 import type { Song, ApiResponse, Tag } from "@/types"
 import { useTagStore } from "./tagStore"
 import { useFilterStore } from "./filterStore"
-import { toast } from "sonner"
+import { toast } from "@/lib/toast"
 
 type View =
   | { kind: "all-songs" }

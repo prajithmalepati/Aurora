@@ -12,7 +12,7 @@ import {
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { PlaylistImagePicker } from "@/components/playlists/PlaylistImagePicker"
 import { api } from "@/lib/api"
-import { toast } from "sonner"
+import { toast } from "@/lib/toast"
 
 // Preset color swatches — retuned to the aurora palette
 const PRESET_COLORS = [
