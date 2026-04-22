@@ -1,9 +1,9 @@
 # Aurora — Session Handoff
 
-## Current State (April 21, 2026)
-Backend: 100% complete. All endpoints working — Songs CRUD, Tags CRUD + assignment, Playlists CRUD + song management + reorder, Filter (boolean AND/OR/NOT with parentheses), Scanner (folder scan with mutagen), Audio streaming. `file_format` column added to songs table (backfilled from file_path extension on startup).
+## Current State (April 22, 2026)
+Backend: 100% complete. All endpoints working — Songs CRUD, Tags CRUD + assignment, Playlists CRUD + song management + reorder, Filter (boolean AND/OR/NOT with parentheses), Scanner (folder scan with mutagen), Audio streaming. `file_format` column added to songs table (backfilled from file_path extension on startup). `album_art_path` column added — extracted from embedded artwork during scan, deduplicated by SHA-1, served via `GET /api/album-art/{filename}`.
 
-Frontend: Full UI overhaul complete. "Northern Lights Over OLED Black" design system applied across all views. Mix page redesigned as compact command zone. PlayerBar idle/playing states with breathing-open transition. Tag-entry vs manual-entry modes in Mix. Surface elevation token scale added. Sidebar polished. Global keyboard shortcuts. Wake lock, error boundary, view transitions. File format displayed inline after duration in all song lists.
+Frontend: Full UI overhaul complete. "Northern Lights Over OLED Black" design system applied across all views. Mix page redesigned as compact command zone. PlayerBar idle/playing states with breathing-open transition. Tag-entry vs manual-entry modes in Mix. Surface elevation token scale added. Sidebar polished. Global keyboard shortcuts. Wake lock, error boundary, view transitions. File format displayed inline after duration in all song lists. Album art displayed in all song rows, PlayerBar, and playlist hero (2x2 grid fallback).
 
 CORS: `allow_origins` now covers ports 5173, 5174, 5175.
 
@@ -56,7 +56,35 @@ Legacy aliases (`--aurora-text-dim` → `--aurora-text-secondary`, `--aurora-tex
 
 Registered in `App.tsx` via `useCallback` + `window.addEventListener("keydown", ...)`. All shortcuts check `document.activeElement.tagName` to avoid firing while typing.
 
-## Completed This Session (April 21 — Session 11)
+## Completed This Session (April 22 — Session 12)
+
+### Feature 1: Album art extraction, storage, and display
+
+**Goal:** Extract embedded artwork from audio files during scan and display it everywhere songs appear.
+
+**Backend:**
+- `file_scanner.py`: Added `ALBUM_ART_DIR = backend/album-art/` constant. Added `extract_album_art(file_path, art_dir)` that reads APIC frames (MP3/ID3), FLAC pictures, MP4/M4A `covr` atoms, and OGG `METADATA_BLOCK_PICTURE` base64 blocks. Deduplicates by SHA-1 — two songs sharing the same artwork bytes write only one file. Returns `{hash}.jpg` or `{hash}.png`.
+- `import_scanned_songs()`: Calls `extract_album_art` for each new song during import. Returns `art_extracted` count.
+- `database.py`: Migration adds `album_art_path TEXT` column. `_backfill_album_art()` extracts art for songs with `album_art_path IS NULL AND file_path IS NOT NULL`. Uses `""` as a processed-but-no-art sentinel to avoid re-scanning on every startup.
+- `models.py`: `SongResponse.album_art_path: Optional[str] = None` added.
+- `songs.py`: All SELECT queries include `s.album_art_path`. `song_row_to_dict()` maps `""` sentinel to `None`. `GET /api/album-art/{filename}` endpoint added with path-traversal guard.
+- `filter_engine.py`: SELECT and results dict include `album_art_path`.
+- `playlists.py`: All 4 song SELECT queries + SongResponse constructors include `album_art_path`.
+- `scanner.py`: Completion message surfaces art extraction count.
+- `.gitignore`: `backend/album-art/` excluded.
+
+**Frontend:**
+- `types/index.ts`: `album_art_path?: string | null` added to `Song`, `PlaylistSong`, `FilterResult`.
+- `AlbumArt.tsx` (new): Sizes sm/md/lg/fill. Procedural `albumGradient` always as background. Lazy `<img>` fades in (opacity 0→1, 200ms) on load; falls back to gradient silently on error. Accepts `style` prop for glow/shadow passthrough.
+- `SongRow.tsx`: Gradient div → `<AlbumArt size="sm">`. `albumGradient` import + `art` useMemo removed.
+- `PlayerBar.tsx`: Mobile (sm) and desktop (md) art areas → `<AlbumArt>` with `art.glow` via `style`. `albumGradient` kept for glow only.
+- `PlaylistDetail.tsx`: `PlaylistSongRow` gradient → `<AlbumArt size="sm">`. Hero: when no custom image and 4+ songs have art, shows a 2×2 `<AlbumArt size="fill">` grid. Falls back to emoji/gradient otherwise.
+
+**Files:** `file_scanner.py`, `database.py`, `models.py`, `songs.py`, `filter_engine.py`, `playlists.py`, `scanner.py`, `.gitignore`, `types/index.ts`, `AlbumArt.tsx` (new), `SongRow.tsx`, `PlayerBar.tsx`, `PlaylistDetail.tsx`
+
+---
+
+## Completed Prior Sessions (April 21 — Session 11)
 
 ### Feature 1: Jam as primary gradient CTA + floating action zone
 
@@ -329,6 +357,14 @@ App shell, song table, filter/Mix view, audio playback, file scanner dialog, ini
 - `aurora-chip` class uses simple `--aurora-muted` border instead of gradient border (Session 3 change — more refined).
 - Play button uses solid `--aurora-primary` instead of gradient (Session 3 change — more premium feel).
 - PlaylistDetail uses `key={view.playlistId}` in App.tsx — forces full remount (and state reset) when switching playlists.
+
+## Technical Decisions (Session 12 additions)
+- `backend/album-art/` stores images named `{sha1}.jpg` or `{sha1}.png`. Deduplication means 20 tracks from the same album write only one file. Directory is gitignored.
+- Empty string `""` is the "already tried, no art" sentinel in `album_art_path`. `song_row_to_dict()` and playlists router map `""` → `None` before sending to frontend. This prevents re-scanning on every startup for files without embedded art.
+- `AlbumArt` always renders the procedural gradient as the container background. The `<img>` overlays it with `opacity: 0` until `onLoad`, then transitions to `1` (200ms). On `onError`, img state is cleared and the gradient remains — no broken-image icon.
+- `size="fill"` on `AlbumArt` uses `w-full h-full`, intended for use inside a CSS Grid cell (the 2×2 playlist hero grid). `className="rounded-none"` removes the default `rounded-md` so the parent's `rounded-xl overflow-hidden` clips all four corners cleanly.
+- The 2×2 hero grid only activates when `!heroImage && songsWithArt.length >= 4`. Playlists with a custom uploaded image always show that image. Playlists with fewer than 4 songs with art fall back to emoji/gradient.
+- PlayerBar keeps `albumGradient` to compute `art.glow` for the box-shadow that glows around the album art container — the glow color is derived from the song identity, not the actual image pixels.
 
 ## Next Steps
 See `features.json` for the remaining task list. Priority order:
