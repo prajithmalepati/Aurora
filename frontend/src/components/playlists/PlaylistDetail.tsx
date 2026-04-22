@@ -30,6 +30,7 @@ import { Pencil, Trash2, ChevronUp, ChevronDown, X, Play, Search } from "lucide-
 import { TagList } from "@/components/tags/TagList"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Equalizer } from "@/components/ui/Equalizer"
+import { AlbumArt } from "@/components/songs/AlbumArt"
 import { PlaylistImagePicker } from "@/components/playlists/PlaylistImagePicker"
 import { api } from "@/lib/api"
 
@@ -92,6 +93,17 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
     if (!activePlaylist) return 0
     return activePlaylist.songs.reduce((sum, s) => sum + (s.duration ?? 0), 0)
   }, [activePlaylist])
+
+  // 2x2 art grid: first 4 songs with embedded art, shown only when playlist has no custom image
+  const songsWithArt = useMemo(
+    () =>
+      activePlaylist && !activePlaylist.image_url
+        ? activePlaylist.songs.filter((s) => s.album_art_path)
+        : [],
+    [activePlaylist]
+  )
+  const showArtGrid = songsWithArt.length >= 4
+  const gridSongs = showArtGrid ? songsWithArt.slice(0, 4) : []
 
   const handleEdit = () => {
     if (activePlaylist) {
@@ -258,12 +270,18 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
           <div
             className="w-[168px] h-[168px] rounded-xl flex-shrink-0 aurora-rim overflow-hidden flex items-center justify-center text-5xl"
             style={{
-              background: heroImage ? undefined : heroTileGradient,
+              background: heroImage || showArtGrid ? undefined : heroTileGradient,
               boxShadow: `0 20px 60px -20px ${heroArt.glow}, inset 0 0 0 1px rgba(255,255,255,0.06)`,
             }}
           >
             {heroImage ? (
               <img src={heroImage} alt="" className="w-full h-full object-cover" />
+            ) : showArtGrid ? (
+              <div className="grid grid-cols-2 w-full h-full">
+                {gridSongs.map((s) => (
+                  <AlbumArt key={s.id} song={s} size="fill" className="rounded-none" />
+                ))}
+              </div>
             ) : (
               activePlaylist.emoji && <span>{activePlaylist.emoji}</span>
             )}
@@ -512,7 +530,6 @@ function PlaylistSongRow({ song, index, total, onRemove, onReorder, onPlay }: Pl
 
   const isCurrent = currentSong?.id === song.id
   const hasFile = song.file_path !== null
-  const art = useMemo(() => albumGradient(song.id ?? song.title), [song.id, song.title])
 
   const handlePlay = () => {
     if (!hasFile) return
@@ -577,11 +594,7 @@ function PlaylistSongRow({ song, index, total, onRemove, onReorder, onPlay }: Pl
           aria-hidden="true"
         />
         <div className="relative z-10 flex items-center gap-3 min-w-0">
-          <div
-            className="w-10 h-10 rounded-md flex-shrink-0 aurora-rim"
-            style={{ background: art.background }}
-            aria-hidden="true"
-          />
+          <AlbumArt song={song} size="sm" className="aurora-rim" />
           <div className="flex flex-col min-w-0">
             <span
               className={`truncate text-[14px] font-medium leading-tight ${
