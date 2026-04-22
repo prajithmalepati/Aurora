@@ -99,4 +99,35 @@ def init_db():
             conn.execute("UPDATE songs SET file_format = ? WHERE id = ?", (ext, row["id"]))
     if rows:
         conn.commit()
+    # Migration: add album_art_path column to songs table
+    try:
+        conn.execute("ALTER TABLE songs ADD COLUMN album_art_path TEXT")
+        conn.commit()
+    except Exception:
+        pass  # Column already exists
+    # Backfill album_art_path for songs that have a file but no art extracted yet
+    _backfill_album_art(conn)
     conn.close()
+
+
+def _backfill_album_art(conn) -> None:
+    """Extract and store album art for any songs missing it. Runs once per song."""
+    from app.services.file_scanner import extract_album_art, ALBUM_ART_DIR
+    rows = conn.execute(
+        "SELECT id, file_path FROM songs WHERE album_art_path IS NULL AND file_path IS NOT NULL"
+    ).fetchall()
+    updated = 0
+    for row in rows:
+        try:
+            filename = extract_album_art(row["file_path"], ALBUM_ART_DIR)
+            # Store filename (or empty string as sentinel if no art found, to skip next startup)
+            conn.execute(
+                "UPDATE songs SET album_art_path = ? WHERE id = ?",
+                (filename or "", row["id"]),
+            )
+            if filename:
+                updated += 1
+        except Exception:
+            pass
+    if rows:
+        conn.commit()
