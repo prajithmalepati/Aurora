@@ -2,6 +2,7 @@ import { usePlayerStore } from "@/stores/playerStore"
 import { useAudioPlayer } from "@/hooks/useAudioPlayer"
 import { formatDuration } from "@/lib/utils"
 import { albumGradient } from "@/lib/albumGradient"
+import { AlbumArt } from "@/components/songs/AlbumArt"
 import { Equalizer } from "@/components/ui/Equalizer"
 import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX } from "lucide-react"
 import { useMemo } from "react"
@@ -59,10 +60,10 @@ export function PlayerBar() {
           <div className="flex flex-col gap-2 px-4 py-3">
             {/* Song info row */}
             <div className="flex items-center gap-3">
-              <div
-                className="w-10 h-10 rounded-md flex-shrink-0"
+              <AlbumArt
+                song={currentSong!}
+                size="sm"
                 style={{
-                  background: art.background,
                   boxShadow: hasSong
                     ? `0 0 16px -4px ${art.glow}, inset 0 0 0 1px rgba(255,255,255,0.06)`
                     : "inset 0 0 0 1px rgba(255,255,255,0.05)",
@@ -173,23 +174,15 @@ export function PlayerBar() {
             {/* LEFT: Album art + title/artist */}
             <div className="flex items-center gap-3.5 w-[240px] min-w-[160px] flex-shrink-0">
               <div className="relative flex-shrink-0">
-                <div
-                  className="w-[56px] h-[56px] rounded-md overflow-hidden"
+                <AlbumArt
+                  song={currentSong!}
+                  size="md"
                   style={{
-                    background: art.background,
                     boxShadow: hasSong
                       ? `0 0 24px -6px ${art.glow}, inset 0 0 0 1px rgba(255,255,255,0.06)`
                       : "inset 0 0 0 1px rgba(255,255,255,0.05)",
                   }}
-                >
-                  <div
-                    className="absolute inset-0"
-                    style={{
-                      background:
-                        "radial-gradient(circle at 25% 15%, rgba(255,255,255,0.08) 0%, transparent 50%)",
-                    }}
-                  />
-                </div>
+                />
               </div>
 
               <div className="flex flex-col min-w-0 flex-1">

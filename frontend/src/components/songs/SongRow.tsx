@@ -1,6 +1,6 @@
 import type { Song } from "@/types"
 import { formatDuration } from "@/lib/utils"
-import { albumGradient } from "@/lib/albumGradient"
+import { AlbumArt } from "@/components/songs/AlbumArt"
 import { Equalizer } from "@/components/ui/Equalizer"
 import { Trash2, Tag as TagIcon, Pencil, Play } from "lucide-react"
 import {
@@ -16,7 +16,7 @@ import {
 import { useSongStore } from "@/stores/songStore"
 import { usePlayerStore } from "@/stores/playerStore"
 import { toast } from "sonner"
-import { useMemo, useState } from "react"
+import { useState } from "react"
 import { TagList } from "@/components/tags/TagList"
 import { TagEditor } from "@/components/tags/TagEditor"
 
@@ -34,8 +34,6 @@ export function SongRow({ song, index, animIndex, onPlay }: SongRowProps) {
   const isPlaying = usePlayerStore((state) => state.isPlaying)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [tagEditorOpen, setTagEditorOpen] = useState(false)
-
-  const art = useMemo(() => albumGradient(song.id ?? song.title), [song.id, song.title])
 
   const handleDelete = async () => {
     setDeleteDialogOpen(false)
@@ -138,11 +136,7 @@ export function SongRow({ song, index, animIndex, onPlay }: SongRowProps) {
             aria-hidden="true"
           />
           <div className="relative z-10 flex items-center gap-3 min-w-0">
-            <div
-              className="w-10 h-10 rounded-md flex-shrink-0 aurora-rim"
-              style={{ background: art.background }}
-              aria-hidden="true"
-            />
+            <AlbumArt song={song} size="sm" className="aurora-rim" />
             <div className="flex flex-col min-w-0">
               <span
                 className={`truncate text-[14px] font-medium leading-tight ${
