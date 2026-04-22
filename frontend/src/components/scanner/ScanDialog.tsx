@@ -13,7 +13,7 @@ import { api } from "@/lib/api"
 import type { ApiResponse, ScanResult } from "@/types"
 import { useSongStore } from "@/stores/songStore"
 import { usePlaylistStore } from "@/stores/playlistStore"
-import { toast } from "sonner"
+import { toast } from "@/lib/toast"
 
 interface ScanDialogProps {
   open: boolean

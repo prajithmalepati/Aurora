@@ -13,7 +13,7 @@ import {
 import { Input } from "@/components/ui/input"
 import type { Song } from "@/types"
 import { useSongStore } from "@/stores/songStore"
-import { toast } from "sonner"
+import { toast } from "@/lib/toast"
 
 interface EditSongDialogProps {
   song: Song

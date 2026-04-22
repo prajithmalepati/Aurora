@@ -25,7 +25,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
-import { toast } from "sonner"
+import { toast } from "@/lib/toast"
 import { Pencil, Trash2, ChevronUp, ChevronDown, X, Play, Search } from "lucide-react"
 import { TagList } from "@/components/tags/TagList"
 import { Skeleton } from "@/components/ui/skeleton"

@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dialog"
 import { useSongStore } from "@/stores/songStore"
 import { useTagStore } from "@/stores/tagStore"
-import { toast } from "sonner"
+import { toast } from "@/lib/toast"
 
 interface TagEditorProps {
   songId: number

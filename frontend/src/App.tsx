@@ -8,6 +8,7 @@ import { Sidebar } from "@/components/layout/Sidebar"
 import { PlayerBar } from "@/components/layout/PlayerBar"
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary"
 import { Toaster } from "sonner"
+import { ToastClickDismiss } from "@/components/ui/ToastClickDismiss"
 import { SongTable } from "@/components/songs/SongTable"
 import { PlaylistDetail } from "@/components/playlists/PlaylistDetail"
 import { QueryBuilder } from "@/components/filter/QueryBuilder"
@@ -191,8 +192,9 @@ function App() {
         }}
       />
       <Toaster
-        position="bottom-right"
+        position="top-right"
         theme="dark"
+        offset={{ top: 24, right: 24 }}
         toastOptions={{
           style: {
             background: "rgba(10, 12, 17, 0.95)",
@@ -202,6 +204,7 @@ function App() {
           },
         }}
       />
+      <ToastClickDismiss />
     </>
   )
 }
