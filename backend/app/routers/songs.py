@@ -37,6 +37,7 @@ def song_row_to_dict(row: sqlite3.Row) -> dict:
                 id_part, name_part = item.split(":", 1)
                 playlists.append({"id": int(id_part), "name": name_part.strip()})
     
+    raw_art = row["album_art_path"] if "album_art_path" in row.keys() else None
     return {
         "id": row["id"],
         "title": row["title"],
@@ -45,6 +46,8 @@ def song_row_to_dict(row: sqlite3.Row) -> dict:
         "duration": row["duration"],
         "file_path": row["file_path"],
         "file_format": row["file_format"] if "file_format" in row.keys() else None,
+        # Empty string is the "attempted, no art" sentinel — expose as None to frontend
+        "album_art_path": raw_art if raw_art else None,
         "source": row["source"],
         "tags": tags,
         "playlists": playlists,
@@ -74,6 +77,7 @@ def list_songs(
             s.duration,
             s.file_path,
             s.file_format,
+            s.album_art_path,
             s.source,
             GROUP_CONCAT(t.name) as tags,
             GROUP_CONCAT(p.id || ':' || p.name) as playlists,
@@ -157,6 +161,7 @@ def get_song(song_id: int):
             s.duration,
             s.file_path,
             s.file_format,
+            s.album_art_path,
             s.source,
             GROUP_CONCAT(t.name) as tags,
             GROUP_CONCAT(p.id || ':' || p.name) as playlists,
@@ -211,6 +216,7 @@ def stream_song(song_id: int):
             s.duration,
             s.file_path,
             s.file_format,
+            s.album_art_path,
             s.source,
             GROUP_CONCAT(t.name) as tags,
             GROUP_CONCAT(p.id || ':' || p.name) as playlists,
@@ -321,6 +327,19 @@ def create_song(song: SongCreate):
     )
 
 
+@router.get("/album-art/{filename}")
+def serve_album_art(filename: str):
+    """Serve an extracted album art image by its hash-based filename."""
+    from app.services.file_scanner import ALBUM_ART_DIR
+    # Strip any directory components to prevent path traversal
+    safe_name = Path(filename).name
+    art_path = ALBUM_ART_DIR / safe_name
+    if not art_path.exists():
+        raise HTTPException(status_code=404, detail="Album art not found")
+    mime = "image/png" if safe_name.endswith(".png") else "image/jpeg"
+    return FileResponse(str(art_path), media_type=mime)
+
+
 @router.put("/songs/{song_id}", response_model=SongResponse)
 def update_song(song_id: int, song_update: SongUpdate):
     """Update a song by ID."""
@@ -381,6 +400,7 @@ def update_song(song_id: int, song_update: SongUpdate):
             s.duration,
             s.file_path,
             s.file_format,
+            s.album_art_path,
             s.source,
             GROUP_CONCAT(t.name) as tags,
             GROUP_CONCAT(p.id || ':' || p.name) as playlists,
