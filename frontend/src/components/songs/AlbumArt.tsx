@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { albumGradient } from "@/lib/albumGradient"
 
 const ALBUM_ART_BASE = "http://localhost:8000/api/album-art"
@@ -22,8 +22,13 @@ export function AlbumArt({ song, size, className = "", style }: AlbumArtProps) {
   const [error, setError] = useState(false)
 
   const art = albumGradient(song.id ?? song.title ?? "void")
-  const showImg = !!song.album_art_path && !error
-  const src = showImg ? `${ALBUM_ART_BASE}/${song.album_art_path}` : undefined
+  const src = song.album_art_path ? `${ALBUM_ART_BASE}/${song.album_art_path}` : undefined
+  const showImg = !!src && !error
+
+  useEffect(() => {
+    setLoaded(false)
+    setError(false)
+  }, [src])
 
   return (
     <div
