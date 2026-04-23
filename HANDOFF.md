@@ -1,11 +1,97 @@
 # Aurora — Session Handoff
 
-## Current State (April 22, 2026)
-Backend: 100% complete. All endpoints working — Songs CRUD, Tags CRUD + assignment, Playlists CRUD + song management + reorder, Filter (boolean AND/OR/NOT with parentheses), Scanner (folder scan with mutagen), Audio streaming. `file_format` column added to songs table (backfilled from file_path extension on startup). `album_art_path` column added — extracted from embedded artwork during scan, deduplicated by SHA-1, served via `GET /api/album-art/{filename}`.
+## Current State (April 23, 2026)
+Backend: 100% complete. All endpoints working — Songs CRUD, Tags CRUD + assignment, Playlists CRUD + song management + reorder, Filter (boolean AND/OR/NOT with parentheses), Scanner (folder scan with mutagen, format-aware dedup), Audio streaming. `file_format` column added to songs table (backfilled from file_path extension on startup). `album_art_path` column added — extracted from embedded artwork during scan, deduplicated by SHA-1, served via `GET /api/album-art/{filename}`.
 
-Frontend: Full UI overhaul complete. "Northern Lights Over OLED Black" design system applied across all views. Mix page redesigned as compact command zone. PlayerBar idle/playing states with breathing-open transition. Tag-entry vs manual-entry modes in Mix. Surface elevation token scale added. Sidebar polished. Global keyboard shortcuts. Wake lock, error boundary, view transitions. File format displayed inline after duration in all song lists. Album art displayed in all song rows, PlayerBar, and playlist hero (2x2 grid fallback).
+Frontend: Full UI overhaul complete. "Northern Lights Over OLED Black" design system applied across all views. Mix page redesigned as compact command zone. PlayerBar idle/playing states with breathing-open transition. Tag-entry vs manual-entry modes in Mix. Surface elevation token scale added. Sidebar polished. Global keyboard shortcuts. Wake lock, error boundary, view transitions. File format displayed inline after duration in all song lists. Album art displayed in all song rows, PlayerBar, and playlist hero (2x2 grid fallback). Toast system at top-right with slide animation, click-to-dismiss.
 
 CORS: `allow_origins` now covers ports 5173, 5174, 5175.
+
+---
+
+## Completed This Session (April 23 — Session 14)
+
+### Fix 1: AlbumArt loaded-state reset on song change
+
+**Root cause (Hypothesis A confirmed):** `AlbumArt.tsx` keeps `loaded` and `error` as component-level `useState`. When the `song` prop changes (new song in PlayerBar), the img `src` changes but both states remain from the previous song. If a prior song had `onError` fire (no embedded art), `error = true` persists → `showImg = false` → gradient shows instead of the new song's art. Also, `loaded` staying `true` meant the fade-in animation never played on song change.
+
+**Fix (`AlbumArt.tsx`):** Added a `useEffect` that resets both `loaded` and `error` to `false` whenever `src` changes. `src` is now derived before `showImg` so the effect dependency is clean.
+
+```ts
+useEffect(() => {
+  setLoaded(false)
+  setError(false)
+}, [src])
+```
+
+Three paths verified: regular song click, Jam (from idle → playing), playlist detail click — all correctly show art in PlayerBar.
+
+**Files:** `frontend/src/components/songs/AlbumArt.tsx`
+
+---
+
+### Fix 2: Toast system — top-right, shorter duration, click-to-dismiss
+
+**Changes:**
+- `App.tsx`: Toaster moved from `position="bottom-right"` to `position="top-right"`, `offset={{ top: 24, right: 24 }}`.
+- `src/lib/toast.ts` (new): Thin wrapper around sonner's `toast`. Overrides `success`/`info` to `duration: 3000`, `error` to `duration: 5000`, `warning` to `duration: 4000`. All 11 call sites updated to import from `@/lib/toast` instead of `"sonner"`.
+- `src/components/ui/ToastClickDismiss.tsx` (new): Uses `useSonner()` to get current toasts array. Event delegation on `document` detects clicks on `[data-sonner-toast]` elements, reads `data-index` attribute (Sonner sets this to the toast's array index), maps to toast ID, calls `toast.dismiss(id)`. Ignores clicks on buttons/links inside the toast.
+- `src/index.css`: CSS overrides for `[data-sonner-toaster][data-y-position=top][data-x-position=right]` — overrides Sonner's default slide-from-top with `--y: translateX(calc(100% + 24px))` (slide from right), 200ms cubic-bezier entrance. `[data-mounted=true][data-removed=true]` override sets 150ms exit to right. `cursor: pointer` on all toasts.
+- Hover-pause: Sonner's built-in behavior (no changes needed).
+- z-index: Sonner's default `z-index: 999999999` already exceeds PlayerBar and floating Jam zone.
+
+**Files:** `App.tsx`, `src/lib/toast.ts`, `src/components/ui/ToastClickDismiss.tsx`, `src/index.css`, 11 store/component files
+
+---
+
+### Spot-check 3: FLAC album art — already working
+
+Query: all 10 FLAC songs sampled have real SHA-1 hash filenames in `album_art_path`. The `audio.pictures` list iteration in `extract_album_art()` was already correct. No fix needed.
+
+---
+
+### Feature 4: Format-aware scanner dedup
+
+**Format tier hierarchy (higher = better quality):**
+
+| Tier | Format(s) |
+|------|-----------|
+| 6 | FLAC |
+| 5 | WAV |
+| 4 | M4A_ALAC |
+| 3 | OGG, OPUS |
+| 2 | M4A_AAC, M4A (undetected) |
+| 1 | MP3, AAC, WMA, AIFF, APE, WV |
+| 0 | Unknown |
+
+**M4A codec detection:** `_detect_m4a_format(file_path)` calls `mutagen.File()` (non-easy mode) and reads `audio.info.codec`. If `"alac"` is in the codec string → `"m4a_alac"` (tier 4). Otherwise → `"m4a_aac"` (tier 2). `extract_metadata()` now calls this for `.m4a` files before returning `file_format`.
+
+**Decision logic in `import_scanned_songs()`:**
+1. Exact `file_path` match → skip (true duplicate, `skipped_exact` counter)
+2. `(title, artist)` match + incoming tier **>** existing tier → **REPLACE** via `_replace_song()`
+3. `(title, artist)` match + incoming tier **==** existing tier → skip (`skipped_same_format`)
+4. `(title, artist)` match + incoming tier **<** existing tier → skip (`skipped_lower_quality`)
+5. No match → fresh import
+
+**`_replace_song()` (transactional via SQLite SAVEPOINT):**
+1. `SAVEPOINT replace_song`
+2. INSERT new song row with new file's metadata
+3. Migrate `song_tags`: INSERT OR IGNORE each tag_id for new song_id
+4. Migrate `playlist_songs`: UPDATE SET song_id = new_id WHERE song_id = old_id (preserves position)
+5. DELETE old song row (CASCADE removes its remaining song_tags rows)
+6. `RELEASE SAVEPOINT replace_song`
+7. On any exception: `ROLLBACK TO SAVEPOINT replace_song` + re-raise (old row preserved, rest of import unaffected)
+
+**Scan response now returns:** `imported`, `replaced`, `skipped`, `skipped_exact`, `skipped_same_format`, `skipped_lower_quality`, `replaced_songs[]`.
+
+**ScanDialog UI:** Shows separate rows for imported (teal dot), upgraded/replaced (violet dot, only when > 0), and skipped (dim dot with lower-quality count annotation). Toast summary shows "Imported X new, Y upgraded".
+
+**Testing guide:**
+1. Note current song count and pick an existing MP3 song with custom tags.
+2. Run scan on a folder with FLAC versions of the same songs.
+3. After scan: (a) those songs should show `file_format=FLAC`, (b) custom tags should survive, (c) report shows correct replaced count.
+
+**Files:** `backend/app/services/file_scanner.py`, `backend/app/routers/scanner.py`, `frontend/src/types/index.ts`, `frontend/src/components/scanner/ScanDialog.tsx`
 
 ## Design System — "Northern Lights Over OLED Black"
 
@@ -365,6 +451,14 @@ App shell, song table, filter/Mix view, audio playback, file scanner dialog, ini
 - `size="fill"` on `AlbumArt` uses `w-full h-full`, intended for use inside a CSS Grid cell (the 2×2 playlist hero grid). `className="rounded-none"` removes the default `rounded-md` so the parent's `rounded-xl overflow-hidden` clips all four corners cleanly.
 - The 2×2 hero grid only activates when `!heroImage && songsWithArt.length >= 4`. Playlists with a custom uploaded image always show that image. Playlists with fewer than 4 songs with art fall back to emoji/gradient.
 - PlayerBar keeps `albumGradient` to compute `art.glow` for the box-shadow that glows around the album art container — the glow color is derived from the song identity, not the actual image pixels.
+
+## Technical Decisions (Session 14 additions)
+- `AlbumArt` loaded/error states reset via `useEffect([src])`. When `src` changes (new song), both states go to `false` so the new image fades in cleanly and a previous error doesn't ghost-block the new image.
+- Toast wrapper at `src/lib/toast.ts` re-exports sonner's `toast` with type-specific durations (success/info: 3s, error: 5s, warning: 4s). All call sites import from `@/lib/toast`, never directly from `"sonner"`. Adding per-type durations in future requires editing only this file.
+- `ToastClickDismiss` component uses `useSonner()` + document-level click delegation. Sonner sets `data-index` on each `<li>` matching the toast's index in the `toasts[]` array. Click handler maps `data-index` → `toasts[index].id` → `toast.dismiss(id)`. Ignores clicks on `button/a/[data-button]/[data-cancel]` elements inside the toast.
+- Toast CSS overrides target `[data-sonner-toaster][data-y-position=top][data-x-position=right]` (4+ attribute specificity), beating Sonner's internal 2–3 attribute rules without `!important`.
+- Format-aware scanner: `file_format` for `.m4a` files is now `"m4a_alac"` or `"m4a_aac"` (detected via `audio.info.codec`), not the generic `"m4a"`. Existing DB rows with `"m4a"` get tier 2 (same as `m4a_aac`) so a real ALAC scan would correctly replace them.
+- `_replace_song` uses `SAVEPOINT replace_song` / `RELEASE` / `ROLLBACK TO` for sub-transaction isolation. A failed replace rolls back only that song's migration, not the entire import batch.
 
 ## Next Steps
 See `features.json` for the remaining task list. Priority order:
