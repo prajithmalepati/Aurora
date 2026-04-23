@@ -54,9 +54,10 @@ export function ScanDialog({ open, onOpenChange }: ScanDialogProps) {
         playlist_name: state.playlistName.trim() || undefined,
       })
       setState((s) => ({ ...s, results: res.data, loading: false }))
-      toast.success(
-        `Scan complete — ${res.data.imported} song${res.data.imported === 1 ? "" : "s"} imported`
-      )
+      const parts: string[] = []
+      if (res.data.imported) parts.push(`${res.data.imported} new`)
+      if (res.data.replaced) parts.push(`${res.data.replaced} upgraded`)
+      toast.success(parts.length ? `Imported: ${parts.join(", ")}` : "Scan complete — nothing new")
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to scan folder"
       setState((s) => ({ ...s, loading: false, error: message }))
@@ -144,20 +145,33 @@ export function ScanDialog({ open, onOpenChange }: ScanDialogProps) {
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2 text-[13px]">
                   <span
-                    className="w-1.5 h-1.5 rounded-full"
-                    style={{
-                      backgroundColor: "#5eead4",
-                      boxShadow: "0 0 6px #5eead4",
-                    }}
+                    className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: "#5eead4", boxShadow: "0 0 6px #5eead4" }}
                   />
                   <span className="text-[var(--aurora-text)] tabular-nums">
                     {state.results.imported} imported
                   </span>
                 </div>
+                {state.results.replaced > 0 && (
+                  <div className="flex items-center gap-2 text-[13px]">
+                    <span
+                      className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: "var(--aurora-secondary)", boxShadow: "0 0 6px var(--aurora-secondary-glow)" }}
+                    />
+                    <span className="text-[var(--aurora-text)] tabular-nums">
+                      {state.results.replaced} upgraded (lower-quality replaced)
+                    </span>
+                  </div>
+                )}
                 <div className="flex items-center gap-2 text-[13px]">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--aurora-text-muted)]" />
-                  <span className="text-[var(--aurora-text-dim)] tabular-nums">
-                    {state.results.skipped} skipped (duplicates)
+                  <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 bg-[var(--aurora-text-tertiary)]" />
+                  <span className="text-[var(--aurora-text-secondary)] tabular-nums">
+                    {state.results.skipped} skipped
+                    {state.results.skipped_lower_quality > 0 && (
+                      <span className="text-[var(--aurora-text-tertiary)]">
+                        {" "}({state.results.skipped_lower_quality} lower-quality than library)
+                      </span>
+                    )}
                   </span>
                 </div>
               </div>

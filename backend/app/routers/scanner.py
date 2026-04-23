@@ -46,11 +46,18 @@ def scan_folder(request: ScanRequest):
         result = import_scanned_songs(conn, request.folder_path, request.playlist_name)
         
         # Build message
+        parts = []
+        if result["imported"]:
+            parts.append(f"Imported {result['imported']} new songs")
+        if result.get("replaced"):
+            parts.append(f"replaced {result['replaced']} lower-quality songs with higher-quality versions")
+        if result["skipped"]:
+            parts.append(f"skipped {result['skipped']} already in library")
         art_count = result.get("art_extracted", 0)
-        message = f"Scan complete: {result['imported']} songs imported, {result['skipped']} skipped"
         if art_count:
-            message += f", extracted album art for {art_count} songs"
-        
+            parts.append(f"extracted art for {art_count} songs")
+        message = "Scan complete: " + (". ".join(parts) if parts else "nothing new found") + "."
+
         return {
             "data": result,
             "message": message,

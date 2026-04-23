@@ -69,9 +69,15 @@ export interface FilterResult {
 export interface ScanResult {
   scanned: number
   imported: number
+  replaced: number
   skipped: number
+  skipped_exact: number
+  skipped_same_format: number
+  skipped_lower_quality: number
   errors: { file: string; error: string }[]
   songs: Song[]
+  replaced_songs: { id: number; replaced_path: string; title: string; artist: string }[]
+  art_extracted: number
 }
 
 export interface ApiResponse<T> {
