@@ -28,6 +28,7 @@ export function AddSongDialog({ onAdd, open: controlledOpen, onOpenChange }: Add
   const [artist, setArtist] = useState("")
   const [album, setAlbum] = useState("")
   const [duration, setDuration] = useState<string>("")
+  const [filePath, setFilePath] = useState("")
   const [error, setError] = useState<string | null>(null)
   const createSong = useSongStore((state) => state.createSong)
 
@@ -47,12 +48,14 @@ export function AddSongDialog({ onAdd, open: controlledOpen, onOpenChange }: Add
         artist: artist.trim(),
         album: album.trim() || undefined,
         duration: durationValue,
+        file_path: filePath.trim() || undefined,
       })
       setOpen(false)
       setTitle("")
       setArtist("")
       setAlbum("")
       setDuration("")
+      setFilePath("")
       toast.success("Song added")
       onAdd?.()
     } catch (err: unknown) {
@@ -129,6 +132,18 @@ export function AddSongDialog({ onAdd, open: controlledOpen, onOpenChange }: Add
                 onChange={(e) => setDuration(e.target.value)}
                 placeholder="e.g., 245"
                 min="0"
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <label htmlFor="file-path" className="label-micro text-[9.5px]">
+                File path (leave empty for metadata-only entry)
+              </label>
+              <Input
+                id="file-path"
+                value={filePath}
+                onChange={(e) => setFilePath(e.target.value)}
+                placeholder="/music/artist/song.flac"
               />
             </div>
           </div>

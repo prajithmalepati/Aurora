@@ -22,6 +22,7 @@ interface SongState {
     artist: string
     album?: string
     duration?: number
+    file_path?: string
   }) => Promise<void>
   updateSong: (id: number, data: {
     title?: string
