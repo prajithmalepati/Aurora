@@ -1,11 +1,50 @@
 # Aurora — Session Handoff
 
-## Current State (April 23, 2026)
+## Current State (April 23, 2026 — Session 15a)
 Backend: 100% complete. All endpoints working — Songs CRUD, Tags CRUD + assignment, Playlists CRUD + song management + reorder, Filter (boolean AND/OR/NOT with parentheses), Scanner (folder scan with mutagen, format-aware dedup), Audio streaming. `file_format` column added to songs table (backfilled from file_path extension on startup). `album_art_path` column added — extracted from embedded artwork during scan, deduplicated by SHA-1, served via `GET /api/album-art/{filename}`.
 
-Frontend: Full UI overhaul complete. "Northern Lights Over OLED Black" design system applied across all views. Mix page redesigned as compact command zone. PlayerBar idle/playing states with breathing-open transition. Tag-entry vs manual-entry modes in Mix. Surface elevation token scale added. Sidebar polished. Global keyboard shortcuts. Wake lock, error boundary, view transitions. File format displayed inline after duration in all song lists. Album art displayed in all song rows, PlayerBar, and playlist hero (2x2 grid fallback). Toast system at top-right with slide animation, click-to-dismiss.
+Frontend: Full UI overhaul complete. "Northern Lights Over OLED Black" design system applied across all views. Mix page redesigned as compact command zone. PlayerBar idle/playing states with breathing-open transition. Tag-entry vs manual-entry modes in Mix. Surface elevation token scale added. Sidebar polished. Global keyboard shortcuts. Wake lock, error boundary, view transitions. File format displayed inline after duration in all song lists. Album art displayed in all song rows, PlayerBar, and playlist hero (2x2 grid fallback). Toast system at top-right with slide animation, click-to-dismiss. Dead affordances revived: pencil icon opens EditSongDialog (controlled mode), EditSongDialog includes playlist-add section, AddSongDialog accepts file_path.
 
 CORS: `allow_origins` now covers ports 5173, 5174, 5175.
+
+---
+
+## Completed This Session (April 23 — Session 15a)
+
+### Fix 1: Wire pencil icon to EditSongDialog
+
+`EditSongDialog` was a complete component that nothing rendered. `SongRow`'s pencil `IconBtn` had only `e.stopPropagation()` as its handler.
+
+**Changes:**
+- `EditSongDialog.tsx`: Converted from fully self-contained (own `DialogTrigger`) to supporting controlled mode via optional `open`/`onOpenChange` props, matching the `AddSongDialog` pattern. `DialogTrigger` removed (unused path). Added `useEffect` to reset all form fields to current song values whenever `open` flips to `true`. Removed the duplicate `toast.success("Song updated")` — the store's `updateSong` already fires it.
+- `SongRow.tsx`: Added `editDialogOpen` state. Pencil `IconBtn` onClick now calls `setEditDialogOpen(true)` (keeping `e.stopPropagation()`). `<EditSongDialog>` rendered as a sibling to `<TagEditor>` and the delete `<AlertDialog>`.
+
+**Verify:** Hover a song row → click pencil → dialog opens pre-filled with current values → edit title → Save → dialog closes → row shows new title without page refresh.
+
+---
+
+### Fix 2: Add "Add to playlist" section in EditSongDialog
+
+`playlistStore.addSongToPlaylist` had zero callers in the UI. No path existed to add an existing song to an existing playlist.
+
+**Changes:**
+- `EditSongDialog.tsx`: Added a `selectedPlaylistId` state and `addingToPlaylist` loading flag. Below the existing fields, a bordered section shows a native `<select>` listing all playlists (from `usePlaylistStore`) and an "Add" button. Clicking "Add" calls `addSongToPlaylist(playlistId, song.id)` — the store's existing success/error toasts fire. The playlist section resets on dialog open.
+
+**Verify:** Open EditSongDialog → pick a playlist from the dropdown → click Add → toast fires → navigate to that playlist → song is there.
+
+**Note:** Both Fix 1 and Fix 2 landed in `EditSongDialog.tsx` in a single edit, so they were committed together (`feat(songs): wire pencil icon to EditSongDialog; add playlist section`).
+
+---
+
+### Fix 3: AddSongDialog accepts file_path
+
+Manual song entries had no `file_path` field, making them always unplayable despite `SongCreate` accepting it.
+
+**Changes:**
+- `AddSongDialog.tsx`: Added `filePath` state and a "File path (leave empty for metadata-only entry)" `Input` field. Passed as `file_path: filePath.trim() || undefined` to `createSong`. Reset on successful submit.
+- `songStore.ts`: Extended the `createSong` data type to include `file_path?: string` (the implementation already passes the entire data object through to `api.post`, so no body change needed).
+
+**Verify:** Open Add Song dialog → fill title/artist → enter a valid absolute path to an audio file → Add Song → click the new row → it plays.
 
 ---
 
