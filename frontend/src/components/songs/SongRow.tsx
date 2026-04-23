@@ -3,6 +3,7 @@ import { formatDuration } from "@/lib/utils"
 import { AlbumArt } from "@/components/songs/AlbumArt"
 import { Equalizer } from "@/components/ui/Equalizer"
 import { Trash2, Tag as TagIcon, Pencil, Play } from "lucide-react"
+import { EditSongDialog } from "@/components/songs/EditSongDialog"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,6 +35,7 @@ export function SongRow({ song, index, animIndex, onPlay }: SongRowProps) {
   const isPlaying = usePlayerStore((state) => state.isPlaying)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [tagEditorOpen, setTagEditorOpen] = useState(false)
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
 
   const handleDelete = async () => {
     setDeleteDialogOpen(false)
@@ -241,6 +243,7 @@ export function SongRow({ song, index, animIndex, onPlay }: SongRowProps) {
               label="Edit song"
               onClick={(e) => {
                 e.stopPropagation()
+                setEditDialogOpen(true)
               }}
             >
               <Pencil className="h-3.5 w-3.5" />
@@ -287,6 +290,12 @@ export function SongRow({ song, index, animIndex, onPlay }: SongRowProps) {
         currentTags={song.tags}
         open={tagEditorOpen}
         onOpenChange={setTagEditorOpen}
+      />
+
+      <EditSongDialog
+        song={song}
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
       />
     </>
   )
