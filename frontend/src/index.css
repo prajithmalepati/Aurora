@@ -72,8 +72,8 @@
   --aurora-rim-glow: rgba(94, 234, 212, 0.18);
 
   /* Aurora accents — brightened for OLED contrast, used SPARINGLY */
-  --aurora-teal: #5eead4;
-  --aurora-teal-dim: rgba(94, 234, 212, 0.55);
+  --aurora-accent-vivid: #5eead4;
+  --aurora-accent-vivid-dim: rgba(94, 234, 212, 0.55);
   --aurora-mint: #86efac;
   --aurora-violet: #a78bfa;
 
@@ -105,9 +105,9 @@
 
   /* ── Aurora accent palette — the three voices ──
      Teal (common aurora), violet (common), amber (rarest light). */
-  --aurora-primary: #4db8a4;                       /* smoked teal  */
-  --aurora-primary-hover: #5ec9b5;
-  --aurora-primary-glow: rgba(77, 184, 164, 0.18);
+  --aurora-accent-interactive: #4db8a4;             /* smoked teal  */
+  --aurora-accent-interactive-hover: #5ec9b5;
+  --aurora-accent-interactive-glow: rgba(77, 184, 164, 0.18);
   --aurora-secondary: #8a75c8;                     /* twilight violet */
   --aurora-secondary-hover: #9b88d6;
   --aurora-secondary-glow: rgba(138, 117, 200, 0.15);
@@ -117,7 +117,7 @@
 
   /* Muted accent — same hue as primary, ~15% less saturated/bright.
      Used for play button fill, seek bar fill, and equalizer bars at rest.
-     Hover on interactive elements transitions to full --aurora-primary. */
+     Hover on interactive elements transitions to full --aurora-accent-interactive. */
   --aurora-accent-muted: #459687;
 
   /* Glow — subtle ambient light for hover and focus halos */
@@ -515,7 +515,7 @@
   transition: background 200ms ease;
 }
 .aurora-play-btn:not(:disabled):hover {
-  background: var(--aurora-primary) !important;
+  background: var(--aurora-accent-interactive) !important;
 }
 
 /* ============================================================
@@ -650,7 +650,7 @@
 }
 .mix-query-bar:focus-within {
   box-shadow: inset 0 0 0 1px var(--aurora-rim-bright),
-              0 0 20px -6px var(--aurora-primary-glow),
+              0 0 20px -6px var(--aurora-accent-interactive-glow),
               0 0 20px -6px var(--aurora-secondary-glow);
 }
 .mix-query-bar--error,
@@ -690,26 +690,26 @@
 
 /* Search button — muted teal fill, dark text */
 .mix-btn-search {
-  background: var(--aurora-primary);
+  background: var(--aurora-accent-interactive);
   color: var(--aurora-slate);
-  box-shadow: 0 0 16px -6px var(--aurora-primary-glow);
+  box-shadow: 0 0 16px -6px var(--aurora-accent-interactive-glow);
   transition: all 150ms ease;
 }
 .mix-btn-search:hover:not(:disabled) {
-  background: var(--aurora-primary-hover);
-  box-shadow: 0 0 22px -4px var(--aurora-primary-glow);
+  background: var(--aurora-accent-interactive-hover);
+  box-shadow: 0 0 22px -4px var(--aurora-accent-interactive-glow);
 }
 
 /* Jam button — muted teal→violet gradient, white text */
 .mix-btn-jam {
-  background: linear-gradient(135deg, var(--aurora-primary) 0%, var(--aurora-secondary) 100%);
+  background: linear-gradient(135deg, var(--aurora-accent-interactive) 0%, var(--aurora-secondary) 100%);
   color: #fff;
-  box-shadow: 0 0 18px -8px var(--aurora-primary-glow);
+  box-shadow: 0 0 18px -8px var(--aurora-accent-interactive-glow);
   letter-spacing: 0.02em;
   transition: all 150ms ease;
 }
 .mix-btn-jam:hover:not(:disabled) {
-  box-shadow: 0 0 24px -5px var(--aurora-primary-glow),
+  box-shadow: 0 0 24px -5px var(--aurora-accent-interactive-glow),
               0 0 24px -5px var(--aurora-secondary-glow);
 }
 
@@ -808,7 +808,7 @@
   height: 50px;
   padding: 0 28px;
   border-radius: 999px;
-  background: linear-gradient(135deg, var(--aurora-primary) 0%, var(--aurora-secondary) 100%);
+  background: linear-gradient(135deg, var(--aurora-accent-interactive) 0%, var(--aurora-secondary) 100%);
   color: #ffffff;
   box-shadow:
     0 0 28px -8px rgba(77, 184, 164, 0.4),
@@ -886,7 +886,7 @@
   height: 48px;
   padding: 0 22px;
   border-radius: 999px;
-  background: linear-gradient(135deg, var(--aurora-primary) 0%, var(--aurora-secondary) 100%);
+  background: linear-gradient(135deg, var(--aurora-accent-interactive) 0%, var(--aurora-secondary) 100%);
   color: #ffffff;
   box-shadow: 0 0 24px -8px rgba(77, 184, 164, 0.45);
   cursor: pointer;

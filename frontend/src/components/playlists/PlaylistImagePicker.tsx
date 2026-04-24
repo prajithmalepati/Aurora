@@ -44,7 +44,7 @@ export function PlaylistImagePicker({ name, imageDataUrl, onImageChange }: Playl
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
-          className="text-[11px] text-[var(--aurora-teal)] hover:underline text-left"
+          className="text-[11px] text-[var(--aurora-accent-vivid)] hover:underline text-left"
         >
           Upload image
         </button>
