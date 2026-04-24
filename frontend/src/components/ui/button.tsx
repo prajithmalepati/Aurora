@@ -16,15 +16,15 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 
     const variants = {
       default:
-        "text-[var(--aurora-text-dim)] hover:text-[var(--aurora-text)] bg-white/[0.02] hover:bg-white/[0.04] shadow-[inset_0_0_0_1px_var(--aurora-rim)] hover:shadow-[inset_0_0_0_1px_var(--aurora-rim-bright)]",
+        "text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] bg-white/[0.02] hover:bg-white/[0.04] shadow-[inset_0_0_0_1px_var(--aurora-rim)] hover:shadow-[inset_0_0_0_1px_var(--aurora-rim-bright)]",
       primary:
         "text-[#050608] shadow-[0_0_22px_-6px_rgba(94,234,212,0.45)] hover:shadow-[0_0_28px_-4px_rgba(94,234,212,0.6)]",
       secondary:
-        "text-[var(--aurora-text-dim)] hover:text-[var(--aurora-text)] bg-white/[0.02] hover:bg-white/[0.04] shadow-[inset_0_0_0_1px_var(--aurora-rim)]",
+        "text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] bg-white/[0.02] hover:bg-white/[0.04] shadow-[inset_0_0_0_1px_var(--aurora-rim)]",
       ghost:
-        "text-[var(--aurora-text-dim)] hover:text-[var(--aurora-text)] hover:bg-white/[0.03]",
+        "text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] hover:bg-white/[0.03]",
       outline:
-        "text-[var(--aurora-text-dim)] hover:text-[var(--aurora-text)] shadow-[inset_0_0_0_1px_var(--aurora-rim)] hover:shadow-[inset_0_0_0_1px_var(--aurora-rim-bright)]",
+        "text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] shadow-[inset_0_0_0_1px_var(--aurora-rim)] hover:shadow-[inset_0_0_0_1px_var(--aurora-rim-bright)]",
     }
 
     const sizes = {

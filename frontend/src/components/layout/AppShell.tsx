@@ -24,7 +24,7 @@ export function AppShell({ children }: AppShellProps) {
       {/* Mobile hamburger */}
       <button
         onClick={() => setSidebarOpen(true)}
-        className="fixed top-4 left-4 z-50 md:hidden h-9 w-9 rounded-md flex items-center justify-center text-[var(--aurora-text-dim)] hover:text-[var(--aurora-text)] transition-colors duration-150"
+        className="fixed top-4 left-4 z-50 md:hidden h-9 w-9 rounded-md flex items-center justify-center text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] transition-colors duration-150"
         style={{
           background: "rgba(6,7,9,0.8)",
           backdropFilter: "blur(12px)",
@@ -52,7 +52,7 @@ export function AppShell({ children }: AppShellProps) {
       >
         <button
           onClick={() => setSidebarOpen(false)}
-          className="absolute top-4 right-3 z-10 h-7 w-7 rounded-md flex items-center justify-center text-[var(--aurora-text-dim)] hover:text-[var(--aurora-text)] transition-colors duration-150"
+          className="absolute top-4 right-3 z-10 h-7 w-7 rounded-md flex items-center justify-center text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] transition-colors duration-150"
           aria-label="Close menu"
         >
           <X className="h-4 w-4" />

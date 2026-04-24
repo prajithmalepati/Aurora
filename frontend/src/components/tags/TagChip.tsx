@@ -37,7 +37,7 @@ export function TagChip({ name, onRemove, onClick }: TagChipProps) {
         {chipContent}
         <button
           onClick={handleRemove}
-          className="text-[var(--aurora-text-muted)] hover:text-[var(--aurora-danger)] transition-colors duration-150"
+          className="text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-danger)] transition-colors duration-150"
           aria-label={`Remove tag ${name}`}
         >
           <X className="h-3 w-3" />

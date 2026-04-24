@@ -52,7 +52,7 @@ export function PlaylistImagePicker({ name, imageDataUrl, onImageChange }: Playl
           <button
             type="button"
             onClick={() => onImageChange(null)}
-            className="text-[11px] text-[var(--aurora-text-muted)] hover:text-[var(--aurora-danger)] text-left transition-colors duration-150"
+            className="text-[11px] text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-danger)] text-left transition-colors duration-150"
           >
             Remove
           </button>

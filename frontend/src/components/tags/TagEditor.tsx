@@ -71,7 +71,7 @@ export function TagEditor({ songId, songTitle, currentTags, open, onOpenChange }
           <DialogTitle className="font-display text-[22px] leading-tight">
             Edit tags
           </DialogTitle>
-          <p className="text-[12px] text-[var(--aurora-text-dim)] font-display-italic mt-0.5 truncate">
+          <p className="text-[12px] text-[var(--aurora-text-secondary)] font-display-italic mt-0.5 truncate">
             {songTitle}
           </p>
         </DialogHeader>
@@ -81,19 +81,19 @@ export function TagEditor({ songId, songTitle, currentTags, open, onOpenChange }
             <p className="label-micro text-[9.5px] mb-2.5">Current</p>
             <div className="flex flex-wrap gap-1.5 min-h-[24px]">
               {currentTags.length === 0 && (
-                <span className="text-[12px] text-[var(--aurora-text-muted)] font-display-italic">
+                <span className="text-[12px] text-[var(--aurora-text-tertiary)] font-display-italic">
                   No tags yet
                 </span>
               )}
               {currentTags.map((tag) => (
                 <span
                   key={tag}
-                  className="aurora-chip inline-flex items-center gap-1 text-[10px] font-medium text-[var(--aurora-text-dim)] px-2 py-[1.5px] rounded-full"
+                  className="aurora-chip inline-flex items-center gap-1 text-[10px] font-medium text-[var(--aurora-text-secondary)] px-2 py-[1.5px] rounded-full"
                 >
                   {tag}
                   <button
                     onClick={() => handleRemoveTag(tag)}
-                    className="text-[var(--aurora-text-muted)] hover:text-[var(--aurora-danger)] transition-colors duration-150"
+                    className="text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-danger)] transition-colors duration-150"
                   >
                     <X className="h-3 w-3" />
                   </button>
@@ -136,7 +136,7 @@ export function TagEditor({ songId, songTitle, currentTags, open, onOpenChange }
                   className="w-full px-3 py-2 text-[13px] text-[var(--aurora-text)] cursor-pointer hover:bg-white/[0.03] transition-colors duration-150 flex items-center justify-between"
                 >
                   <span>{tag.name}</span>
-                  <span className="text-[10px] text-[var(--aurora-text-muted)] tabular-nums">
+                  <span className="text-[10px] text-[var(--aurora-text-tertiary)] tabular-nums">
                     {tag.song_count}
                   </span>
                 </button>
@@ -145,7 +145,7 @@ export function TagEditor({ songId, songTitle, currentTags, open, onOpenChange }
           )}
 
           {filteredTags.length === 0 && allTags.length > 0 && currentTags.length > 0 && (
-            <p className="text-[11px] text-[var(--aurora-text-muted)] font-display-italic">
+            <p className="text-[11px] text-[var(--aurora-text-tertiary)] font-display-italic">
               All tags already assigned
             </p>
           )}
