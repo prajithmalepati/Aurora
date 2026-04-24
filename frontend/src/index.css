@@ -552,7 +552,7 @@
   opacity: 1;
 }
 .aurora-range:disabled {
-  opacity: 0.35;
+  opacity: 0.40;
   cursor: not-allowed;
 }
 
@@ -807,7 +807,7 @@
   transform: scale(0.97);
 }
 .mix-jam-primary:disabled {
-  opacity: 0.45;
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
@@ -856,7 +856,7 @@
   color: var(--aurora-text);
 }
 .mix-float-search:disabled {
-  opacity: 0.45;
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
@@ -884,7 +884,7 @@
   transform: scale(0.97);
 }
 .mix-float-jam:disabled {
-  opacity: 0.45;
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
