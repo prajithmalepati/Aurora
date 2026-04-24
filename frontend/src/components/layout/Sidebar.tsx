@@ -208,7 +208,7 @@ function NavItem({ icon, label, active, onClick }: NavItemProps) {
   return (
     <button
       onClick={onClick}
-      className={`group relative w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all duration-200 ${
+      className={`group relative w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all duration-200 aurora-focus ${
         active
           ? "text-[var(--aurora-text)]"
           : "text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)]"
