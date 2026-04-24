@@ -947,3 +947,29 @@
   opacity: 0;
   transition: transform 150ms ease, opacity 150ms ease, height 0.4s ease;
 }
+
+/* ============================================================
+   REDUCED MOTION — disable ambient loops, collapse transitions
+   ============================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  /* Disable infinite ambient loops */
+  .aurora-pulse,
+  .aurora-idle-shimmer,
+  .aurora-eq > span,
+  .mix-jam-primary,
+  .mix-btn-jam,
+  .mix-float-jam {
+    animation: none !important;
+  }
+  /* Collapse all other animations/transitions to near-instant.
+     Near-zero (not zero) preserves Howler seek-bar state feedback. */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
