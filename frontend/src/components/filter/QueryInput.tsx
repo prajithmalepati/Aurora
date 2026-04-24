@@ -63,13 +63,13 @@ export function QueryInput() {
         onChange={(e) => setQuery(e.target.value)}
         onKeyDown={handleKeyDown}
         placeholder="slow AND (rock OR anime) NOT sad"
-        className="w-full bg-transparent border-0 outline-none pl-4 pr-9 py-2.5 text-[14px] text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-muted)] placeholder:font-display-italic placeholder:text-[13px]"
+        className="aurora-focus w-full bg-transparent border-0 pl-4 pr-9 py-2.5 text-[14px] text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-tertiary)] placeholder:font-display-italic placeholder:text-[13px]"
         style={{ fontFamily: "ui-monospace, 'SF Mono', 'Menlo', monospace" }}
       />
       {showIndicator && (
         <span className="absolute right-2.5 top-1/2 -translate-y-1/2">
           {isValid ? (
-            <Check className="h-3.5 w-3.5 text-[var(--aurora-primary)]" strokeWidth={2.5} />
+            <Check className="h-3.5 w-3.5 text-[var(--aurora-accent-interactive)]" strokeWidth={2.5} />
           ) : (
             <X className="h-3.5 w-3.5 text-[var(--aurora-danger)]" strokeWidth={2.5} />
           )}

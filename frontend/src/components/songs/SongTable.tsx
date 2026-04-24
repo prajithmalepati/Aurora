@@ -11,7 +11,7 @@ interface SongTableProps {
 }
 
 const HEADER_CLASS =
-  "px-4 py-3 text-left label-micro text-[10px] text-[var(--aurora-text-muted)] font-medium"
+  "px-4 py-3 text-left label-micro text-[10px] text-[var(--aurora-text-tertiary)] font-medium"
 
 function TableHeader() {
   return (
@@ -79,11 +79,11 @@ export function SongTable({ songs, loading = false, onPlay, animKey }: SongTable
           <TableHeader />
         </table>
         <div className="py-20 flex flex-col items-center justify-center gap-3">
-          <Music className="h-8 w-8 text-[var(--aurora-text-muted)] opacity-40" />
-          <p className="font-display-italic text-[22px] text-[var(--aurora-text-muted)]">
+          <Music className="h-8 w-8 text-[var(--aurora-text-tertiary)] opacity-40" />
+          <p className="font-display-italic text-[22px] text-[var(--aurora-text-tertiary)]">
             Nothing here yet
           </p>
-          <p className="text-xs text-[var(--aurora-text-muted)]">
+          <p className="text-xs text-[var(--aurora-text-tertiary)]">
             Scan a folder or add a song to begin.
           </p>
         </div>

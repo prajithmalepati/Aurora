@@ -24,7 +24,7 @@ export function AppShell({ children }: AppShellProps) {
       {/* Mobile hamburger */}
       <button
         onClick={() => setSidebarOpen(true)}
-        className="fixed top-4 left-4 z-50 md:hidden h-9 w-9 rounded-md flex items-center justify-center text-[var(--aurora-text-dim)] hover:text-[var(--aurora-text)] transition-colors duration-150"
+        className="fixed top-4 left-4 z-50 md:hidden h-9 w-9 rounded-md flex items-center justify-center text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] transition-colors duration-150 aurora-focus"
         style={{
           background: "rgba(6,7,9,0.8)",
           backdropFilter: "blur(12px)",
@@ -52,7 +52,7 @@ export function AppShell({ children }: AppShellProps) {
       >
         <button
           onClick={() => setSidebarOpen(false)}
-          className="absolute top-4 right-3 z-10 h-7 w-7 rounded-md flex items-center justify-center text-[var(--aurora-text-dim)] hover:text-[var(--aurora-text)] transition-colors duration-150"
+          className="absolute top-4 right-3 z-10 h-7 w-7 rounded-md flex items-center justify-center text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] transition-colors duration-150 aurora-focus"
           aria-label="Close menu"
         >
           <X className="h-4 w-4" />
@@ -66,15 +66,7 @@ export function AppShell({ children }: AppShellProps) {
           {children.sidebar}
         </div>
         <div className="overflow-y-auto relative">
-          {/* Top scrim */}
-          <div
-            className="pointer-events-none sticky top-0 h-6 -mb-6 z-20"
-            style={{
-              background:
-                "linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 100%)",
-            }}
-            aria-hidden="true"
-          />
+          <div className="aurora-scrim-top" aria-hidden="true" />
           {children.main}
         </div>
         <div className="md:col-span-2">{children.playerBar}</div>

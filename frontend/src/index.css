@@ -2,6 +2,7 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
+@import "@fontsource-variable/fraunces";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -72,8 +73,8 @@
   --aurora-rim-glow: rgba(94, 234, 212, 0.18);
 
   /* Aurora accents — brightened for OLED contrast, used SPARINGLY */
-  --aurora-teal: #5eead4;
-  --aurora-teal-dim: rgba(94, 234, 212, 0.55);
+  --aurora-accent-vivid: #5eead4;
+  --aurora-accent-vivid-dim: rgba(94, 234, 212, 0.55);
   --aurora-mint: #86efac;
   --aurora-violet: #a78bfa;
 
@@ -82,8 +83,9 @@
   --aurora-purple: var(--aurora-violet);
   --aurora-blue: #7dd3fc;
 
-  /* The signature gradient — appears in exactly 3 places:
-     play button, seek fill, currently-playing title */
+  /* The signature gradient — identity and primary intent only:
+     play button, seek fill, currently-playing title, primary Button fill,
+     Jam buttons, and aurora keyline fades at PlayerBar / Sidebar edges. */
   --aurora-gradient: linear-gradient(135deg, #5eead4 0%, #86efac 55%, #a78bfa 100%);
   --aurora-gradient-soft: linear-gradient(135deg, rgba(94, 234, 212, 0.16) 0%, rgba(134, 239, 172, 0.12) 55%, rgba(167, 139, 250, 0.16) 100%);
 
@@ -91,9 +93,6 @@
   --aurora-text: #e8e6e3;
   --aurora-text-secondary: #8b95a7;
   --aurora-text-tertiary: #4b5563;
-  --aurora-text-dim: #8b95a7;              /* legacy alias */
-  --aurora-text-muted: #4b5563;            /* legacy alias */
-  --aurora-text-disabled: #2a2f3a;
 
   /* Semantic */
   --aurora-danger: #f87171;
@@ -105,19 +104,16 @@
 
   /* ── Aurora accent palette — the three voices ──
      Teal (common aurora), violet (common), amber (rarest light). */
-  --aurora-primary: #4db8a4;                       /* smoked teal  */
-  --aurora-primary-hover: #5ec9b5;
-  --aurora-primary-glow: rgba(77, 184, 164, 0.18);
+  --aurora-accent-interactive: #4db8a4;             /* smoked teal  */
+  --aurora-accent-interactive-hover: #5ec9b5;
+  --aurora-accent-interactive-glow: rgba(77, 184, 164, 0.18);
   --aurora-secondary: #8a75c8;                     /* twilight violet */
   --aurora-secondary-hover: #9b88d6;
   --aurora-secondary-glow: rgba(138, 117, 200, 0.15);
-  --aurora-tertiary: #c49a6c;                      /* warm amber — golden-hour aurora */
-  --aurora-tertiary-hover: #d4aa7c;
-  --aurora-tertiary-glow: rgba(196, 154, 108, 0.12);
 
   /* Muted accent — same hue as primary, ~15% less saturated/bright.
      Used for play button fill, seek bar fill, and equalizer bars at rest.
-     Hover on interactive elements transitions to full --aurora-primary. */
+     Hover on interactive elements transitions to full --aurora-accent-interactive. */
   --aurora-accent-muted: #459687;
 
   /* Glow — subtle ambient light for hover and focus halos */
@@ -142,71 +138,48 @@
   --aurora-surface-pressed: rgba(255, 255, 255, 0.035); /* pressed state for surface-1 items */
   /* Note: --aurora-surface-hover is already defined above as the glass hover value
      (rgba(255,255,255,0.065)) and serves the hover role for surface-1 items as well. */
+
+  --radius: 0.625rem;
+
+  --aurora-scrim-top: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.85) 0%,
+    rgba(0, 0, 0, 0.55) 40%,
+    rgba(0, 0, 0, 0.20) 75%,
+    rgba(0, 0, 0, 0.00) 100%
+  );
 }
 
-:root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
-}
-
+/* Aurora is dark-only. All shadcn primitives derive from --aurora-* tokens.
+   A future theme overrides the aurora tokens once; shadcn follows automatically. */
 .dark {
-    --background: 0 0% 0%;
-    --foreground: 210 17% 97%;
-    --primary: 167 76% 64%;
-    --primary-foreground: 0 0% 0%;
-    --secondary: 220 14% 6%;
-    --secondary-foreground: 210 17% 97%;
-    --accent: 220 14% 8%;
-    --accent-foreground: 210 17% 97%;
-    --destructive: 0 91% 71%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 100% / 0.06;
-    --input: 0 0% 100% / 0.06;
-    --ring: 167 76% 64%;
-    --muted: 220 14% 7%;
-    --muted-foreground: 218 14% 60%;
-    --card: 220 14% 5%;
-    --card-foreground: 210 17% 97%;
-    --popover: 220 14% 5%;
-    --popover-foreground: 210 17% 97%;
-    --sidebar: 220 14% 4%;
-    --sidebar-foreground: 210 17% 97%;
-    --sidebar-primary: 167 76% 64%;
-    --sidebar-primary-foreground: 0 0% 0%;
-    --sidebar-accent: 220 14% 8%;
-    --sidebar-accent-foreground: 210 17% 97%;
-    --sidebar-border: 0 0% 100% / 0.06;
-    --sidebar-ring: 167 76% 64%;
+    --background: var(--aurora-surface-0);
+    --foreground: var(--aurora-text);
+    --card: var(--aurora-surface-1);
+    --card-foreground: var(--aurora-text);
+    --popover: var(--aurora-surface-2);
+    --popover-foreground: var(--aurora-text);
+    --primary: var(--aurora-accent-vivid);
+    --primary-foreground: var(--aurora-slate);
+    --secondary: var(--aurora-surface-1);
+    --secondary-foreground: var(--aurora-text);
+    --muted: var(--aurora-surface-1);
+    --muted-foreground: var(--aurora-text-secondary);
+    --accent: var(--aurora-surface-1);
+    --accent-foreground: var(--aurora-text);
+    --destructive: var(--aurora-danger);
+    --destructive-foreground: var(--aurora-text);
+    --border: var(--aurora-rim);
+    --input: var(--aurora-rim);
+    --ring: var(--aurora-accent-vivid);
+    --sidebar: var(--aurora-obsidian);
+    --sidebar-foreground: var(--aurora-text);
+    --sidebar-primary: var(--aurora-accent-vivid);
+    --sidebar-primary-foreground: var(--aurora-void);
+    --sidebar-accent: var(--aurora-surface-1);
+    --sidebar-accent-foreground: var(--aurora-text);
+    --sidebar-border: var(--aurora-rim);
+    --sidebar-ring: var(--aurora-accent-vivid);
 }
 
 @layer base {
@@ -266,7 +239,7 @@
   font-weight: 500;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--aurora-text-muted);
+  color: var(--aurora-text-tertiary);
 }
 
 /* ============================================================
@@ -306,6 +279,32 @@
 .aurora-chip:hover {
   border-color: rgba(255, 255, 255, 0.22);
   background: var(--aurora-surface);
+}
+.aurora-chip:focus-visible {
+  outline: 2px solid rgba(94, 234, 212, 0.70);
+  outline-offset: 2px;
+}
+
+/* Top scrim — sticky gradient fades the upper edge of scrollable content.
+   Non-linear curve prevents visible banding on OLED. Height matches sm:pt-6. */
+.aurora-scrim-top {
+  pointer-events: none;
+  position: sticky;
+  top: 0;
+  height: 24px;
+  margin-bottom: -24px;
+  z-index: 20;
+  background: var(--aurora-scrim-top);
+}
+
+/* Canonical focus ring — vivid teal at /70 opacity, 2px ring, 2px offset.
+   Outline avoids box-shadow conflicts with Input's inset dual-glow treatment. */
+.aurora-focus {
+  outline: none;
+}
+.aurora-focus:focus-visible {
+  outline: 2px solid rgba(94, 234, 212, 0.70);
+  outline-offset: 2px;
 }
 
 .aurora-glow-sm {
@@ -511,11 +510,11 @@
    ============================================================ */
 
 .aurora-play-btn {
-  background: var(--aurora-accent-muted) !important;
-  transition: background 200ms ease;
+  background: var(--aurora-gradient) !important;
+  transition: filter 200ms ease;
 }
 .aurora-play-btn:not(:disabled):hover {
-  background: var(--aurora-primary) !important;
+  filter: brightness(1.12);
 }
 
 /* ============================================================
@@ -529,7 +528,8 @@
   height: 3px;
   border-radius: 999px;
   background:
-    linear-gradient(to right, var(--aurora-accent-muted) 0%, var(--aurora-accent-muted) var(--aurora-range-pct), rgba(255,255,255,0.08) var(--aurora-range-pct), rgba(255,255,255,0.08) 100%);
+    linear-gradient(to right, #5eead4 0%, #86efac 55%, #a78bfa 100%) left top / var(--aurora-range-pct) 100% no-repeat,
+    rgba(255, 255, 255, 0.08);
   outline: none;
   cursor: pointer;
   transition: height 180ms ease;
@@ -574,7 +574,7 @@
   opacity: 1;
 }
 .aurora-range:disabled {
-  opacity: 0.35;
+  opacity: 0.40;
   cursor: not-allowed;
 }
 
@@ -650,7 +650,7 @@
 }
 .mix-query-bar:focus-within {
   box-shadow: inset 0 0 0 1px var(--aurora-rim-bright),
-              0 0 20px -6px var(--aurora-primary-glow),
+              0 0 20px -6px var(--aurora-accent-interactive-glow),
               0 0 20px -6px var(--aurora-secondary-glow);
 }
 .mix-query-bar--error,
@@ -670,7 +670,7 @@
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.05em;
-  color: var(--aurora-text-dim);
+  color: var(--aurora-text-secondary);
   background: var(--aurora-surface);
   border: 1px solid var(--aurora-surface-border);
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03);
@@ -687,29 +687,33 @@
   box-shadow: none;
   transform: translateY(1px);
 }
+.mix-kbd:focus-visible {
+  outline: 2px solid rgba(94, 234, 212, 0.70);
+  outline-offset: 2px;
+}
 
 /* Search button — muted teal fill, dark text */
 .mix-btn-search {
-  background: var(--aurora-primary);
+  background: var(--aurora-accent-interactive);
   color: var(--aurora-slate);
-  box-shadow: 0 0 16px -6px var(--aurora-primary-glow);
+  box-shadow: 0 0 16px -6px var(--aurora-accent-interactive-glow);
   transition: all 150ms ease;
 }
 .mix-btn-search:hover:not(:disabled) {
-  background: var(--aurora-primary-hover);
-  box-shadow: 0 0 22px -4px var(--aurora-primary-glow);
+  background: var(--aurora-accent-interactive-hover);
+  box-shadow: 0 0 22px -4px var(--aurora-accent-interactive-glow);
 }
 
 /* Jam button — muted teal→violet gradient, white text */
 .mix-btn-jam {
-  background: linear-gradient(135deg, var(--aurora-primary) 0%, var(--aurora-secondary) 100%);
+  background: linear-gradient(135deg, var(--aurora-accent-interactive) 0%, var(--aurora-secondary) 100%);
   color: #fff;
-  box-shadow: 0 0 18px -8px var(--aurora-primary-glow);
+  box-shadow: 0 0 18px -8px var(--aurora-accent-interactive-glow);
   letter-spacing: 0.02em;
   transition: all 150ms ease;
 }
 .mix-btn-jam:hover:not(:disabled) {
-  box-shadow: 0 0 24px -5px var(--aurora-primary-glow),
+  box-shadow: 0 0 24px -5px var(--aurora-accent-interactive-glow),
               0 0 24px -5px var(--aurora-secondary-glow);
 }
 
@@ -808,7 +812,7 @@
   height: 50px;
   padding: 0 28px;
   border-radius: 999px;
-  background: linear-gradient(135deg, var(--aurora-primary) 0%, var(--aurora-secondary) 100%);
+  background: linear-gradient(135deg, var(--aurora-accent-interactive) 0%, var(--aurora-secondary) 100%);
   color: #ffffff;
   box-shadow:
     0 0 28px -8px rgba(77, 184, 164, 0.4),
@@ -825,7 +829,7 @@
   transform: scale(0.97);
 }
 .mix-jam-primary:disabled {
-  opacity: 0.45;
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
@@ -874,7 +878,7 @@
   color: var(--aurora-text);
 }
 .mix-float-search:disabled {
-  opacity: 0.45;
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
@@ -886,7 +890,7 @@
   height: 48px;
   padding: 0 22px;
   border-radius: 999px;
-  background: linear-gradient(135deg, var(--aurora-primary) 0%, var(--aurora-secondary) 100%);
+  background: linear-gradient(135deg, var(--aurora-accent-interactive) 0%, var(--aurora-secondary) 100%);
   color: #ffffff;
   box-shadow: 0 0 24px -8px rgba(77, 184, 164, 0.45);
   cursor: pointer;
@@ -902,7 +906,7 @@
   transform: scale(0.97);
 }
 .mix-float-jam:disabled {
-  opacity: 0.45;
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
@@ -942,4 +946,30 @@
   --y: translateX(110%);
   opacity: 0;
   transition: transform 150ms ease, opacity 150ms ease, height 0.4s ease;
+}
+
+/* ============================================================
+   REDUCED MOTION — disable ambient loops, collapse transitions
+   ============================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  /* Disable infinite ambient loops */
+  .aurora-pulse,
+  .aurora-idle-shimmer,
+  .aurora-eq > span,
+  .mix-jam-primary,
+  .mix-btn-jam,
+  .mix-float-jam {
+    animation: none !important;
+  }
+  /* Collapse all other animations/transitions to near-instant.
+     Near-zero (not zero) preserves Howler seek-bar state feedback. */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

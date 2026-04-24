@@ -99,7 +99,7 @@ export function EditSongDialog({ song, open: controlledOpen, onOpenChange, onEdi
           <div className="grid gap-4 pt-4">
             <div className="grid gap-2">
               <label htmlFor="edit-title" className="label-micro text-[9.5px]">
-                Title <span className="text-[var(--aurora-teal)]">*</span>
+                Title <span className="text-[var(--aurora-accent-vivid)]">*</span>
               </label>
               <Input
                 id="edit-title"
@@ -111,7 +111,7 @@ export function EditSongDialog({ song, open: controlledOpen, onOpenChange, onEdi
 
             <div className="grid gap-2">
               <label htmlFor="edit-artist" className="label-micro text-[9.5px]">
-                Artist <span className="text-[var(--aurora-teal)]">*</span>
+                Artist <span className="text-[var(--aurora-accent-vivid)]">*</span>
               </label>
               <Input
                 id="edit-artist"
@@ -154,7 +154,7 @@ export function EditSongDialog({ song, open: controlledOpen, onOpenChange, onEdi
                 <select
                   value={selectedPlaylistId}
                   onChange={(e) => setSelectedPlaylistId(e.target.value)}
-                  className="flex-1 h-9 rounded-md border border-[var(--aurora-muted)] bg-[var(--aurora-surface)] px-3 text-[13px] text-[var(--aurora-text)] focus:outline-none focus:ring-1 focus:ring-[var(--aurora-primary)]"
+                  className="flex-1 h-9 rounded-md border border-[var(--aurora-muted)] bg-[var(--aurora-surface)] px-3 text-[13px] text-[var(--aurora-text)] focus:outline-none focus:ring-1 focus:ring-[var(--aurora-accent-interactive)]"
                 >
                   <option value="">Select a playlist…</option>
                   {playlists.map((p) => (
