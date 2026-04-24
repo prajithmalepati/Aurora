@@ -136,71 +136,40 @@
   --aurora-surface-pressed: rgba(255, 255, 255, 0.035); /* pressed state for surface-1 items */
   /* Note: --aurora-surface-hover is already defined above as the glass hover value
      (rgba(255,255,255,0.065)) and serves the hover role for surface-1 items as well. */
+
+  --radius: 0.625rem;
 }
 
-:root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
-}
-
+/* Aurora is dark-only. All shadcn primitives derive from --aurora-* tokens.
+   A future theme overrides the aurora tokens once; shadcn follows automatically. */
 .dark {
-    --background: 0 0% 0%;
-    --foreground: 210 17% 97%;
-    --primary: 167 76% 64%;
-    --primary-foreground: 0 0% 0%;
-    --secondary: 220 14% 6%;
-    --secondary-foreground: 210 17% 97%;
-    --accent: 220 14% 8%;
-    --accent-foreground: 210 17% 97%;
-    --destructive: 0 91% 71%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 100% / 0.06;
-    --input: 0 0% 100% / 0.06;
-    --ring: 167 76% 64%;
-    --muted: 220 14% 7%;
-    --muted-foreground: 218 14% 60%;
-    --card: 220 14% 5%;
-    --card-foreground: 210 17% 97%;
-    --popover: 220 14% 5%;
-    --popover-foreground: 210 17% 97%;
-    --sidebar: 220 14% 4%;
-    --sidebar-foreground: 210 17% 97%;
-    --sidebar-primary: 167 76% 64%;
-    --sidebar-primary-foreground: 0 0% 0%;
-    --sidebar-accent: 220 14% 8%;
-    --sidebar-accent-foreground: 210 17% 97%;
-    --sidebar-border: 0 0% 100% / 0.06;
-    --sidebar-ring: 167 76% 64%;
+    --background: var(--aurora-surface-0);
+    --foreground: var(--aurora-text);
+    --card: var(--aurora-surface-1);
+    --card-foreground: var(--aurora-text);
+    --popover: var(--aurora-surface-2);
+    --popover-foreground: var(--aurora-text);
+    --primary: var(--aurora-accent-vivid);
+    --primary-foreground: var(--aurora-slate);
+    --secondary: var(--aurora-surface-1);
+    --secondary-foreground: var(--aurora-text);
+    --muted: var(--aurora-surface-1);
+    --muted-foreground: var(--aurora-text-secondary);
+    --accent: var(--aurora-surface-1);
+    --accent-foreground: var(--aurora-text);
+    --destructive: var(--aurora-danger);
+    --destructive-foreground: var(--aurora-text);
+    --border: var(--aurora-rim);
+    --input: var(--aurora-rim);
+    --ring: var(--aurora-accent-vivid);
+    --sidebar: var(--aurora-obsidian);
+    --sidebar-foreground: var(--aurora-text);
+    --sidebar-primary: var(--aurora-accent-vivid);
+    --sidebar-primary-foreground: var(--aurora-void);
+    --sidebar-accent: var(--aurora-surface-1);
+    --sidebar-accent-foreground: var(--aurora-text);
+    --sidebar-border: var(--aurora-rim);
+    --sidebar-ring: var(--aurora-accent-vivid);
 }
 
 @layer base {
