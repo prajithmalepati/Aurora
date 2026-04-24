@@ -63,7 +63,7 @@ export function QueryInput() {
         onChange={(e) => setQuery(e.target.value)}
         onKeyDown={handleKeyDown}
         placeholder="slow AND (rock OR anime) NOT sad"
-        className="w-full bg-transparent border-0 outline-none pl-4 pr-9 py-2.5 text-[14px] text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-muted)] placeholder:font-display-italic placeholder:text-[13px]"
+        className="w-full bg-transparent border-0 outline-none pl-4 pr-9 py-2.5 text-[14px] text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-tertiary)] placeholder:font-display-italic placeholder:text-[13px]"
         style={{ fontFamily: "ui-monospace, 'SF Mono', 'Menlo', monospace" }}
       />
       {showIndicator && (

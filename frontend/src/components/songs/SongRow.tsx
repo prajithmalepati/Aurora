@@ -75,7 +75,7 @@ export function SongRow({ song, index, animIndex, onPlay }: SongRowProps) {
         {/* # column / play indicator */}
         <td
           className={`relative px-4 py-3 w-12 text-center ${
-            isCurrentSong ? "" : "text-[var(--aurora-text-muted)]"
+            isCurrentSong ? "" : "text-[var(--aurora-text-tertiary)]"
           }`}
         >
           {/* Left accent bar — only on currently playing */}
@@ -149,7 +149,7 @@ export function SongRow({ song, index, animIndex, onPlay }: SongRowProps) {
               >
                 {song.title}
               </span>
-              <span className="truncate text-[12px] text-[var(--aurora-text-dim)] mt-0.5">
+              <span className="truncate text-[12px] text-[var(--aurora-text-secondary)] mt-0.5">
                 {song.artist}
               </span>
             </div>
@@ -157,7 +157,7 @@ export function SongRow({ song, index, animIndex, onPlay }: SongRowProps) {
         </td>
 
         {/* Duration · Format */}
-        <td className="relative px-4 py-3 w-28 text-[12px] text-[var(--aurora-text-dim)] tabular-nums hidden lg:table-cell">
+        <td className="relative px-4 py-3 w-28 text-[12px] text-[var(--aurora-text-secondary)] tabular-nums hidden lg:table-cell">
           <span
             className={`absolute inset-0 transition-colors duration-150 pointer-events-none ${
               isCurrentSong ? "" : "group-hover:bg-[var(--aurora-surface-1)]"
@@ -184,7 +184,7 @@ export function SongRow({ song, index, animIndex, onPlay }: SongRowProps) {
                 {song.playlists.slice(0, 2).map((playlist) => (
                   <span
                     key={playlist.id}
-                    className="inline-flex items-center gap-1.5 text-[11px] text-[var(--aurora-text-dim)] truncate max-w-[140px]"
+                    className="inline-flex items-center gap-1.5 text-[11px] text-[var(--aurora-text-secondary)] truncate max-w-[140px]"
                   >
                     <span
                       className="w-[5px] h-[5px] rounded-sm flex-shrink-0"
@@ -197,13 +197,13 @@ export function SongRow({ song, index, animIndex, onPlay }: SongRowProps) {
                   </span>
                 ))}
                 {song.playlists.length > 2 && (
-                  <span className="text-[10px] text-[var(--aurora-text-muted)] pl-3">
+                  <span className="text-[10px] text-[var(--aurora-text-tertiary)] pl-3">
                     +{song.playlists.length - 2} more
                   </span>
                 )}
               </div>
             ) : (
-              <span className="text-[var(--aurora-text-muted)] text-[12px]">—</span>
+              <span className="text-[var(--aurora-text-tertiary)] text-[12px]">—</span>
             )}
           </div>
         </td>
@@ -316,8 +316,8 @@ function IconBtn({ children, label, danger, onClick }: IconBtnProps) {
       aria-label={label}
       className={`h-7 w-7 rounded-md flex items-center justify-center transition-all duration-150 ${
         danger
-          ? "text-[var(--aurora-text-muted)] hover:text-[var(--aurora-danger)] hover:bg-[var(--aurora-danger)]/10"
-          : "text-[var(--aurora-text-muted)] hover:text-[var(--aurora-text)] hover:bg-white/[0.04]"
+          ? "text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-danger)] hover:bg-[var(--aurora-danger)]/10"
+          : "text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-text)] hover:bg-white/[0.04]"
       }`}
     >
       {children}

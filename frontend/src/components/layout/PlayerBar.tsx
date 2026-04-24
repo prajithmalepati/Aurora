@@ -51,7 +51,7 @@ export function PlayerBar() {
               <span className="font-display-italic text-[12px] leading-tight text-[var(--aurora-text-secondary)]">
                 Nothing playing
               </span>
-              <span className="text-[10px] text-[var(--aurora-text-muted)]">
+              <span className="text-[10px] text-[var(--aurora-text-tertiary)]">
                 Pick a song or hit Jam
               </span>
             </div>
@@ -163,7 +163,7 @@ export function PlayerBar() {
               <span className="font-display-italic text-[15px] leading-tight text-[var(--aurora-text)]">
                 Nothing playing
               </span>
-              <span className="text-[11px] text-[var(--aurora-text-muted)] tracking-wide">
+              <span className="text-[11px] text-[var(--aurora-text-tertiary)] tracking-wide">
                 Pick a song or hit Jam
               </span>
             </div>

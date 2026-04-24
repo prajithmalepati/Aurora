@@ -186,7 +186,7 @@ export function ScanDialog({ open, onOpenChange }: ScanDialogProps) {
                     {state.results.errors.map((err, idx) => (
                       <li
                         key={idx}
-                        className="text-[11px] text-[var(--aurora-text-dim)] font-mono"
+                        className="text-[11px] text-[var(--aurora-text-secondary)] font-mono"
                       >
                         <span className="text-[var(--aurora-text)]">{err.file}:</span>{" "}
                         {err.error}

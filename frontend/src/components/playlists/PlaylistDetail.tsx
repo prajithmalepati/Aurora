@@ -239,7 +239,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
   if (!activePlaylist) {
     return (
       <div className="p-10">
-        <span className="font-display-italic text-[20px] text-[var(--aurora-text-muted)]">
+        <span className="font-display-italic text-[20px] text-[var(--aurora-text-tertiary)]">
           Playlist not found
         </span>
       </div>
@@ -293,13 +293,13 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
             <h1 className="font-display text-[64px] leading-[0.95] tracking-tight text-[var(--aurora-text)] truncate">
               {activePlaylist.name}
             </h1>
-            <div className="flex items-center gap-2 mt-4 text-[12px] text-[var(--aurora-text-dim)]">
+            <div className="flex items-center gap-2 mt-4 text-[12px] text-[var(--aurora-text-secondary)]">
               <span className="tabular-nums font-medium">
                 {activePlaylist.songs.length} {activePlaylist.songs.length === 1 ? "song" : "songs"}
               </span>
               {totalDuration > 0 && (
                 <>
-                  <span className="text-[var(--aurora-text-muted)]">·</span>
+                  <span className="text-[var(--aurora-text-tertiary)]">·</span>
                   <span className="tabular-nums">{formatTotal(totalDuration)}</span>
                 </>
               )}
@@ -312,7 +312,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
               onClick={handleEdit}
               title="Edit playlist"
               aria-label="Edit playlist"
-              className="h-9 w-9 rounded-md flex items-center justify-center text-[var(--aurora-text-dim)] hover:text-[var(--aurora-text)] hover:bg-white/[0.04] transition-all duration-150"
+              className="h-9 w-9 rounded-md flex items-center justify-center text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] hover:bg-white/[0.04] transition-all duration-150"
             >
               <Pencil className="h-4 w-4" />
             </button>
@@ -320,7 +320,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
               onClick={() => setDeleteDialogOpen(true)}
               title="Delete playlist"
               aria-label="Delete playlist"
-              className="h-9 w-9 rounded-md flex items-center justify-center text-[var(--aurora-text-muted)] hover:text-[var(--aurora-danger)] hover:bg-[var(--aurora-danger)]/10 transition-all duration-150"
+              className="h-9 w-9 rounded-md flex items-center justify-center text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-danger)] hover:bg-[var(--aurora-danger)]/10 transition-all duration-150"
             >
               <Trash2 className="h-4 w-4" />
             </button>
@@ -359,7 +359,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
 
         {activePlaylist.songs.length === 0 ? (
           <div className="py-16 text-center">
-            <p className="font-display-italic text-[22px] text-[var(--aurora-text-muted)]">
+            <p className="font-display-italic text-[22px] text-[var(--aurora-text-tertiary)]">
               This playlist is empty
             </p>
           </div>
@@ -373,19 +373,19 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
           <table className="w-full border-separate border-spacing-0">
             <thead>
               <tr>
-                <th className="px-4 py-3 text-left label-micro text-[10px] text-[var(--aurora-text-muted)] w-12 text-center">
+                <th className="px-4 py-3 text-left label-micro text-[10px] text-[var(--aurora-text-tertiary)] w-12 text-center">
                   #
                 </th>
-                <th className="px-4 py-3 text-left label-micro text-[10px] text-[var(--aurora-text-muted)]">
+                <th className="px-4 py-3 text-left label-micro text-[10px] text-[var(--aurora-text-tertiary)]">
                   Title
                 </th>
-                <th className="px-4 py-3 text-left label-micro text-[10px] text-[var(--aurora-text-muted)] w-24">
+                <th className="px-4 py-3 text-left label-micro text-[10px] text-[var(--aurora-text-tertiary)] w-24">
                   Duration
                 </th>
-                <th className="px-4 py-3 text-left label-micro text-[10px] text-[var(--aurora-text-muted)]">
+                <th className="px-4 py-3 text-left label-micro text-[10px] text-[var(--aurora-text-tertiary)]">
                   Tags
                 </th>
-                <th className="px-4 py-3 text-left label-micro text-[10px] text-[var(--aurora-text-muted)] w-36 text-right">
+                <th className="px-4 py-3 text-left label-micro text-[10px] text-[var(--aurora-text-tertiary)] w-36 text-right">
                   Actions
                 </th>
               </tr>
@@ -416,7 +416,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
           <form onSubmit={(e) => { e.preventDefault(); handleSaveEdit(); }}>
             <DialogHeader>
               <DialogTitle className="font-display text-[24px]">Edit Playlist</DialogTitle>
-              <DialogDescription className="text-[var(--aurora-text-dim)]">
+              <DialogDescription className="text-[var(--aurora-text-secondary)]">
                 Update your playlist details.
               </DialogDescription>
             </DialogHeader>
@@ -464,7 +464,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
                     <button
                       type="button"
                       onClick={() => setEditEmoji("")}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-medium uppercase tracking-wider text-[var(--aurora-text-muted)] hover:text-[var(--aurora-danger)] px-2 py-1 rounded transition-colors duration-150"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-medium uppercase tracking-wider text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-danger)] px-2 py-1 rounded transition-colors duration-150"
                     >
                       Clear
                     </button>
@@ -568,7 +568,7 @@ function PlaylistSongRow({ song, index, total, onRemove, onReorder, onPlay }: Pl
           }
           aria-hidden="true"
         />
-        <span className="relative z-10 flex items-center justify-center text-[var(--aurora-text-muted)]">
+        <span className="relative z-10 flex items-center justify-center text-[var(--aurora-text-tertiary)]">
           {isCurrent ? (
             <Equalizer playing={isPlaying} />
           ) : (
@@ -603,14 +603,14 @@ function PlaylistSongRow({ song, index, total, onRemove, onReorder, onPlay }: Pl
             >
               {song.title}
             </span>
-            <span className="truncate text-[12px] text-[var(--aurora-text-dim)] mt-0.5">
+            <span className="truncate text-[12px] text-[var(--aurora-text-secondary)] mt-0.5">
               {song.artist}
             </span>
           </div>
         </div>
       </td>
 
-      <td className="relative px-4 py-3 w-28 text-[12px] text-[var(--aurora-text-dim)] tabular-nums">
+      <td className="relative px-4 py-3 w-28 text-[12px] text-[var(--aurora-text-secondary)] tabular-nums">
         <span
           className={`absolute inset-0 transition-colors duration-200 pointer-events-none ${
             isCurrent ? "" : "group-hover:bg-white/[0.025]"
@@ -696,8 +696,8 @@ function IconBtn({ children, label, danger, disabled, onClick }: IconBtnProps) {
       aria-label={label}
       className={`h-7 w-7 rounded-md flex items-center justify-center transition-all duration-150 disabled:opacity-25 disabled:pointer-events-none ${
         danger
-          ? "text-[var(--aurora-text-muted)] hover:text-[var(--aurora-danger)] hover:bg-[var(--aurora-danger)]/10"
-          : "text-[var(--aurora-text-muted)] hover:text-[var(--aurora-text)] hover:bg-white/[0.04]"
+          ? "text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-danger)] hover:bg-[var(--aurora-danger)]/10"
+          : "text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-text)] hover:bg-white/[0.04]"
       }`}
     >
       {children}
