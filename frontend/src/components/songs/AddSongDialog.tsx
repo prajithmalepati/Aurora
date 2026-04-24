@@ -87,7 +87,7 @@ export function AddSongDialog({ onAdd, open: controlledOpen, onOpenChange }: Add
           <div className="grid gap-4 pt-4">
             <div className="grid gap-2">
               <label htmlFor="title" className="label-micro text-[9.5px]">
-                Title <span className="text-[var(--aurora-teal)]">*</span>
+                Title <span className="text-[var(--aurora-accent-vivid)]">*</span>
               </label>
               <Input
                 id="title"
@@ -99,7 +99,7 @@ export function AddSongDialog({ onAdd, open: controlledOpen, onOpenChange }: Add
 
             <div className="grid gap-2">
               <label htmlFor="artist" className="label-micro text-[9.5px]">
-                Artist <span className="text-[var(--aurora-teal)]">*</span>
+                Artist <span className="text-[var(--aurora-accent-vivid)]">*</span>
               </label>
               <Input
                 id="artist"

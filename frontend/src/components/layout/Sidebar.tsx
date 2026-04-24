@@ -62,7 +62,7 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
           <div
             className="mt-3 h-[1px] w-12"
             style={{
-              background: "linear-gradient(to right, var(--aurora-primary), var(--aurora-secondary))",
+              background: "linear-gradient(to right, var(--aurora-accent-interactive), var(--aurora-secondary))",
               opacity: 0.4,
             }}
           />
@@ -208,7 +208,7 @@ function NavItem({ icon, label, active, onClick }: NavItemProps) {
   return (
     <button
       onClick={onClick}
-      className={`group relative w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all duration-200 ${
+      className={`group relative w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all duration-200 aurora-focus ${
         active
           ? "text-[var(--aurora-text)]"
           : "text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)]"
@@ -220,8 +220,8 @@ function NavItem({ icon, label, active, onClick }: NavItemProps) {
           active ? "h-5 opacity-100" : "h-0 opacity-0"
         }`}
         style={{
-          background: "var(--aurora-primary)",
-          boxShadow: active ? "0 0 8px var(--aurora-primary-glow)" : "none",
+          background: "var(--aurora-accent-interactive)",
+          boxShadow: active ? "0 0 8px var(--aurora-accent-interactive-glow)" : "none",
         }}
         aria-hidden="true"
       />
@@ -242,7 +242,7 @@ function NavItem({ icon, label, active, onClick }: NavItemProps) {
         aria-hidden="true"
       />
       <span className="relative z-10 flex items-center gap-3">
-        <span className={active ? "text-[var(--aurora-primary)]" : ""}>{icon}</span>
+        <span className={active ? "text-[var(--aurora-accent-interactive)]" : ""}>{icon}</span>
         <span className="font-medium tracking-tight">{label}</span>
       </span>
     </button>
