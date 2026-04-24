@@ -314,7 +314,7 @@ function IconBtn({ children, label, danger, onClick }: IconBtnProps) {
       onClick={onClick}
       title={label}
       aria-label={label}
-      className={`h-7 w-7 rounded-md flex items-center justify-center transition-all duration-150 ${
+      className={`aurora-focus h-7 w-7 rounded-md flex items-center justify-center transition-all duration-150 ${
         danger
           ? "text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-danger)] hover:bg-[var(--aurora-danger)]/10"
           : "text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-text)] hover:bg-white/[0.04]"

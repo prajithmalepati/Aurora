@@ -271,6 +271,20 @@
   border-color: rgba(255, 255, 255, 0.22);
   background: var(--aurora-surface);
 }
+.aurora-chip:focus-visible {
+  outline: 2px solid rgba(94, 234, 212, 0.70);
+  outline-offset: 2px;
+}
+
+/* Canonical focus ring — vivid teal at /70 opacity, 2px ring, 2px offset.
+   Outline avoids box-shadow conflicts with Input's inset dual-glow treatment. */
+.aurora-focus {
+  outline: none;
+}
+.aurora-focus:focus-visible {
+  outline: 2px solid rgba(94, 234, 212, 0.70);
+  outline-offset: 2px;
+}
 
 .aurora-glow-sm {
   box-shadow: 0 0 16px -4px rgba(94, 234, 212, 0.25);
@@ -650,6 +664,10 @@
 .mix-kbd:active {
   box-shadow: none;
   transform: translateY(1px);
+}
+.mix-kbd:focus-visible {
+  outline: 2px solid rgba(94, 234, 212, 0.70);
+  outline-offset: 2px;
 }
 
 /* Search button — muted teal fill, dark text */

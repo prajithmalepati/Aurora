@@ -100,7 +100,7 @@ export function PlayerBar() {
                 value={seek}
                 onChange={(e) => seekTo(Number(e.target.value))}
                 disabled={!hasSong}
-                className="aurora-range flex-1"
+                className="aurora-range aurora-focus flex-1"
                 style={{ ["--aurora-range-pct" as string]: `${seekPct}%` }}
                 aria-label="Seek"
               />
@@ -258,7 +258,7 @@ export function PlayerBar() {
                   value={seek}
                   onChange={(e) => seekTo(Number(e.target.value))}
                   disabled={!hasSong}
-                  className="aurora-range flex-1"
+                  className="aurora-range aurora-focus flex-1"
                   style={{ ["--aurora-range-pct" as string]: `${seekPct}%` }}
                   aria-label="Seek"
                 />
@@ -298,7 +298,7 @@ export function PlayerBar() {
                   step={0.01}
                   value={volume}
                   onChange={(e) => setVolume(Number(e.target.value))}
-                  className="aurora-range flex-1 min-w-0"
+                  className="aurora-range aurora-focus flex-1 min-w-0"
                   style={{ ["--aurora-range-pct" as string]: `${volumePct}%` }}
                   aria-label="Volume"
                 />
