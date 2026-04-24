@@ -39,3 +39,17 @@ dist/
 
 # Logs
 *.log
+
+.claude/skills/ui-ux-pro-max/
+
+
+# Database backups
+backend/*.db.bak*
+
+# User-uploaded content
+frontend/public/playlist-images/
+
+# Old handoff docs (historical, not source)
+docs/aurora-handoff-*.md
+
+.claude/settings.local.json
