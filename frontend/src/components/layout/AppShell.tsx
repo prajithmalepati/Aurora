@@ -66,15 +66,7 @@ export function AppShell({ children }: AppShellProps) {
           {children.sidebar}
         </div>
         <div className="overflow-y-auto relative">
-          {/* Top scrim */}
-          <div
-            className="pointer-events-none sticky top-0 h-6 -mb-6 z-20"
-            style={{
-              background:
-                "linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 100%)",
-            }}
-            aria-hidden="true"
-          />
+          <div className="aurora-scrim-top" aria-hidden="true" />
           {children.main}
         </div>
         <div className="md:col-span-2">{children.playerBar}</div>
