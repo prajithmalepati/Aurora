@@ -83,8 +83,9 @@
   --aurora-purple: var(--aurora-violet);
   --aurora-blue: #7dd3fc;
 
-  /* The signature gradient — appears in exactly 3 places:
-     play button, seek fill, currently-playing title */
+  /* The signature gradient — identity and primary intent only:
+     play button, seek fill, currently-playing title, primary Button fill,
+     Jam buttons, and aurora keyline fades at PlayerBar / Sidebar edges. */
   --aurora-gradient: linear-gradient(135deg, #5eead4 0%, #86efac 55%, #a78bfa 100%);
   --aurora-gradient-soft: linear-gradient(135deg, rgba(94, 234, 212, 0.16) 0%, rgba(134, 239, 172, 0.12) 55%, rgba(167, 139, 250, 0.16) 100%);
 
@@ -509,11 +510,11 @@
    ============================================================ */
 
 .aurora-play-btn {
-  background: var(--aurora-accent-muted) !important;
-  transition: background 200ms ease;
+  background: var(--aurora-gradient) !important;
+  transition: filter 200ms ease;
 }
 .aurora-play-btn:not(:disabled):hover {
-  background: var(--aurora-accent-interactive) !important;
+  filter: brightness(1.12);
 }
 
 /* ============================================================
@@ -527,7 +528,8 @@
   height: 3px;
   border-radius: 999px;
   background:
-    linear-gradient(to right, var(--aurora-accent-muted) 0%, var(--aurora-accent-muted) var(--aurora-range-pct), rgba(255,255,255,0.08) var(--aurora-range-pct), rgba(255,255,255,0.08) 100%);
+    linear-gradient(to right, #5eead4 0%, #86efac 55%, #a78bfa 100%) left top / var(--aurora-range-pct) 100% no-repeat,
+    rgba(255, 255, 255, 0.08);
   outline: none;
   cursor: pointer;
   transition: height 180ms ease;
