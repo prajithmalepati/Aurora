@@ -26,8 +26,8 @@ export function PlaylistItem({ playlist, isActive, onSelect }: PlaylistItemProps
           isActive ? "h-5 opacity-100" : "h-0 opacity-0"
         }`}
         style={{
-          background: "var(--aurora-primary)",
-          boxShadow: isActive ? "0 0 8px var(--aurora-primary-glow)" : "none",
+          background: "var(--aurora-accent-interactive)",
+          boxShadow: isActive ? "0 0 8px var(--aurora-accent-interactive-glow)" : "none",
         }}
         aria-hidden="true"
       />
