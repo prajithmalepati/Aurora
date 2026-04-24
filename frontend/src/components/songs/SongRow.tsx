@@ -94,7 +94,7 @@ export function SongRow({ song, index, animIndex, onPlay }: SongRowProps) {
             className={`absolute inset-0 transition-colors duration-150 pointer-events-none ${
               isCurrentSong
                 ? ""
-                : "group-hover:bg-[var(--aurora-surface-1)]"
+                : "group-hover:bg-[var(--aurora-surface-hover)]"
             }`}
             style={
               isCurrentSong
@@ -133,7 +133,7 @@ export function SongRow({ song, index, animIndex, onPlay }: SongRowProps) {
         <td className="relative px-4 py-3">
           <span
             className={`absolute inset-0 transition-colors duration-150 pointer-events-none ${
-              isCurrentSong ? "" : "group-hover:bg-[var(--aurora-surface-1)]"
+              isCurrentSong ? "" : "group-hover:bg-[var(--aurora-surface-hover)]"
             }`}
             aria-hidden="true"
           />
@@ -160,7 +160,7 @@ export function SongRow({ song, index, animIndex, onPlay }: SongRowProps) {
         <td className="relative px-4 py-3 w-28 text-[12px] text-[var(--aurora-text-secondary)] tabular-nums hidden lg:table-cell">
           <span
             className={`absolute inset-0 transition-colors duration-150 pointer-events-none ${
-              isCurrentSong ? "" : "group-hover:bg-[var(--aurora-surface-1)]"
+              isCurrentSong ? "" : "group-hover:bg-[var(--aurora-surface-hover)]"
             }`}
             aria-hidden="true"
           />
@@ -174,7 +174,7 @@ export function SongRow({ song, index, animIndex, onPlay }: SongRowProps) {
         <td className="relative px-4 py-3 w-40 hidden lg:table-cell">
           <span
             className={`absolute inset-0 transition-colors duration-150 pointer-events-none ${
-              isCurrentSong ? "" : "group-hover:bg-[var(--aurora-surface-1)]"
+              isCurrentSong ? "" : "group-hover:bg-[var(--aurora-surface-hover)]"
             }`}
             aria-hidden="true"
           />
@@ -212,7 +212,7 @@ export function SongRow({ song, index, animIndex, onPlay }: SongRowProps) {
         <td className="relative px-4 py-3 max-w-[200px]">
           <span
             className={`absolute inset-0 transition-colors duration-150 pointer-events-none ${
-              isCurrentSong ? "" : "group-hover:bg-[var(--aurora-surface-1)]"
+              isCurrentSong ? "" : "group-hover:bg-[var(--aurora-surface-hover)]"
             }`}
             aria-hidden="true"
           />
@@ -225,7 +225,7 @@ export function SongRow({ song, index, animIndex, onPlay }: SongRowProps) {
         <td className="relative px-4 py-3 w-32">
           <span
             className={`absolute inset-0 transition-colors duration-150 pointer-events-none ${
-              isCurrentSong ? "" : "group-hover:bg-[var(--aurora-surface-1)]"
+              isCurrentSong ? "" : "group-hover:bg-[var(--aurora-surface-hover)]"
             }`}
             aria-hidden="true"
           />
