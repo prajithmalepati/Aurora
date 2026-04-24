@@ -83,8 +83,8 @@ export function SongRow({ song, index, animIndex, onPlay }: SongRowProps) {
             <span
               className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-7 rounded-r-full"
               style={{
-                background: "var(--aurora-primary)",
-                boxShadow: "0 0 8px var(--aurora-primary-glow)",
+                background: "var(--aurora-accent-interactive)",
+                boxShadow: "0 0 8px var(--aurora-accent-interactive-glow)",
               }}
               aria-hidden="true"
             />

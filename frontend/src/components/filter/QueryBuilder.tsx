@@ -62,7 +62,7 @@ export function QueryBuilder() {
           <div className="flex items-center gap-3 min-w-0">
             <Tag
               className="h-[18px] w-[18px] flex-shrink-0"
-              style={{ color: "var(--aurora-primary)" }}
+              style={{ color: "var(--aurora-accent-interactive)" }}
               strokeWidth={2}
             />
             <span className="font-display text-[26px] leading-none tracking-tight text-[var(--aurora-text)] truncate">

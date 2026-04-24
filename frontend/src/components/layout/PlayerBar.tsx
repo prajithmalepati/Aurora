@@ -124,7 +124,7 @@ export function PlayerBar() {
                 disabled={!hasSong}
                 className="relative h-10 w-10 rounded-full flex items-center justify-center disabled:opacity-25 disabled:pointer-events-none aurora-btn-press aurora-play-btn"
                 style={{
-                  boxShadow: hasSong ? "0 0 20px -6px var(--aurora-primary-glow)" : "none",
+                  boxShadow: hasSong ? "0 0 20px -6px var(--aurora-accent-interactive-glow)" : "none",
                 }}
                 aria-label={isPlaying ? "Pause" : "Play"}
               >
@@ -224,7 +224,7 @@ export function PlayerBar() {
                   className="relative h-11 w-11 rounded-full flex items-center justify-center disabled:opacity-25 disabled:pointer-events-none aurora-btn-press aurora-play-btn"
                   style={{
                     boxShadow: hasSong
-                      ? "0 0 24px -6px var(--aurora-primary-glow)"
+                      ? "0 0 24px -6px var(--aurora-accent-interactive-glow)"
                       : "none",
                   }}
                   aria-label={isPlaying ? "Pause" : "Play"}
@@ -273,7 +273,7 @@ export function PlayerBar() {
               {hasSong && isPlaying && (
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <Equalizer playing={isPlaying} />
-                  <span className="label-micro text-[9.5px] text-[var(--aurora-primary)] whitespace-nowrap opacity-70">
+                  <span className="label-micro text-[9.5px] text-[var(--aurora-accent-interactive)] whitespace-nowrap opacity-70">
                     Playing
                   </span>
                 </div>
