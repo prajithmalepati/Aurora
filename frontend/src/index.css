@@ -91,7 +91,6 @@
   --aurora-text: #e8e6e3;
   --aurora-text-secondary: #8b95a7;
   --aurora-text-tertiary: #4b5563;
-  --aurora-text-disabled: #2a2f3a;
 
   /* Semantic */
   --aurora-danger: #f87171;
@@ -109,9 +108,6 @@
   --aurora-secondary: #8a75c8;                     /* twilight violet */
   --aurora-secondary-hover: #9b88d6;
   --aurora-secondary-glow: rgba(138, 117, 200, 0.15);
-  --aurora-tertiary: #c49a6c;                      /* warm amber — golden-hour aurora */
-  --aurora-tertiary-hover: #d4aa7c;
-  --aurora-tertiary-glow: rgba(196, 154, 108, 0.12);
 
   /* Muted accent — same hue as primary, ~15% less saturated/bright.
      Used for play button fill, seek bar fill, and equalizer bars at rest.
