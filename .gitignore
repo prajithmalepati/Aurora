@@ -52,3 +52,11 @@ frontend/public/playlist-images/
 # Old handoff docs (historical, not source)
 docs/aurora-handoff-*.md
 
+
+
+#  generated artifacts (keep GRAPH_REPORT.md)
+graph.html
+graph.json
+cache/
+cost.json
+manifest.json
