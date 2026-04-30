@@ -123,9 +123,6 @@ export function PlayerBar() {
                 onClick={togglePlay}
                 disabled={!hasSong}
                 className="relative h-10 w-10 rounded-full flex items-center justify-center disabled:opacity-25 disabled:pointer-events-none aurora-btn-press aurora-play-btn"
-                style={{
-                  boxShadow: hasSong ? "0 0 20px -6px var(--aurora-accent-interactive-glow)" : "none",
-                }}
                 aria-label={isPlaying ? "Pause" : "Play"}
               >
                 {isPlaying ? (
@@ -222,11 +219,6 @@ export function PlayerBar() {
                   onClick={togglePlay}
                   disabled={!hasSong}
                   className="relative h-11 w-11 rounded-full flex items-center justify-center disabled:opacity-25 disabled:pointer-events-none aurora-btn-press aurora-play-btn"
-                  style={{
-                    boxShadow: hasSong
-                      ? "0 0 24px -6px var(--aurora-accent-interactive-glow)"
-                      : "none",
-                  }}
                   aria-label={isPlaying ? "Pause" : "Play"}
                 >
                   {isPlaying ? (
