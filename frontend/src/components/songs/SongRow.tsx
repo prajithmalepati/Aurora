@@ -275,8 +275,8 @@ export function SongRow({ song, index, animIndex, onPlay }: SongRowProps) {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
+              variant="destructive"
               onClick={handleDelete}
-              className="bg-[var(--aurora-danger)] text-black hover:bg-[var(--aurora-danger)]/90"
             >
               Delete
             </AlertDialogAction>
