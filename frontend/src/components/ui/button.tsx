@@ -18,7 +18,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       default:
         "text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] bg-white/[0.02] hover:bg-white/[0.04] shadow-[inset_0_0_0_1px_var(--aurora-rim)] hover:shadow-[inset_0_0_0_1px_var(--aurora-rim-bright)]",
       primary:
-        "text-[#050608] shadow-[0_0_22px_-6px_rgba(94,234,212,0.45)] hover:shadow-[0_0_28px_-4px_rgba(94,234,212,0.6)]",
+        "aurora-btn-loud-primary text-[#050608]",
       secondary:
         "text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] bg-white/[0.02] hover:bg-white/[0.04] shadow-[inset_0_0_0_1px_var(--aurora-rim)]",
       ghost:
@@ -37,16 +37,10 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       "icon-sm": "h-7 w-7",
     }
 
-    const primaryStyle =
-      variant === "primary"
-        ? { background: "var(--aurora-gradient)" }
-        : undefined
-
     return (
       <button
         ref={ref}
         className={cn(baseStyles, variants[variant], sizes[size], className)}
-        style={primaryStyle}
         {...props}
       />
     )
