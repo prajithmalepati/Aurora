@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils"
 
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "default" | "primary" | "secondary" | "ghost" | "outline"
+  variant?: "default" | "primary" | "secondary" | "ghost" | "outline" | "destructive"
   size?: "default" | "sm" | "lg" | "icon" | "icon-sm"
 }
 
@@ -25,6 +25,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         "text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] hover:bg-white/[0.03]",
       outline:
         "text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] shadow-[inset_0_0_0_1px_var(--aurora-rim)] hover:shadow-[inset_0_0_0_1px_var(--aurora-rim-bright)]",
+      destructive:
+        "bg-[var(--aurora-danger)] text-[var(--aurora-slate)] shadow-[0_0_22px_-6px_rgba(248,113,113,0.45)] hover:bg-[var(--aurora-danger)]/90 hover:shadow-[0_0_28px_-4px_rgba(248,113,113,0.6)]",
     }
 
     const sizes = {
