@@ -525,11 +525,80 @@
    ============================================================ */
 
 .aurora-play-btn {
-  background: var(--aurora-gradient) !important;
-  transition: filter 200ms ease;
+  position: relative;
+  isolation: isolate;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--aurora-slate);
+  box-shadow:
+    inset 0 0 0 1px var(--aurora-rim-bright),
+    0 0 var(--aurora-button-glow-rest) calc(-1 * var(--aurora-button-glow-spread))
+      var(--aurora-accent-interactive-glow);
+  transition: background 150ms ease, box-shadow 200ms ease, transform 100ms ease;
+}
+.aurora-play-btn::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  z-index: -1;
+  border-radius: inherit;
+  background: radial-gradient(
+    closest-side,
+    var(--aurora-accent-interactive) 0%,
+    var(--aurora-accent-interactive-glow) 55%,
+    transparent 100%
+  );
+  filter: blur(var(--aurora-backlight-blur));
+  opacity: var(--aurora-backlight-rest);
+  transition: opacity 200ms ease;
 }
 .aurora-play-btn:not(:disabled):hover {
-  filter: brightness(1.12);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow:
+    inset 0 0 0 1px var(--aurora-rim-bright),
+    0 0 var(--aurora-button-glow-hover) calc(-1 * var(--aurora-button-glow-spread-hover))
+      var(--aurora-accent-interactive-glow);
+}
+.aurora-play-btn:not(:disabled):hover::before {
+  opacity: var(--aurora-backlight-hover);
+}
+
+/* Primary Button variant — Direction C Frosted Lens.
+   ::before lives here because Tailwind cannot express pseudo-element rules. */
+.aurora-btn-loud-primary {
+  position: relative;
+  isolation: isolate;
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow:
+    inset 0 0 0 1px var(--aurora-rim-bright),
+    0 0 var(--aurora-button-glow-rest) calc(-1 * var(--aurora-button-glow-spread))
+      var(--aurora-accent-interactive-glow);
+  transition: background 150ms ease, box-shadow 200ms ease, transform 100ms ease;
+}
+.aurora-btn-loud-primary::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  z-index: -1;
+  border-radius: inherit;
+  background: radial-gradient(
+    closest-side,
+    var(--aurora-accent-interactive) 0%,
+    var(--aurora-accent-interactive-glow) 55%,
+    transparent 100%
+  );
+  filter: blur(var(--aurora-backlight-blur));
+  opacity: var(--aurora-backlight-rest);
+  transition: opacity 200ms ease;
+}
+.aurora-btn-loud-primary:not(:disabled):hover {
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow:
+    inset 0 0 0 1px var(--aurora-rim-bright),
+    0 0 var(--aurora-button-glow-hover) calc(-1 * var(--aurora-button-glow-spread-hover))
+      var(--aurora-accent-interactive-glow);
+}
+.aurora-btn-loud-primary:not(:disabled):hover::before {
+  opacity: var(--aurora-backlight-hover);
 }
 
 /* ============================================================
@@ -707,16 +776,43 @@
   outline-offset: 2px;
 }
 
-/* Search button — muted teal fill, dark text */
+/* Search button — Direction C Frosted Lens */
 .mix-btn-search {
-  background: var(--aurora-accent-interactive);
+  position: relative;
+  isolation: isolate;
+  background: rgba(255, 255, 255, 0.04);
   color: var(--aurora-slate);
-  box-shadow: 0 0 16px -6px var(--aurora-accent-interactive-glow);
-  transition: all 150ms ease;
+  box-shadow:
+    inset 0 0 0 1px var(--aurora-rim-bright),
+    0 0 var(--aurora-button-glow-rest) calc(-1 * var(--aurora-button-glow-spread))
+      var(--aurora-accent-interactive-glow);
+  transition: background 150ms ease, box-shadow 200ms ease, transform 100ms ease;
+}
+.mix-btn-search::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  z-index: -1;
+  border-radius: inherit;
+  background: radial-gradient(
+    closest-side,
+    var(--aurora-accent-interactive) 0%,
+    var(--aurora-accent-interactive-glow) 55%,
+    transparent 100%
+  );
+  filter: blur(var(--aurora-backlight-blur));
+  opacity: var(--aurora-backlight-rest);
+  transition: opacity 200ms ease;
 }
 .mix-btn-search:hover:not(:disabled) {
-  background: var(--aurora-accent-interactive-hover);
-  box-shadow: 0 0 22px -4px var(--aurora-accent-interactive-glow);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow:
+    inset 0 0 0 1px var(--aurora-rim-bright),
+    0 0 var(--aurora-button-glow-hover) calc(-1 * var(--aurora-button-glow-spread-hover))
+      var(--aurora-accent-interactive-glow);
+}
+.mix-btn-search:hover:not(:disabled)::before {
+  opacity: var(--aurora-backlight-hover);
 }
 
 /* Jam button — muted teal→violet gradient, white text */
@@ -812,6 +908,15 @@
   transform: scale(0.97);
 }
 
+/* Transition restore — .aurora-btn-press above wins the cascade for
+   .aurora-play-btn and .mix-btn-search (both defined earlier in file).
+   Re-declare here so background + box-shadow also animate. */
+.aurora-play-btn,
+.aurora-btn-loud-primary,
+.mix-btn-search {
+  transition: background 150ms ease, box-shadow 200ms ease, transform 100ms ease;
+}
+
 .aurora-btn-glow:hover {
   box-shadow: 0 0 20px -4px var(--aurora-glow);
 }
@@ -827,18 +932,44 @@
   height: 50px;
   padding: 0 28px;
   border-radius: 999px;
-  background: linear-gradient(135deg, var(--aurora-accent-interactive) 0%, var(--aurora-secondary) 100%);
+  position: relative;
+  isolation: isolate;
+  background: rgba(255, 255, 255, 0.04);
   color: #ffffff;
   box-shadow:
-    0 0 28px -8px rgba(77, 184, 164, 0.4),
-    0 0 28px -8px rgba(138, 117, 200, 0.3);
-  transition: transform 200ms ease, box-shadow 200ms ease;
+    inset 0 0 0 1px var(--aurora-rim-bright),
+    0 0 var(--aurora-button-glow-rest) calc(-1 * var(--aurora-button-glow-spread))
+      var(--aurora-accent-interactive-glow),
+    0 0 var(--aurora-button-glow-rest) calc(-1 * var(--aurora-button-glow-spread))
+      var(--aurora-secondary-glow);
+  transition: box-shadow 200ms ease, transform 100ms ease;
+}
+.mix-jam-primary::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  z-index: -1;
+  border-radius: inherit;
+  background: radial-gradient(
+    closest-side,
+    var(--aurora-accent-interactive) 0%,
+    var(--aurora-secondary) 55%,
+    transparent 100%
+  );
+  filter: blur(var(--aurora-backlight-blur));
+  opacity: var(--aurora-backlight-rest);
+  transition: opacity 200ms ease;
 }
 .mix-jam-primary:not(:disabled):hover {
-  transform: scale(1.02);
   box-shadow:
-    0 0 40px -6px rgba(77, 184, 164, 0.55),
-    0 0 40px -6px rgba(138, 117, 200, 0.45);
+    inset 0 0 0 1px var(--aurora-rim-bright),
+    0 0 var(--aurora-button-glow-hover) calc(-1 * var(--aurora-button-glow-spread-hover))
+      var(--aurora-accent-interactive-glow),
+    0 0 var(--aurora-button-glow-hover) calc(-1 * var(--aurora-button-glow-spread-hover))
+      var(--aurora-secondary-glow);
+}
+.mix-jam-primary:not(:disabled):hover::before {
+  opacity: var(--aurora-backlight-hover);
 }
 .mix-jam-primary:not(:disabled):active {
   transform: scale(0.97);
@@ -897,7 +1028,7 @@
   cursor: not-allowed;
 }
 
-/* Jam inside the float zone — gradient pill, ~48px */
+/* Jam inside the float zone — Direction C Frosted Lens, ~48px */
 .mix-float-jam {
   display: inline-flex;
   align-items: center;
@@ -905,17 +1036,45 @@
   height: 48px;
   padding: 0 22px;
   border-radius: 999px;
-  background: linear-gradient(135deg, var(--aurora-accent-interactive) 0%, var(--aurora-secondary) 100%);
+  position: relative;
+  isolation: isolate;
+  background: rgba(255, 255, 255, 0.04);
   color: #ffffff;
-  box-shadow: 0 0 24px -8px rgba(77, 184, 164, 0.45);
   cursor: pointer;
-  transition: transform 200ms ease, box-shadow 200ms ease;
+  box-shadow:
+    inset 0 0 0 1px var(--aurora-rim-bright),
+    0 0 var(--aurora-button-glow-rest) calc(-1 * var(--aurora-button-glow-spread))
+      var(--aurora-accent-interactive-glow),
+    0 0 var(--aurora-button-glow-rest) calc(-1 * var(--aurora-button-glow-spread))
+      var(--aurora-secondary-glow);
+  transition: box-shadow 200ms ease, transform 100ms ease;
+}
+.mix-float-jam::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  z-index: -1;
+  border-radius: inherit;
+  background: radial-gradient(
+    closest-side,
+    var(--aurora-accent-interactive) 0%,
+    var(--aurora-secondary) 55%,
+    transparent 100%
+  );
+  filter: blur(var(--aurora-backlight-blur));
+  opacity: var(--aurora-backlight-rest);
+  transition: opacity 200ms ease;
 }
 .mix-float-jam:not(:disabled):hover {
-  transform: scale(1.03);
   box-shadow:
-    0 0 36px -5px rgba(77, 184, 164, 0.6),
-    0 0 36px -5px rgba(138, 117, 200, 0.45);
+    inset 0 0 0 1px var(--aurora-rim-bright),
+    0 0 var(--aurora-button-glow-hover) calc(-1 * var(--aurora-button-glow-spread-hover))
+      var(--aurora-accent-interactive-glow),
+    0 0 var(--aurora-button-glow-hover) calc(-1 * var(--aurora-button-glow-spread-hover))
+      var(--aurora-secondary-glow);
+}
+.mix-float-jam:not(:disabled):hover::before {
+  opacity: var(--aurora-backlight-hover);
 }
 .mix-float-jam:not(:disabled):active {
   transform: scale(0.97);
