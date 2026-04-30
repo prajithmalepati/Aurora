@@ -148,6 +148,17 @@
     rgba(0, 0, 0, 0.20) 75%,
     rgba(0, 0, 0, 0.00) 100%
   );
+
+  /* ── Button system — Loud-tier scalars (Direction C, Frosted Lens) ──
+     Opacity and length scalars consumed by the Loud-tier recipe in C3.
+     PlayerBar scope overrides --aurora-button-glow-* below. */
+  --aurora-backlight-rest: 0.65;
+  --aurora-backlight-hover: 0.9;
+  --aurora-backlight-blur: 12px;
+  --aurora-button-glow-rest: 28px;
+  --aurora-button-glow-hover: 36px;
+  --aurora-button-glow-spread: 10px;
+  --aurora-button-glow-spread-hover: 6px;
 }
 
 /* Aurora is dark-only. All shadcn primitives derive from --aurora-* tokens.
@@ -373,6 +384,10 @@
 /* PlayerBar top edge glow fade */
 .aurora-keyline-top {
   position: relative;
+  /* Dim the Loud-tier outer halo so the emergent AlbumArt atmosphere
+     reads as the bar's primary mood. Backlight scalars are untouched. */
+  --aurora-button-glow-rest: 14px;
+  --aurora-button-glow-hover: 18px;
 }
 .aurora-keyline-top::before {
   content: '';
