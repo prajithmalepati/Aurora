@@ -53,6 +53,7 @@ frontend/public/playlist-images/
 docs/aurora-handoff-*.md
 
 .claude/settings.local.json
+.claude/settings.json
 
 # graphify generated artifacts (keep GRAPH_REPORT.md)
 graphify-out/graph.html
