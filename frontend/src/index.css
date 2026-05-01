@@ -525,7 +525,6 @@
    ============================================================ */
 
 .aurora-play-btn {
-  position: relative;
   isolation: isolate;
   background: rgba(255, 255, 255, 0.04);
   color: var(--aurora-slate);
