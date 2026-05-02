@@ -104,9 +104,9 @@
 
   /* ── Aurora accent palette — the three voices ──
      Teal (common aurora), violet (common), amber (rarest light). */
-  --aurora-accent-interactive: #4db8a4;             /* smoked teal  */
-  --aurora-accent-interactive-hover: #5ec9b5;
-  --aurora-accent-interactive-glow: rgba(77, 184, 164, 0.18);
+  --aurora-accent-interactive: #2dd4bf;             /* aurora pulse */
+  --aurora-accent-interactive-hover: #5eead4;
+  --aurora-accent-interactive-glow: rgba(45, 212, 191, 0.22);
   --aurora-secondary: #8a75c8;                     /* twilight violet */
   --aurora-secondary-hover: #9b88d6;
   --aurora-secondary-glow: rgba(138, 117, 200, 0.15);
@@ -117,7 +117,7 @@
   --aurora-accent-muted: #459687;
 
   /* Glow — subtle ambient light for hover and focus halos */
-  --aurora-glow: rgba(77, 184, 164, 0.12);
+  --aurora-glow: rgba(45, 212, 191, 0.14);
 
   /* Surfaces — glass panels, cards, elevated containers */
   --aurora-surface: rgba(255, 255, 255, 0.04);
@@ -995,11 +995,11 @@
   background: rgba(15, 15, 18, 0.9);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(77, 184, 164, 0.18);
+  border: 1px solid var(--aurora-accent-interactive-glow);
   box-shadow:
     0 12px 40px -8px rgba(0, 0, 0, 0.75),
     inset 0 0 0 1px rgba(255, 255, 255, 0.04),
-    0 0 28px -10px rgba(77, 184, 164, 0.12);
+    0 0 28px -10px rgba(45, 212, 191, 0.14);
   transition: opacity 200ms ease, transform 200ms ease;
 }
 
