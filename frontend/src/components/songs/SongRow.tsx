@@ -124,7 +124,7 @@ export function SongRow({ song, index, animIndex, onPlay }: SongRowProps) {
               aria-label={`Play ${song.title}`}
               tabIndex={-1}
             >
-              <Play className="h-4 w-4 text-white ml-[2px]" fill="currentColor" strokeWidth={0} />
+              <Play className="h-4 w-4 text-[#050608] ml-[2px]" fill="currentColor" strokeWidth={0} />
             </button>
           )}
         </td>
