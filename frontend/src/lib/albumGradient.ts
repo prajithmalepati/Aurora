@@ -57,7 +57,7 @@ export function albumGradient(seed: string | number): AlbumGradient {
     linear-gradient(${angle}deg, #0a0c11 0%, #06080b 100%)
   `.trim()
 
-  const glow = `hsla(${a.h}, ${a.s}%, ${a.l}%, 0.25)`
+  const glow = `hsla(${a.h}, ${a.s}%, ${a.l}%, 0.32)`
 
   return { background, glow }
 }
