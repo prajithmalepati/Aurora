@@ -18,7 +18,7 @@ Glow color is derived entirely from a procedural hash of the song ID, never samp
 | ID | Severity | Status | Description | Files |
 |----|----------|--------|-------------|-------|
 | G-1 | P1 | deferred | Glow color is content-blind (procedural hash, ignores actual album art pixels) — root cause of per-album inconsistency. True fix = pixel sampling via canvas (requires CORS changes); G-2 lightness floor is the immediate mitigation | albumGradient.ts, PlayerBar.tsx |
-| G-2 | P1 | open | Lightness floor missing: hues with l≤45 at alpha≤0.45 are sub-visible on OLED black | albumGradient.ts |
+| G-2 | P1 | fixed | Lightness floor missing: hues with l≤45 at alpha≤0.45 are sub-visible on OLED black | albumGradient.ts |
 | G-3 | P2 | open | Negative spread (-6px, -4px) tightens shadow footprint for already-dim colors — amplifies G-2 | PlayerBar.tsx:69,184 |
 | G-4 | P2 | deferred | pensive-bouman alpha bump (0.32→0.45) is a palliative, not a fix — ships without addressing root cause. Worktree reviewed 2026-05-23, not merged; G-2 lightness floor is the correct Phase 2 fix | albumGradient.ts worktree |
 | G-5 | P3 | open | AlbumArt.tsx ignores surface parameter added in pensive-bouman | AlbumArt.tsx:24 |
@@ -62,7 +62,7 @@ The most common violation is `#050608` hardcoded as an icon color on play/pause 
 
 | ID | Severity | Status | Description | Files |
 |----|----------|--------|-------------|-------|
-| I-01 | P1 | open | text-[#050608] hardcoded on primary Button variant — propagates to all variant="primary" buttons app-wide. Replace with text-[var(--aurora-slate)] (define token if missing) | button.tsx:21 |
+| I-01 | P1 | fixed | text-[#050608] hardcoded on primary Button variant — propagates to all variant="primary" buttons app-wide. Replace with text-[var(--aurora-slate)] (define token if missing) | button.tsx:21 |
 | I-02 | P2 | open | Same #050608 repeated inline on Play/Pause icons in mobile and desktop PlayerBar | PlayerBar.tsx:134,136,233,235 |
 | I-03 | P2 | open | Same #050608 on SongRow hover play button | SongRow.tsx:127 |
 | I-04 | P2 | open | Same #050608 in ErrorBoundary Reload button inline style | ErrorBoundary.tsx:44 |
