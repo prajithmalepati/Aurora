@@ -271,7 +271,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
             className="w-[168px] h-[168px] rounded-xl flex-shrink-0 aurora-rim overflow-hidden flex items-center justify-center text-5xl"
             style={{
               background: heroImage || showArtGrid ? undefined : heroTileGradient,
-              boxShadow: `0 20px 60px -20px ${heroArt.glow}, inset 0 0 0 1px rgba(255,255,255,0.06)`,
+              boxShadow: `0 20px 60px -20px ${heroArt.glow}, inset 0 0 0 1px var(--aurora-rim)`,
             }}
           >
             {heroImage ? (

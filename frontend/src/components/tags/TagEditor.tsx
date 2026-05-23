@@ -125,7 +125,7 @@ export function TagEditor({ songId, songTitle, currentTags, open, onOpenChange }
               className="max-h-[180px] overflow-y-auto rounded-md"
               style={{
                 boxShadow: "inset 0 0 0 1px var(--aurora-rim)",
-                background: "rgba(255,255,255,0.015)",
+                background: "var(--aurora-surface-inset)",
               }}
             >
               {filteredTags.map((tag) => (

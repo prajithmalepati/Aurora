@@ -208,7 +208,7 @@ function NavItem({ icon, label, active, onClick }: NavItemProps) {
   return (
     <button
       onClick={onClick}
-      className={`group relative w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all duration-200 aurora-focus ${
+      className={`group relative w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors duration-200 aurora-focus ${
         active
           ? "text-[var(--aurora-text)]"
           : "text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)]"
@@ -259,7 +259,7 @@ function FooterAction({ icon, label, onClick }: FooterActionProps) {
   return (
     <button
       onClick={onClick}
-      className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-md text-[12px] text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] transition-all duration-150"
+      className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-md text-[12px] text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] transition-colors duration-150"
       style={{ background: "transparent" }}
       onMouseEnter={(e) => { e.currentTarget.style.background = "var(--aurora-surface-hover)" }}
       onMouseLeave={(e) => { e.currentTarget.style.background = "transparent" }}
@@ -280,7 +280,7 @@ function TagSidebarItem({ name, count, onClick }: TagSidebarItemProps) {
   return (
     <button
       onClick={onClick}
-      className="group relative w-full flex items-center gap-2 px-3 py-[6px] rounded-md text-left text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] transition-all duration-150"
+      className="group relative w-full flex items-center gap-2 px-3 py-[6px] rounded-md text-left text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] transition-colors duration-150"
     >
       <span
         className="absolute inset-0 rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none"
