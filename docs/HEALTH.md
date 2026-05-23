@@ -90,7 +90,7 @@ The most common violation is `#050608` hardcoded as an icon color on play/pause 
 
 | ID | Severity | Status | Description |
 |----|----------|--------|-------------|
-| WF-001 | P2 | open | GRAPH_REPORT.md is 25 days stale. 3 commits landed on source since last graphify run (AlbumArt bleed, token retune, button fix). Run `graphify update .` |
+| WF-001 | P2 | fixed | GRAPH_REPORT.md refreshed 2026-05-23 via `graphify update .` — 390 nodes, 563 edges, 60 communities |
 | WF-002 | P2 | fixed | HANDOFF.md last entry is Session 15a (April 23). Session 16 completed but handoff never updated. Breaks continuity. |
 | WF-003 | P3 | fixed | Branch claude/pensive-bouman-c15aea deleted 2026-05-23 (Session 18) |
 
