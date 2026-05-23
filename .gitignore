@@ -55,6 +55,10 @@ docs/aurora-handoff-*.md
 
 
 
+
+# Obsidian vault (personal notes, not project source)
+.obsidian/
+
 #  generated artifacts (keep GRAPH_REPORT.md)
 graph.html
 graph.json
