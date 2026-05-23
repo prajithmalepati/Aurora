@@ -41,7 +41,7 @@ export class ErrorBoundary extends Component<Props, State> {
             className="mt-2 px-5 py-2 rounded-full text-[12px] font-semibold aurora-btn-press"
             style={{
               background: "var(--aurora-accent-interactive)",
-              color: "#050608",
+              color: "var(--aurora-slate)",
             }}
           >
             Reload
