@@ -146,7 +146,7 @@ export function ScanDialog({ open, onOpenChange }: ScanDialogProps) {
                 <div className="flex items-center gap-2 text-[13px]">
                   <span
                     className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: "#5eead4", boxShadow: "0 0 6px #5eead4" }}
+                    style={{ backgroundColor: "var(--aurora-accent-interactive-hover)", boxShadow: "0 0 6px var(--aurora-accent-interactive-hover)" }}
                   />
                   <span className="text-[var(--aurora-text)] tabular-nums">
                     {state.results.imported} imported
