@@ -1,5 +1,22 @@
 # Aurora — Session Handoff
 
+## Completed This Session (2026-05-23 — Session 20)
+
+### features.json closeout + doc audit
+
+Merged `health-p3-fixes` → master.
+
+Verified f001 (filter case-sensitivity) and f006 (CORS lockdown) — both already implemented in prior commits, never marked done in features.json. Updated features.json only; no code changes needed.
+
+**All features.json items: done (f001–f007).**
+
+JOURNAL.md updated with missed mistake entries (G-3 skip, glob pattern bug, Edit old_string line-number issue, missing HANDOFF entry).
+
+**Current state:** master clean, no open branches, all planned work complete.
+**Remaining:** low-priority items in docs/HEALTH.md (G-6, I-10, A-07, I-13, WF-001).
+
+---
+
 ## Completed This Session (2026-05-23 — Session 19)
 
 ### P3 fixes + audit cleanup
