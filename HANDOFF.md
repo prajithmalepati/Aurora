@@ -1,5 +1,35 @@
 # Aurora — Session Handoff
 
+## Completed This Session (2026-05-23 — Session 19)
+
+### P3 fixes + audit cleanup
+
+Merged `health-p2-fixes` → master. Executed remaining P3 issues from holistic audit.
+
+**Fixes shipped (9 issues):**
+- G-3: PlayerBar glow — negative spread `(-4px/-6px)` → `0` (wider footprint)
+- A-04: `transition-all` → specific props on NavItem, FooterAction, TagSidebarItem, SongRow play btn, IconBtn, QueryBuilder chips, PlaylistItem
+- A-05: Sonner slide-in cubic-bezier → `var(--ease-spring)` token
+- A-06: Motion tokens defined in `:root` (`--duration-*`, `--ease-*`)
+- I-08: SongRow color dot fallback → `var(--aurora-accent-vivid)` + `var(--aurora-accent-interactive-glow)`
+- I-09: `--aurora-surface-inset` defined, applied to ScanDialog + TagEditor
+- I-11: `rgba(255,255,255,0.06)` → `var(--aurora-rim)` in PlayerBar + PlaylistDetail box-shadows
+- I-12: `--font-mono` defined, applied to QueryInput
+- WF-003: pensive-bouman branch deleted
+
+**Deferred:**
+- G-5: AlbumArt surface param (pensive-bouman was rejected, param never existed in master)
+- G-6: PlaylistDetail glow from name (design limitation)
+- A-07: QueryBuilder float zone refactor
+- I-10: heroTileGradient (needs --aurora-surface-1/2 design decision)
+- I-13: One-off font sizes
+- WF-001: graphify refresh (run `graphify update .`)
+
+**Branch:** `health-p3-fixes` (5 commits). Build clean.
+**Next:** Merge `health-p3-fixes` → master, then f001 filter case-sensitivity.
+
+---
+
 ## Completed This Session (2026-05-23 — Session 18)
 
 ### P1 + P2 fixes from holistic audit
