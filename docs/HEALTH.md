@@ -19,9 +19,9 @@ Glow color is derived entirely from a procedural hash of the song ID, never samp
 |----|----------|--------|-------------|-------|
 | G-1 | P1 | deferred | Glow color is content-blind (procedural hash, ignores actual album art pixels) — root cause of per-album inconsistency. True fix = pixel sampling via canvas (requires CORS changes); G-2 lightness floor is the immediate mitigation | albumGradient.ts, PlayerBar.tsx |
 | G-2 | P1 | fixed | Lightness floor missing: hues with l≤45 at alpha≤0.45 are sub-visible on OLED black | albumGradient.ts |
-| G-3 | P2 | open | Negative spread (-6px, -4px) tightens shadow footprint for already-dim colors — amplifies G-2 | PlayerBar.tsx:69,184 |
+| G-3 | P2 | fixed | Negative spread (-6px, -4px) tightens shadow footprint for already-dim colors — amplifies G-2 | PlayerBar.tsx:69,184 |
 | G-4 | P2 | deferred | pensive-bouman alpha bump (0.32→0.45) is a palliative, not a fix — ships without addressing root cause. Worktree reviewed 2026-05-23, not merged; G-2 lightness floor is the correct Phase 2 fix | albumGradient.ts worktree |
-| G-5 | P3 | open | AlbumArt.tsx ignores surface parameter added in pensive-bouman | AlbumArt.tsx:24 |
+| G-5 | P3 | deferred | AlbumArt.tsx ignores surface parameter added in pensive-bouman — worktree was rejected, param was never merged | AlbumArt.tsx:24 |
 | G-6 | P3 | open | PlaylistDetail hero glow seeded from playlist name string, not constituent song art | PlaylistDetail.tsx:76 |
 
 ---
@@ -49,9 +49,9 @@ The dominant easing throughout the app is the CSS `ease` keyword, with the syste
 | A-01 | P2 | fixed | aurora-fade-up keyframe runs at 420ms — sluggish for view mount entrance. Reduce to 300ms (--duration-enter) | index.css |
 | A-02 | P2 | fixed | Sonner toast height transition is 400ms on both in and out. Slowest transition in system. Reduce to 300ms | index.css |
 | A-03 | P2 | fixed | Sidebar NavItem active-bar uses transition-all duration-300. 300ms too slow for nav click response. Change to transition-[height,opacity] duration-200 | Sidebar.tsx |
-| A-04 | P3 | open | transition-all on 9+ elements (NavItem, FooterAction, TagSidebarItem, SongRow play btn, IconBtn, QueryBuilder chips). Animates non-animating properties, wastes composite budget | Sidebar.tsx, SongRow.tsx, QueryBuilder.tsx |
-| A-05 | P3 | open | Sonner toast slide-in uses cubic-bezier(0.16,1,0.3,1) — only place this curve appears, not aligned with system. Adopt as --ease-spring or replace with --ease-expressive | index.css |
-| A-06 | P3 | open | No motion tokens in :root. All durations and easings hardcoded as literals across 40+ rules. Prevents global tuning, causes drift | index.css |
+| A-04 | P3 | fixed | transition-all on 9+ elements (NavItem, FooterAction, TagSidebarItem, SongRow play btn, IconBtn, QueryBuilder chips). Animates non-animating properties, wastes composite budget | Sidebar.tsx, SongRow.tsx, QueryBuilder.tsx |
+| A-05 | P3 | fixed | Sonner toast slide-in uses cubic-bezier(0.16,1,0.3,1) — only place this curve appears, not aligned with system. Now references --ease-spring | index.css |
+| A-06 | P3 | fixed | No motion tokens in :root. All durations and easings hardcoded as literals across 40+ rules. Prevents global tuning, causes drift | index.css |
 | A-07 | P3 | open | QueryBuilder float zone uses JSX inline opacity/transform + CSS class transition — dual source of truth. JS should only toggle a class; animation should live entirely in CSS | QueryBuilder.tsx, index.css |
 
 ---
@@ -69,11 +69,11 @@ The most common violation is `#050608` hardcoded as an icon color on play/pause 
 | I-05 | P2 | fixed | rgba(6,7,9,0.80) raw magic color for PlayerBar and AppShell hamburger backgrounds. Defined --aurora-surface-bar in index.css | PlayerBar.tsx:40, AppShell.tsx:29 |
 | I-06 | P2 | fixed | backgroundColor: "#5eead4" raw hex in ScanDialog results dot | ScanDialog.tsx:149 |
 | I-07 | P2 | fixed | bg-[#050608]/60 on Sidebar aside — unregistered value, use --aurora-obsidian or --aurora-surface-0 | Sidebar.tsx:52 |
-| I-08 | P3 | open | Playlist color dot fallbacks use "#5eead4" and "#a78bfa" literals | SongRow.tsx:192, QueryBuilder.tsx:217 |
-| I-09 | P3 | open | rgba(255,255,255,0.02) and rgba(255,255,255,0.015) as surface backgrounds — below --aurora-surface (0.04), no token for sub-surface inset | ScanDialog.tsx:141, TagEditor.tsx:128 |
-| I-10 | P3 | open | heroTileGradient uses opaque rgba colors approximating --aurora-surface-1/2 but with blue tint offset | PlaylistDetail.tsx:88-89 |
-| I-11 | P3 | open | rgba(255,255,255,0.06) in boxShadow strings — equals --aurora-rim but written inline as raw rgba | PlaylistDetail.tsx:274, PlayerBar.tsx:69,184 |
-| I-12 | P3 | open | No --font-mono token. Mono stack duplicated: CSS class (.mix-kbd) vs inline style (QueryInput.tsx). No single source of truth | QueryInput.tsx:67, ScanDialog.tsx:189 |
+| I-08 | P3 | fixed | Playlist color dot fallbacks use "#5eead4" and "#a78bfa" literals — SongRow fixed; QueryBuilder:217 deferred (hex alpha template literal pattern incompatible with CSS vars) | SongRow.tsx:192, QueryBuilder.tsx:217 |
+| I-09 | P3 | fixed | rgba(255,255,255,0.02) and rgba(255,255,255,0.015) as surface backgrounds — defined --aurora-surface-inset, applied to ScanDialog + TagEditor | ScanDialog.tsx:141, TagEditor.tsx:128 |
+| I-10 | P3 | open | heroTileGradient uses opaque rgba colors approximating --aurora-surface-1/2 but with blue tint offset — needs --aurora-surface-1/2 token design decision | PlaylistDetail.tsx:88-89 |
+| I-11 | P3 | fixed | rgba(255,255,255,0.06) in boxShadow strings — replaced with var(--aurora-rim) in PlayerBar + PlaylistDetail | PlaylistDetail.tsx:274, PlayerBar.tsx:69,184 |
+| I-12 | P3 | fixed | No --font-mono token. Defined in :root, applied to QueryInput.tsx inline style | QueryInput.tsx:67, ScanDialog.tsx:189 |
 | I-13 | P3 | open | One-off font sizes with single use: text-[9.5px], text-[10.5px], text-[12.5px], text-[17px] — break informal type scale | ScanDialog.tsx, PlayerBar.tsx, Sidebar.tsx, QueryBuilder.tsx |
 
 ---
@@ -92,7 +92,7 @@ The most common violation is `#050608` hardcoded as an icon color on play/pause 
 |----|----------|--------|-------------|
 | WF-001 | P2 | open | GRAPH_REPORT.md is 25 days stale. 3 commits landed on source since last graphify run (AlbumArt bleed, token retune, button fix). Run `graphify update .` |
 | WF-002 | P2 | fixed | HANDOFF.md last entry is Session 15a (April 23). Session 16 completed but handoff never updated. Breaks continuity. |
-| WF-003 | P3 | open | Branch claude/pensive-bouman-c15aea still exists locally (worktree removed 2026-05-23, branch not deleted) |
+| WF-003 | P3 | fixed | Branch claude/pensive-bouman-c15aea deleted 2026-05-23 (Session 18) |
 
 ---
 
