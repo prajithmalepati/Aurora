@@ -82,7 +82,7 @@ export function QueryBuilder() {
 
           <button
             onClick={() => setQuickTagEditorOpen(true)}
-            className="h-8 px-4 rounded-full text-[12px] font-semibold inline-flex items-center gap-1.5 flex-shrink-0 transition-all duration-150 aurora-btn-press"
+            className="h-8 px-4 rounded-full text-[12px] font-semibold inline-flex items-center gap-1.5 flex-shrink-0 transition-colors duration-150 aurora-btn-press"
             style={{
               background: "var(--aurora-surface)",
               boxShadow: "inset 0 0 0 1px var(--aurora-surface-border)",
@@ -142,7 +142,7 @@ export function QueryBuilder() {
             disabled={loading}
             title="Shuffle & play"
             aria-label="Shuffle and play"
-            className="h-8 w-8 rounded-full flex items-center justify-center text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] transition-all duration-150 aurora-btn-press disabled:opacity-[0.55]"
+            className="h-8 w-8 rounded-full flex items-center justify-center text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] transition-colors duration-150 aurora-btn-press disabled:opacity-[0.55]"
             style={{
               background: "var(--aurora-surface)",
               boxShadow: "inset 0 0 0 1px var(--aurora-surface-border)",
@@ -225,7 +225,7 @@ export function QueryBuilder() {
                             : playlist.name.toLowerCase()
                         )
                       }
-                      className="flex-shrink-0 whitespace-nowrap text-[11px] font-medium px-2.5 py-[2px] rounded-full transition-all duration-150 inline-flex items-center gap-1.5 text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)]"
+                      className="flex-shrink-0 whitespace-nowrap text-[11px] font-medium px-2.5 py-[2px] rounded-full transition-colors duration-150 inline-flex items-center gap-1.5 text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)]"
                       style={{
                         border: `1px solid ${color}30`,
                       }}

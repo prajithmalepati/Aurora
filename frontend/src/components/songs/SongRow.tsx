@@ -119,7 +119,7 @@ export function SongRow({ song, index, animIndex, onPlay }: SongRowProps) {
           {/* Circular play button — positioned in td (td has relative), fades in on hover */}
           {!isCurrentSong && (
             <button
-              className="aurora-play-btn absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-150 hover:scale-105"
+              className="aurora-play-btn absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-[opacity,transform] duration-150 hover:scale-105"
               onClick={(e) => { e.stopPropagation(); handlePlay() }}
               aria-label={`Play ${song.title}`}
               tabIndex={-1}
@@ -189,8 +189,8 @@ export function SongRow({ song, index, animIndex, onPlay }: SongRowProps) {
                     <span
                       className="w-[5px] h-[5px] rounded-sm flex-shrink-0"
                       style={{
-                        backgroundColor: playlist.color || "#5eead4",
-                        boxShadow: `0 0 4px ${playlist.color || "#5eead4"}60`,
+                        backgroundColor: playlist.color || "var(--aurora-accent-vivid)",
+                        boxShadow: playlist.color ? `0 0 4px ${playlist.color}60` : "0 0 4px var(--aurora-accent-interactive-glow)",
                       }}
                     />
                     {playlist.name}
@@ -314,7 +314,7 @@ function IconBtn({ children, label, danger, onClick }: IconBtnProps) {
       onClick={onClick}
       title={label}
       aria-label={label}
-      className={`aurora-focus h-7 w-7 rounded-md flex items-center justify-center transition-all duration-150 ${
+      className={`aurora-focus h-7 w-7 rounded-md flex items-center justify-center transition-colors duration-150 ${
         danger
           ? "text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-danger)] hover:bg-[var(--aurora-danger)]/10"
           : "text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-text)] hover:bg-white/[0.04]"

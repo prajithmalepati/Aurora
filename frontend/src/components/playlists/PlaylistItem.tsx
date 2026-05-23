@@ -14,7 +14,7 @@ export function PlaylistItem({ playlist, isActive, onSelect }: PlaylistItemProps
   return (
     <button
       onClick={() => onSelect(playlist.id)}
-      className={`group relative w-full flex items-center gap-2.5 px-3 py-[7px] rounded-md text-left transition-all duration-200 ${
+      className={`group relative w-full flex items-center gap-2.5 px-3 py-[7px] rounded-md text-left transition-colors duration-200 ${
         isActive
           ? "text-[var(--aurora-text)]"
           : "text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)]"
@@ -22,7 +22,7 @@ export function PlaylistItem({ playlist, isActive, onSelect }: PlaylistItemProps
     >
       {/* Active indicator — 3px left bar, solid primary */}
       <span
-        className={`absolute left-0 top-1/2 -translate-y-1/2 w-[3px] rounded-r-full transition-all duration-300 ${
+        className={`absolute left-0 top-1/2 -translate-y-1/2 w-[3px] rounded-r-full transition-[height,opacity] duration-200 ${
           isActive ? "h-5 opacity-100" : "h-0 opacity-0"
         }`}
         style={{
