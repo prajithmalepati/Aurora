@@ -59,6 +59,9 @@ docs/aurora-handoff-*.md
 # Obsidian vault (personal notes, not project source)
 .obsidian/
 
+# Visual brainstorming companion sessions
+.
+
 #  generated artifacts (keep GRAPH_REPORT.md)
 graph.html
 graph.json
