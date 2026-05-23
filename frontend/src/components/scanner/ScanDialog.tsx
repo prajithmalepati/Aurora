@@ -138,7 +138,7 @@ export function ScanDialog({ open, onOpenChange }: ScanDialogProps) {
             <div
               className="rounded-lg p-4 space-y-3"
               style={{
-                background: "rgba(255,255,255,0.02)",
+                background: "var(--aurora-surface-inset)",
                 boxShadow: "inset 0 0 0 1px var(--aurora-rim)",
               }}
             >

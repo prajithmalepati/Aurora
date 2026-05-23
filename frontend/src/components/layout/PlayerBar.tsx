@@ -66,7 +66,7 @@ export function PlayerBar() {
                   size="sm"
                   style={{
                     boxShadow: hasSong
-                      ? `0 0 16px -4px ${art.glow}, inset 0 0 0 1px rgba(255,255,255,0.06)`
+                      ? `0 0 16px 0 ${art.glow}, inset 0 0 0 1px var(--aurora-rim)`
                       : "inset 0 0 0 1px rgba(255,255,255,0.05)",
                   }}
                 />
@@ -181,7 +181,7 @@ export function PlayerBar() {
                   size="md"
                   style={{
                     boxShadow: hasSong
-                      ? `0 0 24px -6px ${art.glow}, inset 0 0 0 1px rgba(255,255,255,0.06)`
+                      ? `0 0 24px 0 ${art.glow}, inset 0 0 0 1px var(--aurora-rim)`
                       : "inset 0 0 0 1px rgba(255,255,255,0.05)",
                   }}
                 />

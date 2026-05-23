@@ -64,7 +64,7 @@ export function QueryInput() {
         onKeyDown={handleKeyDown}
         placeholder="slow AND (rock OR anime) NOT sad"
         className="aurora-focus w-full bg-transparent border-0 pl-4 pr-9 py-2.5 text-[14px] text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-tertiary)] placeholder:font-display-italic placeholder:text-[13px]"
-        style={{ fontFamily: "ui-monospace, 'SF Mono', 'Menlo', monospace" }}
+        style={{ fontFamily: "var(--font-mono)" }}
       />
       {showIndicator && (
         <span className="absolute right-2.5 top-1/2 -translate-y-1/2">
