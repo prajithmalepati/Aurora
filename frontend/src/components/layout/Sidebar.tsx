@@ -49,7 +49,7 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
 
   return (
     <>
-      <aside className="w-60 h-full flex flex-col bg-[#050608]/60 backdrop-blur-xl">
+      <aside className="w-60 h-full flex flex-col bg-[var(--aurora-obsidian)]/60 backdrop-blur-xl">
         {/* Brand lockup */}
         <div className="px-6 pt-7 pb-5">
           <button
@@ -216,7 +216,7 @@ function NavItem({ icon, label, active, onClick }: NavItemProps) {
     >
       {/* Active indicator — 3px left bar, solid primary */}
       <span
-        className={`absolute left-0 top-1/2 -translate-y-1/2 w-[3px] rounded-r-full transition-all duration-300 ${
+        className={`absolute left-0 top-1/2 -translate-y-1/2 w-[3px] rounded-r-full transition-[height,opacity] duration-200 ${
           active ? "h-5 opacity-100" : "h-0 opacity-0"
         }`}
         style={{
