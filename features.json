@@ -4,8 +4,8 @@
       "id": "f001",
       "name": "Fix filter case sensitivity",
       "description": "Make the filter engine case-insensitive. Lowercase both query terms and tag/playlist names during comparison in backend/app/services/filter_engine.py",
-      "status": "pending",
-      "passes": false,
+      "status": "done",
+      "passes": true,
       "scope": "backend",
       "files": ["backend/app/services/filter_engine.py"]
     },
@@ -49,8 +49,8 @@
       "id": "f006",
       "name": "Lock down CORS",
       "description": "In backend/app/main.py, change allow_origins from ['*'] back to ['http://localhost:5173', 'http://localhost:5174']. Test that the frontend still works.",
-      "status": "pending",
-      "passes": false,
+      "status": "done",
+      "passes": true,
       "scope": "backend",
       "files": ["backend/app/main.py"]
     },
