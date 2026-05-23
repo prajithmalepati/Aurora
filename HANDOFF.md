@@ -1,5 +1,34 @@
 # Aurora — Session Handoff
 
+## Completed This Session (2026-05-23 — Session 18)
+
+### P1 + P2 fixes from holistic audit
+
+Executed all open P1 and P2 audit issues from `docs/HEALTH.md`. 12 issues fixed.
+
+**P1 (2 — Session 17 carry-over):**
+- G-2: `albumGradient.ts` — glow lightness floor `Math.max(a.l, 60)`
+- I-01: `button.tsx` — `text-[#050608]` → `text-[var(--aurora-slate)]`
+
+**P2 — Animation (3):**
+- A-01: `index.css` — `aurora-fade-up` 420ms → 300ms
+- A-02: `index.css` — Sonner toast height 0.4s → 0.3s
+- A-03: `Sidebar.tsx` — NavItem active-bar `transition-all` → `transition-[height,opacity] duration-200`
+
+**P2 — Token consistency (6):**
+- I-02: `PlayerBar.tsx` — Play/Pause `fill="#050608"` → `fill="currentColor"` + `text-[var(--aurora-slate)]`
+- I-03: `SongRow.tsx` — hover play `text-[#050608]` → `text-[var(--aurora-slate)]`
+- I-04: `ErrorBoundary.tsx` — `color: "#050608"` → `color: "var(--aurora-slate)"`
+- I-05: defined `--aurora-surface-bar`, applied to `PlayerBar.tsx` + `AppShell.tsx`
+- I-06: `ScanDialog.tsx` — `#5eead4` → `var(--aurora-accent-interactive-hover)`
+- I-07: `Sidebar.tsx` — `bg-[#050608]/60` → `bg-[var(--aurora-obsidian)]/60`
+
+**Merges:** `aesthetic-quick-wins` → `master`. Branch: `health-p2-fixes` (7 commits, build clean).
+
+**Next:** Merge `health-p2-fixes` → master, then f001 filter case-sensitivity.
+
+---
+
 ## Completed This Session (2026-05-23 — Session 17)
 
 ### Holistic Audit — Phase 1

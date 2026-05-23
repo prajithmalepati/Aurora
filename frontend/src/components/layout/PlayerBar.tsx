@@ -37,7 +37,7 @@ export function PlayerBar() {
     <div
       className="aurora-keyline-top col-span-1 md:col-span-2 relative"
       style={{
-        background: "rgba(6,7,9,0.80)",
+        background: "var(--aurora-surface-bar)",
         backdropFilter: "blur(12px)",
         WebkitBackdropFilter: "blur(12px)",
       }}
@@ -131,9 +131,9 @@ export function PlayerBar() {
                 aria-label={isPlaying ? "Pause" : "Play"}
               >
                 {isPlaying ? (
-                  <Pause className="h-4 w-4 text-[#050608]" fill="#050608" strokeWidth={0} />
+                  <Pause className="h-4 w-4 text-[var(--aurora-slate)]" fill="currentColor" strokeWidth={0} />
                 ) : (
-                  <Play className="h-4 w-4 ml-[1px] text-[#050608]" fill="#050608" strokeWidth={0} />
+                  <Play className="h-4 w-4 ml-[1px] text-[var(--aurora-slate)]" fill="currentColor" strokeWidth={0} />
                 )}
               </button>
               <button
@@ -230,9 +230,9 @@ export function PlayerBar() {
                   aria-label={isPlaying ? "Pause" : "Play"}
                 >
                   {isPlaying ? (
-                    <Pause className="h-[18px] w-[18px] text-[#050608]" fill="#050608" strokeWidth={0} />
+                    <Pause className="h-[18px] w-[18px] text-[var(--aurora-slate)]" fill="currentColor" strokeWidth={0} />
                   ) : (
-                    <Play className="h-[18px] w-[18px] ml-[2px] text-[#050608]" fill="#050608" strokeWidth={0} />
+                    <Play className="h-[18px] w-[18px] ml-[2px] text-[var(--aurora-slate)]" fill="currentColor" strokeWidth={0} />
                   )}
                 </button>
 

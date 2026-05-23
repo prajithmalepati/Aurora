@@ -46,9 +46,9 @@ The dominant easing throughout the app is the CSS `ease` keyword, with the syste
 
 | ID | Severity | Status | Description | Files |
 |----|----------|--------|-------------|-------|
-| A-01 | P2 | open | aurora-fade-up keyframe runs at 420ms — sluggish for view mount entrance. Reduce to 300ms (--duration-enter) | index.css |
-| A-02 | P2 | open | Sonner toast height transition is 400ms on both in and out. Slowest transition in system. Reduce to 300ms | index.css |
-| A-03 | P2 | open | Sidebar NavItem active-bar uses transition-all duration-300. 300ms too slow for nav click response. Change to transition-[height,opacity] duration-200 | Sidebar.tsx |
+| A-01 | P2 | fixed | aurora-fade-up keyframe runs at 420ms — sluggish for view mount entrance. Reduce to 300ms (--duration-enter) | index.css |
+| A-02 | P2 | fixed | Sonner toast height transition is 400ms on both in and out. Slowest transition in system. Reduce to 300ms | index.css |
+| A-03 | P2 | fixed | Sidebar NavItem active-bar uses transition-all duration-300. 300ms too slow for nav click response. Change to transition-[height,opacity] duration-200 | Sidebar.tsx |
 | A-04 | P3 | open | transition-all on 9+ elements (NavItem, FooterAction, TagSidebarItem, SongRow play btn, IconBtn, QueryBuilder chips). Animates non-animating properties, wastes composite budget | Sidebar.tsx, SongRow.tsx, QueryBuilder.tsx |
 | A-05 | P3 | open | Sonner toast slide-in uses cubic-bezier(0.16,1,0.3,1) — only place this curve appears, not aligned with system. Adopt as --ease-spring or replace with --ease-expressive | index.css |
 | A-06 | P3 | open | No motion tokens in :root. All durations and easings hardcoded as literals across 40+ rules. Prevents global tuning, causes drift | index.css |
@@ -63,12 +63,12 @@ The most common violation is `#050608` hardcoded as an icon color on play/pause 
 | ID | Severity | Status | Description | Files |
 |----|----------|--------|-------------|-------|
 | I-01 | P1 | fixed | text-[#050608] hardcoded on primary Button variant — propagates to all variant="primary" buttons app-wide. Replace with text-[var(--aurora-slate)] (define token if missing) | button.tsx:21 |
-| I-02 | P2 | open | Same #050608 repeated inline on Play/Pause icons in mobile and desktop PlayerBar | PlayerBar.tsx:134,136,233,235 |
-| I-03 | P2 | open | Same #050608 on SongRow hover play button | SongRow.tsx:127 |
-| I-04 | P2 | open | Same #050608 in ErrorBoundary Reload button inline style | ErrorBoundary.tsx:44 |
-| I-05 | P2 | open | rgba(6,7,9,0.80) raw magic color for PlayerBar and AppShell hamburger backgrounds. Not in token set. Define --aurora-surface-bar or alias to --aurora-obsidian at 80% | PlayerBar.tsx:40, AppShell.tsx:29 |
-| I-06 | P2 | open | backgroundColor: "#5eead4" raw hex in ScanDialog results dot | ScanDialog.tsx:149 |
-| I-07 | P2 | open | bg-[#050608]/60 on Sidebar aside — unregistered value, use --aurora-obsidian or --aurora-surface-0 | Sidebar.tsx:52 |
+| I-02 | P2 | fixed | Same #050608 repeated inline on Play/Pause icons in mobile and desktop PlayerBar | PlayerBar.tsx:134,136,233,235 |
+| I-03 | P2 | fixed | Same #050608 on SongRow hover play button | SongRow.tsx:127 |
+| I-04 | P2 | fixed | Same #050608 in ErrorBoundary Reload button inline style | ErrorBoundary.tsx:44 |
+| I-05 | P2 | fixed | rgba(6,7,9,0.80) raw magic color for PlayerBar and AppShell hamburger backgrounds. Defined --aurora-surface-bar in index.css | PlayerBar.tsx:40, AppShell.tsx:29 |
+| I-06 | P2 | fixed | backgroundColor: "#5eead4" raw hex in ScanDialog results dot | ScanDialog.tsx:149 |
+| I-07 | P2 | fixed | bg-[#050608]/60 on Sidebar aside — unregistered value, use --aurora-obsidian or --aurora-surface-0 | Sidebar.tsx:52 |
 | I-08 | P3 | open | Playlist color dot fallbacks use "#5eead4" and "#a78bfa" literals | SongRow.tsx:192, QueryBuilder.tsx:217 |
 | I-09 | P3 | open | rgba(255,255,255,0.02) and rgba(255,255,255,0.015) as surface backgrounds — below --aurora-surface (0.04), no token for sub-surface inset | ScanDialog.tsx:141, TagEditor.tsx:128 |
 | I-10 | P3 | open | heroTileGradient uses opaque rgba colors approximating --aurora-surface-1/2 but with blue tint offset | PlaylistDetail.tsx:88-89 |
@@ -91,8 +91,8 @@ The most common violation is `#050608` hardcoded as an icon color on play/pause 
 | ID | Severity | Status | Description |
 |----|----------|--------|-------------|
 | WF-001 | P2 | open | GRAPH_REPORT.md is 25 days stale. 3 commits landed on source since last graphify run (AlbumArt bleed, token retune, button fix). Run `graphify update .` |
-| WF-002 | P2 | open | HANDOFF.md last entry is Session 15a (April 23). Session 16 completed but handoff never updated. Breaks continuity. |
-| WF-003 | P3 | open | Active worktree claude/pensive-bouman-c15aea is unmerged and unresolved |
+| WF-002 | P2 | fixed | HANDOFF.md last entry is Session 15a (April 23). Session 16 completed but handoff never updated. Breaks continuity. |
+| WF-003 | P3 | open | Branch claude/pensive-bouman-c15aea still exists locally (worktree removed 2026-05-23, branch not deleted) |
 
 ---
 
