@@ -57,7 +57,9 @@ export function albumGradient(seed: string | number): AlbumGradient {
     linear-gradient(${angle}deg, #0a0c11 0%, #06080b 100%)
   `.trim()
 
-  const glow = `hsla(${a.h}, ${a.s}%, ${a.l}%, 0.25)`
+  // Floor at l=60 so glow is always perceptible on OLED black (#06080b).
+  const glowL = Math.max(a.l, 60)
+  const glow = `hsla(${a.h}, ${a.s}%, ${glowL}%, 0.32)`
 
   return { background, glow }
 }

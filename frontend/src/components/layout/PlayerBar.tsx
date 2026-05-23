@@ -60,19 +60,24 @@ export function PlayerBar() {
           <div className="flex flex-col gap-2 px-4 py-3">
             {/* Song info row */}
             <div className="flex items-center gap-3">
-              <AlbumArt
-                song={currentSong!}
-                size="sm"
-                style={{
-                  boxShadow: hasSong
-                    ? `0 0 16px -4px ${art.glow}, inset 0 0 0 1px rgba(255,255,255,0.06)`
-                    : "inset 0 0 0 1px rgba(255,255,255,0.05)",
-                }}
-              />
+              <div key={currentSong.id} className="aurora-song-fade flex-shrink-0">
+                <AlbumArt
+                  song={currentSong!}
+                  size="sm"
+                  style={{
+                    boxShadow: hasSong
+                      ? `0 0 16px -4px ${art.glow}, inset 0 0 0 1px rgba(255,255,255,0.06)`
+                      : "inset 0 0 0 1px rgba(255,255,255,0.05)",
+                  }}
+                />
+              </div>
               <div className="flex flex-col min-w-0 flex-1">
                 {hasSong ? (
                   <>
-                    <span className="font-display text-[15px] leading-tight text-[var(--aurora-text)] truncate">
+                    <span
+                      key={currentSong.id}
+                      className="font-display text-[15px] leading-tight text-[var(--aurora-text)] truncate aurora-song-fade"
+                    >
                       {currentSong.title}
                     </span>
                     <span className="text-[10px] text-[var(--aurora-text-secondary)] truncate">
@@ -170,7 +175,7 @@ export function PlayerBar() {
           <div className="flex items-center h-[80px] px-8 gap-8 aurora-view-enter">
             {/* LEFT: Album art + title/artist */}
             <div className="flex items-center gap-3.5 w-[240px] min-w-[160px] flex-shrink-0">
-              <div className="relative flex-shrink-0">
+              <div key={currentSong.id} className="relative flex-shrink-0 aurora-song-fade">
                 <AlbumArt
                   song={currentSong!}
                   size="md"
@@ -185,7 +190,10 @@ export function PlayerBar() {
               <div className="flex flex-col min-w-0 flex-1">
                 {hasSong ? (
                   <>
-                    <span className="font-display text-[18px] leading-tight text-[var(--aurora-text)] truncate">
+                    <span
+                      key={currentSong.id}
+                      className="font-display text-[18px] leading-tight text-[var(--aurora-text)] truncate aurora-song-fade"
+                    >
                       {currentSong.title}
                     </span>
                     <span className="text-[11px] text-[var(--aurora-text-secondary)] truncate mt-0.5 tracking-wide">

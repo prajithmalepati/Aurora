@@ -18,7 +18,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       default:
         "text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] bg-white/[0.02] hover:bg-white/[0.04] shadow-[inset_0_0_0_1px_var(--aurora-rim)] hover:shadow-[inset_0_0_0_1px_var(--aurora-rim-bright)]",
       primary:
-        "aurora-btn-loud-primary text-[#050608]",
+        "aurora-btn-loud-primary text-[var(--aurora-slate)]",
       secondary:
         "text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] bg-white/[0.02] hover:bg-white/[0.04] shadow-[inset_0_0_0_1px_var(--aurora-rim)]",
       ghost:

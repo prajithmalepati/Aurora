@@ -54,6 +54,13 @@ docs/aurora-handoff-*.md
 
 .claude/settings.local.json
 .claude/settings.json
+.claude/worktrees/
+
+# Obsidian vault (personal notes, not project source)
+.obsidian/
+
+# Visual brainstorming companion sessions
+.superpowers/
 
 # graphify generated artifacts (keep GRAPH_REPORT.md)
 graphify-out/graph.html

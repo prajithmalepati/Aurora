@@ -710,6 +710,15 @@
   animation: aurora-fade-up 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
 
+/* Song-change cross-fade — 150ms opacity ease, fires on key remount */
+@keyframes aurora-song-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.aurora-song-fade {
+  animation: aurora-song-fade 150ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
 @keyframes aurora-pulse-glow {
   0%, 100% { box-shadow: 0 0 24px -6px rgba(94, 234, 212, 0.35); }
   50% { box-shadow: 0 0 36px -4px rgba(94, 234, 212, 0.55); }

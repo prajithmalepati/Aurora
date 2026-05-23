@@ -1,5 +1,28 @@
 # Aurora — Session Handoff
 
+## Completed This Session (2026-05-23 — Session 17)
+
+### Holistic Audit — Phase 1
+
+Dispatched 4 parallel audit agents (Glow/Bleed, Animations, Visual Consistency, Workflow).
+Synthesized findings into `docs/HEALTH.md`.
+
+**Audit results: 29 issues total — 3 P1, 9 P2, 17 P3**
+
+P1 issues (fix next session):
+- G-2: Lightness floor missing in albumGradient.ts — dark art glow invisible on OLED black
+- I-01: #050608 hardcoded on primary Button variant (button.tsx:21) — propagates app-wide
+
+Worktree `claude/pensive-bouman-c15aea`: reviewed, not merged. Alpha bump was palliative;
+G-2 lightness floor is the correct fix. Worktree force-removed.
+
+Branch: `aesthetic-quick-wins` (clean)
+
+## Next Steps
+See `docs/HEALTH.md` for full issue list. Phase 2 implementation plan covers P1 fixes.
+
+---
+
 ## Current State (April 23, 2026 — Session 15a)
 Backend: 100% complete. All endpoints working — Songs CRUD, Tags CRUD + assignment, Playlists CRUD + song management + reorder, Filter (boolean AND/OR/NOT with parentheses), Scanner (folder scan with mutagen, format-aware dedup), Audio streaming. `file_format` column added to songs table (backfilled from file_path extension on startup). `album_art_path` column added — extracted from embedded artwork during scan, deduplicated by SHA-1, served via `GET /api/album-art/{filename}`.
 
