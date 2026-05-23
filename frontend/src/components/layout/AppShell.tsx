@@ -26,7 +26,7 @@ export function AppShell({ children }: AppShellProps) {
         onClick={() => setSidebarOpen(true)}
         className="fixed top-4 left-4 z-50 md:hidden h-9 w-9 rounded-md flex items-center justify-center text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] transition-colors duration-150 aurora-focus"
         style={{
-          background: "rgba(6,7,9,0.8)",
+          background: "var(--aurora-surface-bar)",
           backdropFilter: "blur(12px)",
           boxShadow: "inset 0 0 0 1px var(--aurora-rim)",
         }}
