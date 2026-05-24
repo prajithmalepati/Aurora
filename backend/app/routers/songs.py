@@ -58,9 +58,9 @@ def song_row_to_dict(row: sqlite3.Row) -> dict:
 
 ALLOWED_SORT_FIELDS = {"title", "artist", "album", "duration", "created_at"}
 SORT_COL_MAP = {
-    "title": "s.title",
-    "artist": "s.artist",
-    "album": "s.album",
+    "title": "s.title COLLATE NOCASE",
+    "artist": "s.artist COLLATE NOCASE",
+    "album": "s.album COLLATE NOCASE",
     "duration": "s.duration",
     "created_at": "s.created_at",
 }
@@ -114,7 +114,7 @@ def list_songs(
     if where_clauses:
         query += " WHERE " + " AND ".join(where_clauses)
 
-    query += f" GROUP BY s.id ORDER BY {sort_col} {order_str}"
+    query += f" GROUP BY s.id ORDER BY {sort_col} {order_str}, s.id ASC"
 
     if limit is not None and limit > 0:
         query += " LIMIT ?"
