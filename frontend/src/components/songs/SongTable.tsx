@@ -9,6 +9,7 @@ interface SongTableProps {
   loading?: boolean
   onPlay?: (song: Song, index: number) => void
   animKey?: number
+  showSort?: boolean
 }
 
 const HEADER_CLASS =
@@ -62,7 +63,7 @@ function TableHeader({ sortField, sortOrder, onSort }: TableHeaderProps) {
   )
 }
 
-export function SongTable({ songs, loading = false, onPlay, animKey }: SongTableProps) {
+export function SongTable({ songs, loading = false, onPlay, animKey, showSort = true }: SongTableProps) {
   const sortField = useSongStore((state) => state.sortField)
   const sortOrder = useSongStore((state) => state.sortOrder)
   const sortSongs = useSongStore((state) => state.sortSongs)
@@ -82,7 +83,7 @@ export function SongTable({ songs, loading = false, onPlay, animKey }: SongTable
 
   const sortDropdownValue = `${sortField}-${sortOrder}`
 
-  const toolbar = (
+  const toolbar = showSort ? (
     <div className="flex items-center justify-end px-4 pb-2">
       <div className="flex items-center gap-2">
         <span className="text-[10px] text-[var(--aurora-text-tertiary)] uppercase tracking-wide">Sort</span>
@@ -104,7 +105,7 @@ export function SongTable({ songs, loading = false, onPlay, animKey }: SongTable
         </select>
       </div>
     </div>
-  )
+  ) : null
 
   if (loading) {
     return (
