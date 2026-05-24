@@ -34,6 +34,8 @@ class SongResponse(BaseModel):
     playlists: list[str]
     created_at: str
     updated_at: str
+    start_time_ms: int = 0
+    end_time_ms: int = 0
     position: Optional[int] = None
 
 
@@ -66,10 +68,19 @@ class PlaylistUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1)
     color: Optional[str] = None
     emoji: Optional[str] = None
+    crossfade_enabled: Optional[int] = None
+    crossfade_duration_s: Optional[int] = None
 
 
 class PlaylistSongAdd(BaseModel):
     song_id: int
+    start_time_ms: int = 0
+    end_time_ms: int = 0
+
+
+class PlaylistSongTiming(BaseModel):
+    start_time_ms: int = Field(0, ge=0)
+    end_time_ms: int = Field(0, ge=0)
 
 
 class PlaylistReorder(BaseModel):
@@ -82,6 +93,8 @@ class PlaylistResponse(BaseModel):
     color: Optional[str]
     emoji: Optional[str]
     image_url: Optional[str] = None
+    crossfade_enabled: Optional[int] = None
+    crossfade_duration_s: Optional[int] = None
     song_count: int
     created_at: str
     updated_at: str
