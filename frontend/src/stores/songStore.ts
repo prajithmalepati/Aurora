@@ -9,6 +9,7 @@ type View =
   | { kind: "all-songs" }
   | { kind: "filter" }
   | { kind: "playlist"; playlistId: number }
+  | { kind: "settings" }
 
 type SortField = "title" | "artist" | "album" | "duration" | "created_at"
 
