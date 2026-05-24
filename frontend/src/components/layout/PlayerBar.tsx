@@ -140,7 +140,7 @@ export function PlayerBar() {
               </button>
 
               <button
-                onClick={() => { if (seek > 3) seekTo(0); else previous() }}
+                onClick={() => { if (seek > 3) seekTo(0); else { seekTo(0); previous() } }}
                 disabled={!hasSong}
                 className={transportBtnClass(false)}
                 aria-label="Previous"
@@ -255,7 +255,7 @@ export function PlayerBar() {
                 </button>
 
                 <button
-                  onClick={() => { if (seek > 3) seekTo(0); else previous() }}
+                  onClick={() => { if (seek > 3) seekTo(0); else { seekTo(0); previous() } }}
                   disabled={!hasSong}
                   className={transportBtnClass(false)}
                   aria-label="Previous"

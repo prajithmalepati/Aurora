@@ -105,7 +105,7 @@ export function QueryBuilder() {
         {/* Results */}
         <div>
           {loading ? (
-            <SongTable songs={[]} loading={true} />
+            <SongTable songs={[]} loading={true} showSort={false} />
           ) : error ? (
             <div className="py-16 text-center">
               <p className="font-display-italic text-[18px] text-[var(--aurora-danger)]">{error}</p>
@@ -113,7 +113,7 @@ export function QueryBuilder() {
           ) : results.length === 0 ? (
             <MixEmptyState />
           ) : (
-            <SongTable songs={results} loading={false} onPlay={handlePlaySong} animKey={resultsVersion} />
+            <SongTable songs={results} loading={false} onPlay={handlePlaySong} animKey={resultsVersion} showSort={false} />
           )}
         </div>
       </div>
@@ -291,7 +291,7 @@ export function QueryBuilder() {
             </p>
           </div>
         ) : loading ? (
-          <SongTable songs={[]} loading={true} />
+          <SongTable songs={[]} loading={true} showSort={false} />
         ) : results.length === 0 ? (
           <MixEmptyState />
         ) : (
@@ -299,7 +299,7 @@ export function QueryBuilder() {
             <p className="label-micro mb-3 text-[var(--aurora-text-secondary)]">
               {results.length} {results.length === 1 ? "song" : "songs"}
             </p>
-            <SongTable songs={results} loading={false} onPlay={handlePlaySong} animKey={resultsVersion} />
+            <SongTable songs={results} loading={false} onPlay={handlePlaySong} animKey={resultsVersion} showSort={false} />
           </>
         )}
       </div>
