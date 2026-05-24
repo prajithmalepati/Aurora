@@ -56,92 +56,97 @@ def song_row_to_dict(row: sqlite3.Row) -> dict:
     }
 
 
+ALLOWED_SORT_FIELDS = {"title", "artist", "album", "duration", "created_at"}
+SORT_COL_MAP = {
+    "title": "s.title",
+    "artist": "s.artist",
+    "album": "s.album",
+    "duration": "s.duration",
+    "created_at": "s.created_at",
+}
+
+
 @router.get("/songs")
 def list_songs(
     search: Optional[str] = Query(None),
     limit: int = Query(50, ge=1),
     offset: int = Query(0, ge=0),
+    sort: str = Query("title"),
+    order: str = Query("asc"),
 ):
-    """List all songs with optional search, limit, and offset."""
-    
+    """List all songs with optional search, sort, limit, and offset."""
+    if sort not in ALLOWED_SORT_FIELDS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid sort field. Allowed: {', '.join(sorted(ALLOWED_SORT_FIELDS))}",
+        )
+    if order not in {"asc", "desc"}:
+        raise HTTPException(status_code=400, detail="order must be 'asc' or 'desc'")
+
+    order_str = "ASC" if order == "asc" else "DESC"
+    sort_col = SORT_COL_MAP[sort]
+
     conn = get_db()
     cursor = conn.cursor()
-    
-    # Build the query with LEFT JOINs for tags and playlists
+
     query = """
         SELECT
-            s.id,
-            s.title,
-            s.artist,
-            s.album,
-            s.duration,
-            s.file_path,
-            s.file_format,
-            s.album_art_path,
-            s.source,
+            s.id, s.title, s.artist, s.album, s.duration,
+            s.file_path, s.file_format, s.album_art_path, s.source,
             GROUP_CONCAT(t.name) as tags,
             GROUP_CONCAT(p.id || ':' || p.name) as playlists,
-            s.created_at,
-            s.updated_at
+            s.created_at, s.updated_at
         FROM songs s
         LEFT JOIN song_tags st ON s.id = st.song_id
         LEFT JOIN tags t ON st.tag_id = t.id
         LEFT JOIN playlist_songs ps ON s.id = ps.song_id
         LEFT JOIN playlists p ON ps.playlist_id = p.id
     """
-    
+
     params = []
     where_clauses = []
-    
+
     if search:
         where_clauses.append("(s.title LIKE ? OR s.artist LIKE ?)")
         search_pattern = f"%{search}%"
         params.extend([search_pattern, search_pattern])
-    
+
     if where_clauses:
         query += " WHERE " + " AND ".join(where_clauses)
-    
-    query += " GROUP BY s.id ORDER BY s.title ASC"
-    
+
+    query += f" GROUP BY s.id ORDER BY {sort_col} {order_str}"
+
     if limit is not None and limit > 0:
         query += " LIMIT ?"
         params.append(limit)
-    
+
     if offset is not None and offset >= 0:
         query += " OFFSET ?"
         params.append(offset)
-    
+
     cursor.execute(query, params)
     rows = cursor.fetchall()
-    
-    # Get total count for pagination
-    count_query = """
-        SELECT COUNT(*) as total
-        FROM songs s
-    """
+
+    count_query = "SELECT COUNT(*) as total FROM songs s"
     count_params = []
-    where_clauses = []
-    
+    count_where = []
+
     if search:
-        where_clauses.append("(s.title LIKE ? OR s.artist LIKE ?)")
+        count_where.append("(s.title LIKE ? OR s.artist LIKE ?)")
         search_pattern = f"%{search}%"
         count_params.extend([search_pattern, search_pattern])
-    
-    if where_clauses:
-        count_query += " WHERE " + " AND ".join(where_clauses)
-    
+
+    if count_where:
+        count_query += " WHERE " + " AND ".join(count_where)
+
     cursor.execute(count_query, count_params)
     total = cursor.fetchone()["total"]
-    
+
     conn.close()
-    
+
     data = [song_row_to_dict(row) for row in rows]
-    
-    return {
-        "data": data,
-        "total": total,
-        "message": "ok",
-    }
+
+    return {"data": data, "total": total, "message": "ok"}
 
 
 @router.get("/songs/{song_id}")
