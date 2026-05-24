@@ -10,6 +10,7 @@ interface PlayerState {
   preMuteVolume: number   // volume to restore when unmuting
   seek: number            // current position in seconds
   duration: number        // total duration in seconds
+  repeatMode: "none" | "all" | "one"
 
   playSong: (song: Song, queue?: Song[]) => void
   togglePlay: () => void
@@ -21,7 +22,6 @@ interface PlayerState {
   setDuration: (d: number) => void
   updateSeek: (s: number) => void
   stop: () => void
-  repeatMode: "none" | "all" | "one"
   cycleRepeat: () => void
 }
 
