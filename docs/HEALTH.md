@@ -4,6 +4,7 @@ Living audit of visual and workflow health across Aurora.
 Updated as fixes land. Review the P1 column at every session start.
 
 **Last full audit:** 2026-05-23 (Session 17 — 4 agent parallel audit)
+**Last updated:** 2026-05-24 (Session 21 — offline player features + all remaining open items closed)
 
 **Severity:** `P1` = fix this session | `P2` = fix next 1–2 sessions | `P3` = fix when passing through
 
@@ -22,7 +23,7 @@ Glow color is derived entirely from a procedural hash of the song ID, never samp
 | G-3 | P2 | fixed | Negative spread (-6px, -4px) tightens shadow footprint for already-dim colors — amplifies G-2 | PlayerBar.tsx:69,184 |
 | G-4 | P2 | deferred | pensive-bouman alpha bump (0.32→0.45) is a palliative, not a fix — ships without addressing root cause. Worktree reviewed 2026-05-23, not merged; G-2 lightness floor is the correct Phase 2 fix | albumGradient.ts worktree |
 | G-5 | P3 | deferred | AlbumArt.tsx ignores surface parameter added in pensive-bouman — worktree was rejected, param was never merged | AlbumArt.tsx:24 |
-| G-6 | P3 | open | PlaylistDetail hero glow seeded from playlist name string, not constituent song art | PlaylistDetail.tsx:76 |
+| G-6 | P3 | fixed | PlaylistDetail hero glow seeded from playlist name string, not constituent song art | PlaylistDetail.tsx:76 |
 
 ---
 
@@ -52,7 +53,7 @@ The dominant easing throughout the app is the CSS `ease` keyword, with the syste
 | A-04 | P3 | fixed | transition-all on 9+ elements (NavItem, FooterAction, TagSidebarItem, SongRow play btn, IconBtn, QueryBuilder chips). Animates non-animating properties, wastes composite budget | Sidebar.tsx, SongRow.tsx, QueryBuilder.tsx |
 | A-05 | P3 | fixed | Sonner toast slide-in uses cubic-bezier(0.16,1,0.3,1) — only place this curve appears, not aligned with system. Now references --ease-spring | index.css |
 | A-06 | P3 | fixed | No motion tokens in :root. All durations and easings hardcoded as literals across 40+ rules. Prevents global tuning, causes drift | index.css |
-| A-07 | P3 | open | QueryBuilder float zone uses JSX inline opacity/transform + CSS class transition — dual source of truth. JS should only toggle a class; animation should live entirely in CSS | QueryBuilder.tsx, index.css |
+| A-07 | P3 | fixed | QueryBuilder float zone uses JSX inline opacity/transform + CSS class transition — dual source of truth. JS should only toggle a class; animation should live entirely in CSS | QueryBuilder.tsx, index.css |
 
 ---
 
@@ -71,10 +72,10 @@ The most common violation is `#050608` hardcoded as an icon color on play/pause 
 | I-07 | P2 | fixed | bg-[#050608]/60 on Sidebar aside — unregistered value, use --aurora-obsidian or --aurora-surface-0 | Sidebar.tsx:52 |
 | I-08 | P3 | fixed | Playlist color dot fallbacks use "#5eead4" and "#a78bfa" literals — SongRow fixed; QueryBuilder:217 deferred (hex alpha template literal pattern incompatible with CSS vars) | SongRow.tsx:192, QueryBuilder.tsx:217 |
 | I-09 | P3 | fixed | rgba(255,255,255,0.02) and rgba(255,255,255,0.015) as surface backgrounds — defined --aurora-surface-inset, applied to ScanDialog + TagEditor | ScanDialog.tsx:141, TagEditor.tsx:128 |
-| I-10 | P3 | open | heroTileGradient uses opaque rgba colors approximating --aurora-surface-1/2 but with blue tint offset — needs --aurora-surface-1/2 token design decision | PlaylistDetail.tsx:88-89 |
+| I-10 | P3 | fixed | heroTileGradient uses opaque rgba colors approximating --aurora-surface-1/2 but with blue tint offset — replaced with var(--aurora-surface-3) and var(--aurora-surface-1) tokens | PlaylistDetail.tsx:88-89 |
 | I-11 | P3 | fixed | rgba(255,255,255,0.06) in boxShadow strings — replaced with var(--aurora-rim) in PlayerBar + PlaylistDetail | PlaylistDetail.tsx:274, PlayerBar.tsx:69,184 |
 | I-12 | P3 | fixed | No --font-mono token. Defined in :root, applied to QueryInput.tsx inline style | QueryInput.tsx:67, ScanDialog.tsx:189 |
-| I-13 | P3 | open | One-off font sizes with single use: text-[9.5px], text-[10.5px], text-[12.5px], text-[17px] — break informal type scale | ScanDialog.tsx, PlayerBar.tsx, Sidebar.tsx, QueryBuilder.tsx |
+| I-13 | P3 | fixed | One-off font sizes with single use: text-[9.5px], text-[10.5px], text-[12.5px], text-[17px] — rounded to nearest scale step (10, 11, 13, 18px) | ScanDialog.tsx, PlayerBar.tsx, Sidebar.tsx, QueryBuilder.tsx |
 
 ---
 
@@ -82,7 +83,7 @@ The most common violation is `#050608` hardcoded as an icon color on play/pause 
 
 | Item | Current State | Last Updated | Verdict |
 |------|---------------|--------------|---------|
-| graphify GRAPH_REPORT.md | 550 nodes, 841 edges, 52 communities | 2026-05-23 | CURRENT |
+| graphify GRAPH_REPORT.md | 444 nodes, 576 edges, 91 communities | 2026-05-24 | CURRENT |
 | JOURNAL.md | Session 20 entries present | 2026-05-23 | CURRENT |
 | CONTEXT.md Next-session prep | Reflects Session 20 state | 2026-05-23 | ACCURATE |
 | HANDOFF.md | Last entry: Session 20 | 2026-05-23 | CURRENT |
@@ -90,7 +91,7 @@ The most common violation is `#050608` hardcoded as an icon color on play/pause 
 
 | ID | Severity | Status | Description |
 |----|----------|--------|-------------|
-| WF-001 | P2 | fixed | GRAPH_REPORT.md refreshed 2026-05-23 via full `/graphify` pipeline — 550 nodes, 841 edges, 52 communities |
+| WF-001 | P2 | fixed | GRAPH_REPORT.md refreshed 2026-05-24 via `graphify update .` — 444 nodes, 576 edges, 91 communities |
 | WF-002 | P2 | fixed | HANDOFF.md last entry is Session 15a (April 23). Session 16 completed but handoff never updated. Breaks continuity. |
 | WF-003 | P3 | fixed | Branch claude/pensive-bouman-c15aea deleted 2026-05-23 (Session 18) |
 
