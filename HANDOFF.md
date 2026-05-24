@@ -1,5 +1,28 @@
 # Aurora — Session Handoff
 
+## Completed This Session (2026-05-24 — Session 21)
+
+### Offline player completeness (all 8 plan tasks)
+- **Backend:** `sort` + `order` params on `GET /songs` (COLLATE NOCASE, allowlist-validated, stable `s.id` tiebreaker)
+- **songStore:** `sortField`, `sortOrder`, `sortSongs` — all post-mutation fetches inherit current sort
+- **playerStore:** volume persist to localStorage (read on init, write on change + mute); repeat mode (none/all/one) with `cycleRepeat`; shuffle with Fisher-Yates + queue restore; fixed `previous()` no-op at queue start
+- **useAudioPlayer:** `onend` checks `repeatMode === "one"` to replay vs advance
+- **PlayerBar:** Shuffle + Repeat buttons in both desktop and mobile layouts; `previous` handler always calls `seekTo(0)` for low-seek case (fixed Howl not actually seeking)
+- **SongTable:** sort dropdown + sortable Title/Duration column headers; `showSort={false}` in QueryBuilder (filter results don't have a sortable backing fetch)
+
+### HEALTH.md — all remaining open items closed
+- **G-6:** Hero glow now seeds from first song ID, not playlist name
+- **A-07:** Float zone animation moved entirely to CSS (`mix-float-zone--visible` class); JSX no longer owns opacity/transform
+- **I-10:** `heroTileGradient` raw rgba replaced with `var(--aurora-surface-3)` / `var(--aurora-surface-1)` tokens
+- **I-13:** Half-pixel font sizes rounded to scale: 9.5→10, 10.5→11, 12.5→13, 17→18px
+- **WF-001:** `graphify update .` run — 444 nodes, 576 edges, 91 communities
+
+### State
+- `master` clean, all items done, no open health issues
+- Next: user-driven new features (crossfade, custom playlist playback times, query autocomplete)
+
+---
+
 ## Completed This Session (2026-05-23 — Session 20)
 
 ### features.json closeout + doc audit
