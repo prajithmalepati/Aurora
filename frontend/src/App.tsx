@@ -12,6 +12,7 @@ import { ToastClickDismiss } from "@/components/ui/ToastClickDismiss"
 import { SongTable } from "@/components/songs/SongTable"
 import { PlaylistDetail } from "@/components/playlists/PlaylistDetail"
 import { QueryBuilder } from "@/components/filter/QueryBuilder"
+import { SettingsView } from "@/components/settings/SettingsView"
 import { Search } from "lucide-react"
 import type { Song } from "@/types"
 
@@ -178,6 +179,9 @@ function App() {
 
         {/* Playlist — conditionally mounted (depends on playlistId) */}
         {view.kind === "playlist" && <PlaylistDetail key={view.playlistId} playlistId={view.playlistId} />}
+
+        {/* Settings */}
+        {view.kind === "settings" && <SettingsView />}
       </>
     )
   }

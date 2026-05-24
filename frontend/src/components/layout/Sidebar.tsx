@@ -2,6 +2,7 @@ type View =
   | { kind: "all-songs" }
   | { kind: "filter" }
   | { kind: "playlist"; playlistId: number }
+  | { kind: "settings" }
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { useTagStore } from "@/stores/tagStore"
 import { useFilterStore } from "@/stores/filterStore"
@@ -10,7 +11,7 @@ import { CreatePlaylistDialog } from "@/components/playlists/CreatePlaylistDialo
 import { ScanDialog } from "@/components/scanner/ScanDialog"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useState } from "react"
-import { Library, SlidersHorizontal, Plus, FolderSearch, Music } from "lucide-react"
+import { Library, SlidersHorizontal, Plus, FolderSearch, Music, Settings } from "lucide-react"
 import { AddSongDialog } from "@/components/songs/AddSongDialog"
 
 interface SidebarProps {
@@ -184,6 +185,12 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
             label="Add Song"
             onClick={() => setAddSongOpen(true)}
           />
+          <FooterAction
+            icon={<Settings className="h-3.5 w-3.5" />}
+            label="Settings"
+            active={currentView.kind === "settings"}
+            onClick={() => onViewChange({ kind: "settings" })}
+          />
         </div>
       </aside>
 
@@ -252,19 +259,24 @@ function NavItem({ icon, label, active, onClick }: NavItemProps) {
 interface FooterActionProps {
   icon: React.ReactNode
   label: string
+  active?: boolean
   onClick: () => void
 }
 
-function FooterAction({ icon, label, onClick }: FooterActionProps) {
+function FooterAction({ icon, label, active, onClick }: FooterActionProps) {
   return (
     <button
       onClick={onClick}
-      className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-md text-[12px] text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] transition-colors duration-150"
-      style={{ background: "transparent" }}
-      onMouseEnter={(e) => { e.currentTarget.style.background = "var(--aurora-surface-hover)" }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = "transparent" }}
+      className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-md text-[12px] transition-colors duration-150 ${
+        active
+          ? "text-[var(--aurora-accent-interactive)] bg-[var(--aurora-accent-interactive)]/10"
+          : "text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)]"
+      }`}
+      style={{ background: active ? undefined : "transparent" }}
+      onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = "var(--aurora-surface-hover)" }}
+      onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = "transparent" }}
     >
-      <span className="opacity-60">{icon}</span>
+      <span className={active ? "" : "opacity-60"}>{icon}</span>
       <span className="font-medium tracking-tight">{label}</span>
     </button>
   )
