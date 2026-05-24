@@ -21,6 +21,8 @@ interface PlayerState {
   setDuration: (d: number) => void
   updateSeek: (s: number) => void
   stop: () => void
+  repeatMode: "none" | "all" | "one"
+  cycleRepeat: () => void
 }
 
 function loadStoredVolume(): number {
@@ -39,6 +41,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   preMuteVolume: _initVol > 0 ? _initVol : 0.7,
   seek: 0,
   duration: 0,
+  repeatMode: "none" as "none" | "all" | "one",
 
   playSong: (song, queue) => {
     // Only play songs that have a file_path (audio available)
@@ -64,7 +67,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   next: () => {
-    const { queue, queueIndex } = get()
+    const { queue, queueIndex, repeatMode } = get()
+    // repeat-one is handled by useAudioPlayer onend — pressing Next still advances
     if (queueIndex < queue.length - 1) {
       const nextSong = queue[queueIndex + 1]
       set({
@@ -74,15 +78,23 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         seek: 0,
         duration: nextSong.duration ?? 0,
       })
+    } else if (repeatMode === "all") {
+      const firstSong = queue[0]
+      set({
+        currentSong: firstSong,
+        queueIndex: 0,
+        isPlaying: true,
+        seek: 0,
+        duration: firstSong.duration ?? 0,
+      })
     } else {
-      // End of queue — stop playing
+      // end of queue, no repeat — stop but keep currentSong visible
       set({ isPlaying: false })
     }
   },
 
   previous: () => {
     const { queue, queueIndex, seek } = get()
-    // If more than 3 seconds in, restart current song
     if (seek > 3) {
       set({ seek: 0 })
       return
@@ -96,6 +108,9 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         seek: 0,
         duration: prevSong.duration ?? 0,
       })
+    } else {
+      // at queue start with seek <= 3s — restart current song
+      set({ seek: 0 })
     }
   },
 
@@ -132,4 +147,14 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     queue: [],
     queueIndex: 0,
   }),
+
+  cycleRepeat: () => {
+    const { repeatMode } = get()
+    const nextMode: Record<string, "none" | "all" | "one"> = {
+      none: "all",
+      all: "one",
+      one: "none",
+    }
+    set({ repeatMode: nextMode[repeatMode] })
+  },
 }))
