@@ -23,13 +23,20 @@ interface PlayerState {
   stop: () => void
 }
 
+function loadStoredVolume(): number {
+  const stored = parseFloat(localStorage.getItem("aurora-volume") ?? "")
+  return !isNaN(stored) && stored >= 0 && stored <= 1 ? stored : 0.7
+}
+
+const _initVol = loadStoredVolume()
+
 export const usePlayerStore = create<PlayerState>((set, get) => ({
   currentSong: null,
   queue: [],
   queueIndex: 0,
   isPlaying: false,
-  volume: 0.7,
-  preMuteVolume: 0.7,
+  volume: _initVol,
+  preMuteVolume: _initVol > 0 ? _initVol : 0.7,
   seek: 0,
   duration: 0,
 
@@ -94,7 +101,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
   setVolume: (v) => {
     const clamped = Math.max(0, Math.min(1, v))
-    // Track the last non-zero volume so unmute can restore it
+    localStorage.setItem("aurora-volume", String(clamped))
     if (clamped > 0) {
       set({ volume: clamped, preMuteVolume: clamped })
     } else {
