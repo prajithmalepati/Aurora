@@ -1,91 +1,89 @@
-# Graph Report - D:/AI/projects2/Aurora  (2026-05-23)
+# Graph Report - Aurora  (2026-05-23)
 
 ## Corpus Check
-- 97 files · ~112,297 words
+- 66 files · ~112,288 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 550 nodes · 841 edges · 52 communities detected
-- Extraction: 79% EXTRACTED · 21% INFERRED · 0% AMBIGUOUS · INFERRED: 179 edges (avg confidence: 0.64)
+- 437 nodes · 566 edges · 50 communities detected
+- Extraction: 72% EXTRACTED · 28% INFERRED · 0% AMBIGUOUS · INFERRED: 159 edges (avg confidence: 0.62)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
-- [[_COMMUNITY_Aurora Aesthetic Audit (2026-05-05), PlayerBar.tsx â€” Persistent Bottom Player Bar|Aurora Aesthetic Audit (2026-05-05), PlayerBar.tsx â€” Persistent Bottom Player Bar]]
-- [[_COMMUNITY_Filter Engine (filter_engine.py), Session 15 Completeness Audit|Filter Engine (filter_engine.py), Session 15 Completeness Audit]]
-- [[_COMMUNITY_get_db(), SongResponse|get_db(), SongResponse]]
-- [[_COMMUNITY_error(), success()|error(), success()]]
-- [[_COMMUNITY_file_scanner.py, file_scanner.py|file_scanner.py, file_scanner.py]]
-- [[_COMMUNITY_filter_songs(), filter_engine.py|filter_songs(), filter_engine.py]]
-- [[_COMMUNITY_Design System Principles, Northern Lights Over OLED Black Design System|Design System Principles, Northern Lights Over OLED Black Design System]]
-- [[_COMMUNITY_init_db(), _backfill_album_art()|init_db(), _backfill_album_art()]]
-- [[_COMMUNITY_File Scanner (file_scanner.py), Backend Project Structure|File Scanner (file_scanner.py), Backend Project Structure]]
-- [[_COMMUNITY_songs.py, songs.py|songs.py, songs.py]]
-- [[_COMMUNITY_Aurora Color Palette (CSS Tokens), shadcnui Theme Override|Aurora Color Palette (CSS Tokens), shadcn/ui Theme Override]]
-- [[_COMMUNITY_dropdown-menu.tsx, dropdown-menu.tsx|dropdown-menu.tsx, dropdown-menu.tsx]]
-- [[_COMMUNITY_popover.tsx, popover.tsx|popover.tsx, popover.tsx]]
-- [[_COMMUNITY_albumGradient(), AlbumArt()|albumGradient(), AlbumArt()]]
-- [[_COMMUNITY_table.tsx, table.tsx|table.tsx, table.tsx]]
-- [[_COMMUNITY_ApiError, api.ts|ApiError, api.ts]]
-- [[_COMMUNITY_Fraunces Variable Font Loading, index.html Entry Point|Fraunces Variable Font Loading, index.html Entry Point]]
-- [[_COMMUNITY_alert-dialog.tsx, alert-dialog.tsx|alert-dialog.tsx, alert-dialog.tsx]]
-- [[_COMMUNITY_command.tsx, command.tsx|command.tsx, command.tsx]]
-- [[_COMMUNITY_filterStore.ts, filterStore.ts|filterStore.ts, filterStore.ts]]
-- [[_COMMUNITY_App(), App.tsx|App(), App.tsx]]
-- [[_COMMUNITY_QueryInput.tsx, QueryInput.tsx|QueryInput.tsx, QueryInput.tsx]]
-- [[_COMMUNITY_EditSongDialog.tsx, handleAddToPlaylist()|EditSongDialog.tsx, handleAddToPlaylist()]]
-- [[_COMMUNITY_Alert(), cn()|Alert(), cn()]]
-- [[_COMMUNITY_hashString(), playlistThumbnail()|hashString(), playlistThumbnail()]]
-- [[_COMMUNITY_utils.ts, utils.ts|utils.ts, utils.ts]]
-- [[_COMMUNITY_Sidebar.tsx, Sidebar.tsx|Sidebar.tsx, Sidebar.tsx]]
-- [[_COMMUNITY_Aurora backend entry point., run.py|Aurora backend entry point., run.py]]
-- [[_COMMUNITY_handlePlaySong(), QueryBuilder.tsx|handlePlaySong(), QueryBuilder.tsx]]
-- [[_COMMUNITY_handleFileChange(), PlaylistImagePicker.tsx|handleFileChange(), PlaylistImagePicker.tsx]]
-- [[_COMMUNITY_TableHeader(), SongTable.tsx|TableHeader(), SongTable.tsx]]
-- [[_COMMUNITY_TagChip(), TagChip.tsx|TagChip(), TagChip.tsx]]
-- [[_COMMUNITY_cn(), dialog.tsx|cn(), dialog.tsx]]
-- [[_COMMUNITY_Equalizer(), Equalizer.tsx|Equalizer(), Equalizer.tsx]]
-- [[_COMMUNITY_cn(), input-group.tsx|cn(), input-group.tsx]]
-- [[_COMMUNITY_Skeleton(), skeleton.tsx|Skeleton(), skeleton.tsx]]
-- [[_COMMUNITY_cn(), textarea.tsx|cn(), textarea.tsx]]
-- [[_COMMUNITY_ToastClickDismiss(), ToastClickDismiss.tsx|ToastClickDismiss(), ToastClickDismiss.tsx]]
-- [[_COMMUNITY_useAudioPlayer(), useAudioPlayer.ts|useAudioPlayer(), useAudioPlayer.ts]]
-- [[_COMMUNITY_FastAPI 0.115.12, Uvicorn 0.34.2|FastAPI 0.115.12, Uvicorn 0.34.2]]
-- [[_COMMUNITY_@ Path Alias, Vite Configuration|@/ Path Alias, Vite Configuration]]
-- [[_COMMUNITY_Disabled State Three-Tier System, C3 Disabled Opacity Three-Tier System|Disabled State Three-Tier System, C3: Disabled Opacity Three-Tier System]]
-- [[_COMMUNITY_Canonical Focus Ring (.aurora-focus), C2 Focus Ring Canonical Treatment|Canonical Focus Ring (.aurora-focus), C2: Focus Ring Canonical Treatment]]
-- [[_COMMUNITY_Supported Audio Extensions|Supported Audio Extensions]]
-- [[_COMMUNITY_Frontend Project Structure|Frontend Project Structure]]
-- [[_COMMUNITY_Store Design Principles|Store Design Principles]]
-- [[_COMMUNITY_Aurora Session 4 Handoff|Aurora Session 4 Handoff]]
-- [[_COMMUNITY_PlayerBar Bugs (Session 4)|PlayerBar Bugs (Session 4)]]
-- [[_COMMUNITY_Future Features (Electron, Crossfade, Lyrics)|Future Features (Electron, Crossfade, Lyrics)]]
-- [[_COMMUNITY_Aurora Known Gaps and Bugs|Aurora Known Gaps and Bugs]]
-- [[_COMMUNITY_Aurora Quick Start (Backend + Frontend)|Aurora Quick Start (Backend + Frontend)]]
-- [[_COMMUNITY_Frontend Vite + React Template README|Frontend Vite + React Template README]]
+- [[_COMMUNITY_Community 0|Community 0]]
+- [[_COMMUNITY_Community 1|Community 1]]
+- [[_COMMUNITY_Community 2|Community 2]]
+- [[_COMMUNITY_Community 3|Community 3]]
+- [[_COMMUNITY_Community 4|Community 4]]
+- [[_COMMUNITY_Community 5|Community 5]]
+- [[_COMMUNITY_Community 6|Community 6]]
+- [[_COMMUNITY_Community 7|Community 7]]
+- [[_COMMUNITY_Community 8|Community 8]]
+- [[_COMMUNITY_Community 9|Community 9]]
+- [[_COMMUNITY_Community 10|Community 10]]
+- [[_COMMUNITY_Community 11|Community 11]]
+- [[_COMMUNITY_Community 15|Community 15]]
+- [[_COMMUNITY_Community 18|Community 18]]
+- [[_COMMUNITY_Community 24|Community 24]]
+- [[_COMMUNITY_Community 26|Community 26]]
+- [[_COMMUNITY_Community 27|Community 27]]
+- [[_COMMUNITY_Community 29|Community 29]]
+- [[_COMMUNITY_Community 39|Community 39]]
+- [[_COMMUNITY_Community 40|Community 40]]
+- [[_COMMUNITY_Community 41|Community 41]]
+- [[_COMMUNITY_Community 42|Community 42]]
+- [[_COMMUNITY_Community 49|Community 49]]
+- [[_COMMUNITY_Community 52|Community 52]]
+- [[_COMMUNITY_Community 53|Community 53]]
+- [[_COMMUNITY_Community 54|Community 54]]
+- [[_COMMUNITY_Community 64|Community 64]]
+- [[_COMMUNITY_Community 65|Community 65]]
+- [[_COMMUNITY_Community 66|Community 66]]
+- [[_COMMUNITY_Community 67|Community 67]]
+- [[_COMMUNITY_Community 68|Community 68]]
+- [[_COMMUNITY_Community 69|Community 69]]
+- [[_COMMUNITY_Community 70|Community 70]]
+- [[_COMMUNITY_Community 71|Community 71]]
+- [[_COMMUNITY_Community 72|Community 72]]
+- [[_COMMUNITY_Community 73|Community 73]]
+- [[_COMMUNITY_Community 74|Community 74]]
+- [[_COMMUNITY_Community 75|Community 75]]
+- [[_COMMUNITY_Community 76|Community 76]]
+- [[_COMMUNITY_Community 77|Community 77]]
+- [[_COMMUNITY_Community 78|Community 78]]
+- [[_COMMUNITY_Community 79|Community 79]]
+- [[_COMMUNITY_Community 80|Community 80]]
+- [[_COMMUNITY_Community 81|Community 81]]
+- [[_COMMUNITY_Community 82|Community 82]]
+- [[_COMMUNITY_Community 83|Community 83]]
+- [[_COMMUNITY_Community 84|Community 84]]
+- [[_COMMUNITY_Community 85|Community 85]]
+- [[_COMMUNITY_Community 86|Community 86]]
+- [[_COMMUNITY_Community 87|Community 87]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `get_db()` - 28 edges
-2. `SongResponse` - 24 edges
-3. `PlaylistResponse` - 18 edges
+1. `get_db()` - 27 edges
+2. `SongResponse` - 23 edges
+3. `PlaylistResponse` - 17 edges
 4. `Aurora Aesthetic Audit (2026-05-05)` - 15 edges
-5. `PlaylistCreate` - 14 edges
-6. `PlaylistUpdate` - 14 edges
-7. `PlaylistSongAdd` - 14 edges
-8. `PlaylistReorder` - 14 edges
-9. `error()` - 13 edges
-10. `Filter Engine (filter_engine.py)` - 13 edges
+5. `PlaylistCreate` - 13 edges
+6. `PlaylistUpdate` - 13 edges
+7. `PlaylistSongAdd` - 13 edges
+8. `PlaylistReorder` - 13 edges
+9. `Filter Engine (filter_engine.py)` - 13 edges
+10. `Quick Wins Build Spec (7 Fixes, 5 Commits)` - 12 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `playlistStore (Playlists, Playlist Songs)` --conceptually_related_to--> `PlaylistDetail.tsx â€” Playlist Hero + Song List`  [INFERRED]
-  CLAUDE.md → frontend/src/components/playlists/PlaylistDetail.tsx
-- `useAudioPlayer Hook (Two-Effect Architecture)` --references--> `PlayerBar.tsx â€” Persistent Bottom Player Bar`  [INFERRED]
-  CLAUDE.md → frontend/src/components/layout/PlayerBar.tsx
-- `OLED Void as Ground Plane` --semantically_similar_to--> `Northern Lights Over OLED Black Design System`  [INFERRED] [semantically similar]
-  docs/design-system.md → HANDOFF.md
-- `songStore (Songs, View Routing, CRUD)` --conceptually_related_to--> `SongRow.tsx â€” Song Table Row Component`  [INFERRED]
-  CLAUDE.md → frontend/src/components/songs/SongRow.tsx
+- `get_db()` --calls--> `health_check()`  [INFERRED]
+  backend\app\database.py → backend\app\main.py
+- `filterStore (Filter Query, Results, Jam)` --conceptually_related_to--> `filter_engine.py â€” Boolean Filter Parser`  [INFERRED]
+  CLAUDE.md → backend/app/services/filter_engine.py
 - `filterStore (Filter Query, Results, Jam)` --conceptually_related_to--> `QueryBuilder.tsx â€” Boolean Filter + Mix Page`  [INFERRED]
   CLAUDE.md → frontend/src/components/filter/QueryBuilder.tsx
+- `playerStore (Current Song, Queue, Playback)` --conceptually_related_to--> `PlayerBar.tsx â€” Persistent Bottom Player Bar`  [INFERRED]
+  CLAUDE.md → frontend/src/components/layout/PlayerBar.tsx
+- `useAudioPlayer Hook (Two-Effect Architecture)` --references--> `PlayerBar.tsx â€” Persistent Bottom Player Bar`  [INFERRED]
+  CLAUDE.md → frontend/src/components/layout/PlayerBar.tsx
 
 ## Hyperedges (group relationships)
 - **Song-Tag-Playlist Many-to-Many Relationships** — dm_songs_table, dm_tags_table, dm_playlists_table, dm_playlist_songs_table, dm_song_tags_table [EXTRACTED 1.00]
@@ -100,296 +98,296 @@
 
 ## Communities
 
-### Community 0 - "Aurora Aesthetic Audit (2026-05-05), PlayerBar.tsx â€” Persistent Bottom Player Bar"
-Cohesion: 0.03
-Nodes (102): Aurora Aesthetic Audit (2026-05-05), Â§5.2 AlbumArt Bleed Invisibility (HIGH), Â§5.3 AlbumArt Visual Mass Imbalance (HIGH), Â§5.5 All Songs View Findings (HIGH/MEDIUM), Â§5.8 Dialog Italic Register Misapplication (MEDIUM), Â§5.7 Mix Page Button-Tier Rationalisation (HIGH), Â§5.10 Motion â€” Missing Song-Change Moment (MEDIUM), Â§5.1 PlayerBar Idle State Finding (LOW) (+94 more)
-
-### Community 1 - "Filter Engine (filter_engine.py), Session 15 Completeness Audit"
-Cohesion: 0.04
-Nodes (71): POST /api/filter Endpoint, Playlists CRUD Endpoints, Songs CRUD Endpoints, Tags CRUD Endpoints, Session 15 Completeness Audit, Dead Affordances (EditDialog + addToPlaylist), MediaSession API Missing, Missing File Handling Gap (+63 more)
-
-### Community 2 - "get_db(), SongResponse"
-Cohesion: 0.12
-Nodes (56): BaseModel, get_db(), Get a database connection with row_factory set to sqlite3.Row., FilterRequest, PlaylistCreate, PlaylistDetailResponse, PlaylistReorder, PlaylistResponse (+48 more)
-
-### Community 3 - "error(), success()"
+### Community 0 - "Community 0"
 Cohesion: 0.08
-Nodes (22): handleSubmit(), handlePresetClick(), handleSubmit(), ErrorBoundary, handleDelete(), handleEdit(), handlePlay(), handlePlaySong() (+14 more)
+Nodes (45): BaseModel, get_db(), Get a database connection with row_factory set to sqlite3.Row., filter_endpoint(), Run a boolean tag query and return matching songs.          Accepts a FilterRe, FilterRequest, PlaylistDetailResponse, Pydantic schemas for request/response validation. (+37 more)
 
-### Community 4 - "file_scanner.py, file_scanner.py"
+### Community 1 - "Community 1"
+Cohesion: 0.06
+Nodes (41): Aurora Aesthetic Audit (2026-05-05), Â§5.2 AlbumArt Bleed Invisibility (HIGH), Â§5.3 AlbumArt Visual Mass Imbalance (HIGH), Â§5.5 All Songs View Findings (HIGH/MEDIUM), Â§5.8 Dialog Italic Register Misapplication (MEDIUM), Â§5.7 Mix Page Button-Tier Rationalisation (HIGH), Â§5.10 Motion â€” Missing Song-Change Moment (MEDIUM), Â§5.1 PlayerBar Idle State Finding (LOW) (+33 more)
+
+### Community 2 - "Community 2"
+Cohesion: 0.09
+Nodes (36): POST /api/filter Endpoint, Playlists CRUD Endpoints, Songs CRUD Endpoints, Tags CRUD Endpoints, AddSongDialog Component, EditSongDialog Component, PlaylistDetail Component, QueryBuilder Component (+28 more)
+
+### Community 3 - "Community 3"
+Cohesion: 0.06
+Nodes (35): Session 15 Completeness Audit, Dead Affordances (EditDialog + addToPlaylist), MediaSession API Missing, Missing File Handling Gap, No Bulk Operations Gap, No M3U Export Gap, No Sort Capability Gap, Priority Gap List (17 Items) (+27 more)
+
+### Community 4 - "Community 4"
+Cohesion: 0.25
+Nodes (28): PlaylistCreate, PlaylistReorder, PlaylistResponse, PlaylistSongAdd, PlaylistUpdate, SongResponse, add_song_to_playlist(), create_playlist() (+20 more)
+
+### Community 5 - "Community 5"
+Cohesion: 0.09
+Nodes (28): Holistic Audit Design Spec (2026-05-23), Audit Domain Definitions (4 Domains), Agent 1 â€” Glow/Bleed Audit (Sonnet), Agent 2 â€” Animation Audit (Sonnet), Agent 3 â€” Visual Consistency Audit (Sonnet), Agent 4 â€” Workflow Practices Audit (Haiku), Holistic Audit Phase 1 Plan (4 Parallel Agents), Phase 2 Task 1 â€” G-2 Glow Lightness Floor Fix (+20 more)
+
+### Community 6 - "Community 6"
+Cohesion: 0.11
+Nodes (6): handleSubmit(), handleSubmit(), ErrorBoundary, handleScan(), error(), success()
+
+### Community 7 - "Community 7"
 Cohesion: 0.12
-Nodes (23): _detect_m4a_format(), extract_album_art(), extract_metadata(), _first_or_none(), format_tier(), import_scanned_songs(), File scanner for audio files using mutagen., Return quality rank for a file_format string. Higher = better quality. (+15 more)
+Nodes (18): Aurora Architecture (Backend + Frontend), Aurora Project Overview, Dual Audio Bug Root Cause (isPlaying effect dep), filterStore (Filter Query, Results, Jam), graphify Knowledge Graph Integration, playerStore (Current Song, Queue, Playback), playlistStore (Playlists, Playlist Songs), Aurora Development Rules (+10 more)
 
-### Community 5 - "filter_songs(), filter_engine.py"
-Cohesion: 0.2
-Nodes (11): build_tag_set(), evaluate_song(), filter_songs(), parse_query(), Filter engine for boolean tag queries., Parse a user query string into a boolean expression.          Handles quoted s, Build a complete tag set for a song from CSV strings.          Combines explic, Evaluate whether a song's tag set satisfies the boolean expression.          U (+3 more)
-
-### Community 6 - "Design System Principles, Northern Lights Over OLED Black Design System"
+### Community 8 - "Community 8"
 Cohesion: 0.15
 Nodes (13): OLED Black Theme (Session 3), Atmosphere Fixed Content Quiet (Principle 5), Aurora Gradient Definition, Aurora Gradient as Meaning (Principle 2), Historical Design Decisions (Resolved), Muted at Rest Bright on Hover (Principle 3), OLED Void as Ground Plane, Design System Principles (+5 more)
 
-### Community 7 - "init_db(), _backfill_album_art()"
-Cohesion: 0.24
-Nodes (8): _backfill_album_art(), init_db(), SQLite database connection and initialization., Extract and store album art for any songs missing it. Runs once per song., Initialize the database — create tables if they don't exist., health_check(), FastAPI application factory., startup()
-
-### Community 8 - "File Scanner (file_scanner.py), Backend Project Structure"
+### Community 9 - "Community 9"
 Cohesion: 0.18
 Nodes (12): CORS Configuration, POST /api/scan Endpoint, extract_metadata Function, File Scanner (file_scanner.py), scan_folder Function, Backend Implementation Phases, Backend Project Structure, database.py Module (+4 more)
 
-### Community 9 - "songs.py, songs.py"
-Cohesion: 0.42
-Nodes (9): create_song(), delete_song(), get_song(), _get_utc_now(), list_songs(), serve_album_art(), song_row_to_dict(), stream_song() (+1 more)
+### Community 10 - "Community 10"
+Cohesion: 0.22
+Nodes (8): _backfill_album_art(), init_db(), SQLite database connection and initialization., Extract and store album art for any songs missing it. Runs once per song., Initialize the database — create tables if they don't exist., health_check(), FastAPI application factory., startup()
 
-### Community 10 - "Aurora Color Palette (CSS Tokens), shadcn/ui Theme Override"
+### Community 11 - "Community 11"
 Cohesion: 0.22
 Nodes (9): Shadcn-Aurora Token Bridge Table, Token Naming Migration v1 to v2, shadcn/ui Setup, C1: Two Teal Token Rename, C4: Text Token Canonical Names, C5: Dead Token Deletion, C6: Shadcn Light Theme Delete + Bridge Table, Aurora Color Palette (CSS Tokens) (+1 more)
 
-### Community 11 - "dropdown-menu.tsx, dropdown-menu.tsx"
-Cohesion: 0.48
-Nodes (5): cn(), DropdownMenu(), DropdownMenuCheckboxItem(), DropdownMenuPortal(), DropdownMenuTrigger()
-
-### Community 12 - "popover.tsx, popover.tsx"
-Cohesion: 0.48
-Nodes (5): cn(), Popover(), PopoverDescription(), PopoverTitle(), PopoverTrigger()
-
-### Community 13 - "albumGradient(), AlbumArt()"
-Cohesion: 0.38
-Nodes (3): AlbumArt(), albumGradient(), hashString()
-
-### Community 14 - "table.tsx, table.tsx"
-Cohesion: 0.53
-Nodes (4): cn(), Table(), TableBody(), TableHeader()
-
-### Community 15 - "ApiError, api.ts"
-Cohesion: 0.47
-Nodes (3): ApiError, request(), uploadRequest()
-
-### Community 16 - "Fraunces Variable Font Loading, index.html Entry Point"
-Cohesion: 0.33
-Nodes (6): Fraunces Variable Font Loading, index.html Entry Point, Dark Class on html Element, C9: Fraunces Self-Hosting Decision, Dark Mode Only Rule, Typography System (Outfit + Geist)
-
-### Community 17 - "alert-dialog.tsx, alert-dialog.tsx"
-Cohesion: 0.6
-Nodes (3): AlertDialogPortal(), AlertDialogTrigger(), cn()
-
-### Community 18 - "command.tsx, command.tsx"
-Cohesion: 0.6
-Nodes (3): cn(), CommandGroup(), CommandItem()
-
-### Community 19 - "filterStore.ts, filterStore.ts"
-Cohesion: 0.6
-Nodes (3): filterResultToSong(), friendlyFilterError(), shuffleArray()
-
-### Community 20 - "App(), App.tsx"
+### Community 15 - "Community 15"
 Cohesion: 0.4
-Nodes (1): App()
+Nodes (1): ApiError
 
-### Community 21 - "QueryInput.tsx, QueryInput.tsx"
-Cohesion: 0.67
-Nodes (2): handleKeyDown(), validateQuery()
+### Community 18 - "Community 18"
+Cohesion: 0.5
+Nodes (4): background Property â€” AlbumGradient.background Radial CSS, glow Property â€” AlbumGradient.glow HSLA String, HUES Array (8 Cool-Family Hue Anchors), albumGradient.ts â€” Procedural Gradient Generator
 
-### Community 22 - "EditSongDialog.tsx, handleAddToPlaylist()"
-Cohesion: 0.67
-Nodes (2): handleAddToPlaylist(), handleSubmit()
-
-### Community 23 - "Alert(), cn()"
-Cohesion: 0.67
-Nodes (2): Alert(), cn()
-
-### Community 24 - "hashString(), playlistThumbnail()"
-Cohesion: 0.83
+### Community 24 - "Community 24"
+Cohesion: 1.0
 Nodes (2): hashString(), playlistThumbnail()
 
-### Community 25 - "utils.ts, utils.ts"
+### Community 26 - "Community 26"
 Cohesion: 0.67
-Nodes (2): cn(), formatDuration()
+Nodes (3): Fraunces Variable Font Loading, C9: Fraunces Self-Hosting Decision, Typography System (Outfit + Geist)
 
-### Community 26 - "Sidebar.tsx, Sidebar.tsx"
-Cohesion: 0.67
-Nodes (2): handleTagClick(), isActive()
-
-### Community 27 - "Aurora backend entry point., run.py"
-Cohesion: 0.67
+### Community 27 - "Community 27"
+Cohesion: 1.0
 Nodes (1): Aurora backend entry point.
 
-### Community 28 - "handlePlaySong(), QueryBuilder.tsx"
-Cohesion: 0.67
-Nodes (1): handlePlaySong()
+### Community 29 - "Community 29"
+Cohesion: 1.0
+Nodes (2): AlbumArt.tsx â€” Album Art Display Component, file_scanner.py â€” Mutagen + Album Art Extraction
 
-### Community 29 - "handleFileChange(), PlaylistImagePicker.tsx"
-Cohesion: 0.67
-Nodes (1): handleFileChange()
-
-### Community 30 - "TableHeader(), SongTable.tsx"
-Cohesion: 0.67
-Nodes (1): TableHeader()
-
-### Community 31 - "TagChip(), TagChip.tsx"
-Cohesion: 0.67
-Nodes (1): TagChip()
-
-### Community 32 - "cn(), dialog.tsx"
-Cohesion: 0.67
-Nodes (1): cn()
-
-### Community 33 - "Equalizer(), Equalizer.tsx"
-Cohesion: 0.67
-Nodes (1): Equalizer()
-
-### Community 34 - "cn(), input-group.tsx"
-Cohesion: 0.67
-Nodes (1): cn()
-
-### Community 35 - "Skeleton(), skeleton.tsx"
-Cohesion: 0.67
-Nodes (1): Skeleton()
-
-### Community 36 - "cn(), textarea.tsx"
-Cohesion: 0.67
-Nodes (1): cn()
-
-### Community 37 - "ToastClickDismiss(), ToastClickDismiss.tsx"
-Cohesion: 0.67
-Nodes (1): ToastClickDismiss()
-
-### Community 38 - "useAudioPlayer(), useAudioPlayer.ts"
-Cohesion: 0.67
-Nodes (1): useAudioPlayer()
-
-### Community 39 - "FastAPI 0.115.12, Uvicorn 0.34.2"
+### Community 39 - "Community 39"
 Cohesion: 1.0
 Nodes (2): FastAPI 0.115.12, Uvicorn 0.34.2
 
-### Community 40 - "@/ Path Alias, Vite Configuration"
+### Community 40 - "Community 40"
 Cohesion: 1.0
 Nodes (2): @/ Path Alias, Vite Configuration
 
-### Community 41 - "Disabled State Three-Tier System, C3: Disabled Opacity Three-Tier System"
-Cohesion: 1.0
-Nodes (2): Disabled State Three-Tier System, C3: Disabled Opacity Three-Tier System
-
-### Community 42 - "Canonical Focus Ring (.aurora-focus), C2: Focus Ring Canonical Treatment"
+### Community 41 - "Community 41"
 Cohesion: 1.0
 Nodes (2): Canonical Focus Ring (.aurora-focus), C2: Focus Ring Canonical Treatment
 
-### Community 81 - "Supported Audio Extensions"
+### Community 42 - "Community 42"
+Cohesion: 1.0
+Nodes (2): Disabled State Three-Tier System, C3: Disabled Opacity Three-Tier System
+
+### Community 49 - "Community 49"
+Cohesion: 1.0
+Nodes (1): Sidebar.tsx â€” Nav + Tags + Playlists
+
+### Community 52 - "Community 52"
+Cohesion: 1.0
+Nodes (1): button.tsx â€” Base Button Component (shadcn)
+
+### Community 53 - "Community 53"
+Cohesion: 1.0
+Nodes (1): Button primary Variant (aurora-btn-loud-primary)
+
+### Community 54 - "Community 54"
+Cohesion: 1.0
+Nodes (1): Button destructive Variant (aurora-danger)
+
+### Community 64 - "Community 64"
+Cohesion: 1.0
+Nodes (1): File scanner for audio files using mutagen.
+
+### Community 65 - "Community 65"
+Cohesion: 1.0
+Nodes (1): Extract embedded album art from an audio file and save to art_dir.     Returns
+
+### Community 66 - "Community 66"
+Cohesion: 1.0
+Nodes (1): Mutagen returns tag values as lists. Get first item or None.
+
+### Community 67 - "Community 67"
+Cohesion: 1.0
+Nodes (1): Return quality rank for a file_format string. Higher = better quality.
+
+### Community 68 - "Community 68"
+Cohesion: 1.0
+Nodes (1): Distinguish ALAC from AAC inside an .m4a container by reading MP4Info.codec.
+
+### Community 69 - "Community 69"
+Cohesion: 1.0
+Nodes (1): Extract metadata from an audio file.     Returns dict with title, artist, album
+
+### Community 70 - "Community 70"
+Cohesion: 1.0
+Nodes (1): Recursively scan a folder for audio files.     Returns tuple of (list of metada
+
+### Community 71 - "Community 71"
+Cohesion: 1.0
+Nodes (1): Atomically replace an existing song row with a higher-quality version.     Migr
+
+### Community 72 - "Community 72"
+Cohesion: 1.0
+Nodes (1): Scan folder, import new songs, optionally add to playlist.     Format-aware ded
+
+### Community 73 - "Community 73"
+Cohesion: 1.0
+Nodes (1): Filter engine for boolean tag queries.
+
+### Community 74 - "Community 74"
+Cohesion: 1.0
+Nodes (1): Parse a user query string into a boolean expression.          Handles quoted s
+
+### Community 75 - "Community 75"
+Cohesion: 1.0
+Nodes (1): Build a complete tag set for a song from CSV strings.          Combines explic
+
+### Community 76 - "Community 76"
+Cohesion: 1.0
+Nodes (1): Evaluate whether a song's tag set satisfies the boolean expression.          U
+
+### Community 77 - "Community 77"
+Cohesion: 1.0
+Nodes (1): Main entry point for the filter engine.          1. Parse the query     2. Lo
+
+### Community 78 - "Community 78"
 Cohesion: 1.0
 Nodes (1): Supported Audio Extensions
 
-### Community 82 - "Frontend Project Structure"
+### Community 79 - "Community 79"
 Cohesion: 1.0
 Nodes (1): Frontend Project Structure
 
-### Community 83 - "Store Design Principles"
+### Community 80 - "Community 80"
 Cohesion: 1.0
 Nodes (1): Store Design Principles
 
-### Community 84 - "Aurora Session 4 Handoff"
+### Community 81 - "Community 81"
+Cohesion: 1.0
+Nodes (1): Dark Mode Only Rule
+
+### Community 82 - "Community 82"
 Cohesion: 1.0
 Nodes (1): Aurora Session 4 Handoff
 
-### Community 85 - "PlayerBar Bugs (Session 4)"
+### Community 83 - "Community 83"
 Cohesion: 1.0
 Nodes (1): PlayerBar Bugs (Session 4)
 
-### Community 86 - "Future Features (Electron, Crossfade, Lyrics)"
+### Community 84 - "Community 84"
 Cohesion: 1.0
 Nodes (1): Future Features (Electron, Crossfade, Lyrics)
 
-### Community 87 - "Aurora Known Gaps and Bugs"
+### Community 85 - "Community 85"
 Cohesion: 1.0
 Nodes (1): Aurora Known Gaps and Bugs
 
-### Community 88 - "Aurora Quick Start (Backend + Frontend)"
+### Community 86 - "Community 86"
 Cohesion: 1.0
 Nodes (1): Aurora Quick Start (Backend + Frontend)
 
-### Community 89 - "Frontend Vite + React Template README"
+### Community 87 - "Community 87"
 Cohesion: 1.0
 Nodes (1): Frontend Vite + React Template README
 
 ## Knowledge Gaps
-- **110 isolated node(s):** `Get a database connection with row_factory set to sqlite3.Row.`, `Initialize the database — create tables if they don't exist.`, `Extract and store album art for any songs missing it. Runs once per song.`, `Request body for POST /scan.`, `Response body for POST /scan.` (+105 more)
+- **136 isolated node(s):** `Aurora backend entry point.`, `SQLite database connection and initialization.`, `Get a database connection with row_factory set to sqlite3.Row.`, `Initialize the database — create tables if they don't exist.`, `Extract and store album art for any songs missing it. Runs once per song.` (+131 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **Thin community `App(), App.tsx`** (5 nodes): `App()`, `App.tsx`, `main.tsx`, `App.tsx`, `main.tsx`
+- **Thin community `Community 15`** (5 nodes): `ApiError`, `.constructor()`, `request()`, `uploadRequest()`, `api.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `QueryInput.tsx, QueryInput.tsx`** (4 nodes): `QueryInput.tsx`, `QueryInput.tsx`, `handleKeyDown()`, `validateQuery()`
+- **Thin community `Community 24`** (3 nodes): `playlistImage.ts`, `hashString()`, `playlistThumbnail()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `EditSongDialog.tsx, handleAddToPlaylist()`** (4 nodes): `EditSongDialog.tsx`, `handleAddToPlaylist()`, `handleSubmit()`, `EditSongDialog.tsx`
+- **Thin community `Community 27`** (2 nodes): `run.py`, `Aurora backend entry point.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Alert(), cn()`** (4 nodes): `Alert()`, `cn()`, `alert.tsx`, `alert.tsx`
+- **Thin community `Community 29`** (2 nodes): `AlbumArt.tsx â€” Album Art Display Component`, `file_scanner.py â€” Mutagen + Album Art Extraction`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `hashString(), playlistThumbnail()`** (4 nodes): `playlistImage.ts`, `playlistImage.ts`, `hashString()`, `playlistThumbnail()`
+- **Thin community `Community 39`** (2 nodes): `FastAPI 0.115.12`, `Uvicorn 0.34.2`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `utils.ts, utils.ts`** (4 nodes): `utils.ts`, `utils.ts`, `cn()`, `formatDuration()`
+- **Thin community `Community 40`** (2 nodes): `@/ Path Alias`, `Vite Configuration`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Sidebar.tsx, Sidebar.tsx`** (4 nodes): `Sidebar.tsx`, `Sidebar.tsx`, `handleTagClick()`, `isActive()`
+- **Thin community `Community 41`** (2 nodes): `Canonical Focus Ring (.aurora-focus)`, `C2: Focus Ring Canonical Treatment`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Aurora backend entry point., run.py`** (3 nodes): `run.py`, `run.py`, `Aurora backend entry point.`
+- **Thin community `Community 42`** (2 nodes): `Disabled State Three-Tier System`, `C3: Disabled Opacity Three-Tier System`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `handlePlaySong(), QueryBuilder.tsx`** (3 nodes): `QueryBuilder.tsx`, `QueryBuilder.tsx`, `handlePlaySong()`
+- **Thin community `Community 49`** (1 nodes): `Sidebar.tsx â€” Nav + Tags + Playlists`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `handleFileChange(), PlaylistImagePicker.tsx`** (3 nodes): `PlaylistImagePicker.tsx`, `PlaylistImagePicker.tsx`, `handleFileChange()`
+- **Thin community `Community 52`** (1 nodes): `button.tsx â€” Base Button Component (shadcn)`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `TableHeader(), SongTable.tsx`** (3 nodes): `SongTable.tsx`, `SongTable.tsx`, `TableHeader()`
+- **Thin community `Community 53`** (1 nodes): `Button primary Variant (aurora-btn-loud-primary)`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `TagChip(), TagChip.tsx`** (3 nodes): `TagChip.tsx`, `TagChip.tsx`, `TagChip()`
+- **Thin community `Community 54`** (1 nodes): `Button destructive Variant (aurora-danger)`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `cn(), dialog.tsx`** (3 nodes): `dialog.tsx`, `cn()`, `dialog.tsx`
+- **Thin community `Community 64`** (1 nodes): `File scanner for audio files using mutagen.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Equalizer(), Equalizer.tsx`** (3 nodes): `Equalizer.tsx`, `Equalizer()`, `Equalizer.tsx`
+- **Thin community `Community 65`** (1 nodes): `Extract embedded album art from an audio file and save to art_dir.     Returns`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `cn(), input-group.tsx`** (3 nodes): `input-group.tsx`, `input-group.tsx`, `cn()`
+- **Thin community `Community 66`** (1 nodes): `Mutagen returns tag values as lists. Get first item or None.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Skeleton(), skeleton.tsx`** (3 nodes): `skeleton.tsx`, `skeleton.tsx`, `Skeleton()`
+- **Thin community `Community 67`** (1 nodes): `Return quality rank for a file_format string. Higher = better quality.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `cn(), textarea.tsx`** (3 nodes): `textarea.tsx`, `textarea.tsx`, `cn()`
+- **Thin community `Community 68`** (1 nodes): `Distinguish ALAC from AAC inside an .m4a container by reading MP4Info.codec.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `ToastClickDismiss(), ToastClickDismiss.tsx`** (3 nodes): `ToastClickDismiss.tsx`, `ToastClickDismiss.tsx`, `ToastClickDismiss()`
+- **Thin community `Community 69`** (1 nodes): `Extract metadata from an audio file.     Returns dict with title, artist, album`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `useAudioPlayer(), useAudioPlayer.ts`** (3 nodes): `useAudioPlayer.ts`, `useAudioPlayer.ts`, `useAudioPlayer()`
+- **Thin community `Community 70`** (1 nodes): `Recursively scan a folder for audio files.     Returns tuple of (list of metada`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `FastAPI 0.115.12, Uvicorn 0.34.2`** (2 nodes): `FastAPI 0.115.12`, `Uvicorn 0.34.2`
+- **Thin community `Community 71`** (1 nodes): `Atomically replace an existing song row with a higher-quality version.     Migr`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `@/ Path Alias, Vite Configuration`** (2 nodes): `@/ Path Alias`, `Vite Configuration`
+- **Thin community `Community 72`** (1 nodes): `Scan folder, import new songs, optionally add to playlist.     Format-aware ded`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Disabled State Three-Tier System, C3: Disabled Opacity Three-Tier System`** (2 nodes): `Disabled State Three-Tier System`, `C3: Disabled Opacity Three-Tier System`
+- **Thin community `Community 73`** (1 nodes): `Filter engine for boolean tag queries.`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Canonical Focus Ring (.aurora-focus), C2: Focus Ring Canonical Treatment`** (2 nodes): `Canonical Focus Ring (.aurora-focus)`, `C2: Focus Ring Canonical Treatment`
+- **Thin community `Community 74`** (1 nodes): `Parse a user query string into a boolean expression.          Handles quoted s`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Supported Audio Extensions`** (1 nodes): `Supported Audio Extensions`
+- **Thin community `Community 75`** (1 nodes): `Build a complete tag set for a song from CSV strings.          Combines explic`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Frontend Project Structure`** (1 nodes): `Frontend Project Structure`
+- **Thin community `Community 76`** (1 nodes): `Evaluate whether a song's tag set satisfies the boolean expression.          U`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Store Design Principles`** (1 nodes): `Store Design Principles`
+- **Thin community `Community 77`** (1 nodes): `Main entry point for the filter engine.          1. Parse the query     2. Lo`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Aurora Session 4 Handoff`** (1 nodes): `Aurora Session 4 Handoff`
+- **Thin community `Community 78`** (1 nodes): `Supported Audio Extensions`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `PlayerBar Bugs (Session 4)`** (1 nodes): `PlayerBar Bugs (Session 4)`
+- **Thin community `Community 79`** (1 nodes): `Frontend Project Structure`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Future Features (Electron, Crossfade, Lyrics)`** (1 nodes): `Future Features (Electron, Crossfade, Lyrics)`
+- **Thin community `Community 80`** (1 nodes): `Store Design Principles`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Aurora Known Gaps and Bugs`** (1 nodes): `Aurora Known Gaps and Bugs`
+- **Thin community `Community 81`** (1 nodes): `Dark Mode Only Rule`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Aurora Quick Start (Backend + Frontend)`** (1 nodes): `Aurora Quick Start (Backend + Frontend)`
+- **Thin community `Community 82`** (1 nodes): `Aurora Session 4 Handoff`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Frontend Vite + React Template README`** (1 nodes): `Frontend Vite + React Template README`
+- **Thin community `Community 83`** (1 nodes): `PlayerBar Bugs (Session 4)`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 84`** (1 nodes): `Future Features (Electron, Crossfade, Lyrics)`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 85`** (1 nodes): `Aurora Known Gaps and Bugs`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 86`** (1 nodes): `Aurora Quick Start (Backend + Frontend)`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 87`** (1 nodes): `Frontend Vite + React Template README`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `get_db()` connect `get_db(), SongResponse` to `songs.py, songs.py`, `file_scanner.py, file_scanner.py`, `filter_songs(), filter_engine.py`, `init_db(), _backfill_album_art()`?**
-  _High betweenness centrality (0.031) - this node is a cross-community bridge._
-- **Why does `scan_folder()` connect `file_scanner.py, file_scanner.py` to `get_db(), SongResponse`?**
-  _High betweenness centrality (0.014) - this node is a cross-community bridge._
+- **Why does `get_db()` connect `Community 0` to `Community 10`, `Community 4`?**
+  _High betweenness centrality (0.019) - this node is a cross-community bridge._
+- **Why does `playerStore (Zustand)` connect `Community 3` to `Community 2`?**
+  _High betweenness centrality (0.015) - this node is a cross-community bridge._
+- **Why does `Filter Engine (filter_engine.py)` connect `Community 2` to `Community 9`?**
+  _High betweenness centrality (0.013) - this node is a cross-community bridge._
 - **Are the 24 inferred relationships involving `get_db()` (e.g. with `health_check()` and `filter_endpoint()`) actually correct?**
   _`get_db()` has 24 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 21 inferred relationships involving `SongResponse` (e.g. with `Return current UTC timestamp in ISO format.` and `Upload a cover image for a playlist. Saved to frontend/public/playlist-images/.`) actually correct?**
   _`SongResponse` has 21 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 14 inferred relationships involving `PlaylistResponse` (e.g. with `Return current UTC timestamp in ISO format.` and `Upload a cover image for a playlist. Saved to frontend/public/playlist-images/.`) actually correct?**
   _`PlaylistResponse` has 14 INFERRED edges - model-reasoned connections that need verification._
-- **What connects `Get a database connection with row_factory set to sqlite3.Row.`, `Initialize the database — create tables if they don't exist.`, `Extract and store album art for any songs missing it. Runs once per song.` to the rest of the system?**
-  _110 weakly-connected nodes found - possible documentation gaps or missing edges._
-- **Should `Aurora Aesthetic Audit (2026-05-05), PlayerBar.tsx â€” Persistent Bottom Player Bar` be split into smaller, more focused modules?**
-  _Cohesion score 0.03 - nodes in this community are weakly interconnected._
+- **What connects `Aurora backend entry point.`, `SQLite database connection and initialization.`, `Get a database connection with row_factory set to sqlite3.Row.` to the rest of the system?**
+  _136 weakly-connected nodes found - possible documentation gaps or missing edges._
