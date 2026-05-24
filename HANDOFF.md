@@ -1,5 +1,32 @@
 # Aurora — Session Handoff
 
+## Completed This Session (2026-05-24 — Session 22)
+
+### Three spec features shipped (autocomplete, trim times, crossfade)
+
+**Query autocomplete** (`feat(filter)`)
+- `AutocompleteDropdown.tsx` — glassmorphism dropdown, operator badges, tag rows, active 3px left bar
+- `QueryInput.tsx` — `getTokenAtCursor` (quote-aware context detection), `computeSuggestions` (3 tiers: operators, prefix tags, substring tags, cap 8), `acceptSuggestion` (quoted-space handling), arrow/tab/esc/enter keyboard nav, 150ms blur delay + `onMouseDown preventDefault` click pattern
+
+**Custom playback times + per-playlist crossfade** (`feat(playlists)`)
+- DB: 4 migrations (`playlist_songs.start_time_ms/end_time_ms`, `playlists.crossfade_enabled/crossfade_duration_s`)
+- Backend models, routers: `PATCH /playlists/{id}/songs/{song_id}/timing`, crossfade fields on `PlaylistUpdate`/`PlaylistResponse`, `model_fields_set` for null-vs-missing distinction
+- Frontend: `TrimPanel` component (zone bar, sliders, inline M:SS editing, Mark In/Out), `CrossfadeChip` popover (Inherit/On/Off, duration slider)
+- `api.ts`: added `patch<T>()` method
+
+**Crossfade player** (`feat(player)`)
+- `settingsStore.ts` — crossfade enabled/duration, persisted to localStorage
+- `SettingsView.tsx` — toggle + duration slider (1–12s), Settings nav item in Sidebar
+- `playerStore.ts` — `queuePlaylistId` for per-playlist context
+- `useAudioPlayer.ts` — complete rewrite: `nextHowlRef` + `crossfadeActiveRef` pattern, `resolveXfade()` (playlist override → global fallback), midpoint `next()` timer + fade-complete Howl swap timer, end-time enforcement, start-time auto-seek
+
+### State
+- `master` clean — 3 commits this session
+- Build verified clean (`npm run build`)
+- Fixed TS errors: unused `resolvedEnabled`, `asChild` on Base UI `PopoverTrigger` (pass props directly)
+
+---
+
 ## Completed This Session (2026-05-24 — Session 21)
 
 ### Offline player completeness (all 8 plan tasks)
