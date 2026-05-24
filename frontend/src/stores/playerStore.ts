@@ -159,6 +159,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     duration: 0,
     queue: [],
     queueIndex: 0,
+    isShuffled: false,
+    originalQueue: [],
   }),
 
   cycleRepeat: () => {
@@ -173,6 +175,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
   toggleShuffle: () => {
     const { isShuffled, queue, currentSong, originalQueue } = get()
+    if (queue.length === 0) return
     if (!isShuffled) {
       const shuffled = shuffleArray(queue)
       const newIndex = shuffled.findIndex((s) => s.id === currentSong?.id)
