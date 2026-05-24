@@ -1021,7 +1021,16 @@
     0 12px 40px -8px rgba(0, 0, 0, 0.75),
     inset 0 0 0 1px rgba(255, 255, 255, 0.04),
     0 0 28px -10px rgba(45, 212, 191, 0.14);
+  opacity: 0;
+  transform: translateY(6px);
+  pointer-events: none;
   transition: opacity 200ms ease, transform 200ms ease;
+}
+
+.mix-float-zone--visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
 }
 
 /* Search inside the float zone — understated */
