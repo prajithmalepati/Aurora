@@ -1,0 +1,92 @@
+import { useSettingsStore } from "@/stores/settingsStore"
+
+export function SettingsView() {
+  const crossfadeEnabled = useSettingsStore((s) => s.crossfadeEnabled)
+  const crossfadeDuration = useSettingsStore((s) => s.crossfadeDuration)
+  const setCrossfadeEnabled = useSettingsStore((s) => s.setCrossfadeEnabled)
+  const setCrossfadeDuration = useSettingsStore((s) => s.setCrossfadeDuration)
+
+  const durPct = ((crossfadeDuration - 1) / 11) * 100
+
+  return (
+    <div className="aurora-view-enter p-10 max-w-[600px]">
+      <h1 className="font-display text-[36px] leading-none tracking-tight text-[var(--aurora-text)] mb-8">
+        Settings
+      </h1>
+
+      {/* Audio section */}
+      <div
+        className="rounded-xl overflow-hidden"
+        style={{
+          background: "var(--aurora-surface)",
+          border: "1px solid var(--aurora-rim)",
+          backdropFilter: "blur(12px)",
+        }}
+      >
+        <div className="px-5 py-3 border-b border-[var(--aurora-rim)]">
+          <p className="label-micro text-[10px] tracking-[0.2em] text-[var(--aurora-text-tertiary)]">Audio</p>
+        </div>
+
+        {/* Crossfade toggle */}
+        <div className="px-5 py-4 flex items-center justify-between">
+          <div>
+            <p className="text-[14px] text-[var(--aurora-text)] font-medium">Crossfade</p>
+            <p className="text-[12px] text-[var(--aurora-text-secondary)] mt-0.5">
+              Blend songs smoothly as they transition
+            </p>
+          </div>
+          <button
+            onClick={() => setCrossfadeEnabled(!crossfadeEnabled)}
+            role="switch"
+            aria-checked={crossfadeEnabled}
+            className={`relative w-10 h-5.5 rounded-full transition-colors duration-200 flex-shrink-0 ${
+              crossfadeEnabled
+                ? "bg-[var(--aurora-accent-interactive)]"
+                : "bg-white/[0.12]"
+            }`}
+            style={{ height: "22px", width: "40px" }}
+          >
+            <span
+              className="absolute top-0.5 left-0.5 w-[18px] h-[18px] rounded-full bg-white shadow-sm transition-transform duration-200"
+              style={{ transform: crossfadeEnabled ? "translateX(18px)" : "translateX(0)" }}
+            />
+          </button>
+        </div>
+
+        {/* Duration slider */}
+        <div
+          className="px-5 py-4 border-t border-[var(--aurora-rim)] transition-opacity duration-200"
+          style={{ opacity: crossfadeEnabled ? 1 : 0.35, pointerEvents: crossfadeEnabled ? "auto" : "none" }}
+        >
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[14px] text-[var(--aurora-text)]">Duration</p>
+            <span className="text-[13px] tabular-nums text-[var(--aurora-accent-interactive)] font-medium">
+              {crossfadeDuration}s
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] text-[var(--aurora-text-tertiary)] w-4">1s</span>
+            <input
+              type="range"
+              min={1}
+              max={12}
+              step={1}
+              value={crossfadeDuration}
+              onChange={(e) => setCrossfadeDuration(Number(e.target.value))}
+              className="aurora-range flex-1"
+              style={{ ["--aurora-range-pct" as string]: `${durPct}%` }}
+              aria-label="Crossfade duration"
+            />
+            <span className="text-[11px] text-[var(--aurora-text-tertiary)] w-5">12s</span>
+          </div>
+        </div>
+
+        {/* Manual skip info */}
+        <div className="px-5 py-4 border-t border-[var(--aurora-rim)] flex items-center justify-between">
+          <p className="text-[13px] text-[var(--aurora-text-secondary)]">Manual skip fade</p>
+          <span className="text-[13px] tabular-nums text-[var(--aurora-text-tertiary)]">1s (fixed)</span>
+        </div>
+      </div>
+    </div>
+  )
+}

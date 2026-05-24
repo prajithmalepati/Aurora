@@ -13,8 +13,9 @@ interface PlayerState {
   repeatMode: "none" | "all" | "one"
   isShuffled: boolean
   originalQueue: Song[]
+  queuePlaylistId: number | null
 
-  playSong: (song: Song, queue?: Song[]) => void
+  playSong: (song: Song, queue?: Song[], playlistId?: number | null) => void
   togglePlay: () => void
   next: () => void
   previous: () => void
@@ -56,8 +57,9 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   repeatMode: "none" as "none" | "all" | "one",
   isShuffled: false,
   originalQueue: [],
+  queuePlaylistId: null,
 
-  playSong: (song, queue) => {
+  playSong: (song, queue, playlistId = null) => {
     if (!song.file_path) return
     const newQueue = queue?.filter((s) => s.file_path) ?? [song]
     const index = newQueue.findIndex((s) => s.id === song.id)
@@ -70,6 +72,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       duration: song.duration ?? 0,
       isShuffled: false,
       originalQueue: [],
+      queuePlaylistId: playlistId ?? null,
     })
   },
 
@@ -161,6 +164,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     queueIndex: 0,
     isShuffled: false,
     originalQueue: [],
+    queuePlaylistId: null,
   }),
 
   cycleRepeat: () => {
