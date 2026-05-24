@@ -39,6 +39,7 @@ export function PlayerBar() {
 
   const RepeatIcon = repeatMode === "one" ? Repeat1 : Repeat
   const repeatActive = repeatMode !== "none"
+  const repeatLabel = repeatMode === "none" ? "Repeat off" : repeatMode === "all" ? "Repeat all" : "Repeat one"
   const transportBtnClass = (active: boolean) =>
     `transition-colors duration-150 disabled:opacity-25 disabled:pointer-events-none ${
       active
@@ -173,7 +174,7 @@ export function PlayerBar() {
                 onClick={cycleRepeat}
                 disabled={!hasSong}
                 className={transportBtnClass(repeatActive)}
-                aria-label={`Repeat: ${repeatMode}`}
+                aria-label={repeatLabel}
               >
                 <RepeatIcon className="h-3.5 w-3.5" strokeWidth={2} />
               </button>
@@ -288,7 +289,7 @@ export function PlayerBar() {
                   onClick={cycleRepeat}
                   disabled={!hasSong}
                   className={transportBtnClass(repeatActive)}
-                  aria-label={`Repeat: ${repeatMode}`}
+                  aria-label={repeatLabel}
                 >
                   <RepeatIcon className="h-[15px] w-[15px]" strokeWidth={2} />
                 </button>
