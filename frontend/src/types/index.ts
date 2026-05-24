@@ -9,6 +9,8 @@ export interface Song {
   album_art_path?: string | null
   source: string
   external_id?: string | null
+  start_time_ms?: number
+  end_time_ms?: number
   tags: string[]
   playlists: Playlist[]
   created_at: string
@@ -21,6 +23,8 @@ export interface Playlist {
   color: string | null
   emoji: string | null
   image_url: string | null
+  crossfade_enabled: number | null
+  crossfade_duration_s: number | null
   song_count: number
   created_at: string
   updated_at: string
@@ -39,6 +43,8 @@ export interface PlaylistSong {
   file_path: string | null
   file_format?: string | null
   album_art_path?: string | null
+  start_time_ms?: number
+  end_time_ms?: number
   tags: string[]
   position: number
 }

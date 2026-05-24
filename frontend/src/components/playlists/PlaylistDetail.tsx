@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from "react"
-import type { PlaylistSong } from "@/types"
+import type { PlaylistSong, PlaylistDetail as PlaylistDetailType } from "@/types"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { useSongStore } from "@/stores/songStore"
 import { usePlayerStore } from "@/stores/playerStore"
@@ -26,7 +26,9 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { toast } from "@/lib/toast"
-import { Pencil, Trash2, ChevronUp, ChevronDown, X, Play, Search } from "lucide-react"
+import { Pencil, Trash2, ChevronUp, ChevronDown, X, Play, Search, Scissors, Sparkles } from "lucide-react"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { useSettingsStore } from "@/stores/settingsStore"
 import { TagList } from "@/components/tags/TagList"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Equalizer } from "@/components/ui/Equalizer"
@@ -49,6 +51,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
   const activePlaylist = usePlaylistStore((state) => state.activePlaylist)
   const loading = usePlaylistStore((state) => state.loading)
 
+  const [openTrimId, setOpenTrimId] = useState<number | null>(null)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [editName, setEditName] = useState("")
@@ -190,7 +193,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
         updated_at: "",
       }))
     const asSong = { ...song, source: "local" as const, playlists: [], created_at: "", updated_at: "" }
-    playSong(asSong, queue)
+    playSong(asSong, queue, activePlaylist.id)
   }
 
   const handleReorder = async (songId: number, direction: "up" | "down") => {
@@ -308,6 +311,9 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
 
           {/* Actions */}
           <div className="flex items-center gap-1 pb-4">
+            {activePlaylist && (
+              <CrossfadeChip playlist={activePlaylist} />
+            )}
             <button
               onClick={handleEdit}
               title="Edit playlist"
@@ -402,6 +408,10 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
                     onRemove={() => handleRemoveSong(song.id)}
                     onReorder={(direction) => handleReorder(song.id, direction)}
                     onPlay={handlePlaySong}
+                    openTrimId={openTrimId}
+                    setOpenTrimId={setOpenTrimId}
+                    playlistId={playlistId}
+                    onRefresh={() => fetchPlaylistDetail(playlistId)}
                   />
                 )
               })}
@@ -522,9 +532,14 @@ interface PlaylistSongRowProps {
   onRemove: () => void
   onReorder: (direction: "up" | "down") => void
   onPlay: (song: PlaylistSong) => void
+  openTrimId: number | null
+  setOpenTrimId: (id: number | null) => void
+  playlistId: number
+  onRefresh: () => void
 }
 
-function PlaylistSongRow({ song, index, total, onRemove, onReorder, onPlay }: PlaylistSongRowProps) {
+function PlaylistSongRow({ song, index, total, onRemove, onReorder, onPlay, openTrimId, setOpenTrimId, playlistId, onRefresh }: PlaylistSongRowProps) {
+  const trimOpen = openTrimId === song.id
   const currentSong = usePlayerStore((s) => s.currentSong)
   const isPlaying = usePlayerStore((s) => s.isPlaying)
 
@@ -537,6 +552,7 @@ function PlaylistSongRow({ song, index, total, onRemove, onReorder, onPlay }: Pl
   }
 
   return (
+    <>
     <tr
       onClick={handlePlay}
       className={`group relative transition-colors duration-200 ${
@@ -644,6 +660,16 @@ function PlaylistSongRow({ song, index, total, onRemove, onReorder, onPlay }: Pl
         />
         <div className="relative z-10 flex items-center gap-0.5 justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-200">
           <IconBtn
+            label="Trim"
+            active={trimOpen}
+            onClick={(e) => {
+              e.stopPropagation()
+              setOpenTrimId(trimOpen ? null : song.id)
+            }}
+          >
+            <Scissors className="h-3.5 w-3.5" />
+          </IconBtn>
+          <IconBtn
             label="Move up"
             disabled={index === 0}
             onClick={(e) => {
@@ -676,6 +702,15 @@ function PlaylistSongRow({ song, index, total, onRemove, onReorder, onPlay }: Pl
         </div>
       </td>
     </tr>
+    {trimOpen && (
+      <TrimPanel
+        song={song}
+        playlistId={playlistId}
+        onClose={() => setOpenTrimId(null)}
+        onSaved={onRefresh}
+      />
+    )}
+    </>
   )
 }
 
@@ -683,11 +718,12 @@ interface IconBtnProps {
   children: React.ReactNode
   label: string
   danger?: boolean
+  active?: boolean
   disabled?: boolean
   onClick: (e: React.MouseEvent) => void
 }
 
-function IconBtn({ children, label, danger, disabled, onClick }: IconBtnProps) {
+function IconBtn({ children, label, danger, active, disabled, onClick }: IconBtnProps) {
   return (
     <button
       onClick={onClick}
@@ -697,10 +733,374 @@ function IconBtn({ children, label, danger, disabled, onClick }: IconBtnProps) {
       className={`aurora-focus h-7 w-7 rounded-md flex items-center justify-center transition-all duration-150 disabled:opacity-25 disabled:pointer-events-none ${
         danger
           ? "text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-danger)] hover:bg-[var(--aurora-danger)]/10"
+          : active
+          ? "text-[var(--aurora-accent-interactive)] bg-white/[0.04]"
           : "text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-text)] hover:bg-white/[0.04]"
       }`}
     >
       {children}
     </button>
+  )
+}
+
+interface TrimPanelProps {
+  song: PlaylistSong
+  playlistId: number
+  onClose: () => void
+  onSaved: () => void
+}
+
+function TrimPanel({ song, playlistId, onClose, onSaved }: TrimPanelProps) {
+  const currentSong = usePlayerStore((s) => s.currentSong)
+  const seek = usePlayerStore((s) => s.seek)
+
+  const durationMs = (song.duration ?? 0) * 1000
+  const isCurrent = currentSong?.id === song.id
+
+  const [startMs, setStartMs] = useState(song.start_time_ms ?? 0)
+  const [endMs, setEndMs] = useState(
+    song.end_time_ms && song.end_time_ms > 0 ? song.end_time_ms : durationMs
+  )
+  const [saving, setSaving] = useState(false)
+  const [editingStart, setEditingStart] = useState(false)
+  const [editingEnd, setEditingEnd] = useState(false)
+  const [startText, setStartText] = useState("")
+  const [endText, setEndText] = useState("")
+
+  const isInvalid = startMs > 0 && endMs > 0 && startMs >= endMs
+  const seekMs = seek * 1000
+  const startPct = durationMs > 0 ? (startMs / durationMs) * 100 : 0
+  const endPct = durationMs > 0 ? (endMs / durationMs) * 100 : 100
+  const seekPct = durationMs > 0 ? Math.min((seekMs / durationMs) * 100, 100) : 0
+
+  function msToMSS(ms: number) {
+    const s = Math.floor(ms / 1000)
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`
+  }
+
+  function parseMSS(text: string): number | null {
+    const m = text.match(/^(\d+):(\d{2})$/)
+    if (!m) return null
+    return (parseInt(m[1]) * 60 + parseInt(m[2])) * 1000
+  }
+
+  async function handleSave() {
+    if (isInvalid) return
+    setSaving(true)
+    try {
+      await api.patch(`/playlists/${playlistId}/songs/${song.id}/timing`, {
+        start_time_ms: startMs,
+        end_time_ms: endMs === durationMs ? endMs : endMs,
+      })
+      toast.success("Trim saved")
+      onSaved()
+      onClose()
+    } catch {
+      toast.error("Failed to save trim")
+      setSaving(false)
+    }
+  }
+
+  async function handleReset() {
+    setSaving(true)
+    try {
+      await api.patch(`/playlists/${playlistId}/songs/${song.id}/timing`, {
+        start_time_ms: 0,
+        end_time_ms: 0,
+      })
+      toast.success("Trim reset")
+      onSaved()
+      onClose()
+    } catch {
+      toast.error("Failed to reset trim")
+      setSaving(false)
+    }
+  }
+
+  return (
+    <tr>
+      <td
+        colSpan={5}
+        className="px-6 pb-3 aurora-fade-in"
+        style={{ background: "var(--aurora-surface)", borderTop: "1px solid var(--aurora-rim)" }}
+      >
+        <div className="space-y-3 pt-3">
+          {/* Visual zone bar */}
+          <div className="relative h-5 flex items-center">
+            <div
+              className="absolute inset-x-0 h-1.5 rounded-full"
+              style={{
+                background: `linear-gradient(to right,
+                  rgba(255,255,255,0.08) 0%,
+                  rgba(255,255,255,0.08) ${startPct}%,
+                  var(--aurora-accent-interactive) ${startPct}%,
+                  var(--aurora-accent-interactive) ${endPct}%,
+                  rgba(255,255,255,0.08) ${endPct}%,
+                  rgba(255,255,255,0.08) 100%
+                )`,
+              }}
+            />
+            {isCurrent && (
+              <div
+                className="absolute w-2 h-2 rounded-full bg-white -translate-x-1/2 z-10"
+                style={{
+                  left: `${seekPct}%`,
+                  boxShadow: "0 0 6px 2px rgba(255,255,255,0.5)",
+                }}
+              />
+            )}
+          </div>
+
+          {/* Start slider */}
+          <div className="flex items-center gap-3">
+            <span className="label-micro w-10 text-right shrink-0">Start</span>
+            <input
+              type="range"
+              min={0}
+              max={durationMs || 100}
+              step={1000}
+              value={startMs}
+              onChange={(e) =>
+                setStartMs(Math.min(Number(e.target.value), endMs > 1000 ? endMs - 1000 : 0))
+              }
+              className="aurora-range flex-1"
+              style={{ ["--aurora-range-pct" as string]: `${startPct}%` }}
+            />
+            {editingStart ? (
+              <input
+                type="text"
+                value={startText}
+                autoFocus
+                onChange={(e) => setStartText(e.target.value)}
+                onBlur={() => {
+                  const parsed = parseMSS(startText)
+                  if (parsed !== null) setStartMs(Math.min(parsed, endMs - 1000))
+                  setEditingStart(false)
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur()
+                  if (e.key === "Escape") setEditingStart(false)
+                }}
+                className="w-14 text-center text-[12px] bg-[var(--aurora-surface-3)] border border-[var(--aurora-rim)] rounded px-1 py-0.5 text-[var(--aurora-text)] outline-none"
+              />
+            ) : (
+              <button
+                onClick={() => { setStartText(msToMSS(startMs)); setEditingStart(true) }}
+                className="w-14 text-center text-[12px] tabular-nums text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] transition-colors"
+              >
+                {msToMSS(startMs)}
+              </button>
+            )}
+          </div>
+
+          {/* End slider */}
+          <div className="flex items-center gap-3">
+            <span className="label-micro w-10 text-right shrink-0">End</span>
+            <input
+              type="range"
+              min={0}
+              max={durationMs || 100}
+              step={1000}
+              value={endMs}
+              onChange={(e) =>
+                setEndMs(Math.max(Number(e.target.value), startMs + 1000))
+              }
+              className="aurora-range flex-1"
+              style={{ ["--aurora-range-pct" as string]: `${endPct}%` }}
+            />
+            {editingEnd ? (
+              <input
+                type="text"
+                value={endText}
+                autoFocus
+                onChange={(e) => setEndText(e.target.value)}
+                onBlur={() => {
+                  const parsed = parseMSS(endText)
+                  if (parsed !== null) setEndMs(Math.max(parsed, startMs + 1000))
+                  setEditingEnd(false)
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur()
+                  if (e.key === "Escape") setEditingEnd(false)
+                }}
+                className="w-14 text-center text-[12px] bg-[var(--aurora-surface-3)] border border-[var(--aurora-rim)] rounded px-1 py-0.5 text-[var(--aurora-text)] outline-none"
+              />
+            ) : (
+              <button
+                onClick={() => { setEndText(msToMSS(endMs)); setEditingEnd(true) }}
+                className="w-14 text-center text-[12px] tabular-nums text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] transition-colors"
+              >
+                {msToMSS(endMs)}
+              </button>
+            )}
+          </div>
+
+          {isInvalid && (
+            <p className="text-[11px] text-[var(--aurora-danger)] pl-16">
+              Start must be before end
+            </p>
+          )}
+
+          {/* Action row */}
+          <div className="flex items-center gap-2 pt-1 pl-16">
+            <button
+              onClick={() => setStartMs(Math.floor(seekMs / 1000) * 1000)}
+              disabled={!isCurrent}
+              title={isCurrent ? undefined : "Play song first"}
+              className="text-[11px] px-2.5 py-1 rounded border border-[var(--aurora-rim)] text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] hover:border-[var(--aurora-accent-interactive)] transition-all duration-150 disabled:opacity-30 disabled:pointer-events-none"
+            >
+              Mark In
+            </button>
+            <button
+              onClick={() => setEndMs(Math.floor(seekMs / 1000) * 1000)}
+              disabled={!isCurrent}
+              title={isCurrent ? undefined : "Play song first"}
+              className="text-[11px] px-2.5 py-1 rounded border border-[var(--aurora-rim)] text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] hover:border-[var(--aurora-accent-interactive)] transition-all duration-150 disabled:opacity-30 disabled:pointer-events-none"
+            >
+              Mark Out
+            </button>
+            <span className="flex-1" />
+            <button
+              onClick={handleReset}
+              disabled={saving}
+              className="text-[11px] px-2.5 py-1 rounded text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-danger)] transition-colors duration-150 disabled:opacity-30"
+            >
+              Reset
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving || isInvalid}
+              className="text-[11px] px-3 py-1 rounded bg-[var(--aurora-accent-interactive)] text-black font-medium hover:opacity-90 transition-opacity disabled:opacity-30 disabled:pointer-events-none"
+            >
+              {saving ? "Saving…" : "Save"}
+            </button>
+          </div>
+        </div>
+      </td>
+    </tr>
+  )
+}
+
+interface CrossfadeChipProps {
+  playlist: PlaylistDetailType
+}
+
+function CrossfadeChip({ playlist }: CrossfadeChipProps) {
+  const globalEnabled = useSettingsStore((s) => s.crossfadeEnabled)
+  const globalDuration = useSettingsStore((s) => s.crossfadeDuration)
+  const updatePlaylist = usePlaylistStore((s) => s.updatePlaylist)
+
+  const [open, setOpen] = useState(false)
+  const [mode, setMode] = useState<"inherit" | "on" | "off">(
+    playlist.crossfade_enabled === null || playlist.crossfade_enabled === undefined
+      ? "inherit"
+      : playlist.crossfade_enabled === 0
+      ? "off"
+      : "on"
+  )
+  const [duration, setDuration] = useState(playlist.crossfade_duration_s ?? globalDuration)
+  const [saving, setSaving] = useState(false)
+
+  const resolvedDuration =
+    mode === "inherit" ? globalDuration : duration
+
+  function label() {
+    if (mode === "off") return "Gapless"
+    return `${resolvedDuration}s`
+  }
+
+  async function handleSave() {
+    setSaving(true)
+    try {
+      await updatePlaylist(playlist.id, {
+        crossfade_enabled: mode === "inherit" ? null : mode === "on" ? 1 : 0,
+        crossfade_duration_s: mode === "on" ? duration : null,
+      })
+      setOpen(false)
+    } catch {
+      toast.error("Failed to save crossfade settings")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const durPct = ((duration - 1) / 11) * 100
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
+        className="flex items-center gap-1.5 h-9 px-3 rounded-md text-[12px] text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] hover:bg-white/[0.04] transition-all duration-150"
+        title="Crossfade settings"
+      >
+        <Sparkles className="h-3.5 w-3.5" />
+        <span>{label()}</span>
+      </PopoverTrigger>
+      <PopoverContent
+        className="w-64 p-4 space-y-4"
+        style={{
+          background: "var(--aurora-surface-3)",
+          border: "1px solid var(--aurora-rim)",
+          backdropFilter: "blur(12px)",
+        }}
+        align="end"
+      >
+        <p className="label-micro text-[10px] tracking-[0.15em]">Crossfade</p>
+
+        <div className="space-y-1">
+          {(["inherit", "on", "off"] as const).map((m) => (
+            <button
+              key={m}
+              onClick={() => setMode(m)}
+              className={`w-full text-left px-3 py-2 rounded-md text-[13px] transition-colors duration-150 ${
+                mode === m
+                  ? "bg-[var(--aurora-accent-interactive)]/15 text-[var(--aurora-accent-interactive)]"
+                  : "text-[var(--aurora-text-secondary)] hover:bg-white/[0.04] hover:text-[var(--aurora-text)]"
+              }`}
+            >
+              {m === "inherit"
+                ? `Inherit global (${globalEnabled ? globalDuration + "s" : "off"})`
+                : m === "on"
+                ? "On"
+                : "Gapless (off)"}
+            </button>
+          ))}
+        </div>
+
+        {mode === "on" && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[12px] text-[var(--aurora-text-secondary)]">Duration</span>
+              <span className="text-[12px] tabular-nums text-[var(--aurora-text)]">{duration}s</span>
+            </div>
+            <input
+              type="range"
+              min={1}
+              max={12}
+              step={1}
+              value={duration}
+              onChange={(e) => setDuration(Number(e.target.value))}
+              className="aurora-range w-full"
+              style={{ ["--aurora-range-pct" as string]: `${durPct}%` }}
+            />
+          </div>
+        )}
+
+        <div className="flex justify-end gap-2 pt-1">
+          <button
+            onClick={() => setOpen(false)}
+            className="text-[11px] px-3 py-1.5 rounded text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="text-[11px] px-3 py-1.5 rounded bg-[var(--aurora-accent-interactive)] text-black font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+          >
+            Save
+          </button>
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }

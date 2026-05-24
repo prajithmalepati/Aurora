@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, UploadFile, File
 from datetime import datetime, timezone
 
 from app.database import get_db
-from app.models import PlaylistCreate, PlaylistUpdate, PlaylistResponse, SongResponse, PlaylistSongAdd, PlaylistReorder
+from app.models import PlaylistCreate, PlaylistUpdate, PlaylistResponse, SongResponse, PlaylistSongAdd, PlaylistReorder, PlaylistSongTiming
 
 # Playlist cover images are saved into the Vite public folder so they're
 # served at /playlist-images/<id>.<ext> by the dev server (no CORS issues).
@@ -141,6 +141,8 @@ def list_playlists():
             p.color,
             p.emoji,
             p.image_url,
+            p.crossfade_enabled,
+            p.crossfade_duration_s,
             COUNT(ps.song_id) as song_count,
             p.created_at,
             p.updated_at
@@ -161,6 +163,8 @@ def list_playlists():
             color=row["color"],
             emoji=row["emoji"],
             image_url=row["image_url"],
+            crossfade_enabled=row["crossfade_enabled"],
+            crossfade_duration_s=row["crossfade_duration_s"],
             song_count=row["song_count"],
             created_at=row["created_at"],
             updated_at=row["updated_at"],
@@ -240,6 +244,8 @@ def reorder_playlist_songs(playlist_id: int, reorder: PlaylistReorder):
             s.album_art_path,
             s.source,
             GROUP_CONCAT(t.name) as tags,
+            ps.start_time_ms,
+            ps.end_time_ms,
             ps.position
         FROM songs s
         JOIN playlist_songs ps ON s.id = ps.song_id
@@ -275,6 +281,8 @@ def reorder_playlist_songs(playlist_id: int, reorder: PlaylistReorder):
                 playlists=[],
                 created_at="",
                 updated_at="",
+                start_time_ms=song_row["start_time_ms"],
+                end_time_ms=song_row["end_time_ms"],
                 position=song_row["position"],
             )
         )
@@ -285,7 +293,7 @@ def reorder_playlist_songs(playlist_id: int, reorder: PlaylistReorder):
 
     cursor.execute(
         """
-        SELECT id, name, color, emoji, image_url, created_at, updated_at
+        SELECT id, name, color, emoji, image_url, crossfade_enabled, crossfade_duration_s, created_at, updated_at
         FROM playlists
         WHERE id = ?
         """,
@@ -303,6 +311,8 @@ def reorder_playlist_songs(playlist_id: int, reorder: PlaylistReorder):
             "color": row["color"],
             "emoji": row["emoji"],
             "image_url": row["image_url"],
+            "crossfade_enabled": row["crossfade_enabled"],
+            "crossfade_duration_s": row["crossfade_duration_s"],
             "song_count": song_count,
             "songs": songs,
             "created_at": row["created_at"],
@@ -389,6 +399,8 @@ def delete_song_from_playlist(playlist_id: int, song_id: int):
             s.album_art_path,
             s.source,
             GROUP_CONCAT(t.name) as tags,
+            ps.start_time_ms,
+            ps.end_time_ms,
             ps.position
         FROM songs s
         JOIN playlist_songs ps ON s.id = ps.song_id
@@ -424,6 +436,8 @@ def delete_song_from_playlist(playlist_id: int, song_id: int):
                 playlists=[],
                 created_at="",
                 updated_at="",
+                start_time_ms=song_row["start_time_ms"],
+                end_time_ms=song_row["end_time_ms"],
                 position=song_row["position"],
             )
         )
@@ -434,7 +448,7 @@ def delete_song_from_playlist(playlist_id: int, song_id: int):
 
     cursor.execute(
         """
-        SELECT id, name, color, emoji, image_url, created_at, updated_at
+        SELECT id, name, color, emoji, image_url, crossfade_enabled, crossfade_duration_s, created_at, updated_at
         FROM playlists
         WHERE id = ?
         """,
@@ -452,6 +466,8 @@ def delete_song_from_playlist(playlist_id: int, song_id: int):
             "color": row["color"],
             "emoji": row["emoji"],
             "image_url": row["image_url"],
+            "crossfade_enabled": row["crossfade_enabled"],
+            "crossfade_duration_s": row["crossfade_duration_s"],
             "song_count": song_count,
             "songs": songs,
             "created_at": row["created_at"],
@@ -470,7 +486,7 @@ def get_playlist(playlist_id: int):
     # Fetch playlist metadata
     cursor.execute(
         """
-        SELECT id, name, color, emoji, image_url, created_at, updated_at
+        SELECT id, name, color, emoji, image_url, crossfade_enabled, crossfade_duration_s, created_at, updated_at
         FROM playlists
         WHERE id = ?
         """,
@@ -498,6 +514,8 @@ def get_playlist(playlist_id: int):
             s.album_art_path,
             s.source,
             GROUP_CONCAT(t.name) as tags,
+            ps.start_time_ms,
+            ps.end_time_ms,
             ps.position
         FROM songs s
         JOIN playlist_songs ps ON s.id = ps.song_id
@@ -533,6 +551,8 @@ def get_playlist(playlist_id: int):
                 playlists=[],
                 created_at="",
                 updated_at="",
+                start_time_ms=song_row["start_time_ms"],
+                end_time_ms=song_row["end_time_ms"],
                 position=song_row["position"],
             )
         )
@@ -547,6 +567,8 @@ def get_playlist(playlist_id: int):
             "color": row["color"],
             "emoji": row["emoji"],
             "image_url": row["image_url"],
+            "crossfade_enabled": row["crossfade_enabled"],
+            "crossfade_duration_s": row["crossfade_duration_s"],
             "song_count": song_count,
             "songs": songs,
             "created_at": row["created_at"],
@@ -602,7 +624,15 @@ def update_playlist(playlist_id: int, playlist: PlaylistUpdate):
     if playlist.emoji is not None:
         updates.append("emoji = ?")
         params.append(playlist.emoji if playlist.emoji else None)
-    
+
+    if "crossfade_enabled" in playlist.model_fields_set:
+        updates.append("crossfade_enabled = ?")
+        params.append(playlist.crossfade_enabled)
+
+    if "crossfade_duration_s" in playlist.model_fields_set:
+        updates.append("crossfade_duration_s = ?")
+        params.append(playlist.crossfade_duration_s)
+
     updates.append("updated_at = ?")
     params.append(now)
     
@@ -626,6 +656,8 @@ def update_playlist(playlist_id: int, playlist: PlaylistUpdate):
             p.color,
             p.emoji,
             p.image_url,
+            p.crossfade_enabled,
+            p.crossfade_duration_s,
             COUNT(ps.song_id) as song_count,
             p.created_at,
             p.updated_at
@@ -645,6 +677,8 @@ def update_playlist(playlist_id: int, playlist: PlaylistUpdate):
         color=row["color"],
         emoji=row["emoji"],
         image_url=row["image_url"],
+        crossfade_enabled=row["crossfade_enabled"],
+        crossfade_duration_s=row["crossfade_duration_s"],
         song_count=row["song_count"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
@@ -732,10 +766,10 @@ def add_song_to_playlist(playlist_id: int, song_add: PlaylistSongAdd):
     
     cursor.execute(
         """
-        INSERT INTO playlist_songs (playlist_id, song_id, position, added_at)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO playlist_songs (playlist_id, song_id, position, added_at, start_time_ms, end_time_ms)
+        VALUES (?, ?, ?, ?, ?, ?)
         """,
-        (playlist_id, song_add.song_id, new_position, now),
+        (playlist_id, song_add.song_id, new_position, now, song_add.start_time_ms, song_add.end_time_ms),
     )
     conn.commit()
     conn.close()
@@ -756,6 +790,8 @@ def add_song_to_playlist(playlist_id: int, song_add: PlaylistSongAdd):
             s.album_art_path,
             s.source,
             GROUP_CONCAT(t.name) as tags,
+            ps.start_time_ms,
+            ps.end_time_ms,
             ps.position
         FROM songs s
         JOIN playlist_songs ps ON s.id = ps.song_id
@@ -791,6 +827,8 @@ def add_song_to_playlist(playlist_id: int, song_add: PlaylistSongAdd):
                 playlists=[],
                 created_at="",
                 updated_at="",
+                start_time_ms=song_row["start_time_ms"],
+                end_time_ms=song_row["end_time_ms"],
                 position=song_row["position"],
             )
         )
@@ -801,7 +839,7 @@ def add_song_to_playlist(playlist_id: int, song_add: PlaylistSongAdd):
 
     cursor.execute(
         """
-        SELECT id, name, color, emoji, image_url, created_at, updated_at
+        SELECT id, name, color, emoji, image_url, crossfade_enabled, crossfade_duration_s, created_at, updated_at
         FROM playlists
         WHERE id = ?
         """,
@@ -819,6 +857,8 @@ def add_song_to_playlist(playlist_id: int, song_add: PlaylistSongAdd):
             "color": row["color"],
             "emoji": row["emoji"],
             "image_url": row["image_url"],
+            "crossfade_enabled": row["crossfade_enabled"],
+            "crossfade_duration_s": row["crossfade_duration_s"],
             "song_count": song_count,
             "songs": songs,
             "created_at": row["created_at"],
@@ -826,3 +866,37 @@ def add_song_to_playlist(playlist_id: int, song_add: PlaylistSongAdd):
         },
         "message": "ok",
     }
+
+@router.patch("/playlists/{playlist_id}/songs/{song_id}/timing", status_code=200)
+def update_song_timing(playlist_id: int, song_id: int, timing: PlaylistSongTiming):
+    """Set start/end trim times for a song in a playlist. 0 = not set (full song)."""
+    if timing.start_time_ms > 0 and timing.end_time_ms > 0:
+        if timing.start_time_ms >= timing.end_time_ms:
+            raise HTTPException(status_code=422, detail="start_time_ms must be less than end_time_ms")
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT id FROM playlist_songs WHERE playlist_id = ? AND song_id = ?",
+        (playlist_id, song_id),
+    )
+    if not cursor.fetchone():
+        conn.close()
+        raise HTTPException(status_code=404, detail="Song not in playlist")
+
+    end_ms = timing.end_time_ms
+    if end_ms > 0:
+        cursor.execute("SELECT duration FROM songs WHERE id = ?", (song_id,))
+        song_row = cursor.fetchone()
+        if song_row and song_row["duration"] and end_ms > song_row["duration"] * 1000:
+            end_ms = song_row["duration"] * 1000
+
+    cursor.execute(
+        "UPDATE playlist_songs SET start_time_ms = ?, end_time_ms = ? WHERE playlist_id = ? AND song_id = ?",
+        (timing.start_time_ms, end_ms, playlist_id, song_id),
+    )
+    conn.commit()
+    conn.close()
+
+    return {"start_time_ms": timing.start_time_ms, "end_time_ms": end_ms, "message": "ok"}

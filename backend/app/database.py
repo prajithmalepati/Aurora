@@ -107,6 +107,28 @@ def init_db():
         pass  # Column already exists
     # Backfill album_art_path for songs that have a file but no art extracted yet
     _backfill_album_art(conn)
+    # Migration: add trim columns to playlist_songs
+    try:
+        conn.execute("ALTER TABLE playlist_songs ADD COLUMN start_time_ms INTEGER NOT NULL DEFAULT 0")
+        conn.commit()
+    except Exception:
+        pass
+    try:
+        conn.execute("ALTER TABLE playlist_songs ADD COLUMN end_time_ms INTEGER NOT NULL DEFAULT 0")
+        conn.commit()
+    except Exception:
+        pass
+    # Migration: add crossfade columns to playlists
+    try:
+        conn.execute("ALTER TABLE playlists ADD COLUMN crossfade_enabled INTEGER DEFAULT NULL")
+        conn.commit()
+    except Exception:
+        pass
+    try:
+        conn.execute("ALTER TABLE playlists ADD COLUMN crossfade_duration_s INTEGER DEFAULT NULL")
+        conn.commit()
+    except Exception:
+        pass
     conn.close()
 
 
