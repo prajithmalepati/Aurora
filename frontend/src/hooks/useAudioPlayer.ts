@@ -60,7 +60,14 @@ export function useAudioPlayer() {
           window.clearInterval(intervalRef.current)
           intervalRef.current = null
         }
-        next()
+        const { repeatMode } = usePlayerStore.getState()
+        if (repeatMode === "one") {
+          howl.seek(0)
+          howl.play()
+          updateSeek(0)
+        } else {
+          next()
+        }
       },
       onload: () => {
         if (howlRef.current) {
