@@ -306,12 +306,7 @@ export function QueryBuilder() {
 
       {/* Floating action zone — fades in once user scrolls past the query bar */}
       <div
-        className="mix-float-zone"
-        style={{
-          opacity: showFloat ? 1 : 0,
-          pointerEvents: showFloat ? "auto" : "none",
-          transform: showFloat ? "translateY(0)" : "translateY(6px)",
-        }}
+        className={`mix-float-zone${showFloat ? " mix-float-zone--visible" : ""}`}
         aria-hidden={!showFloat}
       >
         <button
@@ -327,8 +322,8 @@ export function QueryBuilder() {
           disabled={loading || !query.trim()}
           className="mix-float-jam aurora-btn-press"
         >
-          <Sparkles className="h-[17px] w-[17px]" strokeWidth={2} />
-          <span className="font-display text-[17px] font-medium leading-none">Jam</span>
+          <Sparkles className="h-[18px] w-[18px]" strokeWidth={2} />
+          <span className="font-display text-[18px] font-medium leading-none">Jam</span>
         </button>
       </div>
     </div>

@@ -296,7 +296,7 @@ export function PlayerBar() {
               </div>
 
               <div className="flex items-center gap-3 w-full">
-                <span className="text-[10.5px] text-[var(--aurora-text-secondary)] w-9 text-right tabular-nums font-medium">
+                <span className="text-[11px] text-[var(--aurora-text-secondary)] w-9 text-right tabular-nums font-medium">
                   {formatDuration(seek)}
                 </span>
                 <input
@@ -311,7 +311,7 @@ export function PlayerBar() {
                   style={{ ["--aurora-range-pct" as string]: `${seekPct}%` }}
                   aria-label="Seek"
                 />
-                <span className="text-[10.5px] text-[var(--aurora-text-tertiary)] w-9 tabular-nums font-medium">
+                <span className="text-[11px] text-[var(--aurora-text-tertiary)] w-9 tabular-nums font-medium">
                   {formatDuration(duration)}
                 </span>
               </div>
@@ -322,7 +322,7 @@ export function PlayerBar() {
               {hasSong && isPlaying && (
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <Equalizer playing={isPlaying} />
-                  <span className="label-micro text-[9.5px] text-[var(--aurora-accent-interactive)] whitespace-nowrap opacity-70">
+                  <span className="label-micro text-[10px] text-[var(--aurora-accent-interactive)] whitespace-nowrap opacity-70">
                     Playing
                   </span>
                 </div>

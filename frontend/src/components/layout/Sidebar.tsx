@@ -294,7 +294,7 @@ function TagSidebarItem({ name, count, onClick }: TagSidebarItemProps) {
         }}
         aria-hidden="true"
       />
-      <span className="relative z-10 flex-1 min-w-0 truncate text-[12.5px] font-medium tracking-tight">
+      <span className="relative z-10 flex-1 min-w-0 truncate text-[13px] font-medium tracking-tight">
         {name}
       </span>
       <span className="relative z-10 text-[10px] tabular-nums text-[var(--aurora-text-tertiary)] group-hover:text-[var(--aurora-text-secondary)] transition-colors duration-150">
