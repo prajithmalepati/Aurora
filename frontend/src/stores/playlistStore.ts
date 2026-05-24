@@ -20,6 +20,8 @@ interface PlaylistState {
     name?: string
     color?: string
     emoji?: string
+    crossfade_enabled?: number | null
+    crossfade_duration_s?: number | null
   }) => Promise<void>
   deletePlaylist: (id: number) => Promise<void>
   addSongToPlaylist: (playlistId: number, songId: number) => Promise<void>
