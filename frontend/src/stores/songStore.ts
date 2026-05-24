@@ -15,8 +15,11 @@ interface SongState {
   loading: boolean
   error: string | null
   view: View
+  sortField: string
+  sortOrder: "asc" | "desc"
 
   fetchSongs: (search?: string) => Promise<void>
+  sortSongs: (field: string, order: "asc" | "desc") => void
   createSong: (data: {
     title: string
     artist: string
@@ -42,16 +45,27 @@ export const useSongStore = create<SongState>((set, get) => ({
   loading: false,
   error: null,
   view: { kind: "filter" },
+  sortField: "title",
+  sortOrder: "asc",
 
   fetchSongs: async (search) => {
     set({ loading: true, error: null })
     try {
-      const params = search ? `?search=${encodeURIComponent(search)}&limit=500` : "?limit=500"
-      const res = await api.get<ApiResponse<Song[]>>(`/songs${params}`)
+      const { sortField, sortOrder } = get()
+      const params = new URLSearchParams({ limit: "500" })
+      if (search) params.set("search", search)
+      params.set("sort", sortField)
+      params.set("order", sortOrder)
+      const res = await api.get<ApiResponse<Song[]>>(`/songs?${params.toString()}`)
       set({ songs: res.data, loading: false })
     } catch (e: any) {
       set({ error: e.message, loading: false })
     }
+  },
+
+  sortSongs: (field, order) => {
+    set({ sortField: field, sortOrder: order })
+    get().fetchSongs()
   },
 
   createSong: async (data) => {
