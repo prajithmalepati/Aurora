@@ -11,6 +11,8 @@ interface PlayerState {
   seek: number            // current position in seconds
   duration: number        // total duration in seconds
   repeatMode: "none" | "all" | "one"
+  isShuffled: boolean
+  originalQueue: Song[]
 
   playSong: (song: Song, queue?: Song[]) => void
   togglePlay: () => void
@@ -23,6 +25,7 @@ interface PlayerState {
   updateSeek: (s: number) => void
   stop: () => void
   cycleRepeat: () => void
+  toggleShuffle: () => void
 }
 
 function loadStoredVolume(): number {
@@ -31,6 +34,15 @@ function loadStoredVolume(): number {
 }
 
 const _initVol = loadStoredVolume()
+
+function shuffleArray<T>(arr: T[]): T[] {
+  const a = [...arr]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
 
 export const usePlayerStore = create<PlayerState>((set, get) => ({
   currentSong: null,
@@ -42,14 +54,13 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   seek: 0,
   duration: 0,
   repeatMode: "none" as "none" | "all" | "one",
+  isShuffled: false,
+  originalQueue: [],
 
   playSong: (song, queue) => {
-    // Only play songs that have a file_path (audio available)
     if (!song.file_path) return
-
-    const newQueue = queue?.filter(s => s.file_path) ?? [song]
-    const index = newQueue.findIndex(s => s.id === song.id)
-
+    const newQueue = queue?.filter((s) => s.file_path) ?? [song]
+    const index = newQueue.findIndex((s) => s.id === song.id)
     set({
       currentSong: song,
       queue: newQueue,
@@ -57,6 +68,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       isPlaying: true,
       seek: 0,
       duration: song.duration ?? 0,
+      isShuffled: false,
+      originalQueue: [],
     })
   },
 
@@ -156,5 +169,28 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       one: "none",
     }
     set({ repeatMode: nextMode[repeatMode] })
+  },
+
+  toggleShuffle: () => {
+    const { isShuffled, queue, currentSong, originalQueue } = get()
+    if (!isShuffled) {
+      const shuffled = shuffleArray(queue)
+      const newIndex = shuffled.findIndex((s) => s.id === currentSong?.id)
+      set({
+        isShuffled: true,
+        originalQueue: queue,
+        queue: shuffled,
+        queueIndex: newIndex >= 0 ? newIndex : 0,
+      })
+    } else {
+      const restored = originalQueue
+      const newIndex = restored.findIndex((s) => s.id === currentSong?.id)
+      set({
+        isShuffled: false,
+        queue: restored,
+        queueIndex: newIndex >= 0 ? newIndex : 0,
+        originalQueue: [],
+      })
+    }
   },
 }))
