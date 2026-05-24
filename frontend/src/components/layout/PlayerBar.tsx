@@ -4,7 +4,7 @@ import { formatDuration } from "@/lib/utils"
 import { albumGradient } from "@/lib/albumGradient"
 import { AlbumArt } from "@/components/songs/AlbumArt"
 import { Equalizer } from "@/components/ui/Equalizer"
-import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX } from "lucide-react"
+import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Shuffle, Repeat, Repeat1 } from "lucide-react"
 import { useMemo } from "react"
 
 export function PlayerBar() {
@@ -19,6 +19,10 @@ export function PlayerBar() {
   const togglePlay = usePlayerStore((state) => state.togglePlay)
   const next = usePlayerStore((state) => state.next)
   const previous = usePlayerStore((state) => state.previous)
+  const repeatMode = usePlayerStore((state) => state.repeatMode)
+  const cycleRepeat = usePlayerStore((state) => state.cycleRepeat)
+  const isShuffled = usePlayerStore((state) => state.isShuffled)
+  const toggleShuffle = usePlayerStore((state) => state.toggleShuffle)
 
   // isIdle = no song ever selected (initial app load only).
   // Once currentSong is set it never returns to null, so this only fires once.
@@ -32,6 +36,15 @@ export function PlayerBar() {
     () => albumGradient(currentSong?.id ?? currentSong?.title ?? "void"),
     [currentSong?.id, currentSong?.title]
   )
+
+  const RepeatIcon = repeatMode === "one" ? Repeat1 : Repeat
+  const repeatActive = repeatMode !== "none"
+  const transportBtnClass = (active: boolean) =>
+    `transition-colors duration-150 disabled:opacity-25 disabled:pointer-events-none ${
+      active
+        ? "text-[var(--aurora-accent-interactive)]"
+        : "text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)]"
+    }`
 
   return (
     <div
@@ -115,15 +128,25 @@ export function PlayerBar() {
             </div>
 
             {/* Controls row */}
-            <div className="flex items-center justify-center gap-5">
+            <div className="flex items-center justify-center gap-4">
+              <button
+                onClick={toggleShuffle}
+                disabled={!hasSong}
+                className={transportBtnClass(isShuffled)}
+                aria-label={isShuffled ? "Shuffle on" : "Shuffle off"}
+              >
+                <Shuffle className="h-3.5 w-3.5" strokeWidth={2} />
+              </button>
+
               <button
                 onClick={() => { if (seek > 3) seekTo(0); else previous() }}
                 disabled={!hasSong}
-                className="text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] disabled:opacity-25 disabled:pointer-events-none transition-colors duration-150"
+                className={transportBtnClass(false)}
                 aria-label="Previous"
               >
                 <SkipBack className="h-4 w-4" fill="currentColor" strokeWidth={0} />
               </button>
+
               <button
                 onClick={togglePlay}
                 disabled={!hasSong}
@@ -136,13 +159,23 @@ export function PlayerBar() {
                   <Play className="h-4 w-4 ml-[1px] text-[var(--aurora-slate)]" fill="currentColor" strokeWidth={0} />
                 )}
               </button>
+
               <button
                 onClick={next}
                 disabled={!hasSong}
-                className="text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] disabled:opacity-25 disabled:pointer-events-none transition-colors duration-150"
+                className={transportBtnClass(false)}
                 aria-label="Next"
               >
                 <SkipForward className="h-4 w-4" fill="currentColor" strokeWidth={0} />
+              </button>
+
+              <button
+                onClick={cycleRepeat}
+                disabled={!hasSong}
+                className={transportBtnClass(repeatActive)}
+                aria-label={`Repeat: ${repeatMode}`}
+              >
+                <RepeatIcon className="h-3.5 w-3.5" strokeWidth={2} />
               </button>
             </div>
           </div>
@@ -212,12 +245,18 @@ export function PlayerBar() {
             <div className="flex-1 flex flex-col items-center gap-2 max-w-[580px] mx-auto min-w-0">
               <div className="flex items-center gap-3">
                 <button
-                  onClick={() => {
-                    if (seek > 3) seekTo(0)
-                    else previous()
-                  }}
+                  onClick={toggleShuffle}
                   disabled={!hasSong}
-                  className="text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] disabled:opacity-25 disabled:pointer-events-none transition-colors duration-150"
+                  className={transportBtnClass(isShuffled)}
+                  aria-label={isShuffled ? "Shuffle on" : "Shuffle off"}
+                >
+                  <Shuffle className="h-[15px] w-[15px]" strokeWidth={2} />
+                </button>
+
+                <button
+                  onClick={() => { if (seek > 3) seekTo(0); else previous() }}
+                  disabled={!hasSong}
+                  className={transportBtnClass(false)}
                   aria-label="Previous"
                 >
                   <SkipBack className="h-[18px] w-[18px]" fill="currentColor" strokeWidth={0} />
@@ -239,10 +278,19 @@ export function PlayerBar() {
                 <button
                   onClick={next}
                   disabled={!hasSong}
-                  className="text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] disabled:opacity-25 disabled:pointer-events-none transition-colors duration-150"
+                  className={transportBtnClass(false)}
                   aria-label="Next"
                 >
                   <SkipForward className="h-[18px] w-[18px]" fill="currentColor" strokeWidth={0} />
+                </button>
+
+                <button
+                  onClick={cycleRepeat}
+                  disabled={!hasSong}
+                  className={transportBtnClass(repeatActive)}
+                  aria-label={`Repeat: ${repeatMode}`}
+                >
+                  <RepeatIcon className="h-[15px] w-[15px]" strokeWidth={2} />
                 </button>
               </div>
 
