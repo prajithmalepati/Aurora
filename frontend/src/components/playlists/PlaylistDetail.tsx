@@ -73,8 +73,8 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
   }, [activePlaylist, searchQuery])
 
   const heroArt = useMemo(
-    () => albumGradient(activePlaylist?.name ?? `playlist-${playlistId}`),
-    [activePlaylist?.name, playlistId]
+    () => albumGradient(activePlaylist?.songs[0]?.id?.toString() ?? activePlaylist?.name ?? `playlist-${playlistId}`),
+    [activePlaylist?.songs, activePlaylist?.name, playlistId]
   )
 
   // Server-stored image URL (comes back from the API on every fetchPlaylistDetail)
@@ -85,8 +85,8 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
   const heroTileGradient = useMemo(() => {
     const accent = activePlaylist?.color
     return accent
-      ? `linear-gradient(135deg, ${accent}22 0%, rgba(18,20,26,1) 100%)`
-      : "linear-gradient(135deg, rgba(38,38,42,1) 0%, rgba(16,17,22,1) 100%)"
+      ? `linear-gradient(135deg, ${accent}22 0%, var(--aurora-surface-1) 100%)`
+      : "linear-gradient(135deg, var(--aurora-surface-3) 0%, var(--aurora-surface-1) 100%)"
   }, [activePlaylist?.color])
 
   const totalDuration = useMemo(() => {
