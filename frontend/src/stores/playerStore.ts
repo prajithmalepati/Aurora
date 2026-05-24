@@ -112,10 +112,12 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   toggleMute: () => {
     const { volume, preMuteVolume } = get()
     if (volume > 0) {
+      localStorage.setItem("aurora-volume", "0")
       set({ volume: 0, preMuteVolume: volume })
     } else {
-      // Restore previous level (fallback to 0.7 if somehow zero)
-      set({ volume: preMuteVolume > 0 ? preMuteVolume : 0.7 })
+      const restored = preMuteVolume > 0 ? preMuteVolume : 0.7
+      localStorage.setItem("aurora-volume", String(restored))
+      set({ volume: restored })
     }
   },
   setSeek: (s) => set({ seek: s }),
