@@ -10,16 +10,18 @@ type View =
   | { kind: "filter" }
   | { kind: "playlist"; playlistId: number }
 
+type SortField = "title" | "artist" | "album" | "duration" | "created_at"
+
 interface SongState {
   songs: Song[]
   loading: boolean
   error: string | null
   view: View
-  sortField: string
+  sortField: SortField
   sortOrder: "asc" | "desc"
 
   fetchSongs: (search?: string) => Promise<void>
-  sortSongs: (field: string, order: "asc" | "desc") => void
+  sortSongs: (field: SortField, order: "asc" | "desc") => void
   createSong: (data: {
     title: string
     artist: string
