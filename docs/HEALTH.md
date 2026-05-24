@@ -82,15 +82,15 @@ The most common violation is `#050608` hardcoded as an icon color on play/pause 
 
 | Item | Current State | Last Updated | Verdict |
 |------|---------------|--------------|---------|
-| graphify GRAPH_REPORT.md | 460 nodes, 709 edges, 43 communities | 2026-04-28 | STALE (25 days, 3 source commits since) |
-| JOURNAL.md | Session 16 entry present | 2026-05-23 | CURRENT |
-| CONTEXT.md Next-session prep | Reflects Session 16 state | 2026-05-23 | ACCURATE |
-| HANDOFF.md | Last entry: Session 15a | 2026-04-23 | STALE (30 days) |
-| features.json | f001+f006 pending, f002-f005+f007 done | 2026-05-23 | ACCURATE |
+| graphify GRAPH_REPORT.md | 550 nodes, 841 edges, 52 communities | 2026-05-23 | CURRENT |
+| JOURNAL.md | Session 20 entries present | 2026-05-23 | CURRENT |
+| CONTEXT.md Next-session prep | Reflects Session 20 state | 2026-05-23 | ACCURATE |
+| HANDOFF.md | Last entry: Session 20 | 2026-05-23 | CURRENT |
+| features.json | All done (f001-f007) | 2026-05-23 | ACCURATE |
 
 | ID | Severity | Status | Description |
 |----|----------|--------|-------------|
-| WF-001 | P2 | fixed | GRAPH_REPORT.md refreshed 2026-05-23 via `graphify update .` — 390 nodes, 563 edges, 60 communities |
+| WF-001 | P2 | fixed | GRAPH_REPORT.md refreshed 2026-05-23 via full `/graphify` pipeline — 550 nodes, 841 edges, 52 communities |
 | WF-002 | P2 | fixed | HANDOFF.md last entry is Session 15a (April 23). Session 16 completed but handoff never updated. Breaks continuity. |
 | WF-003 | P3 | fixed | Branch claude/pensive-bouman-c15aea deleted 2026-05-23 (Session 18) |
 
