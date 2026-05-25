@@ -116,20 +116,22 @@ Not frosted glass. Liquid glass: fluid, refractive, alive.
 - Star: absolute center element — sharp radial point light, `oklch(0.97 0.02 185)` (near-white with aurora tint). Tiny bright core (4px), wide soft bloom (radial-gradient 40px). Sits behind play icon, visible through glass.
 - Play icon: SVG, `color: rgba(255,255,255,0.92)`, centered
 
-**Interaction — mouse waver:**
-- Track mouse enter point relative to button center → compute angle
-- On hover: `transform: rotate(var(--wave-angle)) scale(1.04)` with 150ms ease-out
-- Subtle: ±4° rotation toward mouse contact, not a dramatic tilt
-- Leave: 200ms ease-out return to rest
+**Interaction — playback state (not pointer theatrics):**
+- **Play:** star bloom expands from 6px core → 24px, opacity 0.5 → 1.0, 300ms ease-out. Button ring brightens.
+- **Pause:** star contracts back to 6px, 200ms ease-out. Ring dims.
+- **Buffering / AnalyserNode loading:** star pulses at 1.5s cycle, 30% → 80% opacity — the only continuous animation on this element.
+- **Press feedback:** `scale(0.94)` on `pointerdown`, 80ms ease-out. Releases on `pointerup`.
+- **Disabled / no song:** star at 15% opacity, button at 40% opacity. No hover response.
 
-**Interaction — hold glow:**
-- `pointerdown` → CSS animation `auroraGlow` plays over `var(--hold-duration)`
-- `--hold-duration` = `clamp(1.5s, song.duration * 0.003s, 4s)` — scales with song length
-- Animation: star bloom expands from 40px to 70px, opacity 0.4 → 0.9, button border brightens
-- `pointerup` / `pointerleave`: animation cancels, 300ms ease-out fade back
-- Note: if song length not available, default 2.5s
+**Why not mouse waver or hold glow:** hover rotation on a control used hundreds of times/day reads as "demo," not premium software. Hold glow adds mystery with no utility — users don't hold play to learn song length. State-driven behavior is always more earned than pointer theatrics.
 
-**Implementation:** Pure CSS + small JS event handler. No canvas needed. ~60 lines.
+**Specular edges (make it glass, not just blur):**
+- Top edge: `box-shadow: inset 0 1px 0 rgba(255,255,255,0.22)` — catches light from above
+- Bottom edge: `box-shadow: inset 0 -1px 0 rgba(0,0,0,0.3)`
+- Both combined with `backdrop-filter: blur(12px) saturate(1.4)`
+- Pressed: specular reverses — top dims, bottom brightens (`inset 0 1px 0 rgba(0,0,0,0.2)`)
+
+**Implementation:** Pure CSS + playback state from `playerStore.isPlaying` + `playerStore.isBuffering`. No canvas. ~70 lines.
 
 ### 5. Color Bleed — Ambient Wash
 
@@ -176,11 +178,13 @@ Not a subtle halo behind the art. A big, distant light source that floods the en
 
 | Role | Font | Usage |
 |---|---|---|
-| Display | Fraunces (variable, italic axis) | App name, section headers, hero moments |
-| Body | Geist (variable) | All UI text, labels, descriptions |
-| Accent / mono | JetBrains Mono (variable) | Timestamps, file format badge, query syntax, tag labels |
+| Display | Fraunces (variable, italic axis) | App name (wordmark), section hero heads — max 2–3 instances per view |
+| Body | Geist (variable) | Everything else — nav items, song titles, labels, descriptions, UI text |
+| Accent / mono | JetBrains Mono (variable) | Timestamps, file format badge, query syntax, tag chips, duration |
 
 All three via `@fontsource-variable`. No purchases. No self-hosting.
+
+**Fraunces constraint:** if it appears more than 3 times in any single view, it's being misused. It's a display accent, not a body substitute. Three typefaces in a dense product UI risk costume design — Fraunces earns its place by being rare.
 
 ---
 
@@ -188,12 +192,13 @@ All three via `@fontsource-variable`. No purchases. No self-hosting.
 
 - All UI transitions: `< 300ms`, `ease-out` (cubic-bezier(0.16, 1, 0.3, 1))
 - Exits: 200ms. Enters: 300ms max
-- Animate ONLY `transform` + `opacity`. Never `width`/`height`/`margin`/`padding`
+- Animate ONLY `transform` + `opacity` for UI state changes
+- **Acknowledged exceptions:** `grid-template-rows: 0fr → 1fr` for PlayerBar height (layout-safe alternative to `height`), SVG waveform fill split (geometry update, not a CSS layout property)
 - Playback controls: sub-100ms (keyboard-triggered → never animate)
 - List stagger: 20–30ms per item
-- Aurora shader + waveform: `requestAnimationFrame` loops (decorative — not UI animation, Emil rules don't apply)
+- Aurora shader + waveform: `requestAnimationFrame` loops — decorative ambient layer, not UI animation
 - Per-song color crossfade: 300ms lerp on shader uniforms + CSS transition on `--song-color`
-- `prefers-reduced-motion`: kill shader animation, freeze waveform, disable color lerp
+- `prefers-reduced-motion`: kill shader animation, freeze waveform, disable color lerp, set Lenis (if added later) to `lerp: 1`
 
 ---
 
@@ -270,6 +275,41 @@ Treatment: SVG wordmark, letterforms traced to paths (not a live font render).
 **Total estimate: ~2.5 sessions (~12 hrs)**
 
 ---
+
+## Performance Budget
+
+- **Shader:** target 60fps. Frame budget: ≤ 4ms per draw call. If `performance.now()` shows consistent overrun → reduce Perlin octaves. WebGL compile failure → CSS static gradient fallback, no crash.
+- **Memory:** cancel `requestAnimationFrame` loop on component unmount. Null WebGL context on song change, don't accumulate. Test with 10,000 song library.
+- **Low-power mode:** expose `prefersReducedMotion` + add `reducedShaderQuality` flag (halve shader resolution via canvas `width/height` scaling) for battery-constrained devices.
+- **Waveform peaks:** backend-computed eliminates frontend decode. Skeleton shown while API response pending. No decode freeze risk.
+
+## Database Migration
+
+New columns on `songs` table — required before Phase 1 frontend work:
+```sql
+ALTER TABLE songs ADD COLUMN waveform_peaks TEXT;        -- JSON array, 1000 floats
+ALTER TABLE songs ADD COLUMN dominant_color TEXT;        -- OKLCH string e.g. "oklch(0.55 0.18 185)"
+ALTER TABLE songs ADD COLUMN dominant_color_2 TEXT;      -- second cluster
+```
+All nullable. Existing songs get NULL until re-scanned. Frontend handles NULL gracefully:
+- `waveform_peaks = null` → `<WaveformBarSkeleton>` until available
+- `dominant_color = null` → default `oklch(0.55 0.15 185)` (brand teal)
+
+**Backfill:** scanner re-scan triggers on next library refresh. No forced migration — organic fill as user plays or manually rescans.
+
+## Howler.js → AnalyserNode
+
+**This is non-trivial with the existing audio hook.** Howler.js abstracts the Web Audio API. Accessing the raw `AnalyserNode` requires:
+```js
+// After Howl is created and playing:
+const ctx = Howler.ctx;                          // shared AudioContext
+const analyser = ctx.createAnalyser();
+Howler.masterGain.connect(analyser);             // tap off the master gain
+analyser.fftSize = 256;
+```
+This must be initialized in the song-change effect in `useAudioPlayer.ts`, AFTER the Howl is created. Connecting to `masterGain` means the analyser sees the mixed output (correct for amplitude). Must disconnect on unmount to avoid graph leaks.
+
+**Risk:** `Howler.ctx` may be undefined until first user interaction (browser autoplay policy). Handle with a lazy-init check.
 
 ## Implementation Gotchas (Gemini research)
 
