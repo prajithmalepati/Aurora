@@ -1,5 +1,44 @@
 # Aurora — Session Handoff
 
+## Completed This Session (2026-05-26 — Session 26)
+
+### Implementation plan — written, not yet executed
+
+**What this session was:** Plan-only. No code written. Multi-model review synthesis → `writing-plans` skill → full implementation plan.
+
+**Plan:** `docs/superpowers/plans/2026-05-25-aurora-visual-overhaul.md` — read this before executing.
+
+**External model reviews absorbed:**
+- DeepSeek gap audit (`.kilo/plans/`) — blockers B1–B5 confirmed by GPT 5.5
+- GPT 5.5 corrections: `start_time_ms`/`end_time_ms` already in model; culori needed for shader uniforms; don't remove static bg until AuroraCanvas lands; API returns `waveform_peaks` as `list[float] | null`
+- Opus (Cursor) additions: token system, track transition choreography (useSongTransition), focus model, empty/error states, anti-slop checks (prime curtain phases, Lucide stroke-width 1.25, grain opacity 3–7%, diverse radii)
+
+**Plan structure (6 phases + Phase 0):**
+- Phase 0: Design tokens (`tokens.css`) — 30 min, no deps
+- Phase 1: Backend contract (DB + scanner + API + frontend types) — blocks Phases 3–5
+- Phase 2: Kill list + fonts — independent, can run in parallel with Phase 1
+- Phase 3: Color pipeline (`useAuroraColor`, `useSongTransition`) — needs Phase 1
+- Phase 4: GLSL aurora shader + `useAudioAnalyser` + `useAuroraIntensity` — needs Phase 3
+- Phase 5: `WaveformBar` SVG — needs Phase 1
+- Phase 6: Polish, focus model, anti-slop audit, perf validation
+
+**Key technical decisions locked in plan:**
+- `miniaudio.decode_file()` for peak extraction; graceful None for unsupported formats
+- Pure Python sRGB→OKLCH math in `color_utils.py` (no colour-science dependency)
+- 5 GLSL curtains with irrational phase offsets (0.00, 1.70, 3.14, 5.30, 7.93) — prevents mechanical repetition
+- `waveform_peaks` stored as JSON TEXT in SQLite, decoded in `song_row_to_dict`
+- `useAuroraIntensity` derives from 3 signals: `songStore.view` + `playerStore.isExpanded` + 30s idle timer
+- K5 (static PNG background): NOT removed in Phase 2 — only Phase 4 removes it when AuroraCanvas replaces it
+- Kimi noted for frontend visual iteration (Phases 2–5) once backend lands
+- Agent-browser (Vercel Labs) noted as better than Playwright for visual regression
+
+**State:**
+- No code changed this session
+- Plan file created: `docs/superpowers/plans/2026-05-25-aurora-visual-overhaul.md`
+- **Next session: execute plan — start with Phase 0 + Phase 1 (backend scanner), then Phase 2 in parallel**
+
+---
+
 ## Completed This Session (2026-05-25 — Session 25)
 
 ### Visual overhaul design spec — finalized
