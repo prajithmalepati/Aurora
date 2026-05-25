@@ -105,10 +105,55 @@ Replace the flat progress `<input type="range">` visual with a wavy SVG waveform
 
 **Empty/no-song state:** `--song-color` defaults to `oklch(0.55 0.15 185)` (aurora teal); shader runs brand palette only.
 
-### 4. Album Art
+### 4. Play Button — Liquid Glass with Aurora Star
 
-- `box-shadow: 0 0 40px 8px color-mix(in oklch, var(--song-color) 30%, transparent)` — soft radial halo
+Not frosted glass. Liquid glass: fluid, refractive, alive.
+
+**Visual layers (bottom → top):**
+- Base: `backdrop-filter: blur(12px) saturate(1.4)` — pulls the aurora behind it
+- Refraction tint: `background: radial-gradient(circle, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.04) 100%)` — slightly brighter at center
+- Border: `border: 1px solid rgba(255,255,255,0.18)` with subtle inner highlight at top edge
+- Star: absolute center element — sharp radial point light, `oklch(0.97 0.02 185)` (near-white with aurora tint). Tiny bright core (4px), wide soft bloom (radial-gradient 40px). Sits behind play icon, visible through glass.
+- Play icon: SVG, `color: rgba(255,255,255,0.92)`, centered
+
+**Interaction — mouse waver:**
+- Track mouse enter point relative to button center → compute angle
+- On hover: `transform: rotate(var(--wave-angle)) scale(1.04)` with 150ms ease-out
+- Subtle: ±4° rotation toward mouse contact, not a dramatic tilt
+- Leave: 200ms ease-out return to rest
+
+**Interaction — hold glow:**
+- `pointerdown` → CSS animation `auroraGlow` plays over `var(--hold-duration)`
+- `--hold-duration` = `clamp(1.5s, song.duration * 0.003s, 4s)` — scales with song length
+- Animation: star bloom expands from 40px to 70px, opacity 0.4 → 0.9, button border brightens
+- `pointerup` / `pointerleave`: animation cancels, 300ms ease-out fade back
+- Note: if song length not available, default 2.5s
+
+**Implementation:** Pure CSS + small JS event handler. No canvas needed. ~60 lines.
+
+### 5. Color Bleed — Ambient Wash
+
+Not a subtle halo behind the art. A big, distant light source that floods the entire player region.
+
+**PlayerBar bleed:**
+- Light source: `position: absolute` pseudo-element, `width: 400px, height: 400px`, center-left of bar
+- `background: radial-gradient(circle, color-mix(in oklch, var(--song-color) 35%, transparent) 0%, transparent 70%)`
+- `filter: blur(60px)` — soft, large, far-away feel
+- Sits behind all PlayerBar chrome, `z-index: -1`
+- Effect: entire left half of player bar is faintly washed in album color, not just behind the art
+
+**Library view — current playing song bleed:**
+- Playing song row gets a `::before` pseudo — same radial-gradient wash but narrower, behind the row
+- `background: radial-gradient(...) 20%, transparent 80%)` at `opacity: 0.6`
+- Transitions in over 400ms ease-out when song changes
+
+**Art halo (keep, adjust):**
+- `box-shadow: 0 0 60px 12px color-mix(in oklch, var(--song-color) 40%, transparent)` — larger than before
 - 2px apparent lift via `box-shadow` layering (no `transform: translateZ`)
+
+### 6. Album Art
+
+- Halo: see Color Bleed section above
 - Border-radius: keep current value
 
 ---
@@ -163,17 +208,25 @@ Layering (bottom → top):
 
 ### Sidebar
 
-- Wordmark: `<svg>` element with Fraunces italic letterforms, plain fill `#e8e6e3`, no gradient
+**Wordmark — "Aurora":**
+User dislikes current rendering (gradient text on Fraunces italic). Problem is presence, not just the gradient.
+
+Treatment: SVG wordmark, letterforms traced to paths (not a live font render).
+- Letters: filled `oklch(0.92 0.01 185)` — near-white, slightly cool
+- Star at apex of "A": tiny radial glow point — `oklch(0.78 0.18 185)` teal, 6px hard core, 20px soft bloom via SVG `<radialGradient>`. Same visual language as the play button star, miniaturized.
+- No gradient on the letterforms (banned). The light comes FROM the star, not painted on the letters.
+- The star is the one deliberate decision that makes this wordmark cost something to design.
+
 - Active nav: `bg-white/[0.05]` full-width tint, zero left-stripe
 - Nav hover: `group-hover:bg-white/[0.03]` transition 200ms ease-out
 - Footer actions: `group-hover:` Tailwind, remove inline `onMouseEnter/Leave`
 
 ### PlayerBar
 
-- Height expand: `grid-template-rows` transition (was `height`)
+- Height expand: `grid-template-rows` transition (was `height`) — **add `align-items: start` to grid container** (Gemini gotcha: without it, `0fr → 1fr` jumps)
 - Progress bar: `<WaveformBar>` SVG component
 - Playing indicator: equalizer icon only (remove "Playing" text label)
-- Background: `background: color-mix(in oklch, var(--song-color) 5%, transparent)` tint
+- Background: large ambient bleed pseudo-element (see Color Bleed section), not just a 5% tint
 
 ---
 
@@ -215,6 +268,16 @@ Layering (bottom → top):
 13. Contrast / a11y pass (~30 min)
 
 **Total estimate: ~2.5 sessions (~12 hrs)**
+
+---
+
+## Implementation Gotchas (Gemini research)
+
+1. **`grid-template-rows: 0fr → 1fr` needs `align-items: start`** on the grid container. Default `align-items: none` causes jumpy transitions because fr units can't size children. Already noted in PlayerBar section — do not skip this.
+
+2. **`decodeAudioData` is blocking with no progress callback and no cancel.** Large FLACs (40MB+) will silently consume CPU. Always show a waveform loading skeleton (`<WaveformBarSkeleton>` — animated flat line) while decode runs. Backend-computed peaks (Phase 1) eliminates this entirely; skeleton is still needed while backend processes newly-scanned files.
+
+3. **Lenis + GSAP lag** (N/A for now — we're not using either). Noted for future reference: if GSAP ScrollTrigger is ever added, must pass `autoRaf: false` to Lenis and bind `.raf()` to `gsap.ticker`.
 
 ---
 
