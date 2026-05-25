@@ -4,6 +4,7 @@ import { useTagStore } from "@/stores/tagStore"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { usePlayerStore } from "@/stores/playerStore"
 import { QueryInput } from "./QueryInput"
+import { AutocompleteDropdown, type SuggestionItem } from "./AutocompleteDropdown"
 import { SongTable } from "@/components/songs/SongTable"
 import { Search, X, Shuffle, Sparkles, SlidersHorizontal, Tag } from "lucide-react"
 import type { Song } from "@/types"
@@ -29,6 +30,24 @@ export function QueryBuilder() {
   const playSong = usePlayerStore((state) => state.playSong)
   const tags = useTagStore((state) => state.tags)
   const playlists = usePlaylistStore((state) => state.playlists)
+
+  // Autocomplete state lifted from QueryInput so it can render in-flow
+  const [dropdownItems, setDropdownItems] = useState<SuggestionItem[]>([])
+  const [dropdownShow, setDropdownShow] = useState(false)
+  const [dropdownIdx, setDropdownIdx] = useState(-1)
+  const dropdownAcceptRef = useRef<(item: SuggestionItem) => void>(() => {})
+
+  function handleDropdownChange(
+    items: SuggestionItem[],
+    show: boolean,
+    accept: (item: SuggestionItem) => void,
+    idx: number
+  ) {
+    dropdownAcceptRef.current = accept
+    setDropdownItems(items)
+    setDropdownShow(show)
+    setDropdownIdx(idx)
+  }
 
   // Floating action zone: appears once user scrolls past the query bar
   const sentinelRef = useRef<HTMLDivElement>(null)
@@ -165,7 +184,24 @@ export function QueryBuilder() {
         className={`rounded-lg overflow-hidden mix-query-bar ${error ? "mix-query-bar--error" : ""}`}
       >
         {/* Top: query input spanning full width */}
-        <QueryInput />
+        <QueryInput onDropdownChange={handleDropdownChange} />
+
+        {/* In-flow autocomplete — slides chip tray down when suggestions present */}
+        <div
+          style={{
+            maxHeight: dropdownShow && dropdownItems.length > 0
+              ? `${dropdownItems.length * 34 + 8}px`
+              : "0px",
+            overflow: "hidden",
+            transition: "max-height 180ms cubic-bezier(0.25, 0.46, 0.45, 0.94)",
+          }}
+        >
+          <AutocompleteDropdown
+            suggestions={dropdownItems}
+            selectedIndex={dropdownIdx}
+            onSelect={(item) => dropdownAcceptRef.current(item)}
+          />
+        </div>
 
         {/* Bottom: chip tray — tags | operators | playlists */}
         {(tags.length > 0 || playlists.length > 0) && (

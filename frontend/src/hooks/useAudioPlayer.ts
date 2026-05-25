@@ -6,13 +6,11 @@ import { usePlaylistStore } from "@/stores/playlistStore"
 
 export function useAudioPlayer() {
   const howlRef = useRef<Howl | null>(null)
-  const nextHowlRef = useRef<Howl | null>(null)
+  // Holds the outgoing howl being faded out — cleanup passes it here instead of stopping
+  const prevHowlRef = useRef<Howl | null>(null)
   const intervalRef = useRef<number | null>(null)
   const currentSongRef = useRef<string | null>(null)
   const seekingRef = useRef(false)
-  const crossfadeActiveRef = useRef(false)
-  const crossfadeTimersRef = useRef<ReturnType<typeof setTimeout>[]>([])
-  const crossfadeNextSongIdRef = useRef<number | null>(null)
 
   const currentSong = usePlayerStore((state) => state.currentSong)
   const isPlaying = usePlayerStore((state) => state.isPlaying)
@@ -20,11 +18,6 @@ export function useAudioPlayer() {
   const updateSeek = usePlayerStore((state) => state.updateSeek)
   const setDuration = usePlayerStore((state) => state.setDuration)
   const next = usePlayerStore((state) => state.next)
-
-  function clearCrossfadeTimers() {
-    crossfadeTimersRef.current.forEach(clearTimeout)
-    crossfadeTimersRef.current = []
-  }
 
   function resolveXfade(): { enabled: boolean; duration: number } {
     const { queuePlaylistId } = usePlayerStore.getState()
@@ -41,30 +34,40 @@ export function useAudioPlayer() {
     return { enabled: settings.crossfadeEnabled, duration: settings.crossfadeDuration }
   }
 
-  // Single chokepoint: ALL Howl creation and initial playback goes through here.
-  // Fires only when the song ID changes.
+  // Unmount cleanup — stop everything that's still playing
   useEffect(() => {
-    // If crossfade is in progress, suppress normal Howl creation — the fade-complete
-    // timer owns the swap. Song-change effect just returns.
-    if (crossfadeActiveRef.current) return
-
-    // Cancel any crossfade that was pending from a previous song (manual skip scenario)
-    if (nextHowlRef.current) {
-      nextHowlRef.current.unload()
-      nextHowlRef.current = null
+    return () => {
+      if (howlRef.current) { howlRef.current.stop(); howlRef.current.unload() }
+      if (prevHowlRef.current) { prevHowlRef.current.stop(); prevHowlRef.current.unload() }
+      if (intervalRef.current) window.clearInterval(intervalRef.current)
     }
-    clearCrossfadeTimers()
-    crossfadeNextSongIdRef.current = null
+  }, [])
 
-    // Always unload any previous Howl before creating a new one
-    if (howlRef.current) {
-      howlRef.current.stop()
-      howlRef.current.unload()
-      howlRef.current = null
-    }
+  // Song-change effect — fires only when currentSong.id changes.
+  // Cleanup does NOT stop the outgoing howl; it hands it to prevHowlRef so this
+  // effect's body can crossfade it instead of hard-cutting.
+  useEffect(() => {
     if (intervalRef.current) {
       window.clearInterval(intervalRef.current)
       intervalRef.current = null
+    }
+
+    // The previous effect's cleanup deposited the outgoing howl here
+    const prev = prevHowlRef.current
+    prevHowlRef.current = null
+
+    const { enabled, duration } = resolveXfade()
+    const crossfadeIn = enabled && (prev?.playing() ?? false)
+
+    // Fade out / stop the outgoing howl
+    if (prev) {
+      if (crossfadeIn) {
+        prev.fade(prev.volume(), 0, duration * 1000)
+        setTimeout(() => { prev.stop(); prev.unload() }, duration * 1000)
+      } else {
+        prev.stop()
+        prev.unload()
+      }
     }
 
     if (!currentSong?.file_path) {
@@ -80,6 +83,7 @@ export function useAudioPlayer() {
       html5: true,
       preload: true,
       onplay: () => {
+        if (intervalRef.current) window.clearInterval(intervalRef.current)
         intervalRef.current = window.setInterval(() => {
           if (!seekingRef.current && howlRef.current) {
             const seekSec = howlRef.current.seek()
@@ -91,7 +95,7 @@ export function useAudioPlayer() {
               const { repeatMode } = usePlayerStore.getState()
               if (repeatMode === "one") {
                 const startSec = (song.start_time_ms ?? 0) / 1000
-                howlRef.current.seek(startSec)
+                howlRef.current?.seek(startSec)
                 updateSeek(startSec)
               } else {
                 next()
@@ -99,76 +103,16 @@ export function useAudioPlayer() {
               return
             }
 
-            // Crossfade initiation
-            if (!crossfadeActiveRef.current) {
-              const { enabled, duration } = resolveXfade()
-              if (enabled) {
-                const howlDuration = howlRef.current.duration()
-                if (howlDuration > 0) {
-                  const effectiveDuration = Math.min(duration, howlDuration / 2)
-                  if (seekSec >= howlDuration - effectiveDuration) {
-                    const state = usePlayerStore.getState()
-                    const nextIdx = state.queueIndex + 1
-                    const nextSong =
-                      state.queue[nextIdx] ??
-                      (state.repeatMode === "all" ? state.queue[0] : null)
-
-                    if (nextSong?.file_path) {
-                      crossfadeActiveRef.current = true
-                      crossfadeNextSongIdRef.current = nextSong.id
-                      const vol = state.volume
-
-                      nextHowlRef.current = new Howl({
-                        src: `http://localhost:8000/api/songs/${nextSong.id}/stream`,
-                        html5: true,
-                        volume: 0,
-                        autoplay: true,
-                        onend: () => {
-                          if (intervalRef.current) {
-                            window.clearInterval(intervalRef.current)
-                            intervalRef.current = null
-                          }
-                          const { repeatMode: rm } = usePlayerStore.getState()
-                          if (rm === "one") {
-                            const s = usePlayerStore.getState().currentSong
-                            const startSec2 = (s?.start_time_ms ?? 0) / 1000
-                            howlRef.current?.seek(startSec2)
-                            howlRef.current?.play()
-                            updateSeek(startSec2)
-                          } else {
-                            next()
-                          }
-                        },
-                        onpause: () => {
-                          if (intervalRef.current) {
-                            window.clearInterval(intervalRef.current)
-                            intervalRef.current = null
-                          }
-                        },
-                      })
-
-                      howlRef.current.fade(vol, 0, effectiveDuration * 1000)
-                      nextHowlRef.current.fade(0, vol, effectiveDuration * 1000)
-
-                      const t1 = setTimeout(() => {
-                        usePlayerStore.getState().next()
-                      }, effectiveDuration * 500)
-
-                      const t2 = setTimeout(() => {
-                        howlRef.current?.stop()
-                        howlRef.current?.unload()
-                        if (nextHowlRef.current) {
-                          howlRef.current = nextHowlRef.current
-                          nextHowlRef.current = null
-                        }
-                        crossfadeActiveRef.current = false
-                        crossfadeNextSongIdRef.current = null
-                        crossfadeTimersRef.current = []
-                      }, effectiveDuration * 1000)
-
-                      crossfadeTimersRef.current = [t1, t2]
-                    }
-                  }
+            // Crossfade early trigger — clear interval first to prevent double-fire
+            const { enabled: xEnabled, duration: xDuration } = resolveXfade()
+            if (xEnabled) {
+              const howlDuration = howlRef.current.duration()
+              if (howlDuration > 0) {
+                const effectiveDuration = Math.min(xDuration, howlDuration / 2)
+                if (seekSec >= howlDuration - effectiveDuration) {
+                  window.clearInterval(intervalRef.current!)
+                  intervalRef.current = null
+                  next()
                 }
               }
             }
@@ -182,7 +126,6 @@ export function useAudioPlayer() {
         }
       },
       onend: () => {
-        if (crossfadeActiveRef.current) return // crossfade handles advancement
         if (intervalRef.current) {
           window.clearInterval(intervalRef.current)
           intervalRef.current = null
@@ -206,26 +149,32 @@ export function useAudioPlayer() {
         }
       },
       onloaderror: (_, errorId) => {
-        console.error(`Howl load error for song ${songId}, errorId: ${errorId}`)
+        console.error(`Howl load error song ${songId}:`, errorId)
       },
       onplayerror: (_, errorId) => {
-        console.error(`Howl play error for song ${songId}, errorId: ${errorId}`)
+        console.error(`Howl play error song ${songId}:`, errorId)
       },
     })
 
     howlRef.current = howl
-    howl.volume(volume)
 
     if (usePlayerStore.getState().isPlaying) {
-      howl.play()
+      if (crossfadeIn) {
+        howl.volume(0)
+        howl.play()
+        howl.fade(0, volume, duration * 1000)
+      } else {
+        howl.volume(volume)
+        howl.play()
+      }
+    } else {
+      howl.volume(volume)
     }
 
     return () => {
-      howl.stop()
-      howl.unload()
-      if (howlRef.current === howl) {
-        howlRef.current = null
-      }
+      // Hand off to prevHowlRef — DO NOT stop here, let the next body crossfade
+      prevHowlRef.current = howl
+      if (howlRef.current === howl) howlRef.current = null
       if (intervalRef.current) {
         window.clearInterval(intervalRef.current)
         intervalRef.current = null
@@ -234,15 +183,15 @@ export function useAudioPlayer() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentSong?.id])
 
-  // Pause / resume effect: fires ONLY when isPlaying toggles.
+  // Pause / resume
   useEffect(() => {
     if (!howlRef.current) return
     if (isPlaying) {
       howlRef.current.play()
-      if (nextHowlRef.current) nextHowlRef.current.play()
+      prevHowlRef.current?.play()
     } else {
       howlRef.current.pause()
-      if (nextHowlRef.current) nextHowlRef.current.pause()
+      prevHowlRef.current?.pause()
     }
   }, [isPlaying])
 
@@ -250,7 +199,7 @@ export function useAudioPlayer() {
   useEffect(() => {
     if (!howlRef.current) return
     howlRef.current.volume(volume)
-    // Don't override nextHowlRef volume — it's being faded in
+    // Don't touch prevHowlRef — it's mid-fade
   }, [volume])
 
   const seekTo = useCallback((seconds: number) => {
