@@ -41,6 +41,9 @@ dist/
 *.log
 
 ui-ux-pro-max/
+design checklist
+.agents/
+skills-lock.json
 
 
 # Database backups
