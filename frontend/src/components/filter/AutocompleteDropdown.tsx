@@ -10,11 +10,12 @@ interface Props {
 
 export function AutocompleteDropdown({ suggestions, selectedIndex, onSelect }: Props) {
   return (
-    <div className="absolute top-full left-0 right-0 z-50 mt-1 aurora-fade-in rounded-lg overflow-hidden
-                    bg-[var(--aurora-surface-3)] border border-[var(--aurora-rim)] backdrop-blur-md">
+    <div className="border-t border-[rgba(255,255,255,0.05)] py-1">
       {suggestions.map((item, i) => {
         const isActive = i === selectedIndex
-        const activeBase = isActive ? "bg-[var(--aurora-surface)]" : "hover:bg-[var(--aurora-surface)]"
+        const activeBase = isActive
+          ? "bg-[var(--aurora-surface-hover)]"
+          : "hover:bg-[var(--aurora-surface-hover)]"
 
         if (item.kind === "operator") {
           return (
@@ -22,7 +23,7 @@ export function AutocompleteDropdown({ suggestions, selectedIndex, onSelect }: P
               key={item.value}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => onSelect(item)}
-              className={`relative px-3 py-1.5 cursor-pointer flex items-center gap-2 select-none ${activeBase}`}
+              className={`relative px-3 py-1.5 cursor-pointer flex items-center gap-2 select-none transition-colors duration-100 ${activeBase}`}
             >
               {isActive && (
                 <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-[var(--aurora-accent-interactive)] rounded-r" />
@@ -43,7 +44,7 @@ export function AutocompleteDropdown({ suggestions, selectedIndex, onSelect }: P
             key={item.name}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => onSelect(item)}
-            className={`relative px-3 py-1.5 cursor-pointer text-[13px] select-none ${activeBase}
+            className={`relative px-3 py-1.5 cursor-pointer text-[13px] select-none transition-colors duration-100 ${activeBase}
               ${item.matchType === "substring" ? "text-[var(--aurora-text-secondary)]" : "text-[var(--aurora-text)]"}`}
           >
             {isActive && (

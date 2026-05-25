@@ -2,7 +2,7 @@ import { useFilterStore } from "@/stores/filterStore"
 import { useTagStore } from "@/stores/tagStore"
 import { useMemo, useState, useRef } from "react"
 import { Check, X } from "lucide-react"
-import { AutocompleteDropdown, type SuggestionItem } from "./AutocompleteDropdown"
+import type { SuggestionItem } from "./AutocompleteDropdown"
 import type { Tag } from "@/types"
 
 function validateQuery(query: string): boolean {
@@ -104,7 +104,16 @@ function computeSuggestions(
   return results.slice(0, 8)
 }
 
-export function QueryInput() {
+interface QueryInputProps {
+  onDropdownChange: (
+    items: SuggestionItem[],
+    show: boolean,
+    accept: (item: SuggestionItem) => void,
+    selectedIndex: number
+  ) => void
+}
+
+export function QueryInput({ onDropdownChange }: QueryInputProps) {
   const query = useFilterStore((state) => state.query)
   const setQuery = useFilterStore((state) => state.setQuery)
   const executeFilter = useFilterStore((state) => state.executeFilter)
@@ -115,30 +124,6 @@ export function QueryInput() {
   const [showDropdown, setShowDropdown] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  function updateSuggestions(value: string, cursorPos: number) {
-    const { token, context } = getTokenAtCursor(value, cursorPos)
-    if (context === "quoted" || context === "none" || !token) {
-      setSuggestions([])
-      setShowDropdown(false)
-      return
-    }
-    const items = computeSuggestions(token, context, tags)
-    setSuggestions(items)
-    setShowDropdown(items.length > 0)
-    setSelectedIndex(-1)
-  }
-
-  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const value = e.target.value
-    setQuery(value)
-    updateSuggestions(value, e.target.selectionStart ?? value.length)
-  }
-
-  function handleClick(e: React.MouseEvent<HTMLInputElement>) {
-    const input = e.currentTarget
-    updateSuggestions(input.value, input.selectionStart ?? input.value.length)
-  }
 
   function acceptSuggestion(item: SuggestionItem) {
     const cursorPos = inputRef.current?.selectionStart ?? query.length
@@ -154,6 +139,7 @@ export function QueryInput() {
     setSuggestions([])
     setShowDropdown(false)
     setSelectedIndex(-1)
+    onDropdownChange([], false, acceptSuggestion, -1)
     setTimeout(() => {
       if (inputRef.current) {
         const pos = start + accepted.length + 1
@@ -163,16 +149,52 @@ export function QueryInput() {
     }, 0)
   }
 
+  function closeDropdown() {
+    setSuggestions([])
+    setShowDropdown(false)
+    setSelectedIndex(-1)
+    onDropdownChange([], false, acceptSuggestion, -1)
+  }
+
+  function updateSuggestions(value: string, cursorPos: number) {
+    const { token, context } = getTokenAtCursor(value, cursorPos)
+    if (context === "quoted" || context === "none" || !token) {
+      closeDropdown()
+      return
+    }
+    const items = computeSuggestions(token, context, tags)
+    setSuggestions(items)
+    const show = items.length > 0
+    setShowDropdown(show)
+    setSelectedIndex(-1)
+    onDropdownChange(items, show, acceptSuggestion, -1)
+  }
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const value = e.target.value
+    setQuery(value)
+    updateSuggestions(value, e.target.selectionStart ?? value.length)
+  }
+
+  function handleClick(e: React.MouseEvent<HTMLInputElement>) {
+    const input = e.currentTarget
+    updateSuggestions(input.value, input.selectionStart ?? input.value.length)
+  }
+
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (showDropdown && suggestions.length > 0) {
       if (e.key === "ArrowDown") {
         e.preventDefault()
-        setSelectedIndex((i) => (i + 1) % suggestions.length)
+        const newIdx = (selectedIndex + 1) % suggestions.length
+        setSelectedIndex(newIdx)
+        onDropdownChange(suggestions, showDropdown, acceptSuggestion, newIdx)
         return
       }
       if (e.key === "ArrowUp") {
         e.preventDefault()
-        setSelectedIndex((i) => (i <= 0 ? suggestions.length - 1 : i - 1))
+        const newIdx = selectedIndex <= 0 ? suggestions.length - 1 : selectedIndex - 1
+        setSelectedIndex(newIdx)
+        onDropdownChange(suggestions, showDropdown, acceptSuggestion, newIdx)
         return
       }
       if (e.key === "Tab") {
@@ -182,9 +204,7 @@ export function QueryInput() {
       }
       if (e.key === "Escape") {
         e.preventDefault()
-        setSuggestions([])
-        setShowDropdown(false)
-        setSelectedIndex(-1)
+        closeDropdown()
         return
       }
       if (e.key === "Enter" && selectedIndex >= 0) {
@@ -198,9 +218,7 @@ export function QueryInput() {
 
   function handleBlur() {
     blurTimer.current = setTimeout(() => {
-      setSuggestions([])
-      setShowDropdown(false)
-      setSelectedIndex(-1)
+      closeDropdown()
     }, 150)
   }
 
@@ -234,13 +252,6 @@ export function QueryInput() {
             <X className="h-3.5 w-3.5 text-[var(--aurora-danger)]" strokeWidth={2.5} />
           )}
         </span>
-      )}
-      {showDropdown && suggestions.length > 0 && (
-        <AutocompleteDropdown
-          suggestions={suggestions}
-          selectedIndex={selectedIndex}
-          onSelect={acceptSuggestion}
-        />
       )}
     </div>
   )
