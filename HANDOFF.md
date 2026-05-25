@@ -1,5 +1,64 @@
 # Aurora — Session Handoff
 
+## Completed This Session (2026-05-25 — Session 24)
+
+### Aurora identity locked + full tooling install
+
+**What this session was**
+Not a feature session. Full identity + design-language decision session before the visual overhaul.
+
+**Identity doc:** `docs/design/identity-and-skills-plan.md` — single source of truth. Read this first next session.
+
+**Decisions locked:**
+- Aurora = personal tag+query music library dressed as "Northern Lights over OLED"
+- Design language: pure OLED black `#000`, Liquid Glass surfaces (iOS 26 / visionOS), per-song dominant-color bleed
+- Wordmark: custom SVG 'A' (two strokes, razor apex), bright-star at apex, 'urora' trailing in editorial italic. The star IS the play button interior — shared primitive.
+- Fonts: Reckless Neue Italic / PP Editorial New Italic (display), General Sans (body), JetBrains Mono (tags, filter syntax, metadata)
+- Bleed scope: player bar + now-playing + playlist hero. Filter cards stay neutral.
+- Play button hold-to-glow: keep as easter egg
+- Sessions log: keep current HANDOFF + `claude-workspace/Aurora/` workflow
+
+**Skills installed (user-scoped unless noted):**
+- `impeccable` (`~/.claude/skills/impeccable/`) — replaces ui-ux-pro-max. 23 commands, 27 anti-pattern rules.
+- `emil-design-eng` (project `.claude/skills/`, symlinked from `.agents/skills/`) — Emil Kowalski motion principles
+- `playwright` MCP — visual regression suite
+- `context7` MCP — live React 19 / Tailwind 4 docs
+- `shadcn` MCP — live shadcn registry
+- `ui-ux-pro-max` — REMOVED (two visual skills = design drift)
+
+**Visual exploration started:**
+- Wordmark concept C selected (scale-contrast: big A, small trailing urora)
+- Custom SVG A with star at exact apex coordinate — needs more work (strokes too uniform, star too rudimentary). Next session starts here with proper reference research.
+- Visual companion server at `.superpowers/brainstorm/` (needs restart next session)
+
+### State
+- Session 23 code fixes uncommitted — commit them first
+- `docs/design/identity-and-skills-plan.md` — new, commit
+- `docs/design/AURORA1.md`, `docs/design/new1.md` — new design input docs, commit
+- **Next session starts: impeccable audit of current frontend → kill list → DESIGN.md → wordmark refinement with real refs**
+
+---
+
+## Completed This Session (2026-05-25 — Session 23)
+
+### Bug fixes: crossfade playback + autocomplete layout
+
+**Crossfade / playback bug** (`fix(player)`)
+- Root cause: Session 22 `nextHowlRef` architecture — React cleanup runs BEFORE new effect body. Cleanup was stopping old Howl; new body tried to fade an already-stopped Howl → silent.
+- Fix: `prevHowlRef` pattern. Cleanup deposits outgoing Howl WITHOUT stopping. New body reads `prevHowlRef`, checks `prev.playing()` → `crossfadeIn = enabled && prev.playing()`. Natural end: `prev.playing() === false` → instant stop + full-volume start. Crossfade trigger: `prev.playing() === true` → fade old to 0, fade new from 0.
+- Single `howlRef` for active song. Interval ticker always on the single active Howl's `onplay`. No dual-howl architecture.
+
+**Autocomplete in-flow layout** (`fix(filter)`)
+- Was: Absolute-positioned dropdown rendered over chip tray
+- Now: In-flow `max-height` CSS transition between QueryInput and chip tray. Dropdown state lifted to QueryBuilder via `onDropdownChange` prop. Smooth push-down/push-up animation.
+
+### State
+- Build verified clean
+- `useAudioPlayer.ts` — current architecture is `prevHowlRef` (see above)
+- **Needs testing** at http://localhost:5173: natural song end, crossfade overlap, timer starts on new song
+
+---
+
 ## Completed This Session (2026-05-24 — Session 22)
 
 ### Three spec features shipped (autocomplete, trim times, crossfade)

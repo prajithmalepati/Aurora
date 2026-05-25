@@ -41,6 +41,9 @@ dist/
 *.log
 
 .claude/skills/ui-ux-pro-max/
+.claude/skills/emil-design-eng
+.agents/
+skills-lock.json
 
 
 # Database backups

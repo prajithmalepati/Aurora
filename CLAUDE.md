@@ -27,6 +27,8 @@ View switching: `songStore.view` + `songStore.currentView` — **no React Router
 Two effects, strictly separated:
 - **Song-change effect** `[currentSong?.id]` — ONLY place that creates/destroys Howl and calls initial `howl.play()`. Single chokepoint.
 - **isPlaying effect** `[isPlaying]` — ONLY fires on pause/resume toggle. **Never** add `currentSong` to this dep array — that was the root cause of dual-audio bug.
+- **prevHowlRef crossfade pattern**: cleanup deposits outgoing Howl into `prevHowlRef` WITHOUT stopping it. New body reads it, checks `prev.playing()` → `crossfadeIn = enabled && prev.playing()`. React cleanup runs BEFORE new body — never stop a Howl in cleanup if you need to fade it.
+- **Single active Howl**: `howlRef` = only current song. No dual-howl architecture. Crossfade is an overlay effect.
 
 Audio sliders use plain HTML `<input type="range">` — shadcn Slider had compatibility issues. Do not replace them.
 
