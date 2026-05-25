@@ -1,5 +1,47 @@
 # Aurora — Session Handoff
 
+## Completed This Session (2026-05-25 — Session 25)
+
+### Visual overhaul design spec — finalized
+
+**What this session was:** Design-only. No code written. Full brainstorm → multi-model review → spec iteration cycle.
+
+**Spec:** `docs/superpowers/specs/2026-05-25-aurora-visual-overhaul-design.md` — read this first.
+**UX critique:** `docs/superpowers/specs/2026-05-25-aurora-ux-critique.md` — Opus 7500-token review, score 6.5/10 → patches applied.
+
+**Core design decisions locked:**
+
+| Decision | Chosen | Why |
+|---|---|---|
+| Aurora background | Vanilla GLSL canvas | @paper-design has no aurora effect; custom GLSL = real northern lights physics, 0KB bundle |
+| Color computation | Backend scanner (scan time) | Eliminates `decodeAudioData` freeze + K-means hitch on song change |
+| Play button interaction | Playback-state-driven (bloom on play, dim on pause, pulse on buffer) | Pointer theatrics (waver/hold-glow) = demo behavior on high-frequency control |
+| Shader palette | `uColor1` = fixed brand teal, `uColor2` = album color | Preserves identity on any album art color |
+| Aurora intensity | `uIntensity` uniform: 15–80% by view | Fullscreen shader at 100% behind dense list = visual migraine |
+| Waveform | Pre-computed peaks from backend | Real-time FFT on progress bar looks cheap, perf risk |
+| Fraunces | Max 2–3 uses per view | Three typefaces in product UI risks costume design |
+
+**Three external reviews done:**
+- Opus UX critic agent: 6.5/10 — flagged color contradiction, no calm regions, main-thread decode → all fixed
+- Gemini 3.1 Pro: technical gotchas (`align-items: start` for grid-template-rows, decodeAudioData blocking) → added to spec
+- GPT 5.5 via Cursor: 7/10 — killed mouse waver/hold glow, added performance budget + DB migration plan + Howler→AnalyserNode note → all absorbed
+
+**Implementation order (critical — do not reorder):**
+1. Backend scanner (prerequisite for everything)
+2. Kill list + fonts + SVG wordmark (independent)
+3. Color pipeline (`useAuroraColor` hook, CSS vars)
+4. GLSL aurora shader (needs color pipeline first)
+5. Waveform bar (needs backend peaks first)
+6. Polish (reduced-motion, loading states, a11y)
+
+### State
+- All code: unchanged. No features added. Spec-only session.
+- `docs/superpowers/specs/` — two new files committed to `master`
+- `docs/design/new1.md` — user design notes (committed)
+- **Next session: invoke `writing-plans`, produce implementation plan, then start Phase 1 (backend scanner)**
+
+---
+
 ## Completed This Session (2026-05-25 — Session 24)
 
 ### Aurora identity locked + full tooling install
