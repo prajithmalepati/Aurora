@@ -184,6 +184,45 @@ def extract_peaks(file_path: str, num_bins: int = 1000) -> list[float] | None:
         return None
 
 
+def extract_dominant_colors(art_data: bytes) -> tuple[str | None, str | None]:
+    """
+    Pillow MedianCut quantize → top 2 contrast-safe OKLCH colors.
+    Returns (dominant_color, dominant_color_2) as oklch() CSS strings, or (None, None).
+
+    Uses Pillow's native C-optimized quantize() — 100x faster than scikit-learn KMeans
+    and mathematically designed for exactly this task.
+    """
+    try:
+        from io import BytesIO
+        from PIL import Image
+        from app.services.color_utils import rgb_to_oklch, clamp_oklch_for_display
+
+        img = Image.open(BytesIO(art_data)).convert("RGB").resize((64, 64), Image.LANCZOS)
+
+        # MedianCut partitions color space into 2 regions, picks centroid of each.
+        quantized = img.quantize(colors=2, method=Image.Quantize.MEDIANCUT)
+        palette   = quantized.getpalette()  # flat list [R,G,B, R,G,B, ...]
+
+        if not palette or len(palette) < 3:
+            return None, None
+
+        colors: list[str] = []
+        num_colors = min(2, len(palette) // 3)
+
+        for i in range(num_colors):
+            r, g, b = palette[i * 3], palette[i * 3 + 1], palette[i * 3 + 2]
+            L, C, H = rgb_to_oklch(r, g, b)
+            colors.append(clamp_oklch_for_display(L, C, H))
+
+        # If only 1 color, duplicate it for the second slot
+        if len(colors) == 1:
+            colors.append(colors[0])
+
+        return colors[0], colors[1]
+    except Exception:
+        return None, None
+
+
 def extract_metadata(file_path: str) -> dict | None:
     """
     Extract metadata from an audio file.
