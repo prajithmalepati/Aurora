@@ -9,19 +9,17 @@ interface AppShellProps {
     main: ReactNode
     playerBar: ReactNode
   }
-  auroraColor1: [number, number, number]
-  auroraColor2: [number, number, number]
   amplitude: number
   intensity: number
 }
 
-export function AppShell({ children, auroraColor1, auroraColor2, amplitude, intensity }: AppShellProps) {
+export function AppShell({ children, amplitude, intensity }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
     <>
       {/* Fixed atmospheric layers — WebGL canvas, veil, then radial, then noise */}
-      <AuroraCanvas color1={auroraColor1} color2={auroraColor2} amplitude={amplitude} intensity={intensity} />
+      <AuroraCanvas amplitude={amplitude} intensity={intensity} />
       <div className="aurora-bg-veil" aria-hidden="true" />
       <div className="aurora-atmosphere" aria-hidden="true" />
       <div className="aurora-noise" aria-hidden="true" />
