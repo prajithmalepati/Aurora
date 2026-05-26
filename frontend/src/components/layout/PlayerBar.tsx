@@ -4,6 +4,7 @@ import { formatDuration, cn } from "@/lib/utils"
 import { AlbumArt } from "@/components/songs/AlbumArt"
 import { Equalizer } from "@/components/ui/Equalizer"
 import { SkipBack, SkipForward, Volume2, VolumeX, Shuffle, Repeat, Repeat1 } from "lucide-react"
+import { motion } from "motion/react"
 import { AuroraPlayButton } from "@/components/player/AuroraPlayButton"
 import { WaveformBar }         from '@/components/player/WaveformBar'
 import { WaveformBarSkeleton } from '@/components/player/WaveformBarSkeleton'
@@ -180,7 +181,7 @@ export function PlayerBar() {
       </div>
 
       {/* ── DESKTOP layout — grid-template-rows transitions between idle (52px) and playing (80px) ── */}
-      <div className={cn("hidden sm:block playerbar-collapsible", !isIdle && "expanded")}>
+      <motion.div layout className={cn("hidden sm:block playerbar-collapsible", !isIdle && "expanded")} transition={{ type: "spring", stiffness: 400, damping: 33 }}>
         <div>
         {isIdle ? (
           /* Idle: shimmer + text, no controls */
@@ -343,7 +344,7 @@ export function PlayerBar() {
           </div>
         )}
         </div>
-      </div>
+      </motion.div>
     </div>
   )
 }
