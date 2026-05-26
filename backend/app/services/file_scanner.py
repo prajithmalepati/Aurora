@@ -1,5 +1,6 @@
 """File scanner for audio files using mutagen."""
 import hashlib
+import json
 import sqlite3
 import mutagen
 from mutagen.easyid3 import EasyID3
@@ -223,6 +224,32 @@ def extract_dominant_colors(art_data: bytes) -> tuple[str | None, str | None]:
         return None, None
 
 
+def _get_art_bytes(audio) -> bytes | None:
+    """Extract raw album art bytes from a mutagen File object."""
+    if audio is None:
+        return None
+    try:
+        if hasattr(audio, "pictures") and audio.pictures:
+            return audio.pictures[0].data
+        if audio.tags:
+            for key in list(audio.tags.keys()):
+                if key.startswith("APIC"):
+                    return audio.tags[key].data
+            if "covr" in audio.tags and audio.tags["covr"]:
+                return bytes(audio.tags["covr"][0])
+            if "metadata_block_picture" in audio.tags:
+                import base64
+                from mutagen.flac import Picture
+                for b64 in audio.tags["metadata_block_picture"]:
+                    try:
+                        return Picture(base64.b64decode(b64)).data
+                    except Exception:
+                        pass
+    except Exception:
+        pass
+    return None
+
+
 def extract_metadata(file_path: str) -> dict | None:
     """
     Extract metadata from an audio file.
@@ -259,6 +286,19 @@ def extract_metadata(file_path: str) -> dict | None:
     ext = path.suffix.lstrip(".").lower()
     file_format = _detect_m4a_format(file_path) if ext == "m4a" else ext
 
+    # Extract waveform peaks
+    waveform_peaks = extract_peaks(str(path))
+
+    # Extract dominant colors from album art
+    dominant_color: str | None = None
+    dominant_color_2: str | None = None
+    try:
+        art_data = _get_art_bytes(audio)
+        if art_data:
+            dominant_color, dominant_color_2 = extract_dominant_colors(art_data)
+    except Exception:
+        pass
+
     return {
         "title": title.strip(),
         "artist": artist.strip(),
@@ -266,6 +306,9 @@ def extract_metadata(file_path: str) -> dict | None:
         "duration": duration,
         "file_path": str(path.resolve()),  # absolute path
         "file_format": file_format,
+        "waveform_peaks": waveform_peaks,
+        "dominant_color": dominant_color,
+        "dominant_color_2": dominant_color_2,
     }
 
 
@@ -322,11 +365,16 @@ def _replace_song(
         cursor = db.execute(
             """INSERT INTO songs
                    (title, artist, album, duration, file_path, file_format,
-                    album_art_path, source, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, 'local_scan', ?, ?)""",
+                    album_art_path, source, waveform_peaks, dominant_color,
+                    dominant_color_2, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, 'local_scan', ?, ?, ?, ?, ?)""",
             (metadata["title"], metadata["artist"], metadata["album"],
              metadata["duration"], metadata["file_path"], metadata.get("file_format"),
-             album_art_path, now, now),
+             album_art_path,
+             json.dumps(metadata.get("waveform_peaks")) if metadata.get("waveform_peaks") else None,
+             metadata.get("dominant_color"),
+             metadata.get("dominant_color_2"),
+             now, now),
         )
         new_id = cursor.lastrowid
 
@@ -450,11 +498,16 @@ def import_scanned_songs(
         cursor = db_connection.execute(
             """INSERT INTO songs
                    (title, artist, album, duration, file_path, file_format,
-                    album_art_path, source, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, 'local_scan', ?, ?)""",
+                    album_art_path, source, waveform_peaks, dominant_color,
+                    dominant_color_2, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, 'local_scan', ?, ?, ?, ?, ?)""",
             (metadata["title"], metadata["artist"], metadata["album"],
              metadata["duration"], incoming_path, incoming_fmt,
-             album_art_path, now, now),
+             album_art_path,
+             json.dumps(metadata.get("waveform_peaks")) if metadata.get("waveform_peaks") else None,
+             metadata.get("dominant_color"),
+             metadata.get("dominant_color_2"),
+             now, now),
         )
         song_id = cursor.lastrowid
         imported.append({"id": song_id, **metadata})
