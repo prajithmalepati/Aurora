@@ -1221,3 +1221,38 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* ============================================================
+   WEBGL FALLBACK — static gradient when WebGL unavailable or reduced-motion
+   ============================================================ */
+
+/* Fallback static gradient when WebGL unavailable or reduced-motion */
+.aurora-fallback {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 80% 60% at 30% 40%,
+    oklch(0.12 0.06 185 / 0.4) 0%,
+    oklch(0.04 0.003 195) 70%
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  canvas[aria-hidden] {
+    display: none;
+  }
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background: radial-gradient(
+      ellipse 80% 60% at 30% 40%,
+      oklch(0.12 0.06 185 / 0.4) 0%,
+      oklch(0.04 0.003 195) 70%
+    );
+  }
+}
