@@ -4,6 +4,8 @@ import { formatDuration, cn } from "@/lib/utils"
 import { AlbumArt } from "@/components/songs/AlbumArt"
 import { Equalizer } from "@/components/ui/Equalizer"
 import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Shuffle, Repeat, Repeat1 } from "lucide-react"
+import { WaveformBar }         from '@/components/player/WaveformBar'
+import { WaveformBarSkeleton } from '@/components/player/WaveformBarSkeleton'
 
 export function PlayerBar() {
   const { seekTo } = useAudioPlayer()
@@ -27,7 +29,6 @@ export function PlayerBar() {
   const isIdle = currentSong === null
   const hasSong = currentSong !== null && currentSong.file_path !== null
 
-  const seekPct = duration > 0 ? Math.min(100, (seek / duration) * 100) : 0
   const volumePct = Math.min(100, volume * 100)
 
   const RepeatIcon = repeatMode === "one" ? Repeat1 : Repeat
@@ -103,18 +104,24 @@ export function PlayerBar() {
               <span className="text-[10px] text-[var(--aurora-text-secondary)] w-8 text-right tabular-nums">
                 {formatDuration(seek)}
               </span>
-              <input
-                type="range"
-                min={0}
-                max={duration || 100}
-                step={0.1}
-                value={seek}
-                onChange={(e) => seekTo(Number(e.target.value))}
-                disabled={!hasSong}
-                className="aurora-range aurora-focus flex-1"
-                style={{ ["--aurora-range-pct" as string]: `${seekPct}%` }}
-                aria-label="Seek"
-              />
+              <div className="relative flex-1" style={{ height: '32px' }}>
+                {currentSong?.waveform_peaks ? (
+                  <WaveformBar peaks={currentSong.waveform_peaks} duration={duration} />
+                ) : hasSong ? (
+                  <WaveformBarSkeleton />
+                ) : null}
+                <input
+                  type="range"
+                  aria-label="Seek"
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  min={0}
+                  max={duration || 100}
+                  step={1}
+                  value={Math.round(seek)}
+                  onChange={(e) => seekTo(Number(e.target.value))}
+                  disabled={!hasSong}
+                />
+              </div>
               <span className="text-[10px] text-[var(--aurora-text-tertiary)] w-8 tabular-nums">
                 {formatDuration(duration)}
               </span>
@@ -316,18 +323,24 @@ export function PlayerBar() {
                 <span className="text-[11px] text-[var(--aurora-text-secondary)] w-9 text-right tabular-nums font-medium">
                   {formatDuration(seek)}
                 </span>
-                <input
-                  type="range"
-                  min={0}
-                  max={duration || 100}
-                  step={0.1}
-                  value={seek}
-                  onChange={(e) => seekTo(Number(e.target.value))}
-                  disabled={!hasSong}
-                  className="aurora-range aurora-focus flex-1"
-                  style={{ ["--aurora-range-pct" as string]: `${seekPct}%` }}
-                  aria-label="Seek"
-                />
+                <div className="relative flex-1" style={{ height: '32px' }}>
+                  {currentSong?.waveform_peaks ? (
+                    <WaveformBar peaks={currentSong.waveform_peaks} duration={duration} />
+                  ) : hasSong ? (
+                    <WaveformBarSkeleton />
+                  ) : null}
+                  <input
+                    type="range"
+                    aria-label="Seek"
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    min={0}
+                    max={duration || 100}
+                    step={1}
+                    value={Math.round(seek)}
+                    onChange={(e) => seekTo(Number(e.target.value))}
+                    disabled={!hasSong}
+                  />
+                </div>
                 <span className="text-[11px] text-[var(--aurora-text-tertiary)] w-9 tabular-nums font-medium">
                   {formatDuration(duration)}
                 </span>
