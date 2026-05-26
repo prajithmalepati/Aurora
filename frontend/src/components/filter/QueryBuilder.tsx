@@ -101,19 +101,11 @@ export function QueryBuilder() {
 
           <button
             onClick={() => setQuickTagEditorOpen(true)}
-            className="h-8 px-4 rounded-full text-[12px] font-semibold inline-flex items-center gap-1.5 flex-shrink-0 transition-colors duration-150 aurora-btn-press"
+            className="h-8 px-4 rounded-full text-[12px] font-semibold inline-flex items-center gap-1.5 flex-shrink-0 transition-colors duration-150 aurora-btn-press hover:text-[var(--aurora-text)]"
             style={{
               background: "var(--aurora-surface)",
               boxShadow: "inset 0 0 0 1px var(--aurora-surface-border)",
               color: "var(--aurora-text-secondary)",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = "var(--aurora-text)"
-              e.currentTarget.style.background = "var(--aurora-surface-hover)"
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = "var(--aurora-text-secondary)"
-              e.currentTarget.style.background = "var(--aurora-surface)"
             }}
           >
             <SlidersHorizontal className="h-3 w-3" strokeWidth={2} />
@@ -264,14 +256,6 @@ export function QueryBuilder() {
                       className="flex-shrink-0 whitespace-nowrap text-[11px] font-medium px-2.5 py-[2px] rounded-full transition-colors duration-150 inline-flex items-center gap-1.5 text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)]"
                       style={{
                         border: `1px solid ${color}30`,
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.borderColor = `${color}55`
-                        e.currentTarget.style.background = `${color}0a`
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.borderColor = `${color}30`
-                        e.currentTarget.style.background = "transparent"
                       }}
                     >
                       <span
