@@ -1,4 +1,5 @@
 import type { Song } from "@/types"
+import { motion } from "motion/react"
 import { formatDuration } from "@/lib/utils"
 import { AlbumArt } from "@/components/songs/AlbumArt"
 import { Equalizer } from "@/components/ui/Equalizer"
@@ -61,17 +62,18 @@ export function SongRow({ song, index, animIndex, onPlay }: SongRowProps) {
   const isCurrentSong = currentSong?.id === song.id
   const hasFile = song.file_path !== null
 
-  // Stagger delay: first 16 rows get 25ms per-row delay, rest appear instantly
-  const animDelay = animIndex !== undefined && animIndex < 16 ? animIndex * 25 : 0
+  const staggerDelay = animIndex !== undefined && animIndex < 16 ? animIndex * 0.02 : 0
 
   return (
     <>
-      <tr
+      <motion.tr
         onClick={handlePlay}
-        className={`aurora-row-in group relative transition-colors duration-150 ${
+        className={`group relative transition-colors duration-150 ${
           hasFile ? "cursor-pointer" : "cursor-not-allowed opacity-40"
         }`}
-        style={{ animationDelay: `${animDelay}ms` }}
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: staggerDelay, type: "spring", stiffness: 300, damping: 28 }}
       >
         {/* # column / play indicator */}
         <td
@@ -248,7 +250,7 @@ export function SongRow({ song, index, animIndex, onPlay }: SongRowProps) {
             </IconBtn>
           </div>
         </td>
-      </tr>
+      </motion.tr>
 
       {/* Delete confirmation */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
