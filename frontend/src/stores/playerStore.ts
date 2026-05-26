@@ -14,6 +14,8 @@ interface PlayerState {
   isShuffled: boolean
   originalQueue: Song[]
   queuePlaylistId: number | null
+  isBuffering: boolean
+  setIsBuffering: (v: boolean) => void
 
   playSong: (song: Song, queue?: Song[], playlistId?: number | null) => void
   togglePlay: () => void
@@ -58,6 +60,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   isShuffled: false,
   originalQueue: [],
   queuePlaylistId: null,
+  isBuffering: false,
 
   playSong: (song, queue, playlistId = null) => {
     if (!song.file_path) return
@@ -166,6 +169,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     originalQueue: [],
     queuePlaylistId: null,
   }),
+
+  setIsBuffering: (v) => set({ isBuffering: v }),
 
   cycleRepeat: () => {
     const { repeatMode } = get()
