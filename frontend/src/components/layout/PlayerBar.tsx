@@ -3,7 +3,8 @@ import { useAudioPlayer } from "@/hooks/useAudioPlayer"
 import { formatDuration, cn } from "@/lib/utils"
 import { AlbumArt } from "@/components/songs/AlbumArt"
 import { Equalizer } from "@/components/ui/Equalizer"
-import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Shuffle, Repeat, Repeat1 } from "lucide-react"
+import { SkipBack, SkipForward, Volume2, VolumeX, Shuffle, Repeat, Repeat1 } from "lucide-react"
+import { AuroraPlayButton } from "@/components/player/AuroraPlayButton"
 import { WaveformBar }         from '@/components/player/WaveformBar'
 import { WaveformBarSkeleton } from '@/components/player/WaveformBarSkeleton'
 
@@ -148,39 +149,13 @@ export function PlayerBar() {
                 <SkipBack className="h-4 w-4" fill="currentColor" strokeWidth={0} />
               </button>
 
-              <button
-                onClick={togglePlay}
+              <AuroraPlayButton
+                variant="player-mobile"
+                isPlaying={isPlaying}
+                isBuffering={isBuffering}
                 disabled={!hasSong}
-                className={cn(
-                  "relative flex items-center justify-center rounded-full",
-                  "w-10 h-10",
-                  "[contain:paint]",
-                  "backdrop-blur-md",
-                  "[background:radial-gradient(circle,rgba(255,255,255,0.12)_0%,rgba(255,255,255,0.04)_100%)]",
-                  "border border-white/[0.18]",
-                  "shadow-[inset_0_1px_0_rgba(255,255,255,0.22),inset_0_-1px_0_rgba(0,0,0,0.3)]",
-                  "transition-transform duration-75 active:scale-[0.94]",
-                  "disabled:opacity-40 disabled:pointer-events-none",
-                )}
-                aria-label={isPlaying ? 'Pause' : 'Play'}
-              >
-                {/* Star bloom — full when playing, dim when paused, pulse when buffering */}
-                <span
-                  className={cn(
-                    "absolute inset-0 rounded-full pointer-events-none transition-all duration-300",
-                    isBuffering && "star-buffering",
-                  )}
-                  style={{
-                    background: isBuffering
-                      ? undefined
-                      : `radial-gradient(circle, oklch(0.97 0.04 185 / ${isPlaying ? '1.0' : '0.5'}) 0%, oklch(0.78 0.18 185 / 0) 70%)`,
-                  }}
-                />
-                {isPlaying
-                  ? <Pause size={16} strokeWidth={1.5} className="relative z-10 text-white/90" />
-                  : <Play  size={16} strokeWidth={1.5} className="relative z-10 text-white/90" />
-                }
-              </button>
+                onClick={togglePlay}
+              />
 
               <button
                 onClick={next}
@@ -277,39 +252,13 @@ export function PlayerBar() {
                   <SkipBack className="h-[18px] w-[18px]" fill="currentColor" strokeWidth={0} />
                 </button>
 
-                <button
-                  onClick={togglePlay}
+                <AuroraPlayButton
+                  variant="player-desktop"
+                  isPlaying={isPlaying}
+                  isBuffering={isBuffering}
                   disabled={!hasSong}
-                  className={cn(
-                    "relative flex items-center justify-center rounded-full",
-                    "w-11 h-11",
-                    "[contain:paint]",
-                    "backdrop-blur-md",
-                    "[background:radial-gradient(circle,rgba(255,255,255,0.12)_0%,rgba(255,255,255,0.04)_100%)]",
-                    "border border-white/[0.18]",
-                    "shadow-[inset_0_1px_0_rgba(255,255,255,0.22),inset_0_-1px_0_rgba(0,0,0,0.3)]",
-                    "transition-transform duration-75 active:scale-[0.94]",
-                    "disabled:opacity-40 disabled:pointer-events-none",
-                  )}
-                  aria-label={isPlaying ? 'Pause' : 'Play'}
-                >
-                  {/* Star bloom — full when playing, dim when paused, pulse when buffering */}
-                  <span
-                    className={cn(
-                      "absolute inset-0 rounded-full pointer-events-none transition-all duration-300",
-                      isBuffering && "star-buffering",
-                    )}
-                    style={{
-                      background: isBuffering
-                        ? undefined
-                        : `radial-gradient(circle, oklch(0.97 0.04 185 / ${isPlaying ? '1.0' : '0.5'}) 0%, oklch(0.78 0.18 185 / 0) 70%)`,
-                    }}
-                  />
-                  {isPlaying
-                    ? <Pause size={18} strokeWidth={1.5} className="relative z-10 text-white/90" />
-                    : <Play  size={18} strokeWidth={1.5} className="relative z-10 text-white/90" />
-                  }
-                </button>
+                  onClick={togglePlay}
+                />
 
                 <button
                   onClick={next}

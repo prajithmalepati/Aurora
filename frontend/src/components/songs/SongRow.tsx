@@ -2,7 +2,8 @@ import type { Song } from "@/types"
 import { formatDuration } from "@/lib/utils"
 import { AlbumArt } from "@/components/songs/AlbumArt"
 import { Equalizer } from "@/components/ui/Equalizer"
-import { Trash2, Tag as TagIcon, Pencil, Play } from "lucide-react"
+import { Trash2, Tag as TagIcon, Pencil } from "lucide-react"
+import { AuroraPlayButton } from "@/components/player/AuroraPlayButton"
 import { EditSongDialog } from "@/components/songs/EditSongDialog"
 import {
   AlertDialog,
@@ -107,14 +108,12 @@ export function SongRow({ song, index, animIndex, onPlay }: SongRowProps) {
           </span>
           {/* Circular play button — positioned in td (td has relative), fades in on hover */}
           {!isCurrentSong && (
-            <button
-              className="aurora-play-btn absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-[opacity,transform] duration-150 hover:scale-105"
+            <AuroraPlayButton
+              variant="row"
+              isPlaying={false}
               onClick={(e) => { e.stopPropagation(); handlePlay() }}
-              aria-label={`Play ${song.title}`}
-              tabIndex={-1}
-            >
-              <Play className="h-4 w-4 text-[var(--aurora-slate)] ml-[2px]" fill="currentColor" strokeWidth={0} />
-            </button>
+              ariaLabel={`Play ${song.title}`}
+            />
           )}
         </td>
 
