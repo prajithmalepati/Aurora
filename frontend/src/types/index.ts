@@ -15,6 +15,9 @@ export interface Song {
   playlists: Playlist[]
   created_at: string
   updated_at: string
+  waveform_peaks?: number[] | null
+  dominant_color?: string | null
+  dominant_color_2?: string | null
 }
 
 export interface Playlist {
@@ -47,6 +50,9 @@ export interface PlaylistSong {
   end_time_ms?: number
   tags: string[]
   position: number
+  waveform_peaks?: number[] | null
+  dominant_color?: string | null
+  dominant_color_2?: string | null
 }
 
 export interface Tag {
@@ -70,6 +76,9 @@ export interface FilterResult {
   playlists: Playlist[]
   created_at: string
   updated_at: string
+  waveform_peaks?: number[] | null
+  dominant_color?: string | null
+  dominant_color_2?: string | null
 }
 
 export interface ScanResult {
