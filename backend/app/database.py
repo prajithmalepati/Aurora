@@ -69,6 +69,7 @@ def get_db() -> sqlite3.Connection:
     conn = sqlite3.connect(str(DB_PATH))
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA busy_timeout = 5000")  # 5s wait before raising OperationalError
     return conn
 
 
@@ -126,6 +127,22 @@ def init_db():
         pass
     try:
         conn.execute("ALTER TABLE playlists ADD COLUMN crossfade_duration_s INTEGER DEFAULT NULL")
+        conn.commit()
+    except Exception:
+        pass
+    # Migration: add visual pipeline columns (waveform peaks + dominant colors)
+    try:
+        conn.execute("ALTER TABLE songs ADD COLUMN waveform_peaks TEXT")
+        conn.commit()
+    except Exception:
+        pass  # Column already exists
+    try:
+        conn.execute("ALTER TABLE songs ADD COLUMN dominant_color TEXT")
+        conn.commit()
+    except Exception:
+        pass
+    try:
+        conn.execute("ALTER TABLE songs ADD COLUMN dominant_color_2 TEXT")
         conn.commit()
     except Exception:
         pass
