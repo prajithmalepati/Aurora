@@ -63,6 +63,7 @@ export function WaveformBar({ peaks, duration }: WaveformBarProps) {
   }, [duration])
 
   useEffect(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
     rafRef.current = requestAnimationFrame(tick)
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current) }
   }, [tick])

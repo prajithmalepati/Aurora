@@ -240,6 +240,7 @@ export function AuroraCanvas({ color1, color2, amplitude, intensity }: AuroraCan
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
     const result = initWebGL(canvas)
     if (!result) {
       console.warn('[AuroraCanvas] WebGL init failed — using CSS fallback')
