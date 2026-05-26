@@ -151,14 +151,30 @@ export function PlayerBar() {
               <button
                 onClick={togglePlay}
                 disabled={!hasSong}
-                className="relative h-10 w-10 rounded-full flex items-center justify-center disabled:opacity-25 disabled:pointer-events-none aurora-btn-press aurora-play-btn"
-                aria-label={isPlaying ? "Pause" : "Play"}
-              >
-                {isPlaying ? (
-                  <Pause className="h-4 w-4 text-[var(--aurora-slate)]" fill="currentColor" strokeWidth={0} />
-                ) : (
-                  <Play className="h-4 w-4 ml-[1px] text-[var(--aurora-slate)]" fill="currentColor" strokeWidth={0} />
+                className={cn(
+                  "relative flex items-center justify-center rounded-full",
+                  "w-10 h-10",
+                  "[contain:paint]",
+                  "backdrop-blur-md",
+                  "[background:radial-gradient(circle,rgba(255,255,255,0.12)_0%,rgba(255,255,255,0.04)_100%)]",
+                  "border border-white/[0.18]",
+                  "shadow-[inset_0_1px_0_rgba(255,255,255,0.22),inset_0_-1px_0_rgba(0,0,0,0.3)]",
+                  "transition-transform duration-75 active:scale-[0.94]",
+                  "disabled:opacity-40 disabled:pointer-events-none",
                 )}
+                aria-label={isPlaying ? 'Pause' : 'Play'}
+              >
+                {/* Star bloom — full when playing, dim when paused */}
+                <span
+                  className="absolute inset-0 rounded-full pointer-events-none transition-all duration-300"
+                  style={{
+                    background: `radial-gradient(circle, oklch(0.97 0.04 185 / ${isPlaying ? '1.0' : '0.5'}) 0%, oklch(0.78 0.18 185 / 0) 70%)`,
+                  }}
+                />
+                {isPlaying
+                  ? <Pause size={16} strokeWidth={1.5} className="relative z-10 text-white/90" />
+                  : <Play  size={16} strokeWidth={1.5} className="relative z-10 text-white/90" />
+                }
               </button>
 
               <button
@@ -261,14 +277,30 @@ export function PlayerBar() {
                 <button
                   onClick={togglePlay}
                   disabled={!hasSong}
-                  className="relative h-11 w-11 rounded-full flex items-center justify-center disabled:opacity-25 disabled:pointer-events-none aurora-btn-press aurora-play-btn"
-                  aria-label={isPlaying ? "Pause" : "Play"}
-                >
-                  {isPlaying ? (
-                    <Pause className="h-[18px] w-[18px] text-[var(--aurora-slate)]" fill="currentColor" strokeWidth={0} />
-                  ) : (
-                    <Play className="h-[18px] w-[18px] ml-[2px] text-[var(--aurora-slate)]" fill="currentColor" strokeWidth={0} />
+                  className={cn(
+                    "relative flex items-center justify-center rounded-full",
+                    "w-11 h-11",
+                    "[contain:paint]",
+                    "backdrop-blur-md",
+                    "[background:radial-gradient(circle,rgba(255,255,255,0.12)_0%,rgba(255,255,255,0.04)_100%)]",
+                    "border border-white/[0.18]",
+                    "shadow-[inset_0_1px_0_rgba(255,255,255,0.22),inset_0_-1px_0_rgba(0,0,0,0.3)]",
+                    "transition-transform duration-75 active:scale-[0.94]",
+                    "disabled:opacity-40 disabled:pointer-events-none",
                   )}
+                  aria-label={isPlaying ? 'Pause' : 'Play'}
+                >
+                  {/* Star bloom — full when playing, dim when paused */}
+                  <span
+                    className="absolute inset-0 rounded-full pointer-events-none transition-all duration-300"
+                    style={{
+                      background: `radial-gradient(circle, oklch(0.97 0.04 185 / ${isPlaying ? '1.0' : '0.5'}) 0%, oklch(0.78 0.18 185 / 0) 70%)`,
+                    }}
+                  />
+                  {isPlaying
+                    ? <Pause size={18} strokeWidth={1.5} className="relative z-10 text-white/90" />
+                    : <Play  size={18} strokeWidth={1.5} className="relative z-10 text-white/90" />
+                  }
                 </button>
 
                 <button
