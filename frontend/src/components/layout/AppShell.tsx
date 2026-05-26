@@ -1,6 +1,7 @@
 import type { ReactNode } from "react"
 import { useState } from "react"
 import { Menu, X } from "lucide-react"
+import { motion } from "motion/react"
 import { AuroraCanvas } from '@/components/aurora/AuroraCanvas'
 
 interface AppShellProps {
@@ -63,17 +64,17 @@ export function AppShell({ children, amplitude, intensity }: AppShellProps) {
         {children.sidebar}
       </div>
 
-      <div className="relative z-10 grid grid-cols-1 md:grid-cols-[240px_1fr] grid-rows-[1fr_auto] h-screen overflow-hidden">
+      <motion.div layout transition={{ type: "spring", stiffness: 400, damping: 33 }} className="relative z-10 grid grid-cols-1 md:grid-cols-[240px_1fr] grid-rows-[1fr_auto] h-screen overflow-hidden">
         {/* Desktop sidebar */}
-        <div className="hidden md:block overflow-y-auto aurora-keyline-right">
+        <motion.div layout="position" className="hidden md:block overflow-y-auto aurora-keyline-right">
           {children.sidebar}
-        </div>
+        </motion.div>
         <div className="overflow-y-auto relative">
           <div className="aurora-scrim-top" aria-hidden="true" />
           {children.main}
         </div>
         <div className="md:col-span-2">{children.playerBar}</div>
-      </div>
+      </motion.div>
     </>
   )
 }
