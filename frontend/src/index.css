@@ -575,6 +575,15 @@
   opacity: var(--aurora-backlight-hover);
 }
 
+/* Star-pulse — used by liquid glass play button during buffering */
+@keyframes star-pulse {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50%       { opacity: 0.8; transform: scale(1.15); }
+}
+.star-buffering {
+  animation: star-pulse 1.5s ease-in-out infinite;
+}
+
 /* Primary Button variant — Direction C Frosted Lens.
    ::before lives here because Tailwind cannot express pseudo-element rules. */
 .aurora-btn-loud-primary {
