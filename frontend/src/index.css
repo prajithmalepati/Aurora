@@ -306,8 +306,8 @@
   background: var(--aurora-surface);
 }
 .aurora-chip:focus-visible {
-  outline: 2px solid rgba(94, 234, 212, 0.70);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 /* Top scrim — sticky gradient fades the upper edge of scrollable content.
@@ -322,14 +322,20 @@
   background: var(--aurora-scrim-top);
 }
 
+/* Global focus ring — per-song color inner ring + dark outer halo via --focus-ring token. */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
 /* Canonical focus ring — vivid teal at /70 opacity, 2px ring, 2px offset.
    Outline avoids box-shadow conflicts with Input's inset dual-glow treatment. */
 .aurora-focus {
   outline: none;
 }
 .aurora-focus:focus-visible {
-  outline: 2px solid rgba(94, 234, 212, 0.70);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 .aurora-glow-sm {
