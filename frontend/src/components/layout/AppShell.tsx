@@ -37,7 +37,7 @@ export function AppShell({ children, auroraColor1, auroraColor2, amplitude, inte
         }}
         aria-label="Open menu"
       >
-        <Menu className="h-4 w-4" />
+        <Menu className="h-4 w-4" strokeWidth={1.5} />
       </button>
 
       {/* Mobile overlay */}
@@ -60,7 +60,7 @@ export function AppShell({ children, auroraColor1, auroraColor2, amplitude, inte
           className="absolute top-4 right-3 z-10 h-7 w-7 rounded-md flex items-center justify-center text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] transition-colors duration-150 aurora-focus"
           aria-label="Close menu"
         >
-          <X className="h-4 w-4" />
+          <X className="h-4 w-4" strokeWidth={1.5} />
         </button>
         {children.sidebar}
       </div>
