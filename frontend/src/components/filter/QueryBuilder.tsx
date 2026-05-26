@@ -352,6 +352,9 @@ export function QueryBuilder() {
 
 /* ── Empty state for Mix (0 results after search) ──────────────────────── */
 function MixEmptyState() {
+  const setQuery      = useFilterStore(s => s.setQuery)
+  const executeFilter = useFilterStore(s => s.executeFilter)
+
   return (
     <div className="py-16 flex flex-col items-center gap-4">
       {/* Aurora wave SVG — abstract, no external assets */}
@@ -393,6 +396,12 @@ function MixEmptyState() {
         <p className="text-[12px] text-[var(--aurora-text-tertiary)] mt-2">
           Try relaxing a filter, or combine fewer tags
         </p>
+        <button
+          onClick={() => { setQuery(''); executeFilter() }}
+          className="mt-3 text-[12px] text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] underline underline-offset-2 transition-colors"
+        >
+          clear filter
+        </button>
       </div>
     </div>
   )
