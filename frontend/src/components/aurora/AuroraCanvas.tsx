@@ -242,7 +242,10 @@ export function AuroraCanvas({ amplitude, intensity }: AuroraCanvasProps) {
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+
+    const mql = window.matchMedia('(prefers-reduced-motion: reduce)')
+    if (mql.matches) return
+
     const result = initWebGL(canvas)
     if (!result) {
       console.warn('[AuroraCanvas] WebGL init failed — using CSS fallback')
@@ -251,6 +254,15 @@ export function AuroraCanvas({ amplitude, intensity }: AuroraCanvasProps) {
     }
     glRef.current = result
     rafRef.current = requestAnimationFrame(draw)
+
+    const onMotionChange = (e: MediaQueryListEvent) => {
+      if (e.matches) {
+        if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null }
+      } else {
+        if (!rafRef.current) rafRef.current = requestAnimationFrame(draw)
+      }
+    }
+    mql.addEventListener('change', onMotionChange)
 
     let fallbackTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -271,6 +283,7 @@ export function AuroraCanvas({ amplitude, intensity }: AuroraCanvasProps) {
     canvas.addEventListener('webglcontextrestored', onContextRestored)
 
     return () => {
+      mql.removeEventListener('change', onMotionChange)
       clearTimeout(fallbackTimer)
       if (rafRef.current) cancelAnimationFrame(rafRef.current)
       canvas.removeEventListener('webglcontextlost', onContextLost)
