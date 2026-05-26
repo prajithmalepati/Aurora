@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useState } from "react"
 import { Library, SlidersHorizontal, Plus, FolderSearch, Music, Settings } from "lucide-react"
 import { AddSongDialog } from "@/components/songs/AddSongDialog"
+import { AuroraWordmark } from "@/components/aurora/AuroraWordmark"
 
 interface SidebarProps {
   currentView: View
@@ -55,9 +56,9 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
         <div className="px-6 pt-7 pb-5">
           <button
             onClick={() => onViewChange({ kind: "all-songs" })}
-            className="font-display text-[34px] leading-none tracking-tight aurora-gradient-text select-none hover:opacity-80 transition-opacity duration-150"
+            className="select-none hover:opacity-80 transition-opacity duration-150"
           >
-            Aurora
+            <AuroraWordmark />
           </button>
           {/* Thin aurora gradient line beneath logo */}
           <div
