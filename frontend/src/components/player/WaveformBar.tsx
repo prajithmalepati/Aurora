@@ -3,6 +3,7 @@ import { useId, useRef, useEffect, useCallback } from 'react'
 interface WaveformBarProps {
   peaks: number[]   // 1000 floats [0–1]
   duration: number  // song duration in seconds
+  seek: number      // current playhead position in seconds, from playerStore
 }
 
 const BAR_COUNT = 200
@@ -38,22 +39,37 @@ function buildPath(resampled: number[]): string {
 
 // PURELY VISUAL — aria-hidden, pointer-events-none.
 // Seek interaction handled by native <input type="range"> overlaid in PlayerBar (Task 5.3).
-export function WaveformBar({ peaks, duration }: WaveformBarProps) {
+export function WaveformBar({ peaks, duration, seek }: WaveformBarProps) {
   const clipId      = useId()
   const clipRectRef = useRef<SVGRectElement>(null)
   const playlineRef = useRef<SVGLineElement>(null)
   const rafRef      = useRef<number | null>(null)
+  const seekRef     = useRef(seek)
 
   const resampled = resamplePeaks(peaks, BAR_COUNT)
   const path      = buildPath(resampled)
   const barW      = VIEW_W / BAR_COUNT
 
-  // RAF loop — direct ref attribute mutation, zero React re-renders per frame
+  // Keep seekRef current so RAF reads the latest store value without re-running.
+  // Under reduced-motion this still updates the ref so progress is rendered
+  // on the next effect run — static progress, no animation.
+  useEffect(() => {
+    seekRef.current = seek
+    // Under reduced-motion: RAF is stopped, so write directly to DOM.
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches && duration) {
+      const progress = seek / duration
+      const x = progress * VIEW_W
+      clipRectRef.current?.setAttribute('width', String(x))
+      playlineRef.current?.setAttribute('x1', String(x))
+      playlineRef.current?.setAttribute('x2', String(x))
+    }
+  }, [seek, duration])
+
+  // RAF tick — reads seekRef (from store, not Howler internals).
+  // Runs at 60fps for smooth interpolation between the 250ms store ticks.
   const tick = useCallback(() => {
-    const howl = (window as any).Howler?._howls?.[0]
-    if (howl && duration) {
-      const seekPos  = typeof howl.seek === 'function' ? (howl.seek() as number) : 0
-      const progress = seekPos / duration
+    if (duration) {
+      const progress = seekRef.current / duration
       const x        = progress * VIEW_W
       clipRectRef.current?.setAttribute('width', String(x))
       playlineRef.current?.setAttribute('x1', String(x))
@@ -63,9 +79,24 @@ export function WaveformBar({ peaks, duration }: WaveformBarProps) {
   }, [duration])
 
   useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const mql = window.matchMedia('(prefers-reduced-motion: reduce)')
+    if (mql.matches) return
+
     rafRef.current = requestAnimationFrame(tick)
-    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current) }
+
+    const onMotionChange = (e: MediaQueryListEvent) => {
+      if (e.matches) {
+        if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null }
+      } else {
+        rafRef.current = requestAnimationFrame(tick)
+      }
+    }
+    mql.addEventListener('change', onMotionChange)
+
+    return () => {
+      mql.removeEventListener('change', onMotionChange)
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    }
   }, [tick])
 
   return (
@@ -74,7 +105,7 @@ export function WaveformBar({ peaks, duration }: WaveformBarProps) {
       width="100%"
       height={VIEW_H}
       aria-hidden
-      style={{ display: 'block', overflow: 'visible', pointerEvents: 'none' }}
+      className="block overflow-visible pointer-events-none"
     >
       <defs>
         <clipPath id={clipId}>
@@ -102,11 +133,11 @@ export function WaveformBar({ peaks, duration }: WaveformBarProps) {
         style={{ filter: 'drop-shadow(0 0 4px color-mix(in oklch, var(--song-color) 80%, transparent))' }}
       />
 
-      {/* Playhead line */}
+      {/* Playhead line — per-song color */}
       <line
         ref={playlineRef}
         x1="0" y1="0" x2="0" y2={VIEW_H}
-        stroke="oklch(0.78 0.18 195)"
+        stroke="color-mix(in oklch, var(--song-color) 80%, white 20%)"
         strokeWidth="1"
       />
     </svg>
