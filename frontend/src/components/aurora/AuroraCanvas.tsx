@@ -252,12 +252,18 @@ export function AuroraCanvas({ amplitude, intensity }: AuroraCanvasProps) {
     glRef.current = result
     rafRef.current = requestAnimationFrame(draw)
 
+    let fallbackTimer: ReturnType<typeof setTimeout> | undefined
+
     const onContextLost = (e: Event) => {
       e.preventDefault()
       if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null }
       glRef.current = null
+      fallbackTimer = setTimeout(() => {
+        if (!glRef.current) setWebglFailed(true)
+      }, 5000)
     }
     const onContextRestored = () => {
+      clearTimeout(fallbackTimer)
       const r = initWebGL(canvas)
       if (r) { glRef.current = r; rafRef.current = requestAnimationFrame(draw) }
     }
@@ -265,6 +271,7 @@ export function AuroraCanvas({ amplitude, intensity }: AuroraCanvasProps) {
     canvas.addEventListener('webglcontextrestored', onContextRestored)
 
     return () => {
+      clearTimeout(fallbackTimer)
       if (rafRef.current) cancelAnimationFrame(rafRef.current)
       canvas.removeEventListener('webglcontextlost', onContextLost)
       canvas.removeEventListener('webglcontextrestored', onContextRestored)
