@@ -13,6 +13,7 @@ import { SongTable } from "@/components/songs/SongTable"
 import { PlaylistDetail } from "@/components/playlists/PlaylistDetail"
 import { QueryBuilder } from "@/components/filter/QueryBuilder"
 import { SettingsView } from "@/components/settings/SettingsView"
+import { AuroraColorBridge } from "@/components/aurora/AuroraColorBridge"
 import { Search } from "lucide-react"
 import type { Song } from "@/types"
 
@@ -188,6 +189,7 @@ function App() {
 
   return (
     <>
+      <AuroraColorBridge />
       <AppShell
         children={{
           sidebar: <Sidebar currentView={view} onViewChange={setView} />,
