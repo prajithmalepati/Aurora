@@ -71,8 +71,14 @@ export function PlayerBar() {
         ) : (
           <div className="flex flex-col gap-2 px-4 py-3">
             {/* Song info row */}
-            <div className="flex items-center gap-3">
-              <div key={currentSong.id} className="aurora-song-fade flex-shrink-0">
+            <motion.div
+              key={currentSong.id}
+              className="flex items-center gap-3"
+              initial={{ opacity: 0, y: 8, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ type: "spring", stiffness: 260, damping: 26 }}
+            >
+              <div className="flex-shrink-0">
                 <AlbumArt
                   song={currentSong!}
                   size="sm"
@@ -85,8 +91,7 @@ export function PlayerBar() {
                 {hasSong ? (
                   <>
                     <span
-                      key={currentSong.id}
-                      className="font-display text-[15px] leading-tight text-[var(--aurora-text)] truncate aurora-song-fade"
+                      className="font-display text-[15px] leading-tight text-[var(--aurora-text)] truncate"
                     >
                       {currentSong.title}
                     </span>
@@ -100,7 +105,7 @@ export function PlayerBar() {
                   </span>
                 )}
               </div>
-            </div>
+            </motion.div>
 
             {/* Seek bar row */}
             <div className="flex items-center gap-3">
@@ -200,8 +205,14 @@ export function PlayerBar() {
           /* Playing / paused: full controls fade in as bar opens */
           <div className="flex items-center h-[80px] px-8 gap-8 aurora-view-enter">
             {/* LEFT: Album art + title/artist */}
-            <div className="flex items-center gap-3.5 w-[240px] min-w-[160px] flex-shrink-0">
-              <div key={currentSong.id} className="relative flex-shrink-0 aurora-song-fade">
+            <motion.div
+              key={currentSong.id}
+              className="flex items-center gap-3.5 w-[240px] min-w-[160px] flex-shrink-0"
+              initial={{ opacity: 0, y: 8, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ type: "spring", stiffness: 260, damping: 26 }}
+            >
+              <div className="relative flex-shrink-0">
                 <AlbumArt
                   song={currentSong!}
                   size="md"
@@ -215,8 +226,7 @@ export function PlayerBar() {
                 {hasSong ? (
                   <>
                     <span
-                      key={currentSong.id}
-                      className="font-display text-[18px] leading-tight text-[var(--aurora-text)] truncate aurora-song-fade"
+                      className="font-display text-[18px] leading-tight text-[var(--aurora-text)] truncate"
                     >
                       {currentSong.title}
                     </span>
@@ -230,7 +240,7 @@ export function PlayerBar() {
                   </span>
                 )}
               </div>
-            </div>
+            </motion.div>
 
             {/* CENTER: Controls + seek bar */}
             <div className="flex-1 flex flex-col items-center gap-2 max-w-[580px] mx-auto min-w-0">
