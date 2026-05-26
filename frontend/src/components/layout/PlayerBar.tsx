@@ -23,6 +23,7 @@ export function PlayerBar() {
   const cycleRepeat = usePlayerStore((state) => state.cycleRepeat)
   const isShuffled = usePlayerStore((state) => state.isShuffled)
   const toggleShuffle = usePlayerStore((state) => state.toggleShuffle)
+  const isBuffering = usePlayerStore((state) => state.isBuffering)
 
   // isIdle = no song ever selected (initial app load only).
   // Once currentSong is set it never returns to null, so this only fires once.
@@ -163,11 +164,16 @@ export function PlayerBar() {
                 )}
                 aria-label={isPlaying ? 'Pause' : 'Play'}
               >
-                {/* Star bloom — full when playing, dim when paused */}
+                {/* Star bloom — full when playing, dim when paused, pulse when buffering */}
                 <span
-                  className="absolute inset-0 rounded-full pointer-events-none transition-all duration-300"
+                  className={cn(
+                    "absolute inset-0 rounded-full pointer-events-none transition-all duration-300",
+                    isBuffering && "star-buffering",
+                  )}
                   style={{
-                    background: `radial-gradient(circle, oklch(0.97 0.04 185 / ${isPlaying ? '1.0' : '0.5'}) 0%, oklch(0.78 0.18 185 / 0) 70%)`,
+                    background: isBuffering
+                      ? undefined
+                      : `radial-gradient(circle, oklch(0.97 0.04 185 / ${isPlaying ? '1.0' : '0.5'}) 0%, oklch(0.78 0.18 185 / 0) 70%)`,
                   }}
                 />
                 {isPlaying
@@ -287,11 +293,16 @@ export function PlayerBar() {
                   )}
                   aria-label={isPlaying ? 'Pause' : 'Play'}
                 >
-                  {/* Star bloom — full when playing, dim when paused */}
+                  {/* Star bloom — full when playing, dim when paused, pulse when buffering */}
                   <span
-                    className="absolute inset-0 rounded-full pointer-events-none transition-all duration-300"
+                    className={cn(
+                      "absolute inset-0 rounded-full pointer-events-none transition-all duration-300",
+                      isBuffering && "star-buffering",
+                    )}
                     style={{
-                      background: `radial-gradient(circle, oklch(0.97 0.04 185 / ${isPlaying ? '1.0' : '0.5'}) 0%, oklch(0.78 0.18 185 / 0) 70%)`,
+                      background: isBuffering
+                        ? undefined
+                        : `radial-gradient(circle, oklch(0.97 0.04 185 / ${isPlaying ? '1.0' : '0.5'}) 0%, oklch(0.78 0.18 185 / 0) 70%)`,
                     }}
                   />
                   {isPlaying

@@ -78,11 +78,14 @@ export function useAudioPlayer() {
     const songId = String(currentSong.id)
     currentSongRef.current = songId
 
+    usePlayerStore.getState().setIsBuffering(true)
+
     const howl = new Howl({
       src: `http://localhost:8000/api/songs/${songId}/stream`,
       html5: true,
       preload: true,
       onplay: () => {
+        usePlayerStore.getState().setIsBuffering(false)
         if (intervalRef.current) window.clearInterval(intervalRef.current)
         intervalRef.current = window.setInterval(() => {
           if (!seekingRef.current && howlRef.current) {
