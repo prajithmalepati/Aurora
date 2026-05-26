@@ -1,11 +1,9 @@
 import { usePlayerStore } from "@/stores/playerStore"
 import { useAudioPlayer } from "@/hooks/useAudioPlayer"
 import { formatDuration, cn } from "@/lib/utils"
-import { albumGradient } from "@/lib/albumGradient"
 import { AlbumArt } from "@/components/songs/AlbumArt"
 import { Equalizer } from "@/components/ui/Equalizer"
 import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Shuffle, Repeat, Repeat1 } from "lucide-react"
-import { useMemo } from "react"
 
 export function PlayerBar() {
   const { seekTo } = useAudioPlayer()
@@ -32,11 +30,6 @@ export function PlayerBar() {
   const seekPct = duration > 0 ? Math.min(100, (seek / duration) * 100) : 0
   const volumePct = Math.min(100, volume * 100)
 
-  const art = useMemo(
-    () => albumGradient(currentSong?.id ?? currentSong?.title ?? "void"),
-    [currentSong?.id, currentSong?.title]
-  )
-
   const RepeatIcon = repeatMode === "one" ? Repeat1 : Repeat
   const repeatActive = repeatMode !== "none"
   const repeatLabel = repeatMode === "none" ? "Repeat off" : repeatMode === "all" ? "Repeat all" : "Repeat one"
@@ -56,6 +49,7 @@ export function PlayerBar() {
         WebkitBackdropFilter: "blur(12px)",
       }}
     >
+      <div className="player-bleed" aria-hidden />
       {/* ── MOBILE layout ── */}
       <div className="sm:hidden">
         {isIdle ? (
@@ -79,9 +73,7 @@ export function PlayerBar() {
                   song={currentSong!}
                   size="sm"
                   style={{
-                    boxShadow: hasSong
-                      ? `0 0 16px 0 ${art.glow}, inset 0 0 0 1px var(--aurora-rim)`
-                      : "inset 0 0 0 1px rgba(255,255,255,0.05)",
+                    boxShadow: 'var(--halo-art)',
                   }}
                 />
               </div>
@@ -225,9 +217,7 @@ export function PlayerBar() {
                   song={currentSong!}
                   size="md"
                   style={{
-                    boxShadow: hasSong
-                      ? `0 0 24px 0 ${art.glow}, inset 0 0 0 1px var(--aurora-rim)`
-                      : "inset 0 0 0 1px rgba(255,255,255,0.05)",
+                    boxShadow: 'var(--halo-art)',
                   }}
                 />
               </div>
