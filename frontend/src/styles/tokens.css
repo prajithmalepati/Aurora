@@ -1,0 +1,50 @@
+/* Aurora design tokens — all hue-family 195 (aurora teal), not 240 */
+:root {
+  /* Surfaces */
+  --surface-0: oklch(0.04 0.003 195);
+  --surface-1: oklch(0.06 0.004 195 / 0.95);
+  --surface-2: oklch(0.08 0.006 195 / 0.92);
+  --surface-raised: oklch(0.10 0.008 195 / 0.90);
+
+  /* Borders */
+  --border-faint:  rgb(255 255 255 / 0.06);
+  --border-quiet:  rgb(255 255 255 / 0.10);
+  --border-strong: rgb(255 255 255 / 0.18);
+
+  /* Text (contrast-checked against 0.08 max luminance floor) */
+  --text-primary:   rgb(255 255 255 / 0.92);
+  --text-secondary: rgb(255 255 255 / 0.68);
+  --text-tertiary:  rgb(255 255 255 / 0.42);
+  --text-disabled:  rgb(255 255 255 / 0.28);
+
+  /* Brand + dynamic */
+  --aurora-teal:  oklch(0.72 0.18 195);
+  --song-color:   oklch(0.55 0.12 210);   /* slightly cool default — makes first song pop */
+  --song-color-2: oklch(0.55 0.12 210);
+
+  /* Motion */
+  --ease-out:       cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast:       120ms;
+  --dur-base:       200ms;
+  --dur-slow:       300ms;
+  --dur-transition: 400ms;
+
+  /* Space (4px base) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* Radius — must have ≥3 distinct values in use */
+  --radius-sm:   2px;    /* tag chips */
+  --radius-md:   6px;    /* inputs, rows */
+  --radius-lg:   12px;   /* cards */
+  --radius-pill: 999px;  /* play button */
+
+  /* Elevation */
+  --halo-art:  0 0 60px 12px color-mix(in oklch, var(--song-color) 40%, transparent);
+  --focus-ring: 0 0 0 2px color-mix(in oklch, var(--song-color) 60%, white 20%),
+                0 0 0 4px oklch(0 0 0 / 0.6);
+}
