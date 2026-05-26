@@ -1,6 +1,52 @@
 # Aurora — Session Handoff
 
-## Completed This Session (2026-05-27 — Session 27)
+## Completed This Session (2026-05-26 — Session 28)
+
+### Visual overhaul QA — f008 driven to `done` / `passes: true`
+
+**What this session was:** Full QA pass of f008 "Visual Overhaul — Northern Lights over OLED" (implemented in Session 27, never QA'd). Used MCP Playwright (WebKit headless). External audits from GPT 5.5 (`docs/design/gpt5.52.md`) and DeepSeek V4 (`.kilo/plans/1779820994868-session27-audit.md`) incorporated before testing.
+
+**Features.json:** `f008` updated to `status: done, passes: true`.
+
+### QA results (3.1–3.9)
+
+| Section | Result | Notes |
+|---|---|---|
+| 3.1 Aurora shader | PASS | WebGL active, 4 curtains, DPR cap 1.5, RAF running |
+| 3.2 Per-song color bleed | PASS | --song-color/--song-color-2 update on click, halo wired |
+| 3.3 WaveformBar | PASS | 200 bars via 2 paths, clip-path playhead, a11y range overlay |
+| 3.4 Play button liquid glass | PASS | backdrop-blur, specular, star bloom, active:scale-[0.94] |
+| 3.5 Wordmark + typography | PASS | SVG wordmark, Fraunces ≤3, JetBrains Mono on kbd operators |
+| 3.6 Focus model | PASS | Double ring on all 12 tab-cycled elements, no trap |
+| 3.7 Empty/loading/error | PASS | 0-results MixEmptyState + clear button, star-buffering class, shader survives backend kill |
+| 3.8 Reduced motion | PASS* | *2 inline fixes required (see below) |
+| 3.9 Performance | PARTIAL PASS | RAF cadence fine; GPU frame time UNABLE TO VERIFY in headless |
+
+### Inline fixes applied during QA
+
+1. **PlayerBar.tsx** — Lucide `Shuffle`/`Repeat`/`Volume` icons: `strokeWidth` 2 → 1.5 (GPT5.5/DeepSeek audit confirmed)
+2. **WaveformBar.tsx:65** — Added `prefers-reduced-motion` guard: skip RAF start when media query matches
+3. **AuroraCanvas.tsx:243** — Added `prefers-reduced-motion` guard: skip `initWebGL` + RAF when media query matches (CSS already hides canvas + shows static `body::before` gradient)
+
+### Backend rescan — already done
+
+Backfill script (`backend/backfill_peaks_colors.py`) ran in Session 28: 358 songs processed, 335/358 have waveform_peaks, 355/358 have dominant_color. API confirmed returning new fields.
+
+### Open follow-up issues (not blocking, filed during audit)
+
+| ID | Issue |
+|---|---|
+| B1 | AuroraColorBridge never rendered — `useAuroraColor()` in App.tsx causes full App re-renders on song change |
+| B2 | WaveformBar uses `Howler._howls[0]` private API for seek position — wrong Howl during crossfade |
+| B3 | AuroraCanvas context loss: `webglFailed` not set on `webglcontextlost` — fallback never activates |
+| B4 | Audio dropout between song changes (source node disconnected briefly) |
+| M1 | `useSongTransition.ts` defined but never imported — 400ms waveform choreography is dead code |
+| M3 | 4 GLSL curtains in code; HANDOFF claimed 5 (phase 7.93 missing) |
+| M8 | `songStore.ts` uses relative imports `./tagStore`, `./filterStore` — CLAUDE.md violation |
+
+---
+
+## Previous Session (2026-05-27 — Session 27)
 
 ### Visual overhaul — full implementation executed (all 39 tasks)
 

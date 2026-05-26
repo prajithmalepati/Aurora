@@ -89,8 +89,8 @@
       "id": "f008",
       "name": "Visual overhaul — Northern Lights over OLED",
       "description": "Full anti-slop redesign. Identity: OLED black base, Liquid Glass surfaces, per-song dominant-color bleed, custom SVG wordmark (A-as-star), General Sans + JetBrains Mono typography. Scope: player bar, wordmark, album art bleed, play button (liquid glass + bright star + physics ripple), playlist hero, sidebar. See docs/design/identity-and-skills-plan.md for full spec.",
-      "status": "in_progress",
-      "passes": false,
+      "status": "done",
+      "passes": true,
       "scope": "frontend",
       "files": [
         "frontend/src/index.css",
