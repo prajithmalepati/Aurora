@@ -1,4 +1,5 @@
 """Songs router."""
+import json
 import sqlite3
 from pathlib import Path
 from typing import Optional
@@ -38,6 +39,8 @@ def song_row_to_dict(row: sqlite3.Row) -> dict:
                 playlists.append({"id": int(id_part), "name": name_part.strip()})
     
     raw_art = row["album_art_path"] if "album_art_path" in row.keys() else None
+    raw_peaks = row["waveform_peaks"] if "waveform_peaks" in row.keys() else None
+    waveform_peaks = json.loads(raw_peaks) if raw_peaks else None
     return {
         "id": row["id"],
         "title": row["title"],
@@ -53,6 +56,9 @@ def song_row_to_dict(row: sqlite3.Row) -> dict:
         "playlists": playlists,
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
+        "waveform_peaks": waveform_peaks,
+        "dominant_color": row["dominant_color"] if "dominant_color" in row.keys() else None,
+        "dominant_color_2": row["dominant_color_2"] if "dominant_color_2" in row.keys() else None,
     }
 
 
@@ -93,6 +99,7 @@ def list_songs(
         SELECT
             s.id, s.title, s.artist, s.album, s.duration,
             s.file_path, s.file_format, s.album_art_path, s.source,
+            s.waveform_peaks, s.dominant_color, s.dominant_color_2,
             GROUP_CONCAT(t.name) as tags,
             GROUP_CONCAT(p.id || ':' || p.name) as playlists,
             s.created_at, s.updated_at
@@ -168,6 +175,9 @@ def get_song(song_id: int):
             s.file_format,
             s.album_art_path,
             s.source,
+            s.waveform_peaks,
+            s.dominant_color,
+            s.dominant_color_2,
             GROUP_CONCAT(t.name) as tags,
             GROUP_CONCAT(p.id || ':' || p.name) as playlists,
             s.created_at,
@@ -407,6 +417,9 @@ def update_song(song_id: int, song_update: SongUpdate):
             s.file_format,
             s.album_art_path,
             s.source,
+            s.waveform_peaks,
+            s.dominant_color,
+            s.dominant_color_2,
             GROUP_CONCAT(t.name) as tags,
             GROUP_CONCAT(p.id || ':' || p.name) as playlists,
             s.created_at,
