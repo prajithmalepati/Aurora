@@ -1,10 +1,10 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
+import { usePlayerStore } from '@/stores/playerStore'
+import { oklchToLinearRgb, BRAND_TEAL_LINEAR, DEFAULT_COLOR } from '@/hooks/useAuroraColor'
 
 interface AuroraCanvasProps {
-  color1: [number, number, number]  // linear RGB brand teal
-  color2: [number, number, number]  // linear RGB album fringe
-  amplitude: number                  // 0–1 transient-sensitive
-  intensity: number                  // 0–1 view-driven
+  amplitude: number  // 0–1 transient-sensitive
+  intensity: number  // 0–1 view-driven
 }
 
 // Vertex shader — fullscreen quad
@@ -159,12 +159,15 @@ function initWebGL(canvas: HTMLCanvasElement): {
   return { gl, uniforms }
 }
 
-export function AuroraCanvas({ color1, color2, amplitude, intensity }: AuroraCanvasProps) {
+export function AuroraCanvas({ amplitude, intensity }: AuroraCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const glRef = useRef<{ gl: WebGLRenderingContext; uniforms: Record<string, WebGLUniformLocation> } | null>(null)
   const rafRef = useRef<number | null>(null)
   const startRef = useRef<number>(performance.now())
   const [webglFailed, setWebglFailed] = useState(false)
+
+  const currentSong = usePlayerStore(s => s.currentSong)
+  const color2 = oklchToLinearRgb(currentSong?.dominant_color_2 ?? DEFAULT_COLOR)
 
   // Lerped color2 (300ms)
   const currentColor2Ref = useRef<[number, number, number]>([...color2])
@@ -181,8 +184,7 @@ export function AuroraCanvas({ color1, color2, amplitude, intensity }: AuroraCan
   const amplitudeRef = useRef(amplitude)
   amplitudeRef.current = amplitude
 
-  const color1Ref = useRef<[number, number, number]>(color1)
-  color1Ref.current = color1
+  const color1Ref = useRef<[number, number, number]>(BRAND_TEAL_LINEAR)
 
   useEffect(() => {
     targetColor2Ref.current = color2

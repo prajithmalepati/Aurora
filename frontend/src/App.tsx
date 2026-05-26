@@ -13,7 +13,7 @@ import { SongTable } from "@/components/songs/SongTable"
 import { PlaylistDetail } from "@/components/playlists/PlaylistDetail"
 import { QueryBuilder } from "@/components/filter/QueryBuilder"
 import { SettingsView } from "@/components/settings/SettingsView"
-import { useAuroraColor } from '@/hooks/useAuroraColor'
+import { AuroraColorBridge } from '@/components/aurora/AuroraColorBridge'
 import { useAudioAnalyser } from '@/hooks/useAudioAnalyser'
 import { useAuroraIntensity } from '@/hooks/useAuroraIntensity'
 import { Search } from "lucide-react"
@@ -31,7 +31,6 @@ function App() {
   const fetchTags = useTagStore((state) => state.fetchTags)
   const playSong = usePlayerStore((state) => state.playSong)
 
-  const { color1LinearRgb, color2LinearRgb } = useAuroraColor()
   const amplitude = useAudioAnalyser()
   const intensity = useAuroraIntensity()
 
@@ -195,9 +194,8 @@ function App() {
 
   return (
     <>
+      <AuroraColorBridge />
       <AppShell
-        auroraColor1={color1LinearRgb}
-        auroraColor2={color2LinearRgb}
         amplitude={amplitude}
         intensity={intensity}
         children={{
