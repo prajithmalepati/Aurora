@@ -80,8 +80,10 @@ export function useAudioPlayer() {
 
     usePlayerStore.getState().setIsBuffering(true)
 
+    const ext = currentSong.file_path?.split('.').pop()?.toLowerCase()
     const howl = new Howl({
       src: `http://localhost:8000/api/songs/${songId}/stream`,
+      format: ext ? [ext] : undefined,
       html5: true,
       preload: true,
       onplay: () => {
