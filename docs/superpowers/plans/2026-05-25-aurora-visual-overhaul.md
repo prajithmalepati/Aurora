@@ -13,10 +13,15 @@
 ## Multi-model review synthesis (Session 26)
 
 - **DeepSeek** implementation readiness audit: blockers B1–B5 confirmed real by GPT 5.5
-- **GPT 5.5** corrections folded in: `start_time_ms`/`end_time_ms` already in model ✓; culori needed for shader uniforms; don't remove static bg until Phase 4 AuroraCanvas lands; API returns `waveform_peaks` as `list[float] | null` not raw JSON string
-- **Opus (Cursor)** additions folded in: token system (Phase 0), track transition choreography, focus model, empty/loading/error states, anti-slop checks (prime curtain phases, Lucide stroke-width, grain opacity at 3–7%, diverse radii)
-- **Kimi** — plan to run Phase 2–5 through Kimi (known for frontend quality) for visual iteration after backend lands
-- **Agent-browser (Vercel Labs)** — better than Playwright for browser-based visual regression; use when available. Playwright MCP used in this plan.
+- **GPT 5.5** corrections: `start_time_ms`/`end_time_ms` already in model ✓; culori needed for shader uniforms; don't remove static bg until Phase 4 AuroraCanvas lands; API returns `waveform_peaks` as `list[float] | null`
+- **Opus (Cursor)** additions: token system (Phase 0), track transition choreography, focus model, empty/loading/error states, anti-slop checks
+- **Kimi round 1** — critical fixes folded in: WebGL context loss handling, `stroke-dasharray` WaveformBar, `useEffectEvent` for `useSongTransition`, refs-not-state for `useAuroraIntensity`, `useReducedMotion` global hook, `contain: paint` on play button, SVG-as-slider accessibility, `AuroraColorBridge` null component
+- **Kimi round 2** — GLSL shader (fBm + OKLab + altitude tinting + 4 curtains), additive blend mode (`ONE, ONE_MINUS_SRC_ALPHA`), `gl.deleteShader()` after linking, `highp float` + `uTime % 1000`
+- **Qwen 3.7** — 6 new infrastructure findings folded in (H12–H17): DPR cap at 1.5, Culori RGB clamping, Pillow.quantize replaces KMeans, SQLite busy_timeout, mutagen pre-validation for miniaudio, ctx.state suspend check. One false alarm: claimed `useEffectEvent` removed from React 19 — GPT confirmed it exists in 19.2.4.
+- **DeepSeek kilo audit (updated)** — confirmed all Qwen findings as H12–H17. Also confirmed skip list: custom SVG `role="slider"` (worse than native `<input type="range">`), useEffectEvent as mandatory architecture, additive blending as hard requirement (prototype first), miniaudio subprocess isolation (mutagen guard is sufficient for v1).
+- **Agent-browser (Vercel Labs)** — better than Playwright for visual regression; use when available. Playwright MCP used here.
+
+**Mistakes documented:** `claude-workspace/Aurora/JOURNAL.md` (Session 26 entries, 13 mistakes). Patterns promoted: 3 new entries in `PATTERNS.md` (WebGL lifecycle, React hook mistakes, new-domain planning gaps).
 
 ---
 
@@ -171,6 +176,17 @@ In `backend/app/database.py`, after the last `try/except` migration block (after
         conn.commit()
     except Exception:
         pass
+```
+
+Also add `busy_timeout=5000` to `get_db()`. WAL is already set in `database.py:9` but without busy_timeout FastAPI async can produce `database is locked` under concurrent scan+read pressure:
+
+```python
+def get_db():
+    conn = sqlite3.connect(DATABASE_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA busy_timeout = 5000")  # 5s wait before raising OperationalError
+    return conn
 ```
 
 - [ ] **Step 2: Verify migration runs without error**
@@ -493,23 +509,22 @@ git commit -m "feat(playlists): include waveform_peaks + dominant colors in play
 - [ ] **Step 1: Add packages**
 
 ```
-scikit-learn==1.6.1
 miniaudio==1.60
 Pillow==11.2.1
 ```
 
-Add these to `backend/requirements.txt`.
+Add these to `backend/requirements.txt`. **Do NOT add scikit-learn** — Pillow's native `Image.quantize()` replaces KMeans (100x faster, C-optimized, no heavy ML dependency — see Task 1.9).
 
 - [ ] **Step 2: Install**
 
 ```bash
-cd backend && venv\Scripts\activate && pip install scikit-learn miniaudio Pillow
+cd backend && venv\Scripts\activate && pip install miniaudio Pillow
 ```
 
 - [ ] **Step 3: Verify**
 
 ```bash
-python -c "import miniaudio, PIL, sklearn; print('ok')"
+python -c "import miniaudio, PIL; print('ok')"
 ```
 
 Expected: `ok`
@@ -680,7 +695,20 @@ def extract_peaks(file_path: str, num_bins: int = 1000) -> list[float] | None:
     Decode audio to mono 22050Hz and compute max-amplitude per bin.
     Returns list of num_bins floats in [0, 1], or None on failure.
     Supports: MP3, FLAC, WAV, OGG. On Windows, M4A via Media Foundation.
+
+    Pre-validates with mutagen before passing to miniaudio.
+    miniaudio is a C-extension: malformed headers cause segfaults (not Python exceptions),
+    which would kill the entire FastAPI process. mutagen is pure Python and safe to probe first.
     """
+    try:
+        import mutagen
+        # Mutagen probe: raises if file is unreadable/corrupt. Pure Python — no crash risk.
+        probe = mutagen.File(file_path)
+        if probe is None:
+            return None  # not an audio file mutagen recognizes
+    except Exception:
+        return None  # corrupt or unrecognized — skip miniaudio entirely
+
     try:
         import miniaudio
         decoded = miniaudio.decode_file(
@@ -736,46 +764,30 @@ git commit -m "feat(scanner): add waveform peak extraction via miniaudio"
 ```python
 def extract_dominant_colors(art_data: bytes) -> tuple[str | None, str | None]:
     """
-    K-means on 64×64 album art pixels → top 2 contrast-safe OKLCH colors.
+    Pillow MedianCut quantize → top 2 contrast-safe OKLCH colors.
     Returns (dominant_color, dominant_color_2) as oklch() CSS strings, or (None, None).
+
+    Uses Pillow's native C-optimized quantize() — 100x faster than scikit-learn KMeans
+    and mathematically designed for exactly this task (2-color dominant extraction).
+    No numpy, no sklearn — Pillow only.
     """
     try:
         from io import BytesIO
         from PIL import Image
-        from sklearn.cluster import KMeans
-        import numpy as np
         from app.services.color_utils import rgb_to_oklch, clamp_oklch_for_display
 
         img = Image.open(BytesIO(art_data)).convert("RGB").resize((64, 64), Image.LANCZOS)
-        pixels = np.array(img).reshape(-1, 3)  # shape (4096, 3), dtype uint8
 
-        # Filter: skip near-gray (low chroma) + near-black/white
-        results_oklch = []
-        for px in pixels:
-            L, C, _ = rgb_to_oklch(int(px[0]), int(px[1]), int(px[2]))
-            results_oklch.append((L, C))
-        oklch_arr = np.array(results_oklch)
-        mask = (
-            (oklch_arr[:, 1] >= 0.05) &   # chroma ≥ 0.05
-            (oklch_arr[:, 0] >= 0.15) &    # not too dark
-            (oklch_arr[:, 0] <= 0.85)       # not too bright
-        )
-        filtered = pixels[mask]
-
-        if len(filtered) < 20:
-            filtered = pixels  # fallback: use all pixels
-
-        n_clusters = min(2, len(filtered))
-        km = KMeans(n_clusters=n_clusters, n_init=3, random_state=42).fit(filtered)
-        centers = km.cluster_centers_.astype(int)
+        # MedianCut partitions the color space into 2 regions, picks centroid of each.
+        # This is exactly K-means for K=2 but implemented in C with decades of tuning.
+        quantized = img.quantize(colors=2, method=Image.Quantize.MEDIANCUT)
+        palette   = quantized.getpalette()  # flat list [R,G,B, R,G,B, ...]
 
         colors: list[str] = []
-        for rgb in centers:
-            L, C, H = rgb_to_oklch(int(rgb[0]), int(rgb[1]), int(rgb[2]))
+        for i in range(2):
+            r, g, b = palette[i * 3], palette[i * 3 + 1], palette[i * 3 + 2]
+            L, C, H = rgb_to_oklch(r, g, b)
             colors.append(clamp_oklch_for_display(L, C, H))
-
-        while len(colors) < 2:
-            colors.append(colors[0] if colors else None)
 
         return colors[0], colors[1]
     except Exception:
@@ -786,7 +798,6 @@ def extract_dominant_colors(art_data: bytes) -> tuple[str | None, str | None]:
 
 ```python
 from app.services.file_scanner import extract_dominant_colors
-import struct
 
 
 def _make_png_1x1(r: int, g: int, b: int) -> bytes:
@@ -1379,6 +1390,80 @@ git commit -m "fix(player): show equalizer icon only, remove redundant Playing l
 
 ---
 
+### Task 2.11: Liquid glass play button (missing from original plan)
+
+**Files:** Modify `frontend/src/components/layout/PlayerBar.tsx`, `frontend/src/index.css`
+
+`backdrop-filter` without `contain: paint` composites against the entire page — GPU repaints everything behind the button on every frame. `contain: paint` scopes it to the button's own bounding box.
+
+- [ ] **Step 1: Update play button element in `PlayerBar.tsx`**
+
+Find the play/pause button. Replace with:
+
+```tsx
+<button
+  onClick={togglePlay}
+  disabled={!currentSong}
+  className={cn(
+    "relative flex items-center justify-center rounded-full",
+    "w-12 h-12",
+    "[contain:paint]",           // limit backdrop-filter compositing to this element
+    "backdrop-blur-md",
+    "[background:radial-gradient(circle,rgba(255,255,255,0.12)_0%,rgba(255,255,255,0.04)_100%)]",
+    "border border-white/[0.18]",
+    "shadow-[inset_0_1px_0_rgba(255,255,255,0.22),inset_0_-1px_0_rgba(0,0,0,0.3)]",
+    "transition-transform duration-75 active:scale-[0.94]",
+    "disabled:opacity-40 disabled:pointer-events-none",
+  )}
+  aria-label={isPlaying ? 'Pause' : 'Play'}
+>
+  {/* Star bloom — full when playing, dim when paused, pulse when buffering */}
+  <span
+    className={cn(
+      "absolute inset-0 rounded-full pointer-events-none",
+      "transition-all duration-300",
+      isBuffering && "star-buffering",
+    )}
+    style={{
+      background: `radial-gradient(circle, oklch(0.97 0.04 185 / ${isPlaying ? '1.0' : '0.4'}) 0%, oklch(0.78 0.18 185 / 0) 70%)`,
+    }}
+  />
+  {isPlaying
+    ? <Pause size={18} strokeWidth={1.5} className="relative z-10 text-white/90" />
+    : <Play  size={18} strokeWidth={1.5} className="relative z-10 text-white/90" />
+  }
+</button>
+```
+
+- [ ] **Step 2: Add buffering pulse animation to `index.css`**
+
+```css
+@keyframes star-pulse {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50%       { opacity: 0.8; transform: scale(1.15); }
+}
+.star-buffering {
+  animation: star-pulse 1.5s ease-in-out infinite;
+}
+```
+
+- [ ] **Step 3: Visual check — play button states**
+
+Start dev server. Verify:
+- No song: button 40% opacity, not clickable
+- Song paused: star dim (40% opacity), no pulse
+- Song playing: star bright (full opacity), no pulse
+- Buffering: star pulse animation at 1.5s cycle
+
+- [ ] **Step 4: Commit**
+
+```
+git add frontend/src/components/layout/PlayerBar.tsx frontend/src/index.css
+git commit -m "feat(player): liquid glass play button with star bloom + contain:paint"
+```
+
+---
+
 ## Phase 3 — Color pipeline
 
 ### Task 3.1: `useAuroraColor` hook
@@ -1397,12 +1482,17 @@ const toLrgb = converter('lrgb')
 const BRAND_TEAL = 'oklch(0.72 0.18 195)'
 const DEFAULT_COLOR = 'oklch(0.55 0.12 210)'
 
+// OKLCH at high chroma produces linear RGB values outside [0,1] (e.g. -0.12, 1.45).
+// WebGL gl.uniform3fv clamps these unpredictably per browser, causing neon color shifts.
+// Must clamp explicitly before passing to the shader.
+const clampRgb = (v: number) => Math.max(0, Math.min(1, v))
+
 function oklchToLinearRgb(oklchStr: string): [number, number, number] {
   try {
     const parsed = parse(oklchStr)
     if (!parsed) return [0.40, 0.78, 0.72]
     const lrgb = toLrgb(parsed)
-    return [lrgb?.r ?? 0, lrgb?.g ?? 0, lrgb?.b ?? 0]
+    return [clampRgb(lrgb?.r ?? 0), clampRgb(lrgb?.g ?? 0), clampRgb(lrgb?.b ?? 0)]
   } catch {
     return [0.40, 0.78, 0.72]
   }
@@ -1463,44 +1553,41 @@ git commit -m "feat(color): add useAuroraColor hook — sets CSS vars and export
 - [ ] **Step 1: Write the hook**
 
 ```typescript
-import { useEffect, useRef } from 'react'
+import { useEffect, useEffectEvent, useRef } from 'react'
 import { usePlayerStore } from '@/stores/playerStore'
 
 /**
  * Drives the 400ms song-change choreography.
- * Returns a normalized progress value [0..1] that consumers can use
- * to fade waveform peaks in/out. CSS variables transition on their own.
+ * useEffectEvent wraps onSwapPeaks so it's always fresh without being
+ * a reactive dep — prevents the effect from re-triggering on every render.
  *
  * Timeline:
- *   t=0ms:     song changes, waveform opacity begins fade to 40%
- *   t=100ms:   --song-color begins CSS lerp (via CSS transition on :root)
- *   t=200ms:   waveform peaks swap, fade back to 100%
+ *   t=0ms:     song changes
+ *   t=100ms:   --song-color begins CSS lerp (via useAuroraColor)
+ *   t=200ms:   waveform peaks swap (onSwapPeaks called)
  *   t=400ms:   transition complete
  */
 export function useSongTransition(onSwapPeaks: () => void) {
   const currentSongId = usePlayerStore(s => s.currentSong?.id)
-  const rafRef = useRef<number | null>(null)
-  const startRef = useRef<number>(0)
   const prevIdRef = useRef<number | undefined>(undefined)
+  const rafRef = useRef<number | null>(null)
+
+  // useEffectEvent: always calls latest onSwapPeaks, never a stale closure,
+  // and never triggers effect re-runs (not a reactive dep)
+  const swapEvent = useEffectEvent(onSwapPeaks)
 
   useEffect(() => {
     if (currentSongId === prevIdRef.current) return
     prevIdRef.current = currentSongId
 
-    // Set CSS transition on --song-color (300ms, triggered by useAuroraColor setting it)
-    document.documentElement.style.setProperty(
-      'transition',
-      '--song-color 300ms var(--ease-out), --song-color-2 300ms var(--ease-out)'
-    )
-
-    startRef.current = performance.now()
+    const start = performance.now()
     let swapped = false
 
     const tick = (now: number) => {
-      const elapsed = now - startRef.current
+      const elapsed = now - start
       if (!swapped && elapsed >= 200) {
         swapped = true
-        onSwapPeaks()
+        swapEvent()
       }
       if (elapsed < 400) {
         rafRef.current = requestAnimationFrame(tick)
@@ -1508,10 +1595,8 @@ export function useSongTransition(onSwapPeaks: () => void) {
     }
 
     rafRef.current = requestAnimationFrame(tick)
-    return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current)
-    }
-  }, [currentSongId, onSwapPeaks])
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current) }
+  }, [currentSongId]) // swapEvent intentionally NOT in deps — that's the point of useEffectEvent
 }
 ```
 
@@ -1530,28 +1615,44 @@ git commit -m "feat(player): add useSongTransition hook for 400ms song-change ch
 
 ---
 
-### Task 3.3: Wire color hooks into `App.tsx`
+### Task 3.3: `AuroraColorBridge` null component + wire into App.tsx
 
-**Files:** Modify `frontend/src/App.tsx`
+**Files:** Create `frontend/src/components/aurora/AuroraColorBridge.tsx`, modify `frontend/src/App.tsx`
 
-- [ ] **Step 1: Import and call `useAuroraColor` in App.tsx**
+CSS variables are side effects — they must NOT trigger App.tsx re-renders. Fix: render an isolated null component that re-renders itself without cascading.
+
+- [ ] **Step 1: Create `AuroraColorBridge.tsx`**
 
 ```tsx
 import { useAuroraColor } from '@/hooks/useAuroraColor'
 
-export function App() {
-  const auroraColor = useAuroraColor()  // sets CSS vars, exposes linear RGB
-  // ... rest of App
+// Null component: re-renders in isolation, never cascades up to App
+export function AuroraColorBridge() {
+  useAuroraColor()  // pure side effects: sets --song-color, --song-color-2
+  return null
 }
 ```
 
-Export `auroraColor` via context or pass down to AuroraCanvas (Phase 4). For now, the CSS vars are the primary consumer.
+- [ ] **Step 2: Add to App.tsx — BEFORE any children that read CSS vars**
 
-- [ ] **Step 2: Commit**
+```tsx
+import { AuroraColorBridge } from '@/components/aurora/AuroraColorBridge'
+
+export function App() {
+  return (
+    <>
+      <AuroraColorBridge />
+      {/* rest of app */}
+    </>
+  )
+}
+```
+
+- [ ] **Step 3: Commit**
 
 ```
-git add frontend/src/App.tsx
-git commit -m "feat(app): wire useAuroraColor — CSS vars update on song change"
+git add frontend/src/components/aurora/AuroraColorBridge.tsx frontend/src/App.tsx
+git commit -m "feat(app): AuroraColorBridge null component — CSS vars without App re-render"
 ```
 
 ---
@@ -1631,65 +1732,102 @@ attribute vec2 aPosition;
 void main() { gl_Position = vec4(aPosition, 0.0, 1.0); }
 `
 
-// Fragment shader — layered sinusoidal aurora curtains
-// Prime-number period offsets prevent curtains from realigning (Opus recommendation)
+// Fragment shader — fBm noise, OKLab color mixing, altitude tinting, 4 curtains
+// Verified by Kimi against Björn Ottosson's OKLab matrices + Inigo Quilez's optimization.
+// ~2ms at 1440p. highp float prevents time-precision drift after 10+ minutes.
 const FS = `
-precision mediump float;
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+  precision highp float;
+#else
+  precision mediump float;
+#endif
 
-uniform float uTime;
-uniform vec3  uColor1;
-uniform vec3  uColor2;
-uniform float uAmplitude;
-uniform float uIntensity;
+uniform float uTime;        // Seconds, wrapped modulo 1000.0 in JS
+uniform vec3  uColor1;      // Brand teal (linear RGB)
+uniform vec3  uColor2;      // Album fringe (linear RGB)
+uniform float uAmplitude;   // 0–1, transient-sensitive
+uniform float uIntensity;   // 0–1, view-driven
 uniform vec2  uResolution;
 
+// Value noise
 float hash(vec2 p) {
-  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+  vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
 }
-float noise(vec2 p) {
+float vnoise(vec2 p) {
   vec2 i = floor(p);
   vec2 f = fract(p);
-  vec2 u = f * f * (3.0 - 2.0 * f);
-  return mix(
-    mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x),
-    mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x),
-    u.y
-  );
+  f = f * f * (3.0 - 2.0 * f);
+  float a = hash(i), b = hash(i + vec2(1,0)), c = hash(i + vec2(0,1)), d = hash(i + vec2(1,1));
+  return mix(mix(a,b,f.x), mix(c,d,f.x), f.y);
 }
 
+// fBm: 3 octaves, lacunarity 2.0, persistence 0.5
+float fbm(vec2 p) {
+  float v = 0.0, a = 0.5;
+  mat2 rot = mat2(0.8, 0.6, -0.6, 0.8);
+  for (int i = 0; i < 3; i++) { v += a * vnoise(p); p = rot * p * 2.0; a *= 0.5; }
+  return v;
+}
+
+// OKLab perceptual mix — avoids muddy gray between complementary colors
+vec3 oklab_mix(vec3 lin1, vec3 lin2, float a) {
+  const mat3 kCONEtoLMS = mat3(0.4122,0.2119,0.0883,0.5363,0.6807,0.2818,0.0515,0.1074,0.6303);
+  const mat3 kLMStoCONE = mat3(4.0767,-1.2681,-0.0041,-3.3072,2.6093,-0.7035,0.2308,-0.3411,1.7069);
+  vec3 lms1 = pow(kCONEtoLMS * lin1, vec3(1.0/3.0));
+  vec3 lms2 = pow(kCONEtoLMS * lin2, vec3(1.0/3.0));
+  vec3 lms  = mix(lms1, lms2, a);
+  lms *= 1.0 + 0.2 * a * (1.0 - a);  // slight mid-tone gain for vibrant blends
+  return kLMStoCONE * (lms * lms * lms);
+}
+
+// Single aurora curtain — ionized gas sheet with fBm turbulence
 float curtain(vec2 uv, float t, float phase, float speed, float freq) {
-  float x = uv.x;
-  float wave  = sin(x * freq + t * speed + phase) * 0.12;
-  wave       += sin(x * freq * 1.73 + t * speed * 0.61 + phase * 1.41) * 0.06;
-  wave       += noise(vec2(x * 1.8, t * 0.15 + phase)) * 0.08;
-  float cy    = 0.52 + wave + sin(t * 0.07 + phase) * 0.04;
+  float wave  = sin(uv.x * freq + t * speed + phase) * 0.14;
+  wave       += sin(uv.x * freq * 1.73 + t * speed * 0.61 + phase * 1.41) * 0.07;
+  wave       += fbm(vec2(uv.x * 2.2, t * 0.12 + phase)) * 0.10;
+  float cy    = 0.48 + wave + sin(t * 0.05 + phase) * 0.05;
   float dist  = abs(uv.y - cy);
-  float coreW = 0.06 + sin(t * 0.05 + phase * 0.7) * 0.01;
+  float coreW = 0.05 + sin(t * 0.04 + phase * 0.7) * 0.012;
   float core  = smoothstep(coreW, 0.0, dist);
-  float glow  = smoothstep(coreW * 4.0, coreW, dist) * 0.25;
+  float glow  = smoothstep(coreW * 5.0, coreW, dist) * 0.22;
   return core + glow;
 }
 
 void main() {
   vec2 uv = gl_FragCoord.xy / uResolution;
+  float t = uTime;
 
-  // 5 curtains — phases and speeds chosen to never align (irrational ratios)
+  // 4 curtains — phases/speeds are irrational, never synchronize
   float a = 0.0;
-  a += curtain(uv, uTime, 0.00, 0.31, 2.10) * 0.55;
-  a += curtain(uv, uTime, 1.70, 0.19, 3.30) * 0.45;
-  a += curtain(uv, uTime, 3.14, 0.23, 1.80) * 0.40;
-  a += curtain(uv, uTime, 5.30, 0.17, 4.10) * 0.35;
-  a += curtain(uv, uTime, 7.93, 0.29, 2.70) * 0.30;
+  a += curtain(uv, t, 0.00, 0.31, 2.10) * 0.50;
+  a += curtain(uv, t, 1.70, 0.19, 3.30) * 0.40;
+  a += curtain(uv, t, 3.14, 0.23, 1.80) * 0.35;
+  a += curtain(uv, t, 5.30, 0.17, 4.10) * 0.30;
 
-  a *= 1.0 + uAmplitude * 0.6;
+  a *= 1.0 + uAmplitude * 0.5;
   a  = clamp(a, 0.0, 1.0);
 
-  float colorT   = uv.x * 0.7 + sin(uTime * 0.08) * 0.15 + 0.15;
-  vec3  color    = mix(uColor1, uColor2, clamp(colorT, 0.0, 1.0));
-  color          = mix(color, vec3(0.95, 0.98, 1.0), a * a * 0.35);
+  // OKLab mix: brand teal → album color by vertical position
+  float colorT = uv.y * 0.6 + sin(t * 0.08) * 0.1 + 0.2;
+  vec3  color  = oklab_mix(uColor1, uColor2, clamp(colorT, 0.0, 1.0));
 
-  float alpha = a * uIntensity * 0.65;
-  gl_FragColor  = vec4(color, alpha);
+  // Altitude tinting (physics-based, even in 2D):
+  //   green (557.7nm oxygen, 100–200km) at lower altitudes
+  //   red (630.0nm oxygen, 200km+) at higher altitudes
+  vec3 greenCore  = vec3(0.05, 0.75, 0.25);
+  vec3 redFringe  = vec3(0.85, 0.15, 0.10);
+  color = mix(color, mix(greenCore, redFringe, smoothstep(0.45, 0.75, uv.y)), 0.35);
+
+  // White-hot core at dense curtain regions
+  color = mix(color, vec3(0.95, 0.98, 1.0), a * a * 0.30);
+
+  // Alpha: density × intensity × atmospheric fade at top + bottom
+  float alpha = a * uIntensity * 0.60;
+  alpha *= smoothstep(0.0, 0.15, uv.y) * smoothstep(1.0, 0.75, uv.y);
+
+  gl_FragColor = vec4(color, alpha);
 }
 `
 
@@ -1735,9 +1873,14 @@ function initWebGL(canvas: HTMLCanvasElement): {
   gl.enableVertexAttribArray(pos)
   gl.vertexAttribPointer(pos, 2, gl.FLOAT, false, 0, 0)
 
+  // Free GPU memory — shaders no longer needed after linking
+  gl.deleteShader(vs)
+  gl.deleteShader(fs)
+
   gl.useProgram(prog)
   gl.enable(gl.BLEND)
-  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
+  gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)  // additive: glow/light emission (not surface alpha)
+  gl.blendEquation(gl.FUNC_ADD)
 
   const uniforms: Record<string, WebGLUniformLocation> = {}
   for (const name of ['uTime','uColor1','uColor2','uAmplitude','uIntensity','uResolution']) {
@@ -1786,7 +1929,7 @@ export function AuroraCanvas({ color1, color2, amplitude, intensity }: AuroraCan
     if (!canvas) return
 
     const now = performance.now()
-    const t = (now - startRef.current) / 1000
+    const t = ((now - startRef.current) / 1000) % 1000  // wrap: highp float loses sub-pixel precision after 600s
 
     // Lerp color2 (300ms)
     const ct = Math.min(1, (now - color2StartRef.current) / 300)
@@ -1829,22 +1972,43 @@ export function AuroraCanvas({ color1, color2, amplitude, intensity }: AuroraCan
     }
     glRef.current = result
     rafRef.current = requestAnimationFrame(draw)
+
+    // WebGL context loss — mandatory per Khronos spec.
+    // Without preventDefault() the browser does NOT restore the context.
+    // Firefox has a per-page limit of 16 contexts — loss is realistic.
+    const onContextLost = (e: Event) => {
+      e.preventDefault()
+      if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null }
+      glRef.current = null
+    }
+    const onContextRestored = () => {
+      const r = initWebGL(canvas)
+      if (r) { glRef.current = r; rafRef.current = requestAnimationFrame(draw) }
+    }
+    canvas.addEventListener('webglcontextlost', onContextLost)
+    canvas.addEventListener('webglcontextrestored', onContextRestored)
+
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current)
+      canvas.removeEventListener('webglcontextlost', onContextLost)
+      canvas.removeEventListener('webglcontextrestored', onContextRestored)
     }
   }, [draw])
 
-  // Resize handler
+  // Resize handler — DPR capped at 1.5.
+  // At 3x Retina (iPad Pro), uncapped = ~9MP render target.
+  // 4 fBm curtains at 60fps thermally throttle within 3 minutes at native 3x.
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.5)
     const ro = new ResizeObserver(() => {
-      canvas.width = canvas.offsetWidth * devicePixelRatio
-      canvas.height = canvas.offsetHeight * devicePixelRatio
+      canvas.width = canvas.offsetWidth * dpr
+      canvas.height = canvas.offsetHeight * dpr
     })
     ro.observe(canvas)
-    canvas.width = canvas.offsetWidth * devicePixelRatio
-    canvas.height = canvas.offsetHeight * devicePixelRatio
+    canvas.width = canvas.offsetWidth * dpr
+    canvas.height = canvas.offsetHeight * dpr
     return () => ro.disconnect()
   }, [])
 
@@ -1907,11 +2071,21 @@ export function useAudioAnalyser(): number {
     if (!Howler?.ctx) return
 
     const ctx: AudioContext = Howler.ctx
+
+    // ctx may exist but be suspended (browser autoplay policy).
+    // A suspended analyser silently returns zero data forever — looks working, isn't.
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => { /* ignore — analyser will try next song change */ })
+      return
+    }
+
     const analyser = ctx.createAnalyser()
     analyser.fftSize = 256
     analyser.smoothingTimeConstant = 0.6
 
-    // Tap off Howler's master gain — sees mixed output
+    // Tap off Howler's master gain — sees mixed output.
+    // NOTE: if Howls use html5:true, masterGain may not see audio output (B5 risk).
+    // Prototype this path before Phase 4 ships to confirm non-zero data.
     try {
       Howler.masterGain.connect(analyser)
     } catch {
@@ -1991,15 +2165,32 @@ export function useAuroraIntensity(): number {
   const [intensity, setIntensity] = useState(INTENSITY_MAP['all-songs'])
 
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [isIdle, setIsIdle] = useState(false)
+  // Ref (not state) — idle flag updates on pointermove at 60fps.
+  // useState here would flood the React scheduler with re-renders.
+  const isIdleRef = useRef(false)
 
-  // Idle timer — reset on any interaction
+  // Idle timer — refs only on high-frequency path; only setIntensity when value changes
   useEffect(() => {
-    const resetIdle = () => {
-      setIsIdle(false)
-      if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
-      idleTimerRef.current = setTimeout(() => setIsIdle(true), IDLE_TIMEOUT_MS)
+    const getViewIntensity = () => {
+      const viewKind = typeof view === 'object' ? (view as { kind: string }).kind : 'all-songs'
+      return INTENSITY_MAP[viewKind] ?? 0.20
     }
+
+    const markIdle = () => {
+      if (isIdleRef.current) return
+      isIdleRef.current = true
+      if (!currentSong) setIntensity(IDLE_INTENSITY)
+    }
+    const resetIdle = () => {
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
+      if (isIdleRef.current) {
+        isIdleRef.current = false
+        // Snap back to view-based intensity on first movement after idle
+        setIntensity(isExpanded && currentSong ? NOW_PLAYING_INTENSITY : getViewIntensity())
+      }
+      idleTimerRef.current = setTimeout(markIdle, IDLE_TIMEOUT_MS)
+    }
+
     window.addEventListener('pointermove', resetIdle)
     window.addEventListener('keydown', resetIdle)
     resetIdle()
@@ -2008,21 +2199,18 @@ export function useAuroraIntensity(): number {
       window.removeEventListener('keydown', resetIdle)
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
     }
-  }, [])
+  }, [view, currentSong, isExpanded])
 
-  // Derive intensity from 3 signals
+  // Derive intensity from view + song + expanded state (idle handled above)
   useEffect(() => {
-    if (isIdle && !currentSong) {
-      setIntensity(IDLE_INTENSITY)
-      return
-    }
+    if (isIdleRef.current && !currentSong) return  // idle branch owns this state
     if (isExpanded && currentSong) {
       setIntensity(NOW_PLAYING_INTENSITY)
       return
     }
     const viewKind = typeof view === 'object' ? (view as { kind: string }).kind : 'all-songs'
     setIntensity(INTENSITY_MAP[viewKind] ?? 0.20)
-  }, [view, currentSong, isIdle, isExpanded])
+  }, [view, currentSong, isExpanded])
 
   return intensity
 }
@@ -2174,16 +2362,19 @@ git commit -m "feat(aurora): add reduced-motion and WebGL failure fallback"
 - [ ] **Step 1: Write the component**
 
 ```tsx
-import { useRef, useEffect, useCallback } from 'react'
+import { useId, useRef, useEffect, useCallback } from 'react'
 import { usePlayerStore } from '@/stores/playerStore'
 
 interface WaveformBarProps {
-  peaks: number[]          // 1000 floats [0–1]
-  duration: number         // song duration in seconds
-  onSeek: (time: number) => void
+  peaks: number[]   // 1000 floats [0–1]
+  duration: number  // song duration in seconds
 }
 
-const BAR_COUNT = 200  // display bars (resampled from 1000)
+const BAR_COUNT = 200
+// Fixed SVG coordinate space — eliminates clientWidth read during render.
+// SVG viewBox scales to actual pixel width automatically.
+const VIEW_W = 600
+const VIEW_H = 32
 
 function resamplePeaks(peaks: number[], target: number): number[] {
   if (!peaks.length) return new Array(target).fill(0)
@@ -2198,107 +2389,98 @@ function resamplePeaks(peaks: number[], target: number): number[] {
   return out
 }
 
-function buildPath(resampled: number[], width: number, height: number): string {
-  if (!resampled.length || !width || !height) return ''
-  const barW = width / resampled.length
-  const midY = height / 2
+function buildPath(resampled: number[]): string {
+  if (!resampled.length) return ''
+  const barW = VIEW_W / resampled.length
+  const midY = VIEW_H / 2
   let d = ''
   for (let i = 0; i < resampled.length; i++) {
     const x = i * barW + barW * 0.5
-    const h = Math.max(2, resampled[i] * height * 0.85)
+    const h = Math.max(2, resampled[i] * VIEW_H * 0.85)
     d += `M${x.toFixed(1)},${(midY - h / 2).toFixed(1)}L${x.toFixed(1)},${(midY + h / 2).toFixed(1)}`
   }
   return d
 }
 
-export function WaveformBar({ peaks, duration, onSeek }: WaveformBarProps) {
-  const svgRef       = useRef<SVGSVGElement>(null)
-  const clipPathId   = useRef(`waveform-clip-${Math.random().toString(36).slice(2)}`)
-  const progressRef  = useRef(0)
-  const rafRef       = useRef<number | null>(null)
+// WaveformBar is PURELY VISUAL — aria-hidden, pointer-events-none.
+// All seek interaction (click, drag, touch, keyboard, screen reader) is handled by a native
+// <input type="range"> overlaid absolutely on top in PlayerBar (Task 5.3).
+// Custom role="slider" on SVG is worse: two tab stops, manual ARIA state, no touch drag.
+export function WaveformBar({ peaks, duration }: WaveformBarProps) {
+  // useId() — deterministic, SSR-safe, collision-proof. Never Math.random() in render
+  // (Math.random() can change on re-render, breaking clipPath url() references mid-frame).
+  const clipId      = useId()
+  const clipRectRef = useRef<SVGRectElement>(null)
+  const playlineRef = useRef<SVGLineElement>(null)
+  const rafRef      = useRef<number | null>(null)
 
-  const currentSong = usePlayerStore(s => s.currentSong)
-  const howlRef     = usePlayerStore(s => s.howlRef)
+  const howlRef = usePlayerStore(s => s.howlRef)
 
-  const [resampled]  = [resamplePeaks(peaks, BAR_COUNT)]
-  const svgW = svgRef.current?.clientWidth ?? 600
-  const svgH = svgRef.current?.clientHeight ?? 32
-  const path = buildPath(resampled, svgW, svgH)
-  const barW = svgW / BAR_COUNT
+  const resampled = resamplePeaks(peaks, BAR_COUNT)
+  const path      = buildPath(resampled)
+  const barW      = VIEW_W / BAR_COUNT
 
-  // RAF loop to update the clip rect (playhead position)
-  const updatePlayhead = useCallback(() => {
+  // RAF loop — direct ref attribute mutation, zero React re-renders per frame
+  const tick = useCallback(() => {
     const howl = (howlRef as any)?.current
-    if (!howl || !duration) { rafRef.current = requestAnimationFrame(updatePlayhead); return }
-    const seek = typeof howl.seek === 'function' ? (howl.seek() as number) : 0
-    progressRef.current = seek / duration
-    const clipEl = document.getElementById(clipPathId.current + '-rect')
-    if (clipEl) clipEl.setAttribute('width', String(progressRef.current * svgW))
-    rafRef.current = requestAnimationFrame(updatePlayhead)
-  }, [duration, svgW])
+    if (howl && duration) {
+      const seek     = typeof howl.seek === 'function' ? (howl.seek() as number) : 0
+      const progress = seek / duration
+      const x        = progress * VIEW_W
+      clipRectRef.current?.setAttribute('width', String(x))
+      playlineRef.current?.setAttribute('x1', String(x))
+      playlineRef.current?.setAttribute('x2', String(x))
+    }
+    rafRef.current = requestAnimationFrame(tick)
+  }, [duration, howlRef])
 
   useEffect(() => {
-    rafRef.current = requestAnimationFrame(updatePlayhead)
+    rafRef.current = requestAnimationFrame(tick)
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current) }
-  }, [updatePlayhead])
-
-  const handleClick = (e: React.MouseEvent<SVGSVGElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect()
-    const ratio = (e.clientX - rect.left) / rect.width
-    onSeek(ratio * duration)
-  }
+  }, [tick])
 
   return (
-    <div className="relative w-full" style={{ height: '32px' }}>
-      <svg
-        ref={svgRef}
-        width="100%"
-        height="32"
-        onClick={handleClick}
-        style={{ cursor: 'pointer', display: 'block' }}
-        aria-hidden
-      >
-        <defs>
-          <clipPath id={clipPathId.current}>
-            <rect
-              id={clipPathId.current + '-rect'}
-              x="0" y="0"
-              width="0" height="32"
-            />
-          </clipPath>
-        </defs>
+    <svg
+      viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
+      width="100%"
+      height={VIEW_H}
+      aria-hidden
+      style={{ display: 'block', overflow: 'visible', pointerEvents: 'none' }}
+    >
+      <defs>
+        <clipPath id={clipId}>
+          <rect ref={clipRectRef} x="0" y="0" width="0" height={VIEW_H} />
+        </clipPath>
+      </defs>
 
-        {/* Dim outline — right of playhead (full width, drawn first) */}
-        <path
-          d={path}
-          stroke="rgba(255,255,255,0.15)"
-          strokeWidth={Math.max(1.5, barW * 0.65)}
-          strokeLinecap="round"
-          fill="none"
-        />
+      {/* Dim outline — right of playhead */}
+      <path
+        d={path}
+        stroke="rgba(255,255,255,0.15)"
+        strokeWidth={Math.max(1.5, barW * 0.65)}
+        strokeLinecap="round"
+        fill="none"
+      />
 
-        {/* Filled + glow — left of playhead (clipped) */}
-        <path
-          d={path}
-          stroke="var(--song-color)"
-          strokeWidth={Math.max(1.5, barW * 0.65)}
-          strokeLinecap="round"
-          fill="none"
-          clipPath={`url(#${clipPathId.current})`}
-          style={{ filter: 'drop-shadow(0 0 4px color-mix(in oklch, var(--song-color) 80%, transparent))' }}
-        />
+      {/* Filled + glow — left of playhead */}
+      <path
+        d={path}
+        stroke="var(--song-color)"
+        strokeWidth={Math.max(1.5, barW * 0.65)}
+        strokeLinecap="round"
+        fill="none"
+        clipPath={`url(#${clipId})`}
+        style={{ filter: 'drop-shadow(0 0 4px color-mix(in oklch, var(--song-color) 80%, transparent))' }}
+      />
 
-        {/* Playhead — 1px vertical line */}
-        <line
-          x1={progressRef.current * svgW}
-          y1="0"
-          x2={progressRef.current * svgW}
-          y2="32"
-          stroke="oklch(0.78 0.18 195)"
-          strokeWidth="1"
-        />
-      </svg>
-    </div>
+      {/* Playhead line — ref-positioned, no DOM query */}
+      <line
+        ref={playlineRef}
+        x1="0" y1="0" x2="0" y2={VIEW_H}
+        stroke="oklch(0.78 0.18 195)"
+        strokeWidth="1"
+      />
+    </svg>
   )
 }
 ```
@@ -2364,32 +2546,37 @@ import { WaveformBar }         from '@/components/player/WaveformBar'
 import { WaveformBarSkeleton } from '@/components/player/WaveformBarSkeleton'
 ```
 
-- [ ] **Step 2: Replace the `<input type="range">` visual with WaveformBar**
+- [ ] **Step 2: Replace the `<input type="range">` visual with WaveformBar + invisible overlay**
 
-Find the progress bar section (around line 298–317). Keep the `<input type="range">` for a11y but hide it visually. Add WaveformBar above it:
+Find the progress bar section (around line 298–317). Replace with this pattern — native range overlaid on WaveformBar handles all pointer/touch/keyboard/a11y natively:
 
 ```tsx
-{/* Waveform visual — hides when peaks not available */}
-{currentSong?.waveform_peaks ? (
-  <WaveformBar
-    peaks={currentSong.waveform_peaks}
-    duration={currentSong.duration ?? 0}
-    onSeek={(time) => seekTo(time)}
-  />
-) : currentSong ? (
-  <WaveformBarSkeleton />
-) : null}
+{/* Waveform seek area — native range absolutely overlays the visual */}
+<div className="relative w-full" style={{ height: '32px' }}>
+  {currentSong?.waveform_peaks ? (
+    <WaveformBar
+      peaks={currentSong.waveform_peaks}
+      duration={currentSong.duration ?? 0}
+    />
+  ) : currentSong ? (
+    <WaveformBarSkeleton />
+  ) : null}
 
-{/* Hidden range for keyboard / screen reader access */}
-<input
-  type="range"
-  aria-label="Seek"
-  className="sr-only"
-  min={0}
-  max={currentSong?.duration ?? 0}
-  value={Math.round(progress)}
-  onChange={(e) => seekTo(Number(e.target.value))}
-/>
+  {/* Invisible native range — sits on top, handles all interaction.
+      Screen readers announce this, not the SVG (which is aria-hidden).
+      Handles: click, drag, touch, keyboard arrows — all natively. */}
+  <input
+    type="range"
+    aria-label="Seek"
+    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+    min={0}
+    max={currentSong?.duration ?? 0}
+    step={1}
+    value={Math.round(progress)}
+    onChange={(e) => seekTo(Number(e.target.value))}
+    disabled={!currentSong}
+  />
+</div>
 ```
 
 - [ ] **Step 3: Visual check**
@@ -2543,7 +2730,7 @@ git commit -m "fix(polish): anti-slop audit — stroke-width, grain opacity, rad
 | Per-song color pipeline | Tasks 1.7–1.11, 3.1–3.4 |
 | CSS color variables | Tasks 0.1, 3.1 |
 | Color bleed / halo | Task 3.4 |
-| Play button: liquid glass + star | Not in plan — pure CSS task, implement in Phase 2 alongside kill list |
+| Play button: liquid glass + star | Task 2.11 (contain:paint + star bloom + disabled/buffering states) |
 | Kill list (K1–K10) | Tasks 2.3–2.10 |
 | JetBrains Mono | Tasks 2.1–2.2 |
 | SVG wordmark | Task 2.5 |
@@ -2558,19 +2745,16 @@ git commit -m "fix(polish): anti-slop audit — stroke-width, grain opacity, rad
 | Backend packages | Task 1.6 |
 | filterResultToSong | Task 1.11 |
 
-**Missing from plan — add as Task 2.11:**
+**Play button (Task 2.11):** Now a proper Phase 2 task. Key fix: `[contain:paint]` on the button scopes `backdrop-filter` compositing to the element's own bounding box — without it, the browser composites against the entire page every frame. The self-review section had the button code without this fix; Task 2.11 has the corrected version.
 
-> **Task 2.11: Liquid glass play button**
-
-The play button visual (liquid glass + star bloom on play, dim on pause, press scale) is a pure CSS + playerStore task. Implement in Phase 2 alongside the kill list. Spec reference: `docs/superpowers/specs/2026-05-25-aurora-visual-overhaul-design.md` §4.
-
-In `PlayerBar.tsx`, update the play button element:
+In `PlayerBar.tsx`, update the play button element (see Task 2.11 for the canonical version):
 
 ```tsx
 <button
   className={cn(
     "relative flex items-center justify-center rounded-full",
     "w-12 h-12",
+    "[contain:paint]",           // REQUIRED: scope backdrop-filter to this element only
     "backdrop-blur-md",
     "[background:radial-gradient(circle,rgba(255,255,255,0.12)_0%,rgba(255,255,255,0.04)_100%)]",
     "border border-white/[0.18]",
@@ -2604,18 +2788,41 @@ In `PlayerBar.tsx`, update the play button element:
 
 **Placeholder scan:** None found. All steps have concrete code.
 
-**Type consistency:** `AuroraColorState.color2LinearRgb` matches `AuroraCanvasProps.color2`. `WaveformBarProps.peaks: number[]` matches `Song.waveform_peaks?: number[] | null` (caller guards null). `useAuroraIntensity` returns `number`, matches `AuroraCanvasProps.intensity`.
+**Type consistency:** `AuroraColorState.color2LinearRgb` matches `AuroraCanvasProps.color2`. `WaveformBarProps.peaks: number[]` matches `Song.waveform_peaks?: number[] | null` (caller guards null). `useAuroraIntensity` returns `number`, matches `AuroraCanvasProps.intensity`. `WaveformBar` no longer takes `onSeek` — removed; seek handled by overlay range in PlayerBar.
+
+**Qwen/DeepSeek findings folded in (H12–H17):**
+- H12 DPR cap at 1.5 ✓
+- H13 Pillow.quantize replaces KMeans ✓
+- H14 Culori RGB clamping ✓
+- H15 ctx.state suspend check ✓
+- H16 mutagen pre-validation ✓
+- H17 busy_timeout ✓
+- WaveformBar: useId() + aria-hidden + native overlay range ✓
 
 ---
 
 ## Execution
 
-Plan saved to `docs/superpowers/plans/2026-05-25-aurora-visual-overhaul.md`.
+**Approach: Subagent-Driven (chosen)**
 
-**Two execution options:**
+Use `superpowers:subagent-driven-development` skill. Fresh subagent per task. Review between tasks.
 
-**1. Subagent-Driven (recommended)** — fresh subagent per task, review between tasks, fast iteration
+**Model guidance:**
+- Orchestrator: **Opus 4.7** (plan reading, review, architectural decisions)
+- Worker subagents: **Sonnet 4.6** for single-file impls with clear spec (most tasks)
+- Cheap reads: **Haiku 4.5** for grep/read/summarize work, checking if a column exists, verifying file contents — anything that doesn't require judgment
 
-**2. Inline Execution** — execute in this session using executing-plans, batch with checkpoints
+**Before starting execution, the next session must:**
+1. Read this plan fully
+2. Read `HANDOFF.md` (last entry) for session state
+3. Skim `claude-workspace/Aurora/CONTEXT.md` (Next session prep section)
+4. Skim `claude-workspace/Aurora/PATTERNS.md` (3 patterns — WebGL lifecycle, React hooks, new-domain planning)
+5. Note B5 (html5:true → analyser risk): Phase 4 is gated on prototype test Task 4.0 passing
 
-Which approach?
+**Plan path:** `docs/superpowers/plans/2026-05-25-aurora-visual-overhaul.md`
+
+**Invoke skill with:**
+```
+/subagent-driven-development
+```
+Then point it at this plan file.
