@@ -2,3 +2,5 @@ fastapi==0.115.12
 uvicorn[standard]==0.34.2
 boolean.py==5.0
 mutagen==1.47.0
+miniaudio==1.60
+Pillow==11.2.1
