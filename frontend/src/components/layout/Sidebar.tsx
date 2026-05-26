@@ -218,21 +218,10 @@ function NavItem({ icon, label, active, onClick }: NavItemProps) {
       onClick={onClick}
       className={`group relative w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors duration-200 aurora-focus ${
         active
-          ? "text-[var(--aurora-text)]"
+          ? "text-[var(--aurora-text)] bg-white/[0.05]"
           : "text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)]"
       }`}
     >
-      {/* Active indicator — 3px left bar, solid primary */}
-      <span
-        className={`absolute left-0 top-1/2 -translate-y-1/2 w-[3px] rounded-r-full transition-[height,opacity] duration-200 ${
-          active ? "h-5 opacity-100" : "h-0 opacity-0"
-        }`}
-        style={{
-          background: "var(--aurora-accent-interactive)",
-          boxShadow: active ? "0 0 8px var(--aurora-accent-interactive-glow)" : "none",
-        }}
-        aria-hidden="true"
-      />
       {/* Active background */}
       {active && (
         <span
@@ -268,14 +257,11 @@ function FooterAction({ icon, label, active, onClick }: FooterActionProps) {
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-md text-[12px] transition-colors duration-150 ${
+      className={`group w-full flex items-center gap-2.5 px-3 py-1.5 rounded-md text-[12px] transition-colors duration-150 ${
         active
           ? "text-[var(--aurora-accent-interactive)] bg-[var(--aurora-accent-interactive)]/10"
-          : "text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)]"
+          : "text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] group-hover:bg-white/[0.05]"
       }`}
-      style={{ background: active ? undefined : "transparent" }}
-      onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = "var(--aurora-surface-hover)" }}
-      onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = "transparent" }}
     >
       <span className={active ? "" : "opacity-60"}>{icon}</span>
       <span className="font-medium tracking-tight">{label}</span>
