@@ -199,7 +199,9 @@ export function useAudioPlayer() {
       const ctx: AudioContext | undefined = (window as any).Howler?.ctx
       if (ctx?.state === 'suspended') ctx.resume().catch(() => {})
       howlRef.current.play()
-      prevHowlRef.current?.play()
+      if (prevHowlRef.current && prevHowlRef.current.volume() > 0.05) {
+        prevHowlRef.current.play()
+      }
     } else {
       howlRef.current.pause()
       prevHowlRef.current?.pause()
