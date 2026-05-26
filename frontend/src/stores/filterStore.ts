@@ -50,6 +50,9 @@ function filterResultToSong(r: FilterResult): Song {
     playlists: r.playlists,
     created_at: r.created_at,
     updated_at: r.updated_at,
+    waveform_peaks: r.waveform_peaks,
+    dominant_color: r.dominant_color,
+    dominant_color_2: r.dominant_color_2,
   }
 }
 
