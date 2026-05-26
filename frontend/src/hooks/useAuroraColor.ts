@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { converter, parse } from 'culori'
 import { usePlayerStore } from '@/stores/playerStore'
 
@@ -35,7 +35,7 @@ const BRAND_TEAL_LINEAR = oklchToLinearRgb(BRAND_TEAL)
 export function useAuroraColor(): AuroraColorState {
   const currentSong = usePlayerStore(s => s.currentSong)
 
-  const color2Linear = useRef<[number, number, number]>(oklchToLinearRgb(DEFAULT_COLOR))
+  const [color2Linear, setColor2Linear] = useState<[number, number, number]>(() => oklchToLinearRgb(DEFAULT_COLOR))
 
   useEffect(() => {
     const color = currentSong?.dominant_color ?? DEFAULT_COLOR
@@ -46,11 +46,11 @@ export function useAuroraColor(): AuroraColorState {
     document.documentElement.style.setProperty('--song-color-2', color2)
 
     // Compute linear RGB for shader
-    color2Linear.current = oklchToLinearRgb(color2)
+    setColor2Linear(oklchToLinearRgb(color2))
   }, [currentSong?.id])
 
   return {
-    color2LinearRgb: color2Linear.current,
+    color2LinearRgb: color2Linear,
     color1LinearRgb: BRAND_TEAL_LINEAR,
   }
 }
