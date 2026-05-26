@@ -107,7 +107,7 @@ export function PlayerBar() {
               </span>
               <div className="relative flex-1" style={{ height: '32px' }}>
                 {currentSong?.waveform_peaks ? (
-                  <WaveformBar peaks={currentSong.waveform_peaks} duration={duration} />
+                  <WaveformBar peaks={currentSong.waveform_peaks} duration={duration} seek={seek} />
                 ) : hasSong ? (
                   <WaveformBarSkeleton />
                 ) : null}
@@ -336,7 +336,7 @@ export function PlayerBar() {
                 </span>
                 <div className="relative flex-1" style={{ height: '32px' }}>
                   {currentSong?.waveform_peaks ? (
-                    <WaveformBar peaks={currentSong.waveform_peaks} duration={duration} />
+                    <WaveformBar peaks={currentSong.waveform_peaks} duration={duration} seek={seek} />
                   ) : hasSong ? (
                     <WaveformBarSkeleton />
                   ) : null}
