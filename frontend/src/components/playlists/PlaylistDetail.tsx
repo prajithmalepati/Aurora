@@ -59,6 +59,8 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
   const [editEmoji, setEditEmoji] = useState("")
   const [editImageDataUrl, setEditImageDataUrl] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
+  const [sortField, setSortField] = useState<'position'|'title'|'artist'|'album'|'duration'>('position')
+  const [sortOrder, setSortOrder] = useState<'asc'|'desc'>('asc')
 
   useEffect(() => {
     fetchPlaylistDetail(playlistId)
@@ -74,6 +76,21 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
         (s.artist ?? "").toLowerCase().includes(q)
     )
   }, [activePlaylist, searchQuery])
+
+  const sortedSongs = useMemo(() => {
+    if (sortField === 'position') return filteredSongs
+    return [...filteredSongs].sort((a, b) => {
+      let va: string | number = ''
+      let vb: string | number = ''
+      if (sortField === 'title')    { va = a.title.toLowerCase(); vb = b.title.toLowerCase() }
+      if (sortField === 'artist')   { va = (a.artist ?? '').toLowerCase(); vb = (b.artist ?? '').toLowerCase() }
+      if (sortField === 'album')    { va = (a.album ?? '').toLowerCase(); vb = (b.album ?? '').toLowerCase() }
+      if (sortField === 'duration') { va = a.duration ?? 0; vb = b.duration ?? 0 }
+      if (va < vb) return sortOrder === 'asc' ? -1 : 1
+      if (va > vb) return sortOrder === 'asc' ? 1 : -1
+      return 0
+    })
+  }, [filteredSongs, sortField, sortOrder])
 
   const heroArt = useMemo(
     () => albumGradient(activePlaylist?.songs[0]?.id?.toString() ?? activePlaylist?.name ?? `playlist-${playlistId}`),
@@ -340,26 +357,48 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
       {/* ── SONG LIST ── */}
       <div className="px-6 py-4">
         {activePlaylist.songs.length > 0 && (
-          <div
-            className="relative flex items-center rounded-full mb-4 transition-all duration-200 focus-within:shadow-[0_0_20px_-6px_var(--aurora-glow)]"
-            style={{
-              background: "var(--aurora-surface)",
-              boxShadow: "inset 0 0 0 1px var(--aurora-surface-border)",
-              backdropFilter: "blur(12px)",
-              WebkitBackdropFilter: "blur(12px)",
-            }}
-          >
-            <Search
-              className="absolute left-4 h-3.5 w-3.5 text-[var(--aurora-text-tertiary)] pointer-events-none"
-              strokeWidth={2}
-            />
-            <input
-              type="text"
-              placeholder="Search in playlist..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-transparent border-0 outline-none pl-11 pr-5 py-2.5 text-[13px] text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-tertiary)] placeholder:font-display-italic placeholder:text-[14px]"
-            />
+          <div className="flex items-center gap-2 mb-4">
+            <div
+              className="relative flex-1 flex items-center rounded-full transition-all duration-200 focus-within:shadow-[0_0_20px_-6px_var(--aurora-glow)]"
+              style={{
+                background: "var(--aurora-surface)",
+                boxShadow: "inset 0 0 0 1px var(--aurora-surface-border)",
+                backdropFilter: "blur(12px)",
+                WebkitBackdropFilter: "blur(12px)",
+              }}
+            >
+              <Search
+                className="absolute left-4 h-3.5 w-3.5 text-[var(--aurora-text-tertiary)] pointer-events-none"
+                strokeWidth={2}
+              />
+              <input
+                type="text"
+                placeholder="Search in playlist..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-transparent border-0 outline-none pl-11 pr-5 py-2.5 text-[13px] text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-tertiary)] placeholder:font-display-italic placeholder:text-[14px]"
+              />
+            </div>
+            <select
+              value={`${sortField}:${sortOrder}`}
+              onChange={(e) => {
+                const [f, o] = e.target.value.split(':')
+                setSortField(f as typeof sortField)
+                setSortOrder(o as typeof sortOrder)
+              }}
+              className="shrink-0 rounded-full px-3 py-2 text-[12px] text-[var(--aurora-text-secondary)] bg-[var(--aurora-surface)] border-0 outline-none cursor-pointer"
+              style={{ boxShadow: "inset 0 0 0 1px var(--aurora-surface-border)" }}
+            >
+              <option value="position:asc">Position</option>
+              <option value="title:asc">Title A→Z</option>
+              <option value="title:desc">Title Z→A</option>
+              <option value="artist:asc">Artist A→Z</option>
+              <option value="artist:desc">Artist Z→A</option>
+              <option value="album:asc">Album A→Z</option>
+              <option value="album:desc">Album Z→A</option>
+              <option value="duration:asc">Shortest first</option>
+              <option value="duration:desc">Longest first</option>
+            </select>
           </div>
         )}
 
@@ -369,7 +408,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
               This playlist is empty
             </p>
           </div>
-        ) : filteredSongs.length === 0 ? (
+        ) : sortedSongs.length === 0 ? (
           <div className="py-12 text-center">
             <p className="font-display-italic text-[18px] text-[var(--aurora-text-tertiary)]">
               No songs match &ldquo;{searchQuery}&rdquo;
@@ -397,7 +436,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
               </tr>
             </thead>
             <tbody>
-              {filteredSongs.map((song) => {
+              {sortedSongs.map((song) => {
                 const originalIndex = activePlaylist.songs.findIndex((s) => s.id === song.id)
                 return (
                   <PlaylistSongRow
