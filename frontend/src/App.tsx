@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, type ReactNode } from "react"
 import { useSongStore } from "@/stores/songStore"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { useTagStore } from "@/stores/tagStore"
@@ -13,6 +13,7 @@ import { SongTable } from "@/components/songs/SongTable"
 import { PlaylistDetail } from "@/components/playlists/PlaylistDetail"
 import { QueryBuilder } from "@/components/filter/QueryBuilder"
 import { SettingsView } from "@/components/settings/SettingsView"
+import { AnimatePresence, motion } from "motion/react"
 import { AuroraColorBridge } from '@/components/aurora/AuroraColorBridge'
 import { useAudioAnalyser } from '@/hooks/useAudioAnalyser'
 import { useAuroraIntensity } from '@/hooks/useAuroraIntensity'
@@ -136,59 +137,62 @@ function App() {
   }
 
   const renderMainContent = () => {
-    return (
-      <>
-        {/* All Songs — always mounted so re-entry is instant */}
-        <div className={view.kind === "all-songs" ? "aurora-view-enter" : "hidden"}>
-          <div className="p-4 sm:px-10 sm:pt-8 sm:pb-6 max-w-[1400px] mx-auto">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-6">
-              <h1 className="font-display text-[28px] leading-none tracking-tight text-[var(--aurora-text)]">
-                All Songs
-              </h1>
-              <span className="label-micro text-[var(--aurora-text-secondary)]">
-                {songs.length} {songs.length === 1 ? "song" : "songs"}
-              </span>
-            </div>
-
-            {/* Search bar */}
-            <div
-              className="relative flex items-center rounded-full mb-6 transition-all duration-200 focus-within:shadow-[0_0_20px_-6px_var(--aurora-glow)]"
-              style={{
-                background: "var(--aurora-surface)",
-                boxShadow: "inset 0 0 0 1px var(--aurora-rim)",
-                backdropFilter: "blur(12px)",
-                WebkitBackdropFilter: "blur(12px)",
-              }}
-            >
-              <Search
-                className="absolute left-4 h-3.5 w-3.5 text-[var(--aurora-text-tertiary)] pointer-events-none"
-                strokeWidth={2}
-              />
-              <input
-                type="text"
-                placeholder="Search titles, artists, albums..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-transparent border-0 outline-none pl-11 pr-5 py-2.5 text-[13px] text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-tertiary)] placeholder:font-display-italic placeholder:text-[14px]"
-              />
-            </div>
-
-            <SongTable songs={songs} loading={songsLoading} onPlay={handlePlaySong} />
+    let content: ReactNode
+    if (view.kind === "all-songs") {
+      content = (
+        <div className="p-4 sm:px-10 sm:pt-8 sm:pb-6 max-w-[1400px] mx-auto">
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="font-display text-[28px] leading-none tracking-tight text-[var(--aurora-text)]">
+              All Songs
+            </h1>
+            <span className="label-micro text-[var(--aurora-text-secondary)]">
+              {songs.length} {songs.length === 1 ? "song" : "songs"}
+            </span>
           </div>
+          <div
+            className="relative flex items-center rounded-full mb-6 transition-all duration-200 focus-within:shadow-[0_0_20px_-6px_var(--aurora-glow)]"
+            style={{
+              background: "var(--aurora-surface)",
+              boxShadow: "inset 0 0 0 1px var(--aurora-rim)",
+              backdropFilter: "blur(12px)",
+              WebkitBackdropFilter: "blur(12px)",
+            }}
+          >
+            <Search
+              className="absolute left-4 h-3.5 w-3.5 text-[var(--aurora-text-tertiary)] pointer-events-none"
+              strokeWidth={2}
+            />
+            <input
+              type="text"
+              placeholder="Search titles, artists, albums..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-transparent border-0 outline-none pl-11 pr-5 py-2.5 text-[13px] text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-tertiary)] placeholder:font-display-italic placeholder:text-[14px]"
+            />
+          </div>
+          <SongTable songs={songs} loading={songsLoading} onPlay={handlePlaySong} />
         </div>
+      )
+    } else if (view.kind === "filter") {
+      content = <QueryBuilder />
+    } else if (view.kind === "playlist") {
+      content = <PlaylistDetail key={view.playlistId} playlistId={view.playlistId} />
+    } else {
+      content = <SettingsView />
+    }
 
-        {/* Mix — always mounted so re-entry is instant */}
-        <div className={view.kind === "filter" ? undefined : "hidden"}>
-          <QueryBuilder />
-        </div>
-
-        {/* Playlist — conditionally mounted (depends on playlistId) */}
-        {view.kind === "playlist" && <PlaylistDetail key={view.playlistId} playlistId={view.playlistId} />}
-
-        {/* Settings */}
-        {view.kind === "settings" && <SettingsView />}
-      </>
+    return (
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={view.kind === "playlist" ? `playlist-${view.playlistId}` : view.kind}
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -6 }}
+          transition={{ type: "spring", stiffness: 280, damping: 30 }}
+        >
+          {content}
+        </motion.div>
+      </AnimatePresence>
     )
   }
 
