@@ -27,16 +27,20 @@ def song_row_to_dict(row: sqlite3.Row) -> dict:
     tags_str = row["tags"] if row["tags"] else ""
     playlists_str = row["playlists"] if row["playlists"] else ""
     
-    tags = [t.strip() for t in tags_str.split(",") if t.strip()] if tags_str else []
-    
-    # Parse playlists as objects with id and name
+    tags = list(dict.fromkeys(t.strip() for t in tags_str.split(",") if t.strip())) if tags_str else []
+
+    # Parse playlists as objects with id and name — deduplicate by id
     playlists = []
+    seen_playlist_ids: set[int] = set()
     if playlists_str:
         # playlists_str format: "id1:name1,id2:name2,..."
         for item in playlists_str.split(","):
             if ":" in item:
                 id_part, name_part = item.split(":", 1)
-                playlists.append({"id": int(id_part), "name": name_part.strip()})
+                pid = int(id_part)
+                if pid not in seen_playlist_ids:
+                    seen_playlist_ids.add(pid)
+                    playlists.append({"id": pid, "name": name_part.strip()})
     
     raw_art = row["album_art_path"] if "album_art_path" in row.keys() else None
     raw_peaks = row["waveform_peaks"] if "waveform_peaks" in row.keys() else None
@@ -100,8 +104,8 @@ def list_songs(
             s.id, s.title, s.artist, s.album, s.duration,
             s.file_path, s.file_format, s.album_art_path, s.source,
             s.waveform_peaks, s.dominant_color, s.dominant_color_2,
-            GROUP_CONCAT(t.name) as tags,
-            GROUP_CONCAT(p.id || ':' || p.name) as playlists,
+            GROUP_CONCAT(DISTINCT t.name) as tags,
+            GROUP_CONCAT(DISTINCT p.id || ':' || p.name) as playlists,
             s.created_at, s.updated_at
         FROM songs s
         LEFT JOIN song_tags st ON s.id = st.song_id
@@ -178,8 +182,8 @@ def get_song(song_id: int):
             s.waveform_peaks,
             s.dominant_color,
             s.dominant_color_2,
-            GROUP_CONCAT(t.name) as tags,
-            GROUP_CONCAT(p.id || ':' || p.name) as playlists,
+            GROUP_CONCAT(DISTINCT t.name) as tags,
+            GROUP_CONCAT(DISTINCT p.id || ':' || p.name) as playlists,
             s.created_at,
             s.updated_at
         FROM songs s
@@ -190,7 +194,7 @@ def get_song(song_id: int):
         WHERE s.id = ?
         GROUP BY s.id
     """
-    
+
     cursor.execute(query, (song_id,))
     row = cursor.fetchone()
     
@@ -233,8 +237,8 @@ def stream_song(song_id: int):
             s.file_format,
             s.album_art_path,
             s.source,
-            GROUP_CONCAT(t.name) as tags,
-            GROUP_CONCAT(p.id || ':' || p.name) as playlists,
+            GROUP_CONCAT(DISTINCT t.name) as tags,
+            GROUP_CONCAT(DISTINCT p.id || ':' || p.name) as playlists,
             s.created_at,
             s.updated_at
         FROM songs s
@@ -245,7 +249,7 @@ def stream_song(song_id: int):
         WHERE s.id = ?
         GROUP BY s.id
     """
-    
+
     cursor.execute(query, (song_id,))
     row = cursor.fetchone()
     
@@ -420,8 +424,8 @@ def update_song(song_id: int, song_update: SongUpdate):
             s.waveform_peaks,
             s.dominant_color,
             s.dominant_color_2,
-            GROUP_CONCAT(t.name) as tags,
-            GROUP_CONCAT(p.id || ':' || p.name) as playlists,
+            GROUP_CONCAT(DISTINCT t.name) as tags,
+            GROUP_CONCAT(DISTINCT p.id || ':' || p.name) as playlists,
             s.created_at,
             s.updated_at
         FROM songs s
@@ -432,7 +436,7 @@ def update_song(song_id: int, song_update: SongUpdate):
         WHERE s.id = ?
         GROUP BY s.id
     """
-    
+
     cursor.execute(query, (song_id,))
     row = cursor.fetchone()
     conn.close()
