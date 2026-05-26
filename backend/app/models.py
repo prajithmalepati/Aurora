@@ -37,6 +37,9 @@ class SongResponse(BaseModel):
     start_time_ms: int = 0
     end_time_ms: int = 0
     position: Optional[int] = None
+    waveform_peaks: Optional[list[float]] = None
+    dominant_color: Optional[str] = None
+    dominant_color_2: Optional[str] = None
 
 
 # ---- Tags ----
