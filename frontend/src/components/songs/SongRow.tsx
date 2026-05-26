@@ -78,17 +78,6 @@ export function SongRow({ song, index, animIndex, onPlay }: SongRowProps) {
             isCurrentSong ? "" : "text-[var(--aurora-text-tertiary)]"
           }`}
         >
-          {/* Left accent bar — only on currently playing */}
-          {isCurrentSong && (
-            <span
-              className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-7 rounded-r-full"
-              style={{
-                background: "var(--aurora-accent-interactive)",
-                boxShadow: "0 0 8px var(--aurora-accent-interactive-glow)",
-              }}
-              aria-hidden="true"
-            />
-          )}
           {/* Row-level hover background */}
           <span
             className={`absolute inset-0 transition-colors duration-150 pointer-events-none ${
@@ -143,7 +132,7 @@ export function SongRow({ song, index, animIndex, onPlay }: SongRowProps) {
               <span
                 className={`truncate text-[14px] font-medium leading-tight ${
                   isCurrentSong
-                    ? "aurora-gradient-text"
+                    ? "text-white/90"
                     : "text-[var(--aurora-text)]"
                 }`}
               >
