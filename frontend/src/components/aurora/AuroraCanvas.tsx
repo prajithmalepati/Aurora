@@ -178,6 +178,12 @@ export function AuroraCanvas({ color1, color2, amplitude, intensity }: AuroraCan
   const intensityStartRef   = useRef<number>(0)
   const intensityPrevRef    = useRef(intensity)
 
+  const amplitudeRef = useRef(amplitude)
+  amplitudeRef.current = amplitude
+
+  const color1Ref = useRef<[number, number, number]>(color1)
+  color1Ref.current = color1
+
   useEffect(() => {
     targetColor2Ref.current = color2
     color2StartRef.current = performance.now()
@@ -221,15 +227,15 @@ export function AuroraCanvas({ color1, color2, amplitude, intensity }: AuroraCan
 
     if (uniforms.uTime)       gl.uniform1f(uniforms.uTime, t)
     if (uniforms.uResolution) gl.uniform2f(uniforms.uResolution, canvas.width, canvas.height)
-    if (uniforms.uColor1)     gl.uniform3fv(uniforms.uColor1, color1)
+    if (uniforms.uColor1)     gl.uniform3fv(uniforms.uColor1, color1Ref.current)
     if (uniforms.uColor2)     gl.uniform3fv(uniforms.uColor2, currentColor2Ref.current)
-    if (uniforms.uAmplitude)  gl.uniform1f(uniforms.uAmplitude, amplitude)
+    if (uniforms.uAmplitude)  gl.uniform1f(uniforms.uAmplitude, amplitudeRef.current)
     if (uniforms.uIntensity)  gl.uniform1f(uniforms.uIntensity, currentIntensityRef.current)
 
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
 
     rafRef.current = requestAnimationFrame(draw)
-  }, [color1, amplitude])
+  }, [])
 
   useEffect(() => {
     const canvas = canvasRef.current
