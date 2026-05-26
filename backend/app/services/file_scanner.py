@@ -139,6 +139,51 @@ def _detect_m4a_format(file_path: str) -> str:
     return "m4a_aac"
 
 
+def extract_peaks(file_path: str, num_bins: int = 1000) -> list[float] | None:
+    """
+    Decode audio to mono 22050Hz and compute max-amplitude per bin.
+    Returns list of num_bins floats in [0, 1], or None on failure.
+
+    Pre-validates with mutagen before passing to miniaudio.
+    miniaudio is a C-extension: malformed headers can cause crashes (not Python exceptions),
+    which would kill the FastAPI process. mutagen is pure Python and safe to probe first.
+    """
+    try:
+        probe = mutagen.File(file_path)
+        if probe is None:
+            return None
+    except Exception:
+        return None
+
+    try:
+        import miniaudio
+        decoded = miniaudio.decode_file(
+            file_path,
+            output_format=miniaudio.SampleFormat.SIGNED16,
+            nchannels=1,
+            sample_rate=22050,
+        )
+        samples = decoded.samples  # array.array('h', ...) — signed 16-bit
+        n = len(samples)
+        if n == 0:
+            return None
+
+        bin_size = max(1, n // num_bins)
+        peaks: list[float] = []
+        for i in range(num_bins):
+            start = i * bin_size
+            end = min(start + bin_size, n)
+            if start >= n:
+                peaks.append(0.0)
+                continue
+            chunk = samples[start:end]
+            max_val = max(abs(s) for s in chunk)
+            peaks.append(min(1.0, max_val / 32768.0))
+        return peaks
+    except Exception:
+        return None
+
+
 def extract_metadata(file_path: str) -> dict | None:
     """
     Extract metadata from an audio file.
