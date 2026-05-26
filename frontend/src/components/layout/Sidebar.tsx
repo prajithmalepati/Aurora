@@ -73,13 +73,13 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
         {/* Primary nav */}
         <nav className="px-3 space-y-0.5">
           <NavItem
-            icon={<Library className="h-4 w-4" />}
+            icon={<Library className="h-4 w-4" strokeWidth={1.5} />}
             label="All Songs"
             active={isActive({ kind: "all-songs" })}
             onClick={() => onViewChange({ kind: "all-songs" })}
           />
           <NavItem
-            icon={<SlidersHorizontal className="h-4 w-4" />}
+            icon={<SlidersHorizontal className="h-4 w-4" strokeWidth={1.5} />}
             label="Mix"
             active={isActive({ kind: "filter" })}
             onClick={() => {
@@ -172,22 +172,22 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
         <div className="px-3 pb-4 pt-2 space-y-0.5">
           <div className="aurora-divider-h mx-3 mb-3" />
           <FooterAction
-            icon={<Plus className="h-3.5 w-3.5" />}
+            icon={<Plus className="h-3.5 w-3.5" strokeWidth={1.5} />}
             label="New Playlist"
             onClick={() => setCreateDialogOpen(true)}
           />
           <FooterAction
-            icon={<FolderSearch className="h-3.5 w-3.5" />}
+            icon={<FolderSearch className="h-3.5 w-3.5" strokeWidth={1.5} />}
             label="Scan Folder"
             onClick={() => setScanOpen(true)}
           />
           <FooterAction
-            icon={<Music className="h-3.5 w-3.5" />}
+            icon={<Music className="h-3.5 w-3.5" strokeWidth={1.5} />}
             label="Add Song"
             onClick={() => setAddSongOpen(true)}
           />
           <FooterAction
-            icon={<Settings className="h-3.5 w-3.5" />}
+            icon={<Settings className="h-3.5 w-3.5" strokeWidth={1.5} />}
             label="Settings"
             active={currentView.kind === "settings"}
             onClick={() => onViewChange({ kind: "settings" })}

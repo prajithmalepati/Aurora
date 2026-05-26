@@ -297,7 +297,7 @@ export function QueryBuilder() {
         {!hasSearched ? (
           <div className="py-16 text-center">
             <SlidersHorizontal className="h-8 w-8 mx-auto mb-4 text-[var(--aurora-text-tertiary)] opacity-50" />
-            <p className="font-display-italic text-[20px] text-[var(--aurora-text-tertiary)]">
+            <p className="text-[15px] text-[var(--aurora-text-tertiary)]">
               Build a query above
             </p>
             <p className="text-[11px] text-[var(--aurora-text-tertiary)] mt-1.5">
@@ -306,7 +306,7 @@ export function QueryBuilder() {
           </div>
         ) : error ? (
           <div className="py-16 text-center">
-            <p className="font-display-italic text-[18px] text-[var(--aurora-danger)]">
+            <p className="text-[14px] text-[var(--aurora-danger)]">
               {error}
             </p>
           </div>
