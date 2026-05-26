@@ -1,4 +1,5 @@
 """Filter engine for boolean tag queries."""
+import json
 import re
 import boolean
 
@@ -121,7 +122,9 @@ def filter_songs(db_connection, query_string: str) -> list[dict]:
     cursor = db_connection.execute("""
         SELECT
             s.id, s.title, s.artist, s.album, s.duration,
-            s.file_path, s.file_format, s.album_art_path, s.source, s.created_at, s.updated_at,
+            s.file_path, s.file_format, s.album_art_path, s.source,
+            s.waveform_peaks, s.dominant_color, s.dominant_color_2,
+            s.created_at, s.updated_at,
             GROUP_CONCAT(DISTINCT t.name) AS tag_names,
             GROUP_CONCAT(DISTINCT p.id || ':' || p.name) AS playlist_ids_names
         FROM songs s
@@ -145,6 +148,10 @@ def filter_songs(db_connection, query_string: str) -> list[dict]:
                         id_part, name_part = item.split(":", 1)
                         playlists.append({"id": int(id_part), "name": name_part.strip()})
             
+            # Parse waveform_peaks JSON
+            raw_peaks = row["waveform_peaks"] if "waveform_peaks" in row.keys() else None
+            waveform_peaks = json.loads(raw_peaks) if raw_peaks else None
+
             results.append({
                 "id": row["id"],
                 "title": row["title"],
@@ -159,6 +166,9 @@ def filter_songs(db_connection, query_string: str) -> list[dict]:
                 "playlists": playlists,
                 "created_at": row["created_at"],
                 "updated_at": row["updated_at"],
+                "waveform_peaks": waveform_peaks,
+                "dominant_color": row["dominant_color"] if "dominant_color" in row.keys() else None,
+                "dominant_color_2": row["dominant_color_2"] if "dominant_color_2" in row.keys() else None,
             })
     
     # Sort by title
