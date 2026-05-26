@@ -1,4 +1,5 @@
 """Playlists router."""
+import json
 import sqlite3
 from pathlib import Path
 from fastapi import APIRouter, HTTPException, UploadFile, File
@@ -243,6 +244,9 @@ def reorder_playlist_songs(playlist_id: int, reorder: PlaylistReorder):
             s.file_format,
             s.album_art_path,
             s.source,
+            s.waveform_peaks,
+            s.dominant_color,
+            s.dominant_color_2,
             GROUP_CONCAT(t.name) as tags,
             ps.start_time_ms,
             ps.end_time_ms,
@@ -265,6 +269,7 @@ def reorder_playlist_songs(playlist_id: int, reorder: PlaylistReorder):
     for song_row in song_rows:
         tags_str = song_row["tags"]
         tags = tags_str.split(",") if tags_str else []
+        raw_peaks = song_row["waveform_peaks"] if "waveform_peaks" in song_row.keys() else None
 
         songs.append(
             SongResponse(
@@ -284,6 +289,9 @@ def reorder_playlist_songs(playlist_id: int, reorder: PlaylistReorder):
                 start_time_ms=song_row["start_time_ms"],
                 end_time_ms=song_row["end_time_ms"],
                 position=song_row["position"],
+                waveform_peaks=json.loads(raw_peaks) if raw_peaks else None,
+                dominant_color=song_row["dominant_color"] if "dominant_color" in song_row.keys() else None,
+                dominant_color_2=song_row["dominant_color_2"] if "dominant_color_2" in song_row.keys() else None,
             )
         )
 
@@ -386,7 +394,7 @@ def delete_song_from_playlist(playlist_id: int, song_id: int):
     # Fetch and return the full playlist with songs
     conn = get_db()
     cursor = conn.cursor()
-    
+
     query = """
         SELECT
             s.id,
@@ -398,6 +406,9 @@ def delete_song_from_playlist(playlist_id: int, song_id: int):
             s.file_format,
             s.album_art_path,
             s.source,
+            s.waveform_peaks,
+            s.dominant_color,
+            s.dominant_color_2,
             GROUP_CONCAT(t.name) as tags,
             ps.start_time_ms,
             ps.end_time_ms,
@@ -420,6 +431,7 @@ def delete_song_from_playlist(playlist_id: int, song_id: int):
     for song_row in song_rows:
         tags_str = song_row["tags"]
         tags = tags_str.split(",") if tags_str else []
+        raw_peaks = song_row["waveform_peaks"] if "waveform_peaks" in song_row.keys() else None
 
         songs.append(
             SongResponse(
@@ -439,6 +451,9 @@ def delete_song_from_playlist(playlist_id: int, song_id: int):
                 start_time_ms=song_row["start_time_ms"],
                 end_time_ms=song_row["end_time_ms"],
                 position=song_row["position"],
+                waveform_peaks=json.loads(raw_peaks) if raw_peaks else None,
+                dominant_color=song_row["dominant_color"] if "dominant_color" in song_row.keys() else None,
+                dominant_color_2=song_row["dominant_color_2"] if "dominant_color_2" in song_row.keys() else None,
             )
         )
 
@@ -501,7 +516,7 @@ def get_playlist(playlist_id: int):
     # Fetch songs with tags ordered by position
     conn = get_db()
     cursor = conn.cursor()
-    
+
     query = """
         SELECT
             s.id,
@@ -513,6 +528,9 @@ def get_playlist(playlist_id: int):
             s.file_format,
             s.album_art_path,
             s.source,
+            s.waveform_peaks,
+            s.dominant_color,
+            s.dominant_color_2,
             GROUP_CONCAT(t.name) as tags,
             ps.start_time_ms,
             ps.end_time_ms,
@@ -535,6 +553,7 @@ def get_playlist(playlist_id: int):
     for song_row in song_rows:
         tags_str = song_row["tags"]
         tags = tags_str.split(",") if tags_str else []
+        raw_peaks = song_row["waveform_peaks"] if "waveform_peaks" in song_row.keys() else None
 
         songs.append(
             SongResponse(
@@ -554,6 +573,9 @@ def get_playlist(playlist_id: int):
                 start_time_ms=song_row["start_time_ms"],
                 end_time_ms=song_row["end_time_ms"],
                 position=song_row["position"],
+                waveform_peaks=json.loads(raw_peaks) if raw_peaks else None,
+                dominant_color=song_row["dominant_color"] if "dominant_color" in song_row.keys() else None,
+                dominant_color_2=song_row["dominant_color_2"] if "dominant_color_2" in song_row.keys() else None,
             )
         )
 
@@ -777,7 +799,7 @@ def add_song_to_playlist(playlist_id: int, song_add: PlaylistSongAdd):
     # Fetch and return the full playlist with songs (reuse the same query from GET /playlists/{id})
     conn = get_db()
     cursor = conn.cursor()
-    
+
     query = """
         SELECT
             s.id,
@@ -789,6 +811,9 @@ def add_song_to_playlist(playlist_id: int, song_add: PlaylistSongAdd):
             s.file_format,
             s.album_art_path,
             s.source,
+            s.waveform_peaks,
+            s.dominant_color,
+            s.dominant_color_2,
             GROUP_CONCAT(t.name) as tags,
             ps.start_time_ms,
             ps.end_time_ms,
@@ -811,6 +836,7 @@ def add_song_to_playlist(playlist_id: int, song_add: PlaylistSongAdd):
     for song_row in song_rows:
         tags_str = song_row["tags"]
         tags = tags_str.split(",") if tags_str else []
+        raw_peaks = song_row["waveform_peaks"] if "waveform_peaks" in song_row.keys() else None
 
         songs.append(
             SongResponse(
@@ -830,9 +856,12 @@ def add_song_to_playlist(playlist_id: int, song_add: PlaylistSongAdd):
                 start_time_ms=song_row["start_time_ms"],
                 end_time_ms=song_row["end_time_ms"],
                 position=song_row["position"],
+                waveform_peaks=json.loads(raw_peaks) if raw_peaks else None,
+                dominant_color=song_row["dominant_color"] if "dominant_color" in song_row.keys() else None,
+                dominant_color_2=song_row["dominant_color_2"] if "dominant_color_2" in song_row.keys() else None,
             )
         )
-    
+
     # Fetch playlist metadata
     conn = get_db()
     cursor = conn.cursor()
