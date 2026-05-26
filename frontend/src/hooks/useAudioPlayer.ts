@@ -162,6 +162,8 @@ export function useAudioPlayer() {
     howlRef.current = howl
 
     if (usePlayerStore.getState().isPlaying) {
+      const ctx: AudioContext | undefined = (window as any).Howler?.ctx
+      if (ctx?.state === 'suspended') ctx.resume().catch(() => {})
       if (crossfadeIn) {
         howl.volume(0)
         howl.play()
@@ -190,6 +192,10 @@ export function useAudioPlayer() {
   useEffect(() => {
     if (!howlRef.current) return
     if (isPlaying) {
+      // Resume AudioContext before play — must happen in the leaf effect closest to user gesture.
+      // useAudioAnalyser runs later (App.tsx root) and may miss the browser's activation window.
+      const ctx: AudioContext | undefined = (window as any).Howler?.ctx
+      if (ctx?.state === 'suspended') ctx.resume().catch(() => {})
       howlRef.current.play()
       prevHowlRef.current?.play()
     } else {
