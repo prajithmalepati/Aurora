@@ -1,6 +1,6 @@
 import { usePlayerStore } from "@/stores/playerStore"
 import { useAudioPlayer } from "@/hooks/useAudioPlayer"
-import { formatDuration } from "@/lib/utils"
+import { formatDuration, cn } from "@/lib/utils"
 import { albumGradient } from "@/lib/albumGradient"
 import { AlbumArt } from "@/components/songs/AlbumArt"
 import { Equalizer } from "@/components/ui/Equalizer"
@@ -183,14 +183,9 @@ export function PlayerBar() {
         )}
       </div>
 
-      {/* ── DESKTOP layout — height transitions between idle (52px) and playing (80px) ── */}
-      <div
-        className="hidden sm:block overflow-hidden"
-        style={{
-          height: isIdle ? "52px" : "80px",
-          transition: "height 300ms cubic-bezier(0.2, 0.7, 0.2, 1)",
-        }}
-      >
+      {/* ── DESKTOP layout — grid-template-rows transitions between idle (52px) and playing (80px) ── */}
+      <div className={cn("hidden sm:block playerbar-collapsible", !isIdle && "expanded")}>
+        <div>
         {isIdle ? (
           /* Idle: shimmer + text, no controls */
           <div className="flex items-center h-[52px] px-8 gap-4">
@@ -322,9 +317,6 @@ export function PlayerBar() {
               {hasSong && isPlaying && (
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <Equalizer playing={isPlaying} />
-                  <span className="label-micro text-[10px] text-[var(--aurora-accent-interactive)] whitespace-nowrap opacity-70">
-                    Playing
-                  </span>
                 </div>
               )}
 
@@ -355,6 +347,7 @@ export function PlayerBar() {
             </div>
           </div>
         )}
+        </div>
       </div>
     </div>
   )
