@@ -3,6 +3,7 @@ type View =
   | { kind: "filter" }
   | { kind: "playlist"; playlistId: number }
   | { kind: "settings" }
+import { motion } from "motion/react"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { useTagStore } from "@/stores/tagStore"
 import { useFilterStore } from "@/stores/filterStore"
@@ -222,11 +223,13 @@ function NavItem({ icon, label, active, onClick }: NavItemProps) {
           : "text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)]"
       }`}
     >
-      {/* Active background */}
+      {/* Active background — layoutId slides indicator between nav items */}
       {active && (
-        <span
+        <motion.span
+          layoutId="nav-active"
           className="absolute inset-0 rounded-md pointer-events-none"
           style={{ background: "var(--aurora-surface)" }}
+          transition={{ type: "spring", stiffness: 450, damping: 35 }}
           aria-hidden="true"
         />
       )}
