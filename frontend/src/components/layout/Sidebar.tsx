@@ -34,13 +34,11 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
   const setIsQuickTagView = useFilterStore((state) => state.setIsQuickTagView)
 
   const handleTagClick = (tagName: string) => {
-    const term = tagName.includes(" ") ? `"${tagName}"` : tagName
+    const term = `"${tagName}"`
     setQuery(term)
     setIsQuickTagView(true)
+    executeFilter()
     onViewChange({ kind: "filter" })
-    setTimeout(() => {
-      executeFilter()
-    }, 0)
   }
 
   const isActive = (view: View) => {
