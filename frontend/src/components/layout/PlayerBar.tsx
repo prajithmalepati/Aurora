@@ -1,6 +1,6 @@
 import { usePlayerStore } from "@/stores/playerStore"
 import { useAudioPlayer } from "@/hooks/useAudioPlayer"
-import { formatDuration, cn } from "@/lib/utils"
+import { formatDuration } from "@/lib/utils"
 import { AlbumArt } from "@/components/songs/AlbumArt"
 import { Equalizer } from "@/components/ui/Equalizer"
 import { SkipBack, SkipForward, Volume2, VolumeX, Shuffle, Repeat, Repeat1 } from "lucide-react"
@@ -185,9 +185,12 @@ export function PlayerBar() {
         )}
       </div>
 
-      {/* ── DESKTOP layout — grid-template-rows transitions between idle (52px) and playing (80px) ── */}
-      <motion.div layout className={cn("hidden sm:block playerbar-collapsible", !isIdle && "expanded")} transition={{ type: "spring", stiffness: 400, damping: 33 }}>
-        <div>
+      {/* ── DESKTOP layout — spring height between idle (52px) and playing (80px) ── */}
+      <motion.div
+        animate={{ height: isIdle ? 52 : 80 }}
+        transition={{ type: "spring", stiffness: 200, damping: 25 }}
+        className="hidden sm:block overflow-hidden"
+      >
         {isIdle ? (
           /* Idle: shimmer + text, no controls */
           <div className="flex items-center h-[52px] px-8 gap-4">
@@ -353,7 +356,6 @@ export function PlayerBar() {
             </div>
           </div>
         )}
-        </div>
       </motion.div>
     </div>
   )

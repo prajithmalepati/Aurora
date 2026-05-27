@@ -726,28 +726,6 @@
   color: #ffffff;
 }
 
-/* ============================================================
-   MOTION — page fade in on mount
-   ============================================================ */
-
-@keyframes aurora-fade-up {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.aurora-fade-in {
-  animation: aurora-fade-up 300ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
-}
-
-/* Song-change cross-fade — 150ms opacity ease, fires on key remount */
-@keyframes aurora-song-fade {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-.aurora-song-fade {
-  animation: aurora-song-fade 150ms cubic-bezier(0.2, 0.7, 0.2, 1);
-}
-
 @keyframes aurora-pulse-glow {
   0%, 100% { box-shadow: 0 0 24px -6px rgba(94, 234, 212, 0.35); }
   50% { box-shadow: 0 0 36px -4px rgba(94, 234, 212, 0.55); }
@@ -939,34 +917,6 @@
   opacity: 1;
 }
 
-.playerbar-collapsible {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows 300ms cubic-bezier(0.2, 0.7, 0.2, 1);
-  align-items: start;
-}
-
-.playerbar-collapsible.expanded {
-  grid-template-rows: 1fr;
-}
-
-.playerbar-collapsible > * {
-  overflow: hidden;
-  min-height: 0;
-}
-
-/* ============================================================
-   VIEW TRANSITIONS — quiet opacity fade between views
-   ============================================================ */
-
-@keyframes aurora-view-enter {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-
-.aurora-view-enter {
-  animation: aurora-view-enter 200ms ease both;
-}
 
 /* ============================================================
    BUTTON MICRO-INTERACTIONS
@@ -1162,19 +1112,6 @@
 .mix-float-jam:disabled {
   opacity: 0.55;
   cursor: not-allowed;
-}
-
-/* ============================================================
-   ROW ANIMATION — staggered fade-in for query results
-   ============================================================ */
-
-@keyframes aurora-row-in {
-  from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-.aurora-row-in {
-  animation: aurora-row-in 220ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
 
 /* ============================================================
