@@ -1,8 +1,8 @@
 import { create } from "zustand"
 import { api } from "@/lib/api"
 import type { Song, ApiResponse, Tag } from "@/types"
-import { useTagStore } from "./tagStore"
-import { useFilterStore } from "./filterStore"
+import { useTagStore } from "@/stores/tagStore"
+import { useFilterStore } from "@/stores/filterStore"
 import { toast } from "@/lib/toast"
 
 type View =
