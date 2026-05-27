@@ -71,3 +71,7 @@ graph.json
 cache/
 cost.json
 manifest.json
+
+# Tool session artifacts (playwright-mcp snapshots, tool session artifacts)
+.playwright-mcp/
+
