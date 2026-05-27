@@ -1,5 +1,52 @@
 # Aurora — Session Handoff
 
+## Completed This Session (2026-05-26 — Session 30)
+
+### Phase A — Bug fixes (4 commits)
+
+| Task | What | Commit |
+|---|---|---|
+| A2 | Eliminate App.tsx re-render cascade — `useAuroraColor` moved to null `AuroraColorBridge`, linear RGB computation moved into `AuroraCanvas` (subscribes to `playerStore` directly) | `91b477c` |
+| A4 | WebGL context loss: 5s `setTimeout` → `setWebglFailed(true)` if GPU never recovers | `9b3cd95` |
+| A5 | Crossfade pause/resume guard: `prevHowlRef.current?.play()` only if `volume() > 0.05` | `5c1f53f` |
+| A6 | `prefers-reduced-motion` dynamic MQL listener in AuroraCanvas: stops/restarts RAF on OS preference change | `ffd3e12` |
+
+### Phase B — Features (2 commits)
+
+| Task | What | Commit |
+|---|---|---|
+| B1 | `AuroraPlayButton` shared component extracted from 3 inline duplicates in `PlayerBar` (mobile+desktop) and `SongRow` | `0146ff0` |
+| B2 | Client-side sort in `PlaylistDetail`: sort dropdown (position/title/artist/album/duration × asc/desc), `sortedSongs` useMemo wrapping `filteredSongs` | `c4325d8` |
+
+### Phase C — Motion animation upgrade (6 commits)
+
+| Task | What | Commit |
+|---|---|---|
+| C0 | Layout spring: `motion.div layout` on AppShell grid, sidebar, PlayerBar desktop wrapper | `5796889` |
+| C1 | `AnimatePresence mode="wait"` view transitions in App.tsx — replaces always-mounted pattern | `7cc7018` |
+| C2 | Spring song-change transition on album art + title in PlayerBar (mobile + desktop) | `dde884d` |
+| C3 | `motion.tr` spring stagger on SongRow — replaces `aurora-row-in` CSS keyframe + `animationDelay` | `bb6e75a` |
+| C4 | `layoutId="nav-active"` on Sidebar NavItem active indicator — slides between items | `7c0f11a` |
+| C5 | `motion.div animate={{ height }}` spring on PlayerBar expand/collapse — removes `grid-template-rows` CSS + deletes 4 stale keyframes (`aurora-row-in`, `aurora-view-enter`, `aurora-song-fade`, `aurora-fade-up`) | `aa4eb1a` |
+
+### In flight at session end
+
+Nothing. All gracefulwand.md phases complete.
+
+### Resolved follow-up issues
+
+From Session 28 open list:
+- B1 ✅ (was: "AuroraColorBridge never rendered — full App re-renders on song change")
+- B2 ✅ (was: "AuroraCanvas context loss: webglFailed not set on webglcontextlost") → A4
+- B4 ✅ partially: A5 (crossfade guard), A6 (reduced-motion RAF restart)
+
+Still open from Session 28 follow-up list:
+- **Old B2:** WaveformBar uses `Howler._howls[0]` private API — NOT fixed this session (renamed to avoid confusion: this is now outstanding issue W1)
+- **M1:** `useSongTransition.ts` dead code — not addressed
+- **M8:** `songStore.ts` relative imports — not addressed
+
+---
+
 ## Completed This Session (2026-05-26 — Session 28)
 
 ### Visual overhaul QA — f008 driven to `done` / `passes: true`
