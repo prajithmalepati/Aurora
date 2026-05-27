@@ -71,3 +71,8 @@ graphify-out/graph.json
 graphify-out/cache/
 graphify-out/cost.json
 graphify-out/manifest.json
+
+# Tool session artifacts (playwright-mcp snapshots, impeccable critiques, kilo plans)
+.playwright-mcp/
+.impeccable/
+.kilo/
