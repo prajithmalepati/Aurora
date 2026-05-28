@@ -10,17 +10,15 @@ interface AppShellProps {
     main: ReactNode
     playerBar: ReactNode
   }
-  amplitude: number
-  intensity: number
 }
 
-export function AppShell({ children, amplitude, intensity }: AppShellProps) {
+export function AppShell({ children }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
     <>
       {/* Fixed atmospheric layers — WebGL canvas, veil, then radial, then noise */}
-      <AuroraCanvas amplitude={amplitude} intensity={intensity} />
+      <AuroraCanvas />
       <div className="aurora-bg-veil" aria-hidden="true" />
       <div className="aurora-atmosphere" aria-hidden="true" />
       <div className="aurora-noise" aria-hidden="true" />

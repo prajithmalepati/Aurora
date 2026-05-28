@@ -15,8 +15,6 @@ import { QueryBuilder } from "@/components/filter/QueryBuilder"
 import { SettingsView } from "@/components/settings/SettingsView"
 import { AnimatePresence, motion } from "motion/react"
 import { AuroraColorBridge } from '@/components/aurora/AuroraColorBridge'
-import { useAudioAnalyser } from '@/hooks/useAudioAnalyser'
-import { useAuroraIntensity } from '@/hooks/useAuroraIntensity'
 import { Search } from "lucide-react"
 import type { Song } from "@/types"
 
@@ -31,9 +29,6 @@ function App() {
   const fetchPlaylists = usePlaylistStore((state) => state.fetchPlaylists)
   const fetchTags = useTagStore((state) => state.fetchTags)
   const playSong = usePlayerStore((state) => state.playSong)
-
-  const amplitude = useAudioAnalyser()
-  const intensity = useAuroraIntensity()
 
   useEffect(() => {
     fetchSongs()
@@ -200,8 +195,6 @@ function App() {
     <>
       <AuroraColorBridge />
       <AppShell
-        amplitude={amplitude}
-        intensity={intensity}
         children={{
           sidebar: <Sidebar currentView={view} onViewChange={setView} />,
           main: <ErrorBoundary>{renderMainContent()}</ErrorBoundary>,
