@@ -541,44 +541,169 @@
 }
 
 /* ============================================================
-   PLAY BUTTON — muted fill at rest, full primary on hover
+   GLASS PLAY BUTTON — pure CSS Approach 1 (no feTurbulence)
    ============================================================ */
 
-.aurora-play-btn {
+.glass-play-btn {
+  --mx: 50%; --my: 25%; --dx: 0; --dy: -0.25;
+
+  position: relative;
   isolation: isolate;
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--aurora-slate);
-  box-shadow:
-    inset 0 0 0 1px var(--aurora-rim-bright),
-    0 0 var(--aurora-button-glow-rest) calc(-1 * var(--aurora-button-glow-spread))
-      var(--aurora-accent-interactive-glow);
-  transition: background 150ms ease, box-shadow 200ms ease, transform 100ms ease;
-}
-.aurora-play-btn::before {
-  content: "";
-  position: absolute;
-  inset: -6px;
-  z-index: -1;
-  border-radius: inherit;
-  background: radial-gradient(
-    closest-side,
-    var(--aurora-accent-interactive) 0%,
-    var(--aurora-accent-interactive-glow) 55%,
-    transparent 100%
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+
+  background: linear-gradient(
+    165deg,
+    rgba(255, 255, 255, 0.08) 0%,
+    rgba(255, 255, 255, 0.03) 35%,
+    rgba(0, 0, 0, 0.14) 100%
   );
-  filter: blur(var(--aurora-backlight-blur));
-  opacity: var(--aurora-backlight-rest);
-  transition: opacity 200ms ease;
-}
-.aurora-play-btn:not(:disabled):hover {
-  background: rgba(255, 255, 255, 0.06);
+
   box-shadow:
-    inset 0 0 0 1px var(--aurora-rim-bright),
-    0 0 var(--aurora-button-glow-hover) calc(-1 * var(--aurora-button-glow-spread-hover))
-      var(--aurora-accent-interactive-glow);
+    0 10px 28px rgba(0, 0, 0, 0.42),
+    0 2px 10px rgba(20, 190, 255, 0.06),
+    inset 0 1px 1px rgba(255, 255, 255, 0.48),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.36),
+    inset 1px 0 1px rgba(255, 80, 180, 0.14),
+    inset -1px 0 1px rgba(60, 220, 255, 0.16);
+
+  transform: translateZ(0);
+  transition:
+    transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  overflow: visible;
 }
-.aurora-play-btn:not(:disabled):hover::before {
-  opacity: var(--aurora-backlight-hover);
+
+.glass-play-btn:active:not(:disabled) {
+  transform: scale(0.955);
+  box-shadow:
+    0 6px 18px rgba(0, 0, 0, 0.46),
+    0 1px 6px rgba(20, 190, 255, 0.04),
+    inset 0 2px 3px rgba(255, 255, 255, 0.34),
+    inset 0 -3px 6px rgba(0, 0, 0, 0.44),
+    inset 2px 0 2px rgba(255, 80, 180, 0.22),
+    inset -2px 0 2px rgba(60, 220, 255, 0.24);
+  transition-duration: 120ms;
+}
+
+/* Refraction layer — backdrop blur behind icon */
+.glass-play-btn__refraction {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 0;
+  backdrop-filter: blur(3px) saturate(1.5) brightness(1.08) contrast(1.06);
+  -webkit-backdrop-filter: blur(3px) saturate(1.5) brightness(1.08) contrast(1.06);
+}
+
+/* Tint layer — song color wash */
+.glass-play-btn__tint {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 90% 80% at 50% 55%,
+    color-mix(in srgb, var(--song-color, #6ee7b7) 30%, transparent),
+    transparent 70%
+  );
+  mix-blend-mode: overlay;
+  opacity: 0.55;
+}
+
+@supports not (background: color-mix(in srgb, red 50%, blue)) {
+  .glass-play-btn__tint {
+    background: radial-gradient(
+      ellipse 90% 80% at 50% 55%,
+      rgba(110, 231, 183, 0.18),
+      transparent 70%
+    );
+  }
+}
+
+/* Icon layer */
+.glass-play-btn__icon {
+  position: relative;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.92);
+  filter: drop-shadow(0 1.5px 2px rgba(0, 0, 0, 0.55));
+}
+
+/* Inner light bend — curved glass volume */
+.glass-play-btn.css-only::before {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: inherit;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 85% 65% at 50% 35%,
+    rgba(255, 255, 255, 0.06) 0%,
+    transparent 55%,
+    rgba(0, 0, 0, 0.10) 92%
+  );
+  mix-blend-mode: soft-light;
+  opacity: 0.9;
+}
+
+/* Specular highlight — tight glint + broad sweep + directional linear */
+.glass-play-btn.css-only::after {
+  content: '';
+  position: absolute;
+  inset: -35%;
+  border-radius: inherit;
+  z-index: 2;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      circle at var(--mx) var(--my),
+      rgba(255, 255, 255, 0.78) 0%,
+      rgba(255, 255, 255, 0.20) 4%,
+      transparent 9%
+    ),
+    radial-gradient(
+      circle at var(--mx) var(--my),
+      rgba(255, 255, 255, 0.34) 8%,
+      transparent 24%
+    ),
+    linear-gradient(
+      118deg,
+      transparent 28%,
+      rgba(255, 255, 255, 0.26) 42%,
+      rgba(255, 255, 255, 0.06) 48%,
+      transparent 58%
+    );
+  mix-blend-mode: screen;
+  opacity: 0.74;
+  transform:
+    translate3d(
+      calc(var(--dx, 0) * 6px),
+      calc(var(--dy, -0.25) * 6px),
+      0
+    )
+    rotate(0.001deg);
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .glass-play-btn.css-only::after {
+    background:
+      radial-gradient(circle at 48% 22%, rgba(255, 255, 255, 0.22) 0%, transparent 18%),
+      linear-gradient(118deg, transparent 30%, rgba(255, 255, 255, 0.14) 43%, transparent 55%);
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glass-play-btn.css-only::after { transform: none; }
+  .glass-play-btn { transition: none; }
 }
 
 /* Star-pulse — used by liquid glass play button during buffering */
