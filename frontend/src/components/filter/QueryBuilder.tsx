@@ -3,7 +3,7 @@ import { useFilterStore } from "@/stores/filterStore"
 import { useTagStore } from "@/stores/tagStore"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { usePlayerStore } from "@/stores/playerStore"
-import { QueryInput } from "./QueryInput"
+import { QueryInput, validateQuery } from "./QueryInput"
 import { AutocompleteDropdown, type SuggestionItem } from "./AutocompleteDropdown"
 import { SongTable } from "@/components/songs/SongTable"
 import { Search, X, Shuffle, Sparkles, SlidersHorizontal, Tag } from "lucide-react"
@@ -30,6 +30,22 @@ export function QueryBuilder() {
   const playSong = usePlayerStore((state) => state.playSong)
   const tags = useTagStore((state) => state.tags)
   const playlists = usePlaylistStore((state) => state.playlists)
+
+  const [searchFired, setSearchFired] = useState(false)
+
+  // Debounce auto-search on query change
+  useEffect(() => {
+    if (!query.trim()) {
+      setSearchFired(false)
+      return
+    }
+    if (!validateQuery(query)) return
+    const timer = setTimeout(() => {
+      setSearchFired(true)
+      executeFilter()
+    }, 280)
+    return () => clearTimeout(timer)
+  }, [query]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Autocomplete state lifted from QueryInput so it can render in-flow
   const [dropdownItems, setDropdownItems] = useState<SuggestionItem[]>([])
@@ -68,7 +84,7 @@ export function QueryBuilder() {
     playSong(song, results)
   }
 
-  const hasSearched = query.trim().length > 0
+  const hasSearched = searchFired || loading
 
   // Strip surrounding quotes to get a clean display name for the compact header.
   const displayTagName = query.replace(/^"|"$/g, "").trim()
@@ -141,7 +157,7 @@ export function QueryBuilder() {
         </h1>
         <div className="flex items-center gap-2 flex-shrink-0">
           <button
-            onClick={executeFilter}
+            onClick={() => { setSearchFired(true); executeFilter() }}
             disabled={loading}
             className="mix-btn-search h-8 px-4 rounded-full text-[12px] font-semibold inline-flex items-center gap-1.5 aurora-btn-press disabled:opacity-[0.55]"
           >

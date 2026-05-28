@@ -5,7 +5,7 @@ import { Check, X } from "lucide-react"
 import type { SuggestionItem } from "./AutocompleteDropdown"
 import type { Tag } from "@/types"
 
-function validateQuery(query: string): boolean {
+export function validateQuery(query: string): boolean {
   const trimmed = query.trim()
   if (!trimmed) return false
 
