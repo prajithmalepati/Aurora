@@ -146,6 +146,18 @@ def init_db():
         conn.commit()
     except Exception:
         pass
+    # Migration: add image-region bleed columns
+    try:
+        conn.execute("ALTER TABLE songs ADD COLUMN bleed_thumb BLOB")
+        conn.commit()
+    except Exception:
+        pass
+    for col in ("bleed_region_x", "bleed_region_y", "bleed_region_w", "bleed_region_h"):
+        try:
+            conn.execute(f"ALTER TABLE songs ADD COLUMN {col} INTEGER")
+            conn.commit()
+        except Exception:
+            pass
     conn.close()
 
 
