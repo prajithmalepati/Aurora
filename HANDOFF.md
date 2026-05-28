@@ -1,6 +1,30 @@
 # Aurora — Session Handoff
 
-## Completed This Session (2026-05-26 — Session 28)
+## Completed This Session (2026-05-27 — Session 33)
+
+### Visual overhaul refinements — executed from plan `new2-md-recovered-cross-check-vs-twinkly-hopper.md`
+
+**What this session was:** Executed all 9 tiers from the locked plan (5 external research responses pre-existed). All tiers shipped, verified with Playwright screenshots, and committed individually.
+
+| Tier | What | Commit |
+|---|---|---|
+| 1C | Move `useAudioAnalyser`+`useAuroraIntensity` from App.tsx → AuroraCanvas. App no longer re-renders on audio frames. | `80075a0` |
+| 1A | Rewrite WaveformBar as dual animated sine-wave lines (no peaks data). Delete WaveformBarSkeleton. | `02e1b88` |
+| 2D | AnimatePresence mode="wait" spring crossfade on song info block in PlayerBar (mobile + desktop). | `0b88105` |
+| 1B | Liquid glass play button: SVG feTurbulence displacement + chromatic dispersion + pointer-tracked specular. CSS+SVG path (no separate WebGL canvas). | `c328a5e` |
+| 2A | Audit — no code changes needed. PlayerBar already uses correct glass variants; SongRow uses row variant; PlaylistDetail uses raw Lucide icon. | — |
+| 2B | PlaylistDetail: replace native sort `<select>` with ArrowUpDown icon → Popover. Title + Duration column headers clickable with chevron indicator. | `cf9aa90` |
+| 2C | Backend: `extract_bright_region()` in `color_utils.py` (pure Pillow, no numpy). 5 new DB columns (`bleed_thumb BLOB`, 4 region ints). New `GET /api/songs/{id}/bleed-thumb` endpoint. Frontend: bleed CSS layer in PlayerBar using background-image + blur + screen blend. | `8c6e00a` |
+| 3A | BorderGlow on sidebar playlist tiles. CSS in index.css, `BorderGlow.tsx` TypeScript component, hex→HSL helper in Sidebar. `glowRadius=8`, `glowIntensity=0.4`, paint-only. | `abf4687` |
+| 3C | Library Label logo: Fraunces upright Roman (`SOFT=0`, `opsz=144`, weight 500), tracking +0.02em, no star, no italic, no glow. | `f2217af` |
+
+Also created `docs/deferred-ideas.md` capturing all explicitly deferred/parked items (FlowingMenu rejection, waveform_peaks column, bespoke ligature fallback, etc.).
+
+**Backend note:** `bleed_thumb` only populated on new scans. Existing 358 songs have NULL → 404 on `/bleed-thumb`. Rescan populates them. Manual backfill helper: `backend/backfill_one.py` (test only, not production).
+
+---
+
+## Previous Session (2026-05-26 — Session 28)
 
 ### Visual overhaul QA — f008 driven to `done` / `passes: true`
 
