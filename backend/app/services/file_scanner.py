@@ -289,13 +289,18 @@ def extract_metadata(file_path: str) -> dict | None:
     # Extract waveform peaks
     waveform_peaks = extract_peaks(str(path))
 
-    # Extract dominant colors from album art
+    # Extract dominant colors + bleed region from album art
     dominant_color: str | None = None
     dominant_color_2: str | None = None
+    bleed_thumb: bytes | None = None
+    bleed_region_x = bleed_region_y = bleed_region_w = bleed_region_h = 0
     try:
         art_data = _get_art_bytes(audio)
         if art_data:
             dominant_color, dominant_color_2 = extract_dominant_colors(art_data)
+            from app.services.color_utils import extract_bright_region
+            bleed_thumb, bleed_region_x, bleed_region_y, bleed_region_w, bleed_region_h = \
+                extract_bright_region(art_data)
     except Exception:
         pass
 
@@ -309,6 +314,11 @@ def extract_metadata(file_path: str) -> dict | None:
         "waveform_peaks": waveform_peaks,
         "dominant_color": dominant_color,
         "dominant_color_2": dominant_color_2,
+        "bleed_thumb": bleed_thumb,
+        "bleed_region_x": bleed_region_x,
+        "bleed_region_y": bleed_region_y,
+        "bleed_region_w": bleed_region_w,
+        "bleed_region_h": bleed_region_h,
     }
 
 
@@ -366,14 +376,20 @@ def _replace_song(
             """INSERT INTO songs
                    (title, artist, album, duration, file_path, file_format,
                     album_art_path, source, waveform_peaks, dominant_color,
-                    dominant_color_2, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, 'local_scan', ?, ?, ?, ?, ?)""",
+                    dominant_color_2, bleed_thumb, bleed_region_x, bleed_region_y,
+                    bleed_region_w, bleed_region_h, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, 'local_scan', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (metadata["title"], metadata["artist"], metadata["album"],
              metadata["duration"], metadata["file_path"], metadata.get("file_format"),
              album_art_path,
              json.dumps(metadata.get("waveform_peaks")) if metadata.get("waveform_peaks") else None,
              metadata.get("dominant_color"),
              metadata.get("dominant_color_2"),
+             metadata.get("bleed_thumb"),
+             metadata.get("bleed_region_x", 0),
+             metadata.get("bleed_region_y", 0),
+             metadata.get("bleed_region_w", 0),
+             metadata.get("bleed_region_h", 0),
              now, now),
         )
         new_id = cursor.lastrowid
@@ -499,14 +515,20 @@ def import_scanned_songs(
             """INSERT INTO songs
                    (title, artist, album, duration, file_path, file_format,
                     album_art_path, source, waveform_peaks, dominant_color,
-                    dominant_color_2, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, 'local_scan', ?, ?, ?, ?, ?)""",
+                    dominant_color_2, bleed_thumb, bleed_region_x, bleed_region_y,
+                    bleed_region_w, bleed_region_h, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, 'local_scan', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (metadata["title"], metadata["artist"], metadata["album"],
              metadata["duration"], incoming_path, incoming_fmt,
              album_art_path,
              json.dumps(metadata.get("waveform_peaks")) if metadata.get("waveform_peaks") else None,
              metadata.get("dominant_color"),
              metadata.get("dominant_color_2"),
+             metadata.get("bleed_thumb"),
+             metadata.get("bleed_region_x", 0),
+             metadata.get("bleed_region_y", 0),
+             metadata.get("bleed_region_w", 0),
+             metadata.get("bleed_region_h", 0),
              now, now),
         )
         song_id = cursor.lastrowid

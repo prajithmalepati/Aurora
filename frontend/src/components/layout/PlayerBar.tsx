@@ -45,14 +45,34 @@ export function PlayerBar() {
 
   return (
     <div
-      className="aurora-keyline-top col-span-1 md:col-span-2 relative"
+      className="aurora-keyline-top col-span-1 md:col-span-2 relative overflow-hidden"
       style={{
         background: "var(--aurora-surface-bar)",
         backdropFilter: "blur(12px)",
         WebkitBackdropFilter: "blur(12px)",
       }}
     >
-      <div className="player-bleed" aria-hidden />
+      {/* Bleed glow — album art bright region diffused as ambient light */}
+      {currentSong && (
+        <div
+          aria-hidden
+          style={{
+            position: 'absolute',
+            inset: '-60px',
+            backgroundImage: `url(/api/songs/${currentSong.id}/bleed-thumb)`,
+            backgroundSize: '180px 180px',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+            filter: 'blur(50px) saturate(2.2) brightness(1.4)',
+            maskImage: 'radial-gradient(closest-side, black, transparent)',
+            WebkitMaskImage: 'radial-gradient(closest-side, black, transparent)',
+            mixBlendMode: 'screen',
+            opacity: 0.55,
+            pointerEvents: 'none',
+            transition: 'opacity 0.4s ease-out',
+          }}
+        />
+      )}
       {/* ── MOBILE layout ── */}
       <div className="sm:hidden">
         {isIdle ? (
