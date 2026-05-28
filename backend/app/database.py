@@ -158,6 +158,12 @@ def init_db():
             conn.commit()
         except Exception:
             pass
+    # Migration: add file_mtime for re-scan detection of edited files
+    try:
+        conn.execute("ALTER TABLE songs ADD COLUMN file_mtime REAL")
+        conn.commit()
+    except Exception:
+        pass
     conn.close()
 
 

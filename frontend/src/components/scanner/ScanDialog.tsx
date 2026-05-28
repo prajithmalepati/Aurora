@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -9,15 +9,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { api } from "@/lib/api"
-import type { ApiResponse, ScanResult } from "@/types"
+import type { ScanResult } from "@/types"
 import { useSongStore } from "@/stores/songStore"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { toast } from "@/lib/toast"
 
+const BASE_URL = "http://localhost:8000/api"
+
 interface ScanDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+}
+
+interface ScanProgress {
+  done: number
+  total: number
+  current: string
 }
 
 interface ScanState {
@@ -26,19 +33,24 @@ interface ScanState {
   results: ScanResult | null
   loading: boolean
   error: string | null
+  progress: ScanProgress | null
+}
+
+const INITIAL_STATE: ScanState = {
+  folderPath: "",
+  playlistName: "",
+  results: null,
+  loading: false,
+  error: null,
+  progress: null,
 }
 
 export function ScanDialog({ open, onOpenChange }: ScanDialogProps) {
-  const [state, setState] = useState<ScanState>({
-    folderPath: "",
-    playlistName: "",
-    results: null,
-    loading: false,
-    error: null,
-  })
+  const [state, setState] = useState<ScanState>(INITIAL_STATE)
+  const abortRef = useRef<AbortController | null>(null)
 
-  const fetchSongs = useSongStore((state) => state.fetchSongs)
-  const fetchPlaylists = usePlaylistStore((state) => state.fetchPlaylists)
+  const fetchSongs = useSongStore((s) => s.fetchSongs)
+  const fetchPlaylists = usePlaylistStore((s) => s.fetchPlaylists)
 
   const handleScan = async () => {
     if (!state.folderPath.trim()) {
@@ -46,50 +58,109 @@ export function ScanDialog({ open, onOpenChange }: ScanDialogProps) {
       return
     }
 
-    setState((s) => ({ ...s, loading: true, error: null }))
+    setState((s) => ({ ...s, loading: true, error: null, progress: null }))
+
+    const controller = new AbortController()
+    abortRef.current = controller
 
     try {
-      const res = await api.post<ApiResponse<ScanResult>>("/scan", {
-        folder_path: state.folderPath.trim(),
-        playlist_name: state.playlistName.trim() || undefined,
+      const res = await fetch(`${BASE_URL}/scan/stream`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          folder_path: state.folderPath.trim(),
+          playlist_name: state.playlistName.trim() || undefined,
+        }),
+        signal: controller.signal,
       })
-      setState((s) => ({ ...s, results: res.data, loading: false }))
-      const parts: string[] = []
-      if (res.data.imported) parts.push(`${res.data.imported} new`)
-      if (res.data.replaced) parts.push(`${res.data.replaced} upgraded`)
-      toast.success(parts.length ? `Imported: ${parts.join(", ")}` : "Scan complete — nothing new")
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: "Unknown error" }))
+        throw new Error(err.detail || res.statusText)
+      }
+
+      const reader = res.body!.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ""
+
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split("\n")
+        buffer = lines.pop() ?? ""
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue
+          let data: Record<string, unknown>
+          try {
+            data = JSON.parse(line.slice(6))
+          } catch {
+            continue
+          }
+
+          if (data.type === "total") {
+            setState((s) => ({ ...s, progress: { done: 0, total: data.total as number, current: "" } }))
+          } else if (data.type === "progress") {
+            setState((s) => ({
+              ...s,
+              progress: {
+                done: data.done as number,
+                total: data.total as number,
+                current: data.current as string,
+              },
+            }))
+          } else if (data.type === "done") {
+            const result = data as unknown as ScanResult & { type: string }
+            setState((s) => ({ ...s, loading: false, results: result, progress: null }))
+            const parts: string[] = []
+            if (result.imported) parts.push(`${result.imported} new`)
+            if (result.replaced) parts.push(`${result.replaced} upgraded`)
+            toast.success(parts.length ? `Imported: ${parts.join(", ")}` : "Scan complete — nothing new")
+          } else if (data.type === "error") {
+            throw new Error(data.message as string)
+          }
+        }
+      }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Failed to scan folder"
-      setState((s) => ({ ...s, loading: false, error: message }))
-      toast.error(message)
+      if (err instanceof Error && err.name === "AbortError") {
+        setState((s) => ({ ...s, loading: false, error: "Scan cancelled.", progress: null }))
+      } else {
+        const message = err instanceof Error ? err.message : "Failed to scan folder"
+        setState((s) => ({ ...s, loading: false, error: message, progress: null }))
+        toast.error(message)
+      }
+    } finally {
+      abortRef.current = null
     }
+  }
+
+  const handleCancel = () => {
+    abortRef.current?.abort()
   }
 
   const handleDone = () => {
     fetchSongs()
     fetchPlaylists()
     onOpenChange(false)
-    setState({
-      folderPath: "",
-      playlistName: "",
-      results: null,
-      loading: false,
-      error: null,
-    })
+    setState(INITIAL_STATE)
   }
 
   const handleClose = (open: boolean) => {
+    if (!open && abortRef.current) {
+      abortRef.current.abort()
+    }
     onOpenChange(open)
     if (!open) {
-      setState({
-        folderPath: "",
-        playlistName: "",
-        results: null,
-        loading: false,
-        error: null,
-      })
+      setState(INITIAL_STATE)
     }
   }
+
+  const progressPct = state.progress && state.progress.total > 0
+    ? Math.round((state.progress.done / state.progress.total) * 100)
+    : 0
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -110,9 +181,7 @@ export function ScanDialog({ open, onOpenChange }: ScanDialogProps) {
               type="text"
               placeholder="C:\Users\rockz\Music\Rock"
               value={state.folderPath}
-              onChange={(e) =>
-                setState((s) => ({ ...s, folderPath: e.target.value, error: null }))
-              }
+              onChange={(e) => setState((s) => ({ ...s, folderPath: e.target.value, error: null }))}
               disabled={state.loading}
             />
           </div>
@@ -123,12 +192,36 @@ export function ScanDialog({ open, onOpenChange }: ScanDialogProps) {
               type="text"
               placeholder="Auto-create a playlist from this folder"
               value={state.playlistName}
-              onChange={(e) =>
-                setState((s) => ({ ...s, playlistName: e.target.value, error: null }))
-              }
+              onChange={(e) => setState((s) => ({ ...s, playlistName: e.target.value, error: null }))}
               disabled={state.loading}
             />
           </div>
+
+          {/* Progress bar */}
+          {state.progress && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-[var(--aurora-text-secondary)] truncate max-w-[80%]">
+                  {state.progress.current || "Scanning…"}
+                </span>
+                <span className="text-[var(--aurora-text-tertiary)] tabular-nums flex-shrink-0">
+                  {state.progress.done}/{state.progress.total}
+                </span>
+              </div>
+              <div
+                className="h-1 rounded-full overflow-hidden"
+                style={{ background: "var(--aurora-surface)" }}
+              >
+                <div
+                  className="h-full rounded-full transition-all duration-150"
+                  style={{
+                    width: `${progressPct}%`,
+                    background: "linear-gradient(to right, var(--aurora-accent-interactive), var(--aurora-secondary))",
+                  }}
+                />
+              </div>
+            </div>
+          )}
 
           {state.error && (
             <div className="text-[12px] text-[var(--aurora-danger)]">{state.error}</div>
@@ -179,15 +272,11 @@ export function ScanDialog({ open, onOpenChange }: ScanDialogProps) {
               {state.results.errors.length > 0 && (
                 <div className="pt-3" style={{ borderTop: "1px solid var(--aurora-rim)" }}>
                   <div className="text-[12px] text-[var(--aurora-danger)] mb-2 font-medium">
-                    {state.results.errors.length} error
-                    {state.results.errors.length === 1 ? "" : "s"}
+                    {state.results.errors.length} error{state.results.errors.length === 1 ? "" : "s"}
                   </div>
                   <ul className="space-y-1 max-h-[120px] overflow-y-auto">
                     {state.results.errors.map((err, idx) => (
-                      <li
-                        key={idx}
-                        className="text-[11px] text-[var(--aurora-text-secondary)] font-mono"
-                      >
+                      <li key={idx} className="text-[11px] text-[var(--aurora-text-secondary)] font-mono">
                         <span className="text-[var(--aurora-text)]">{err.file}:</span>{" "}
                         {err.error}
                       </li>
@@ -209,17 +298,17 @@ export function ScanDialog({ open, onOpenChange }: ScanDialogProps) {
               <Button
                 type="button"
                 variant="ghost"
-                onClick={() => handleClose(false)}
-                disabled={state.loading}
+                onClick={state.loading ? handleCancel : () => handleClose(false)}
+                disabled={false}
               >
-                Cancel
+                {state.loading ? "Cancel" : "Close"}
               </Button>
               <Button
                 onClick={handleScan}
                 disabled={!state.folderPath.trim() || state.loading}
                 variant="primary"
               >
-                {state.loading ? "Scanning..." : "Scan"}
+                {state.loading ? "Scanning…" : "Scan"}
               </Button>
             </>
           )}

@@ -2,12 +2,13 @@
 import hashlib
 import json
 import sqlite3
+import threading
 import mutagen
 from mutagen.easyid3 import EasyID3
 from mutagen.mp3 import MP3
 from pathlib import Path
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Callable
 
 # Extracted art is stored here; deduplicated by SHA-1 hash.
 ALBUM_ART_DIR = Path(__file__).parent.parent.parent / "album-art"
@@ -304,6 +305,12 @@ def extract_metadata(file_path: str) -> dict | None:
     except Exception:
         pass
 
+    file_mtime: float | None = None
+    try:
+        file_mtime = path.stat().st_mtime
+    except OSError:
+        pass
+
     return {
         "title": title.strip(),
         "artist": artist.strip(),
@@ -311,6 +318,7 @@ def extract_metadata(file_path: str) -> dict | None:
         "duration": duration,
         "file_path": str(path.resolve()),  # absolute path
         "file_format": file_format,
+        "file_mtime": file_mtime,
         "waveform_peaks": waveform_peaks,
         "dominant_color": dominant_color,
         "dominant_color_2": dominant_color_2,
@@ -377,8 +385,8 @@ def _replace_song(
                    (title, artist, album, duration, file_path, file_format,
                     album_art_path, source, waveform_peaks, dominant_color,
                     dominant_color_2, bleed_thumb, bleed_region_x, bleed_region_y,
-                    bleed_region_w, bleed_region_h, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, 'local_scan', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    bleed_region_w, bleed_region_h, file_mtime, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, 'local_scan', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (metadata["title"], metadata["artist"], metadata["album"],
              metadata["duration"], metadata["file_path"], metadata.get("file_format"),
              album_art_path,
@@ -390,6 +398,7 @@ def _replace_song(
              metadata.get("bleed_region_y", 0),
              metadata.get("bleed_region_w", 0),
              metadata.get("bleed_region_h", 0),
+             metadata.get("file_mtime"),
              now, now),
         )
         new_id = cursor.lastrowid
@@ -424,39 +433,99 @@ def import_scanned_songs(
     db_connection: sqlite3.Connection,
     folder_path: str,
     playlist_name: str | None = None,
+    cancel_event: threading.Event | None = None,
+    progress_cb: Callable | None = None,
 ) -> dict:
     """
     Scan folder, import new songs, optionally add to playlist.
     Format-aware dedup: if (title, artist) already exists at lower quality,
     the existing song is replaced and its tags/playlists are migrated.
+    Supports cancel_event (threading.Event) and progress_cb(dict) for SSE streaming.
     Returns a detailed summary dict.
     """
-    # 1. Scan the folder
-    found_songs, scan_errors = scan_folder(folder_path)
+    # 1. Quick file enumeration for total count
+    root = Path(folder_path)
+    all_audio_files = [
+        f for f in root.rglob("*")
+        if f.is_file() and f.suffix.lower() in AUDIO_EXTENSIONS
+    ]
+    total_files = len(all_audio_files)
 
-    scanned_count = len(found_songs) + len(scan_errors)
+    if progress_cb:
+        progress_cb({"type": "total", "total": total_files})
+
     imported: list[dict] = []
     replaced: list[dict] = []
-    skipped_exact = 0       # exact file_path match
+    skipped_exact = 0       # exact file_path match, mtime unchanged
     skipped_same_fmt = 0    # (title, artist) match, same tier, different path
     skipped_lower_fmt = 0   # (title, artist) match, lower quality incoming
     art_extracted = 0
+    scan_errors: list[dict] = []
+    done = 0
 
     now = datetime.now(timezone.utc).isoformat()
 
-    # 2. Import each song
-    for metadata in found_songs:
+    # 2. Process each file
+    for file_path in all_audio_files:
+        if cancel_event and cancel_event.is_set():
+            break
+
+        if progress_cb:
+            progress_cb({"type": "progress", "done": done, "total": total_files, "current": file_path.name})
+
+        metadata = extract_metadata(str(file_path))
+        done += 1
+
+        if not metadata:
+            scan_errors.append({"file": str(file_path), "error": "Could not read metadata"})
+            continue
+
         incoming_path = metadata["file_path"]
         incoming_fmt = metadata.get("file_format") or ""
+        incoming_mtime = metadata.get("file_mtime")
 
-        # Rule 1: exact file_path match → skip (true duplicate)
+        # Rule 1: exact file_path match
         exact = db_connection.execute(
-            "SELECT id FROM songs WHERE file_path = ?",
+            "SELECT id, file_mtime FROM songs WHERE file_path = ?",
             (incoming_path,)
         ).fetchone()
         if exact:
-            skipped_exact += 1
-            continue
+            stored_mtime = exact[1]
+            # If mtime unchanged → true duplicate, skip
+            if stored_mtime is not None and incoming_mtime is not None and abs(incoming_mtime - stored_mtime) < 1.0:
+                skipped_exact += 1
+                continue
+            # mtime changed → update in place (preserves tags + playlist memberships)
+            try:
+                art_path_update = None
+                try:
+                    art_fname = extract_album_art(incoming_path, ALBUM_ART_DIR)
+                    if art_fname:
+                        art_path_update = art_fname
+                        art_extracted += 1
+                except Exception:
+                    pass
+                db_connection.execute(
+                    """UPDATE songs SET
+                       title=?, artist=?, album=?, duration=?, file_format=?,
+                       album_art_path=COALESCE(?, album_art_path),
+                       waveform_peaks=?, dominant_color=?, dominant_color_2=?,
+                       bleed_thumb=?, bleed_region_x=?, bleed_region_y=?,
+                       bleed_region_w=?, bleed_region_h=?, file_mtime=?, updated_at=?
+                       WHERE id=?""",
+                    (metadata["title"], metadata["artist"], metadata["album"],
+                     metadata["duration"], incoming_fmt, art_path_update,
+                     json.dumps(metadata.get("waveform_peaks")) if metadata.get("waveform_peaks") else None,
+                     metadata.get("dominant_color"), metadata.get("dominant_color_2"),
+                     metadata.get("bleed_thumb"),
+                     metadata.get("bleed_region_x", 0), metadata.get("bleed_region_y", 0),
+                     metadata.get("bleed_region_w", 0), metadata.get("bleed_region_h", 0),
+                     incoming_mtime, now, exact[0]),
+                )
+                imported.append({"id": exact[0], **metadata})
+            except Exception as exc:
+                scan_errors.append({"file": incoming_path, "error": f"Update failed: {exc}"})
+            continue  # done with this file, don't fall through
 
         # Rule 2–5: check for (title, artist) match
         title_artist_match = db_connection.execute(
@@ -516,8 +585,8 @@ def import_scanned_songs(
                    (title, artist, album, duration, file_path, file_format,
                     album_art_path, source, waveform_peaks, dominant_color,
                     dominant_color_2, bleed_thumb, bleed_region_x, bleed_region_y,
-                    bleed_region_w, bleed_region_h, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, 'local_scan', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    bleed_region_w, bleed_region_h, file_mtime, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, 'local_scan', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (metadata["title"], metadata["artist"], metadata["album"],
              metadata["duration"], incoming_path, incoming_fmt,
              album_art_path,
@@ -529,6 +598,7 @@ def import_scanned_songs(
              metadata.get("bleed_region_y", 0),
              metadata.get("bleed_region_w", 0),
              metadata.get("bleed_region_h", 0),
+             metadata.get("file_mtime"),
              now, now),
         )
         song_id = cursor.lastrowid
@@ -565,8 +635,8 @@ def import_scanned_songs(
 
     skipped_total = skipped_exact + skipped_same_fmt + skipped_lower_fmt
 
-    return {
-        "scanned": scanned_count,
+    result = {
+        "scanned": done,
         "imported": len(imported),
         "replaced": len(replaced),
         "skipped": skipped_total,
@@ -578,3 +648,8 @@ def import_scanned_songs(
         "replaced_songs": replaced,
         "art_extracted": art_extracted,
     }
+
+    if progress_cb:
+        progress_cb({"type": "done", **result})
+
+    return result
