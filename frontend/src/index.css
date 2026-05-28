@@ -541,11 +541,13 @@
 }
 
 /* ============================================================
-   GLASS PLAY BUTTON — pure CSS Approach 1 (no feTurbulence)
+   GLASS PLAY BUTTON — Apple-style clear liquid glass (CSS)
+   Frosted backdrop refraction + bright rim + top sheen + pointer
+   specular. No color fill, no halo. Unified across all variants.
    ============================================================ */
 
 .glass-play-btn {
-  --mx: 50%; --my: 25%; --dx: 0; --dy: -0.25;
+  --mx: 50%; --my: 28%;
 
   position: relative;
   isolation: isolate;
@@ -553,173 +555,100 @@
   place-items: center;
   flex-shrink: 0;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.30);
+  overflow: hidden;                 /* clip sheen + specular — no halo bleed */
 
+  /* faint glass body so it reads on OLED black */
   background: linear-gradient(
-    165deg,
-    rgba(255, 255, 255, 0.08) 0%,
-    rgba(255, 255, 255, 0.03) 35%,
-    rgba(0, 0, 0, 0.14) 100%
+    160deg,
+    rgba(255, 255, 255, 0.16) 0%,
+    rgba(255, 255, 255, 0.05) 45%,
+    rgba(255, 255, 255, 0.02) 100%
   );
 
+  /* lens refraction of whatever sits behind the button */
+  backdrop-filter: blur(4px) saturate(1.6) brightness(1.06);
+  -webkit-backdrop-filter: blur(4px) saturate(1.6) brightness(1.06);
+
   box-shadow:
-    0 10px 28px rgba(0, 0, 0, 0.42),
-    0 2px 10px rgba(20, 190, 255, 0.06),
-    inset 0 1px 1px rgba(255, 255, 255, 0.48),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.36),
-    inset 1px 0 1px rgba(255, 80, 180, 0.14),
-    inset -1px 0 1px rgba(60, 220, 255, 0.16);
+    0 4px 14px rgba(0, 0, 0, 0.40),
+    0 1px 3px rgba(0, 0, 0, 0.30),
+    inset 0 1px 1px rgba(255, 255, 255, 0.55),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.32);
 
   transform: translateZ(0);
   transition:
-    transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
-    box-shadow 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
-  overflow: visible;
+    transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.glass-play-btn:active:not(:disabled) {
-  transform: scale(0.955);
-  box-shadow:
-    0 6px 18px rgba(0, 0, 0, 0.46),
-    0 1px 6px rgba(20, 190, 255, 0.04),
-    inset 0 2px 3px rgba(255, 255, 255, 0.34),
-    inset 0 -3px 6px rgba(0, 0, 0, 0.44),
-    inset 2px 0 2px rgba(255, 80, 180, 0.22),
-    inset -2px 0 2px rgba(60, 220, 255, 0.24);
-  transition-duration: 120ms;
-}
-
-/* Refraction layer — backdrop blur behind icon */
-.glass-play-btn__refraction {
+/* top sheen — glass volume highlight */
+.glass-play-btn::before {
+  content: '';
   position: absolute;
   inset: 0;
   border-radius: inherit;
+  z-index: 1;
   pointer-events: none;
-  z-index: 0;
-  backdrop-filter: blur(3px) saturate(1.5) brightness(1.08) contrast(1.06);
-  -webkit-backdrop-filter: blur(3px) saturate(1.5) brightness(1.08) contrast(1.06);
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.40) 0%,
+    rgba(255, 255, 255, 0.08) 38%,
+    transparent 58%
+  );
+  opacity: 0.7;
 }
 
-/* Tint layer — song color wash */
-.glass-play-btn__tint {
+/* pointer-tracked specular glint — clipped inside the button */
+.glass-play-btn::after {
+  content: '';
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  z-index: 0;
+  z-index: 2;
   pointer-events: none;
   background: radial-gradient(
-    ellipse 90% 80% at 50% 55%,
-    color-mix(in srgb, var(--song-color, #6ee7b7) 30%, transparent),
-    transparent 70%
+    circle at var(--mx) var(--my),
+    rgba(255, 255, 255, 0.65) 0%,
+    rgba(255, 255, 255, 0.12) 18%,
+    transparent 42%
   );
-  mix-blend-mode: overlay;
-  opacity: 0.55;
+  mix-blend-mode: screen;
+  opacity: 0.8;
 }
 
-@supports not (background: color-mix(in srgb, red 50%, blue)) {
-  .glass-play-btn__tint {
-    background: radial-gradient(
-      ellipse 90% 80% at 50% 55%,
-      rgba(110, 231, 183, 0.18),
-      transparent 70%
-    );
-  }
-}
-
-/* Icon layer */
+/* icon */
 .glass-play-btn__icon {
   position: relative;
   z-index: 10;
   display: grid;
   place-items: center;
-  color: rgba(255, 255, 255, 0.92);
-  filter: drop-shadow(0 1.5px 2px rgba(0, 0, 0, 0.55));
+  color: rgba(255, 255, 255, 0.95);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
 }
 
-/* Inner light bend — curved glass volume */
-.glass-play-btn.css-only::before {
-  content: '';
-  position: absolute;
-  inset: 2px;
-  border-radius: inherit;
-  z-index: 1;
-  pointer-events: none;
-  background: radial-gradient(
-    ellipse 85% 65% at 50% 35%,
-    rgba(255, 255, 255, 0.06) 0%,
-    transparent 55%,
-    rgba(0, 0, 0, 0.10) 92%
-  );
-  mix-blend-mode: soft-light;
-  opacity: 0.9;
-}
-
-/* Specular highlight — tight glint + broad sweep + directional linear */
-.glass-play-btn.css-only::after {
-  content: '';
-  position: absolute;
-  inset: -35%;
-  border-radius: inherit;
-  z-index: 2;
-  pointer-events: none;
-  background:
-    radial-gradient(
-      circle at var(--mx) var(--my),
-      rgba(255, 255, 255, 0.78) 0%,
-      rgba(255, 255, 255, 0.20) 4%,
-      transparent 9%
-    ),
-    radial-gradient(
-      circle at var(--mx) var(--my),
-      rgba(255, 255, 255, 0.34) 8%,
-      transparent 24%
-    ),
-    linear-gradient(
-      118deg,
-      transparent 28%,
-      rgba(255, 255, 255, 0.26) 42%,
-      rgba(255, 255, 255, 0.06) 48%,
-      transparent 58%
-    );
-  mix-blend-mode: screen;
-  opacity: 0.74;
-  transform:
-    translate3d(
-      calc(var(--dx, 0) * 6px),
-      calc(var(--dy, -0.25) * 6px),
-      0
-    )
-    rotate(0.001deg);
-}
-
-@media (hover: none) and (pointer: coarse) {
-  .glass-play-btn.css-only::after {
-    background:
-      radial-gradient(circle at 48% 22%, rgba(255, 255, 255, 0.22) 0%, transparent 18%),
-      linear-gradient(118deg, transparent 30%, rgba(255, 255, 255, 0.14) 43%, transparent 55%);
-    transform: none;
-  }
+/* press — scoped to primary so the row variant's translate centering is
+   never overridden (that override caused the row button to teleport). */
+.glass-play-btn--primary:active:not(:disabled) {
+  transform: scale(0.94);
+  transition-duration: 110ms;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .glass-play-btn.css-only::after { transform: none; }
   .glass-play-btn { transition: none; }
 }
 
-/* WebGL glass variant — canvas renders the full material; strip CSS surface layers.
-   Clipped to a circle, contact shadow only (no halo bleed above the player bar). */
-.glass-play-btn--gl {
-  border-color: transparent;
-  background: transparent;
-  overflow: hidden;
-  box-shadow:
-    0 4px 14px rgba(0, 0, 0, 0.42),
-    0 1px 3px rgba(0, 0, 0, 0.30);
+/* Playlist sidebar tile — soft edge glow on hover, keyed to playlist color.
+   Replaces the oversized BorderGlow that flooded small tiles. */
+.playlist-tile {
+  --pl-color: #38bdf8;
+  transition: background-color 180ms ease-out, box-shadow 180ms ease-out, color 200ms;
 }
-.glass-play-btn--gl:active:not(:disabled) {
+.playlist-tile:hover {
+  background-color: color-mix(in srgb, var(--pl-color) 9%, transparent);
   box-shadow:
-    0 3px 10px rgba(0, 0, 0, 0.46),
-    0 1px 3px rgba(0, 0, 0, 0.32);
+    inset 0 0 0 1px color-mix(in srgb, var(--pl-color) 55%, transparent),
+    0 0 12px -3px color-mix(in srgb, var(--pl-color) 70%, transparent);
 }
 
 /* Star-pulse — used by liquid glass play button during buffering */
