@@ -26,7 +26,8 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { toast } from "@/lib/toast"
-import { Pencil, Trash2, ChevronUp, ChevronDown, X, Play, Search, Scissors, Sparkles, ArrowUpDown } from "lucide-react"
+import { Pencil, Trash2, ChevronUp, ChevronDown, X, Search, Scissors, Sparkles, ArrowUpDown } from "lucide-react"
+import { AuroraPlayButton } from "@/components/player/AuroraPlayButton"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { useSettingsStore } from "@/stores/settingsStore"
 import { TagList } from "@/components/tags/TagList"
@@ -648,18 +649,19 @@ function PlaylistSongRow({ song, index, total, onRemove, onReorder, onPlay, open
           {isCurrent ? (
             <Equalizer playing={isPlaying} />
           ) : (
-            <>
-              <span className="text-xs tabular-nums group-hover:hidden">
-                {index + 1}
-              </span>
-              <Play
-                className="h-3.5 w-3.5 hidden group-hover:block text-[var(--aurora-text)]"
-                fill="currentColor"
-                strokeWidth={0}
-              />
-            </>
+            <span className="text-xs tabular-nums transition-opacity duration-150 group-hover:opacity-0">
+              {index + 1}
+            </span>
           )}
         </span>
+        {!isCurrent && (
+          <AuroraPlayButton
+            variant="row"
+            isPlaying={false}
+            onClick={(e) => { e.stopPropagation(); handlePlay() }}
+            ariaLabel={`Play ${song.title}`}
+          />
+        )}
       </td>
 
       <td className="relative px-4 py-3">
