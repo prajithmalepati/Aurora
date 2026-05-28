@@ -45,7 +45,7 @@ export function PlayerBar() {
 
   return (
     <div
-      className="aurora-keyline-top col-span-1 md:col-span-2 relative overflow-hidden"
+      className="aurora-keyline-top col-span-1 md:col-span-2 relative"
       style={{
         background: "var(--aurora-surface-bar)",
         backdropFilter: "blur(12px)",
@@ -203,12 +203,8 @@ export function PlayerBar() {
         )}
       </div>
 
-      {/* ── DESKTOP layout — spring height between idle (52px) and playing (80px) ── */}
-      <motion.div
-        animate={{ height: isIdle ? 52 : 80 }}
-        transition={{ type: "spring", stiffness: 200, damping: 25 }}
-        className="hidden sm:block overflow-hidden"
-      >
+      {/* ── DESKTOP layout — static height, content fades in/out ── */}
+      <div className={`hidden sm:block ${isIdle ? 'h-[52px]' : 'h-[80px]'}`}>
         {isIdle ? (
           /* Idle: shimmer + text, no controls */
           <div className="flex items-center h-[52px] px-8 gap-4">
@@ -373,7 +369,7 @@ export function PlayerBar() {
             </div>
           </div>
         )}
-      </motion.div>
+      </div>
     </div>
   )
 }
