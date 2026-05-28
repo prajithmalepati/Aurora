@@ -1225,7 +1225,7 @@
   isolation: isolate;
   transform: translate3d(0, 0, 0.01px);
   display: grid;
-  border: 1px solid rgb(255 255 255 / 15%);
+  border: 1px solid transparent;
   background: var(--card-bg, transparent);
   overflow: visible;
 }

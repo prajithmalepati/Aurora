@@ -105,7 +105,7 @@ export function BorderGlow({
     '--border-radius': `${borderRadius}px`,
     '--glow-padding': `${glowRadius}px`,
     '--cone-spread': coneSpread,
-    '--fill-opacity': 0.4,
+    '--fill-opacity': 0,
     ...buildGlowVars(glowColor, glowIntensity),
     ...buildGradientVars(colors),
   } as React.CSSProperties

@@ -39,15 +39,6 @@ export function PlaylistItem({ playlist, isActive, onSelect }: PlaylistItemProps
           aria-hidden="true"
         />
       )}
-      {/* Hover background */}
-      <span
-        className={`absolute inset-0 rounded-md transition-opacity duration-200 pointer-events-none ${
-          isActive ? "opacity-0" : "opacity-0 group-hover:opacity-100"
-        }`}
-        style={{ background: "var(--aurora-surface-hover)" }}
-        aria-hidden="true"
-      />
-
       {/* Thumbnail — 32x32 square */}
       <span className="relative z-10 flex-shrink-0">
         {storedImage ? (
