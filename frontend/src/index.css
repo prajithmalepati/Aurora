@@ -643,15 +643,19 @@
    blur is larger than the tile, so the directional arc bleeds across the whole box
    (looks like a full fill). Shrink the blur radii so only the border segment near
    the cursor glows — the directional cone mask is kept intact. */
+/* The mesh-gradient ::before/::after layers mask their interior with an OPAQUE
+   card-bg (padding-box). We want transparent tiles, so that mask can't work and the
+   mesh floods the interior. Disable them — the edge-light ring below is the glow. */
+.border-glow-pl::before,
+.border-glow-pl::after {
+  display: none;
+}
 .border-glow-pl > .edge-light::before {
   box-shadow:
     inset 0 0 0 1px var(--glow-color),
     inset 0 0 2px 0 var(--glow-color-50),
-    inset 0 0 5px 0 var(--glow-color-30),
-    inset 0 0 9px 0 var(--glow-color-20),
-    0 0 3px 0 var(--glow-color-50),
-    0 0 7px 0 var(--glow-color-30),
-    0 0 12px 0 var(--glow-color-20);
+    0 0 3px 0 var(--glow-color-40),
+    0 0 6px 0 var(--glow-color-20);
 }
 
 /* Star-pulse — used by liquid glass play button during buffering */
