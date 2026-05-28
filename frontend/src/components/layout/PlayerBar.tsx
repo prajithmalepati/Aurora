@@ -4,7 +4,7 @@ import { formatDuration } from "@/lib/utils"
 import { AlbumArt } from "@/components/songs/AlbumArt"
 import { Equalizer } from "@/components/ui/Equalizer"
 import { SkipBack, SkipForward, Volume2, VolumeX, Shuffle, Repeat, Repeat1 } from "lucide-react"
-import { motion } from "motion/react"
+import { motion, AnimatePresence } from "motion/react"
 import { AuroraPlayButton } from "@/components/player/AuroraPlayButton"
 import { WaveformBar } from '@/components/player/WaveformBar'
 
@@ -70,12 +70,14 @@ export function PlayerBar() {
         ) : (
           <div className="flex flex-col gap-2 px-4 py-3">
             {/* Song info row */}
+            <AnimatePresence mode="wait">
             <motion.div
               key={currentSong.id}
               className="flex items-center gap-3"
               initial={{ opacity: 0, y: 8, scale: 0.97 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ type: "spring", stiffness: 260, damping: 26 }}
+              exit={{ opacity: 0, scale: 1.04 }}
+              transition={{ type: "spring", stiffness: 200, damping: 28 }}
             >
               <div className="flex-shrink-0">
                 <AlbumArt
@@ -105,6 +107,7 @@ export function PlayerBar() {
                 )}
               </div>
             </motion.div>
+            </AnimatePresence>
 
             {/* Seek bar row */}
             <div className="flex items-center gap-3">
@@ -203,12 +206,14 @@ export function PlayerBar() {
           /* Playing / paused: full controls fade in as bar opens */
           <div className="flex items-center h-[80px] px-8 gap-8 aurora-view-enter">
             {/* LEFT: Album art + title/artist */}
+            <AnimatePresence mode="wait">
             <motion.div
               key={currentSong.id}
               className="flex items-center gap-3.5 w-[240px] min-w-[160px] flex-shrink-0"
               initial={{ opacity: 0, y: 8, scale: 0.97 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ type: "spring", stiffness: 260, damping: 26 }}
+              exit={{ opacity: 0, scale: 1.04 }}
+              transition={{ type: "spring", stiffness: 200, damping: 28 }}
             >
               <div className="relative flex-shrink-0">
                 <AlbumArt
@@ -239,6 +244,7 @@ export function PlayerBar() {
                 )}
               </div>
             </motion.div>
+            </AnimatePresence>
 
             {/* CENTER: Controls + seek bar */}
             <div className="flex-1 flex flex-col items-center gap-2 max-w-[580px] mx-auto min-w-0">
