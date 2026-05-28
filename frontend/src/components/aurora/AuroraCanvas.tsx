@@ -1,11 +1,8 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { usePlayerStore } from '@/stores/playerStore'
 import { oklchToLinearRgb, BRAND_TEAL_LINEAR, DEFAULT_COLOR } from '@/hooks/useAuroraColor'
-
-interface AuroraCanvasProps {
-  amplitude: number  // 0–1 transient-sensitive
-  intensity: number  // 0–1 view-driven
-}
+import { useAudioAnalyser } from '@/hooks/useAudioAnalyser'
+import { useAuroraIntensity } from '@/hooks/useAuroraIntensity'
 
 // Vertex shader — fullscreen quad
 const VS = `
@@ -159,7 +156,10 @@ function initWebGL(canvas: HTMLCanvasElement): {
   return { gl, uniforms }
 }
 
-export function AuroraCanvas({ amplitude, intensity }: AuroraCanvasProps) {
+export function AuroraCanvas() {
+  const amplitude = useAudioAnalyser()
+  const intensity = useAuroraIntensity()
+
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const glRef = useRef<{ gl: WebGLRenderingContext; uniforms: Record<string, WebGLUniformLocation> } | null>(null)
   const rafRef = useRef<number | null>(null)
