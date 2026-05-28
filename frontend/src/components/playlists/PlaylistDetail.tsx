@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { toast } from "@/lib/toast"
-import { Pencil, Trash2, ChevronUp, ChevronDown, X, Play, Search, Scissors, Sparkles } from "lucide-react"
+import { Pencil, Trash2, ChevronUp, ChevronDown, X, Play, Search, Scissors, Sparkles, ArrowUpDown } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { useSettingsStore } from "@/stores/settingsStore"
 import { TagList } from "@/components/tags/TagList"
@@ -379,26 +379,41 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
                 className="w-full bg-transparent border-0 outline-none pl-11 pr-5 py-2.5 text-[13px] text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-tertiary)] placeholder:font-display-italic placeholder:text-[14px]"
               />
             </div>
-            <select
-              value={`${sortField}:${sortOrder}`}
-              onChange={(e) => {
-                const [f, o] = e.target.value.split(':')
-                setSortField(f as typeof sortField)
-                setSortOrder(o as typeof sortOrder)
-              }}
-              className="shrink-0 rounded-full px-3 py-2 text-[12px] text-[var(--aurora-text-secondary)] bg-[var(--aurora-surface)] border-0 outline-none cursor-pointer"
-              style={{ boxShadow: "inset 0 0 0 1px var(--aurora-surface-border)" }}
-            >
-              <option value="position:asc">Position</option>
-              <option value="title:asc">Title A→Z</option>
-              <option value="title:desc">Title Z→A</option>
-              <option value="artist:asc">Artist A→Z</option>
-              <option value="artist:desc">Artist Z→A</option>
-              <option value="album:asc">Album A→Z</option>
-              <option value="album:desc">Album Z→A</option>
-              <option value="duration:asc">Shortest first</option>
-              <option value="duration:desc">Longest first</option>
-            </select>
+            <Popover>
+              <PopoverTrigger
+                className="shrink-0 h-8 w-8 rounded-md flex items-center justify-center text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] transition-colors duration-150 aurora-focus"
+                style={{ background: "var(--aurora-surface)", boxShadow: "inset 0 0 0 1px var(--aurora-rim)" }}
+                aria-label="Sort options"
+              >
+                <ArrowUpDown className="h-3.5 w-3.5" strokeWidth={1.5} />
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-44 p-1">
+                {([
+                  { field: 'position', label: 'Position' },
+                  { field: 'title',    label: 'Title' },
+                  { field: 'artist',   label: 'Artist' },
+                  { field: 'album',    label: 'Album' },
+                  { field: 'duration', label: 'Duration' },
+                ] as { field: typeof sortField; label: string }[]).map(({ field, label }) => {
+                  const active = sortField === field
+                  return (
+                    <button
+                      key={field}
+                      className={`w-full text-left px-3 py-1.5 text-[12px] rounded-sm flex items-center justify-between transition-colors duration-100 hover:bg-[var(--aurora-surface-hover)] ${active ? 'text-[var(--aurora-text)]' : 'text-[var(--aurora-text-secondary)]'}`}
+                      onClick={() => {
+                        if (active) { setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc') }
+                        else { setSortField(field); setSortOrder('asc') }
+                      }}
+                    >
+                      <span>{label}</span>
+                      {active && (sortOrder === 'asc'
+                        ? <ChevronUp className="h-3 w-3" />
+                        : <ChevronDown className="h-3 w-3" />)}
+                    </button>
+                  )
+                })}
+              </PopoverContent>
+            </Popover>
           </div>
         )}
 
@@ -421,11 +436,17 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
                 <th className="px-4 py-3 text-left label-micro text-[10px] text-[var(--aurora-text-tertiary)] w-12 text-center">
                   #
                 </th>
-                <th className="px-4 py-3 text-left label-micro text-[10px] text-[var(--aurora-text-tertiary)]">
-                  Title
+                <th
+                  className={`px-4 py-3 text-left label-micro text-[10px] cursor-pointer select-none transition-colors duration-150 hover:text-[var(--aurora-text-secondary)] ${sortField === 'title' ? 'text-[var(--aurora-text)]' : 'text-[var(--aurora-text-tertiary)]'}`}
+                  onClick={() => sortField === 'title' ? setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc') : (setSortField('title'), setSortOrder('asc'))}
+                >
+                  <span className="inline-flex items-center gap-1">Title{sortField === 'title' && (sortOrder === 'asc' ? <ChevronUp className="h-2.5 w-2.5" /> : <ChevronDown className="h-2.5 w-2.5" />)}</span>
                 </th>
-                <th className="px-4 py-3 text-left label-micro text-[10px] text-[var(--aurora-text-tertiary)] w-24">
-                  Duration
+                <th
+                  className={`px-4 py-3 text-left label-micro text-[10px] w-24 cursor-pointer select-none transition-colors duration-150 hover:text-[var(--aurora-text-secondary)] ${sortField === 'duration' ? 'text-[var(--aurora-text)]' : 'text-[var(--aurora-text-tertiary)]'}`}
+                  onClick={() => sortField === 'duration' ? setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc') : (setSortField('duration'), setSortOrder('asc'))}
+                >
+                  <span className="inline-flex items-center gap-1">Duration{sortField === 'duration' && (sortOrder === 'asc' ? <ChevronUp className="h-2.5 w-2.5" /> : <ChevronDown className="h-2.5 w-2.5" />)}</span>
                 </th>
                 <th className="px-4 py-3 text-left label-micro text-[10px] text-[var(--aurora-text-tertiary)]">
                   Tags
