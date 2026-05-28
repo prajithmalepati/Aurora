@@ -273,6 +273,28 @@ def stream_song(song_id: int):
     return FileResponse(str(file_path), media_type=mime_type)
 
 
+@router.get("/songs/{song_id}/bleed-thumb")
+def get_bleed_thumb(song_id: int):
+    """Return the 64×64 PNG bleed thumbnail for a song's album art bright region."""
+    from fastapi.responses import Response
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT bleed_thumb FROM songs WHERE id = ?", (song_id,)
+        ).fetchone()
+    finally:
+        conn.close()
+
+    if not row or not row["bleed_thumb"]:
+        raise HTTPException(status_code=404, detail="No bleed thumb available")
+
+    return Response(
+        content=bytes(row["bleed_thumb"]),
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=31536000, immutable"},
+    )
+
+
 @router.delete("/songs/{song_id}")
 def delete_song(song_id: int):
     """Delete a song by ID."""
