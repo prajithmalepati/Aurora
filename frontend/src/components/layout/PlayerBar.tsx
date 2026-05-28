@@ -6,8 +6,7 @@ import { Equalizer } from "@/components/ui/Equalizer"
 import { SkipBack, SkipForward, Volume2, VolumeX, Shuffle, Repeat, Repeat1 } from "lucide-react"
 import { motion } from "motion/react"
 import { AuroraPlayButton } from "@/components/player/AuroraPlayButton"
-import { WaveformBar }         from '@/components/player/WaveformBar'
-import { WaveformBarSkeleton } from '@/components/player/WaveformBarSkeleton'
+import { WaveformBar } from '@/components/player/WaveformBar'
 
 export function PlayerBar() {
   const { seekTo } = useAudioPlayer()
@@ -113,11 +112,7 @@ export function PlayerBar() {
                 {formatDuration(seek)}
               </span>
               <div className="relative flex-1" style={{ height: '32px' }}>
-                {currentSong?.waveform_peaks ? (
-                  <WaveformBar peaks={currentSong.waveform_peaks} duration={duration} seek={seek} />
-                ) : hasSong ? (
-                  <WaveformBarSkeleton />
-                ) : null}
+                {hasSong && <WaveformBar duration={duration} seek={seek} />}
                 <input
                   type="range"
                   aria-label="Seek"
@@ -298,11 +293,7 @@ export function PlayerBar() {
                   {formatDuration(seek)}
                 </span>
                 <div className="relative flex-1" style={{ height: '32px' }}>
-                  {currentSong?.waveform_peaks ? (
-                    <WaveformBar peaks={currentSong.waveform_peaks} duration={duration} seek={seek} />
-                  ) : hasSong ? (
-                    <WaveformBarSkeleton />
-                  ) : null}
+                  {hasSong && <WaveformBar duration={duration} seek={seek} />}
                   <input
                     type="range"
                     aria-label="Seek"
