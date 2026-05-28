@@ -23,6 +23,25 @@ Done in 35b (Opus):
 Still open for Sonnet: **S3** (DeepSeek #8 PlayerBar seek re-render + SongTable typing memo) and
 **S4** (#5 stale `.aurora-play-btn` CSS selector). S1/S2 now done.
 
+## REVISION (session 35c) — BorderGlow directional + Fluid Glass decision
+
+User feedback: the playlist hover should glow only the border segment near the cursor (directional),
+not the whole box; and pointed to reactbits **Fluid Glass** (`docs/design/A1/fluid glass.md`).
+
+- **Border glow** — reverted the flat `.playlist-tile` substitution back to `BorderGlow` (its
+  cursor-cone mask IS the directional behavior the user wants). The flood was caused by
+  `.edge-light::before` inset blurs up to 50px on a ~40px tile (blur > tile → directional arc bleeds
+  across the box). Fix = `.border-glow-pl` compact override: inset blur radii capped ~12px so only
+  the near-cursor segment glows. Directional logic untouched. Verified live.
+- **Fluid Glass (reactbits)** — NOT adopted. It's Three.js + R3F + drei + maath + `.glb` lens models,
+  a full `<Canvas>` per instance → heavy bundle + one-canvas-per-row-button = the same perf wall as
+  the rejected WebGL orb. Decision: the unified clear-glass button already uses `backdrop-filter`,
+  which samples the live background. Behind song rows the aurora shows through (grid is `z-10` over
+  the canvas with no opaque bg), so the **row buttons already refract the moving aurora** ("slightly
+  altering"); the player-bar button sits over the calmer bar surface ("normal glass"). Same
+  component, context supplies the difference. No new deps. If the row refraction should read
+  stronger, bump the row variant's `backdrop-filter` blur/saturate — cross-browser, free.
+
 ## Decisions (locked with user)
 
 | Topic | Decision |

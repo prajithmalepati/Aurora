@@ -638,17 +638,20 @@
   .glass-play-btn { transition: none; }
 }
 
-/* Playlist sidebar tile — soft edge glow on hover, keyed to playlist color.
-   Replaces the oversized BorderGlow that flooded small tiles. */
-.playlist-tile {
-  --pl-color: #38bdf8;
-  transition: background-color 180ms ease-out, box-shadow 180ms ease-out, color 200ms;
-}
-.playlist-tile:hover {
-  background-color: color-mix(in srgb, var(--pl-color) 9%, transparent);
+/* Playlist sidebar tile — compact BorderGlow override.
+   The default edge-light bloom uses inset blurs up to 50px; on a ~40px tile that
+   blur is larger than the tile, so the directional arc bleeds across the whole box
+   (looks like a full fill). Shrink the blur radii so only the border segment near
+   the cursor glows — the directional cone mask is kept intact. */
+.border-glow-pl > .edge-light::before {
   box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--pl-color) 55%, transparent),
-    0 0 12px -3px color-mix(in srgb, var(--pl-color) 70%, transparent);
+    inset 0 0 0 1px var(--glow-color),
+    inset 0 0 2px 0 var(--glow-color-50),
+    inset 0 0 5px 0 var(--glow-color-30),
+    inset 0 0 9px 0 var(--glow-color-20),
+    0 0 3px 0 var(--glow-color-50),
+    0 0 7px 0 var(--glow-color-30),
+    0 0 12px 0 var(--glow-color-20);
 }
 
 /* Star-pulse — used by liquid glass play button during buffering */
