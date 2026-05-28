@@ -706,6 +706,22 @@
   .glass-play-btn { transition: none; }
 }
 
+/* WebGL glass variant — canvas renders the full material; strip CSS surface layers.
+   Clipped to a circle, contact shadow only (no halo bleed above the player bar). */
+.glass-play-btn--gl {
+  border-color: transparent;
+  background: transparent;
+  overflow: hidden;
+  box-shadow:
+    0 4px 14px rgba(0, 0, 0, 0.42),
+    0 1px 3px rgba(0, 0, 0, 0.30);
+}
+.glass-play-btn--gl:active:not(:disabled) {
+  box-shadow:
+    0 3px 10px rgba(0, 0, 0, 0.46),
+    0 1px 3px rgba(0, 0, 0, 0.32);
+}
+
 /* Star-pulse — used by liquid glass play button during buffering */
 @keyframes star-pulse {
   0%, 100% { opacity: 0.3; transform: scale(1); }
