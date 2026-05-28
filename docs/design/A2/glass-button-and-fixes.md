@@ -1,8 +1,27 @@
-# A2 — Liquid-Glass Button (WebGL) + Player/Sidebar/Perf Fixes
+# A2 — Liquid-Glass Button + Player/Sidebar/Perf Fixes
 
-Session 35 plan. Supersedes the rejected pure-CSS glass button (Approach 1). Authored by Opus
-after re-reading: `docs/research/*` (the other-model research), `bugs from.md` (DeepSeek repo
-audit), and the live code.
+Session 35 plan. Authored by Opus after re-reading: `docs/research/*` (the other-model research),
+`bugs from.md` (DeepSeek repo audit), and the live code.
+
+## REVISION (session 35b) — WebGL approach REVERTED
+
+The WebGL true-refraction button was built and rejected by the user: it read as a **colored orb**,
+not glass, and running two extra WebGL RAF loops (visible + hidden mobile canvas) **competed with
+the aurora canvas RAF → made the wave stutter worse.** Replaced with **Apple-style clear/frosted
+CSS glass** (backdrop refraction + bright rim + top sheen + pointer specular, no color fill, no
+halo), unified across all variants. `GlassButtonGL.tsx` deleted.
+
+Done in 35b (Opus):
+- Clear-glass CSS button, unified (`AuroraPlayButton.tsx`, `index.css`).
+- DeepSeek #1/#2/#3/#6 resolved: `:active` press scoped to `--primary` (no row teleport); specular
+  is `inset:0` clipped (no -35% halo / coord mismatch / overflow clip).
+- DeepSeek #4 resolved: dead `buttonRef` removed.
+- **S2 sidebar playlist hover** DONE: BorderGlow unwrapped from tiles; new `.playlist-tile` hover =
+  thin color edge ring + soft glow keyed to playlist color. No flood.
+- Stutter regression (extra WebGL RAFs) removed.
+
+Still open for Sonnet: **S3** (DeepSeek #8 PlayerBar seek re-render + SongTable typing memo) and
+**S4** (#5 stale `.aurora-play-btn` CSS selector). S1/S2 now done.
 
 ## Decisions (locked with user)
 
