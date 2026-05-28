@@ -1,5 +1,10 @@
 """Scanner router."""
-from fastapi import APIRouter, HTTPException
+import asyncio
+import json
+import queue
+import threading
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from pathlib import Path
 
@@ -64,3 +69,56 @@ def scan_folder(request: ScanRequest):
         }
     finally:
         conn.close()
+
+
+@router.post("/scan/stream")
+async def scan_folder_stream(request: ScanRequest, req: Request):
+    """Stream scan progress as Server-Sent Events."""
+    if not request.folder_path:
+        raise HTTPException(status_code=400, detail="folder_path is empty")
+    folder_path = Path(request.folder_path)
+    if not folder_path.exists() or not folder_path.is_dir():
+        raise HTTPException(status_code=404, detail="folder_path does not exist or is not a directory")
+
+    event_queue: queue.Queue = queue.Queue()
+    cancel_event = threading.Event()
+
+    def worker() -> None:
+        from app.database import get_db
+        conn = get_db()
+        try:
+            import_scanned_songs(
+                conn,
+                request.folder_path,
+                request.playlist_name,
+                cancel_event=cancel_event,
+                progress_cb=lambda evt: event_queue.put(evt),
+            )
+        except Exception as exc:
+            event_queue.put({"type": "error", "message": str(exc)})
+        finally:
+            conn.close()
+            event_queue.put(None)  # sentinel
+
+    thread = threading.Thread(target=worker, daemon=True)
+    thread.start()
+
+    async def generate():
+        while True:
+            if await req.is_disconnected():
+                cancel_event.set()
+                break
+            try:
+                evt = event_queue.get_nowait()
+            except queue.Empty:
+                await asyncio.sleep(0.05)
+                continue
+            if evt is None:
+                break
+            yield f"data: {json.dumps(evt)}\n\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
