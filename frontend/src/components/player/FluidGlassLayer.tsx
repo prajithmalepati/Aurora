@@ -33,22 +33,33 @@ const AURORA_FRAG = /* glsl */ `
   float fbm(vec2 p){ float v=0.0,a=0.5; mat2 r=mat2(0.8,0.6,-0.6,0.8);
     for(int i=0;i<3;i++){ v+=a*vnoise(p); p=r*p*2.0; a*=0.5; } return v; }
 
+  float curtain(vec2 uv, float t, float ph, float sp, float fr){
+    float w = sin(uv.x*fr + t*sp + ph)*0.14;
+    w += sin(uv.x*fr*1.73 + t*sp*0.61 + ph*1.41)*0.07;
+    w += fbm(vec2(uv.x*2.2, t*0.12 + ph))*0.10;
+    float cy = 0.48 + w + sin(t*0.05 + ph)*0.05;
+    float d = abs(uv.y - cy);
+    float cw = 0.05 + sin(t*0.04 + ph*0.7)*0.012;
+    return smoothstep(cw, 0.0, d) + smoothstep(cw*5.0, cw, d)*0.22;
+  }
+
+  // EXACT page aurora — same curtains/palette as AuroraCanvas. No fabricated color.
   void main(){
     vec2 uv = vUv;
     float t = uTime;
-
-    // Full-field flowing aurora — detailed everywhere so the lens always has
-    // structure to refract (the page aurora is faded near the bottom).
-    float n1 = fbm(uv * 3.0 + vec2(t * 0.15, t * 0.10));
-    float n2 = fbm(uv * 6.0 - vec2(t * 0.20, t * 0.13) + 4.0);
-    float m  = clamp(0.5 + 0.55 * sin((n1 * 2.2 + n2) * 3.14159 + t * 0.30), 0.0, 1.0);
-
-    vec3 col = mix(uColor1, uColor2, m);
-    col *= 0.55 + 0.85 * fbm(uv * 4.0 + t * 0.12);   // luminance flow
-    col += vec3(0.18) * smoothstep(0.70, 1.0, n2);    // bright streaks
-    col += vec3(0.10, 0.14, 0.20) * smoothstep(0.6, 1.0, n1);
-
-    gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+    float a = 0.0;
+    a += curtain(uv,t,0.00,0.31,2.10)*0.50;
+    a += curtain(uv,t,1.70,0.19,3.30)*0.40;
+    a += curtain(uv,t,3.14,0.23,1.80)*0.35;
+    a += curtain(uv,t,5.30,0.17,4.10)*0.30;
+    a = clamp(a, 0.0, 1.0);
+    vec3 col = mix(uColor1, uColor2, clamp(uv.y*0.6 + sin(t*0.08)*0.1 + 0.2, 0.0, 1.0));
+    vec3 greenCore = vec3(0.05, 0.75, 0.25);
+    vec3 redFringe = vec3(0.85, 0.15, 0.10);
+    col = mix(col, mix(greenCore, redFringe, smoothstep(0.45, 0.75, uv.y)), 0.35);
+    col = mix(col*0.30, col, a);
+    col = mix(col, vec3(0.95,0.98,1.0), a*a*0.30);
+    gl_FragColor = vec4(col, 1.0);
   }
 `
 
@@ -85,11 +96,10 @@ function LensScene() {
     []
   )
 
-  // Push song colors into the aurora plane.
+  // Match the page aurora exactly: color1 = fixed brand teal, color2 = song's 2nd color.
   useEffect(() => {
-    const c1 = currentSong?.dominant_color ? oklchToLinearRgb(currentSong.dominant_color) : BRAND_TEAL_LINEAR
     const c2 = currentSong?.dominant_color_2 ? oklchToLinearRgb(currentSong.dominant_color_2) : BRAND_TEAL_LINEAR
-    uniforms.uColor1.value.setRGB(c1[0], c1[1], c1[2])
+    uniforms.uColor1.value.setRGB(BRAND_TEAL_LINEAR[0], BRAND_TEAL_LINEAR[1], BRAND_TEAL_LINEAR[2])
     uniforms.uColor2.value.setRGB(c2[0], c2[1], c2[2])
   }, [currentSong?.id, uniforms])
 
