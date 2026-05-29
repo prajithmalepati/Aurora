@@ -204,7 +204,7 @@ export function PlayerBar() {
       </div>
 
       {/* ── DESKTOP layout — static height, content fades in/out ── */}
-      <div className={`hidden sm:block ${isIdle ? 'h-[52px]' : 'h-[80px]'}`}>
+      <div className={`hidden sm:block ${isIdle ? 'h-[52px]' : 'h-[96px]'}`}>
         {isIdle ? (
           /* Idle: shimmer + text, no controls */
           <div className="flex items-center h-[52px] px-8 gap-4">
@@ -220,7 +220,7 @@ export function PlayerBar() {
           </div>
         ) : (
           /* Playing / paused: full controls fade in as bar opens */
-          <div className="flex items-center h-[80px] px-8 gap-8 aurora-view-enter">
+          <div className="flex items-center h-[96px] px-8 gap-8 aurora-view-enter">
             {/* LEFT: Album art + title/artist */}
             <AnimatePresence mode="wait">
             <motion.div
