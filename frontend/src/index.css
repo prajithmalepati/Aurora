@@ -566,6 +566,10 @@
     rgba(255, 255, 255, 0.02) 100%
   );
 
+  /* frosted refraction of whatever sits behind the button */
+  backdrop-filter: blur(4px) saturate(1.6) brightness(1.06);
+  -webkit-backdrop-filter: blur(4px) saturate(1.6) brightness(1.06);
+
   box-shadow:
     0 4px 14px rgba(0, 0, 0, 0.40),
     0 1px 3px rgba(0, 0, 0, 0.30),
@@ -628,16 +632,6 @@
 .glass-play-btn--primary:active:not(:disabled) {
   transform: scale(0.94);
   transition-duration: 110ms;
-}
-
-/* Fluid-glass lens — applied ONLY to the player-bar button and the hovered row button
-   (max ~2 active), never to all 358 hidden row buttons. Chromium applies the SVG
-   displacement (magnify/distort the real pixels behind); Safari/Firefox fall back to the
-   -webkit blur (graceful frost). */
-.glass-play-btn--primary,
-.group:hover .glass-play-btn--row {
-  backdrop-filter: url(#fluid-lens) blur(0.5px) saturate(1.3) brightness(1.05);
-  -webkit-backdrop-filter: blur(2px) saturate(1.4) brightness(1.05);
 }
 
 @media (prefers-reduced-motion: reduce) {

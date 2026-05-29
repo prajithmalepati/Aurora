@@ -3,7 +3,6 @@ import { useState } from "react"
 import { Menu, X } from "lucide-react"
 import { motion } from "motion/react"
 import { AuroraCanvas } from '@/components/aurora/AuroraCanvas'
-import { FluidLensFilter } from '@/components/player/FluidLensFilter'
 
 interface AppShellProps {
   children: {
@@ -75,8 +74,6 @@ export function AppShell({ children }: AppShellProps) {
         <div className="md:col-span-2">{children.playerBar}</div>
       </motion.div>
 
-      {/* SVG lens filter used by the glass play buttons' backdrop-filter */}
-      <FluidLensFilter />
     </>
   )
 }
