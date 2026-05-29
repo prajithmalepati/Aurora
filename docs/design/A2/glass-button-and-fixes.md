@@ -23,6 +23,24 @@ Done in 35b (Opus):
 Still open for Sonnet: **S3** (DeepSeek #8 PlayerBar seek re-render + SongTable typing memo) and
 **S4** (#5 stale `.aurora-play-btn` CSS selector). S1/S2 now done.
 
+## REVISION (session 35e) — Three.js REVERTED → CSS backdrop SVG lens
+
+User clarified: they like how the reactbits glass **distorts + magnifies what's behind it + how it
+sits**. Player bar is minor (only the icon behind it); the exciting case is the **row hover button
+magnifying/distorting the moving aurora behind it**. The Three.js lens refracts a *re-rendered copy*
+(hence the "extra color" complaint) and can't bend the real backdrop — wrong tool.
+
+Pivot: removed three/r3f/drei/maath + `FluidGlassLayer.tsx`. Added `FluidLensFilter.tsx` — a hidden
+SVG `feDisplacementMap` lens (`#fluid-lens`) applied via `backdrop-filter` so the button bends the
+REAL pixels behind it (the actual moving aurora). Gated to `.glass-play-btn--primary` and
+`.group:hover .glass-play-btn--row` only (max ~2 active) — never the 358 hidden row buttons (perf +
+avoids headless-screenshot hang). Chromium = real displacement; Firefox/Safari = `-webkit` blur
+fallback (no displacement support for `backdrop-filter: url()`).
+
+VERIFY IN REAL CHROME: headless Playwright cannot screenshot `backdrop-filter: url()` (capture
+hangs), so the effect must be eyeballed live. Tuning knobs: `feDisplacementMap scale` (magnify
+strength), the gradient stops in `LENS_MAP` (edge vs uniform distortion).
+
 ## REVISION (session 35d) — Real Fluid Glass (Three.js) shipped for player bar
 
 User rejected the CSS glass repeatedly; wants reactbits Fluid Glass look. Decisions:
