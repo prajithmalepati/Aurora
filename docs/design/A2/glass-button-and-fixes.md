@@ -23,6 +23,24 @@ Done in 35b (Opus):
 Still open for Sonnet: **S3** (DeepSeek #8 PlayerBar seek re-render + SongTable typing memo) and
 **S4** (#5 stale `.aurora-play-btn` CSS selector). S1/S2 now done.
 
+## REVISION (session 35d) — Real Fluid Glass (Three.js) shipped for player bar
+
+User rejected the CSS glass repeatedly; wants reactbits Fluid Glass look. Decisions:
+**Three.js MeshTransmissionMaterial · refract the aurora · player bar + everywhere.**
+(600KB dep is a non-issue here: local single-user app, loads once, cached.)
+
+Built `FluidGlassLayer.tsx` — a fixed full-viewport, `pointer-events:none` R3F `<Canvas>`
+overlay (orthographic, 1 unit = 1px). It renders a flowing aurora field (song colors) into an
+off-screen FBO, then a `MeshTransmissionMaterial` lens (flattened sphere disc) refracts that
+buffer in screen space at the play button's rect (queried each frame). Play/pause icon rendered
+as geometry just in front of the lens. Verified: real transmission glass, chromatic, icon legible,
+clicks pass through (canvas needs explicit `pointerEvents:'none'` — wrapper alone isn't enough).
+Reduced-motion → layer skipped, CSS glass fallback shows.
+
+STATUS: player-bar lens done + verified. NEXT: extend to row hover buttons via the SAME canvas
+(add a second lens that follows the hovered row button) — one context, perf-safe. WATCH: full-
+viewport FBO + MTM per frame; cap FBO resolution if it reintroduces stutter.
+
 ## REVISION (session 35c) — BorderGlow directional + Fluid Glass decision
 
 User feedback: the playlist hover should glow only the border segment near the cursor (directional),
