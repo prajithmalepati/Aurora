@@ -3,6 +3,7 @@ import { useState } from "react"
 import { Menu, X } from "lucide-react"
 import { motion } from "motion/react"
 import { AuroraCanvas } from '@/components/aurora/AuroraCanvas'
+import { FluidGlassLayer } from '@/components/player/FluidGlassLayer'
 
 interface AppShellProps {
   children: {
@@ -73,6 +74,9 @@ export function AppShell({ children }: AppShellProps) {
         </div>
         <div className="md:col-span-2">{children.playerBar}</div>
       </motion.div>
+
+      {/* Fluid-glass lens overlay — refracts the aurora through the play button(s) */}
+      <FluidGlassLayer />
     </>
   )
 }
