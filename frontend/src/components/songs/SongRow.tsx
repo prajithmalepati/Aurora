@@ -108,14 +108,17 @@ export function SongRow({ song, index, animIndex, onPlay }: SongRowProps) {
               </span>
             )}
           </span>
-          {/* Circular play button — positioned in td (td has relative), fades in on hover */}
+          {/* Circular play button — inset-0 flex overlay centers it in the cell
+              (avoids the td percentage-positioning bug), fades in on hover. */}
           {!isCurrentSong && (
-            <AuroraPlayButton
-              variant="row"
-              isPlaying={false}
-              onClick={(e) => { e.stopPropagation(); handlePlay() }}
-              ariaLabel={`Play ${song.title}`}
-            />
+            <span className="absolute inset-0 z-20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+              <AuroraPlayButton
+                variant="row"
+                isPlaying={false}
+                onClick={(e) => { e.stopPropagation(); handlePlay() }}
+                ariaLabel={`Play ${song.title}`}
+              />
+            </span>
           )}
         </td>
 

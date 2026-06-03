@@ -655,12 +655,14 @@ function PlaylistSongRow({ song, index, total, onRemove, onReorder, onPlay, open
           )}
         </span>
         {!isCurrent && (
-          <AuroraPlayButton
-            variant="row"
-            isPlaying={false}
-            onClick={(e) => { e.stopPropagation(); handlePlay() }}
-            ariaLabel={`Play ${song.title}`}
-          />
+          <span className="absolute inset-0 z-20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+            <AuroraPlayButton
+              variant="row"
+              isPlaying={false}
+              onClick={(e) => { e.stopPropagation(); handlePlay() }}
+              ariaLabel={`Play ${song.title}`}
+            />
+          </span>
         )}
       </td>
 
