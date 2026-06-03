@@ -1,20 +1,17 @@
 import { usePlayerStore } from "@/stores/playerStore"
 import { useAudioPlayer } from "@/hooks/useAudioPlayer"
-import { formatDuration } from "@/lib/utils"
 import { AlbumArt } from "@/components/songs/AlbumArt"
 import { Equalizer } from "@/components/ui/Equalizer"
 import { SkipBack, SkipForward, Volume2, VolumeX, Shuffle, Repeat, Repeat1 } from "lucide-react"
 import { motion, AnimatePresence } from "motion/react"
 import { AuroraPlayButton } from "@/components/player/AuroraPlayButton"
-import { WaveformBar } from '@/components/player/WaveformBar'
+import { SeekScrubber } from "@/components/player/SeekScrubber"
 
 export function PlayerBar() {
   const { seekTo } = useAudioPlayer()
   const currentSong = usePlayerStore((state) => state.currentSong)
   const isPlaying = usePlayerStore((state) => state.isPlaying)
   const volume = usePlayerStore((state) => state.volume)
-  const seek = usePlayerStore((state) => state.seek)
-  const duration = usePlayerStore((state) => state.duration)
   const setVolume = usePlayerStore((state) => state.setVolume)
   const toggleMute = usePlayerStore((state) => state.toggleMute)
   const togglePlay = usePlayerStore((state) => state.togglePlay)
@@ -130,28 +127,7 @@ export function PlayerBar() {
             </AnimatePresence>
 
             {/* Seek bar row */}
-            <div className="flex items-center gap-3">
-              <span className="text-[10px] text-[var(--aurora-text-secondary)] w-8 text-right tabular-nums">
-                {formatDuration(seek)}
-              </span>
-              <div className="relative flex-1" style={{ height: '32px' }}>
-                {hasSong && <WaveformBar duration={duration} seek={seek} />}
-                <input
-                  type="range"
-                  aria-label="Seek"
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                  min={0}
-                  max={duration || 100}
-                  step={1}
-                  value={Math.round(seek)}
-                  onChange={(e) => seekTo(Number(e.target.value))}
-                  disabled={!hasSong}
-                />
-              </div>
-              <span className="text-[10px] text-[var(--aurora-text-tertiary)] w-8 tabular-nums">
-                {formatDuration(duration)}
-              </span>
-            </div>
+            <SeekScrubber hasSong={hasSong} seekTo={seekTo} mobile />
 
             {/* Controls row */}
             <div className="flex items-center justify-center gap-4">
@@ -165,7 +141,7 @@ export function PlayerBar() {
               </button>
 
               <button
-                onClick={() => { if (seek > 3) seekTo(0); else { seekTo(0); previous() } }}
+                onClick={() => { if (usePlayerStore.getState().seek > 3) seekTo(0); else { seekTo(0); previous() } }}
                 disabled={!hasSong}
                 className={transportBtnClass(false)}
                 aria-label="Previous"
@@ -275,7 +251,7 @@ export function PlayerBar() {
                 </button>
 
                 <button
-                  onClick={() => { if (seek > 3) seekTo(0); else { seekTo(0); previous() } }}
+                  onClick={() => { if (usePlayerStore.getState().seek > 3) seekTo(0); else { seekTo(0); previous() } }}
                   disabled={!hasSong}
                   className={transportBtnClass(false)}
                   aria-label="Previous"
@@ -310,28 +286,7 @@ export function PlayerBar() {
                 </button>
               </div>
 
-              <div className="flex items-center gap-3 w-full">
-                <span className="text-[11px] text-[var(--aurora-text-secondary)] w-9 text-right tabular-nums font-medium">
-                  {formatDuration(seek)}
-                </span>
-                <div className="relative flex-1" style={{ height: '32px' }}>
-                  {hasSong && <WaveformBar duration={duration} seek={seek} />}
-                  <input
-                    type="range"
-                    aria-label="Seek"
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    min={0}
-                    max={duration || 100}
-                    step={1}
-                    value={Math.round(seek)}
-                    onChange={(e) => seekTo(Number(e.target.value))}
-                    disabled={!hasSong}
-                  />
-                </div>
-                <span className="text-[11px] text-[var(--aurora-text-tertiary)] w-9 tabular-nums font-medium">
-                  {formatDuration(duration)}
-                </span>
-              </div>
+              <SeekScrubber hasSong={hasSong} seekTo={seekTo} />
             </div>
 
             {/* RIGHT: Now-playing indicator + volume */}
