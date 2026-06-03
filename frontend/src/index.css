@@ -985,7 +985,6 @@
 /* Transition restore — .aurora-btn-press above wins the cascade for
    .aurora-play-btn and .mix-btn-search (both defined earlier in file).
    Re-declare here so background + box-shadow also animate. */
-.aurora-play-btn,
 .aurora-btn-loud-primary,
 .mix-btn-search {
   transition: background 150ms ease, box-shadow 200ms ease, transform 100ms ease;
