@@ -24,32 +24,15 @@ export function AuroraPlayButton({
   const sizeClass = isDesktop ? 'w-11 h-11' : isRow ? 'w-9 h-9' : 'w-10 h-10'
   const iconSize = isDesktop ? 18 : isRow ? 14 : 16
 
-  // Pointer-tracked specular (desktop only).
-  function handlePointerMove(e: React.PointerEvent<HTMLButtonElement>) {
-    const rect = e.currentTarget.getBoundingClientRect()
-    const x = (e.clientX - rect.left) / rect.width
-    const y = (e.clientY - rect.top) / rect.height
-    e.currentTarget.style.setProperty('--mx', `${x * 100}%`)
-    e.currentTarget.style.setProperty('--my', `${y * 100}%`)
-  }
-  function handlePointerLeave(e: React.PointerEvent<HTMLButtonElement>) {
-    e.currentTarget.style.setProperty('--mx', '50%')
-    e.currentTarget.style.setProperty('--my', '28%')
-  }
-
   const variantClass = isPrimary ? 'glass-play-btn--primary' : 'glass-play-btn--row'
-  const rowPosition = isRow
-    ? ' absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-150'
-    : ''
 
+  // Row variant is a plain circle; the consumer wraps it in an inset-0 flex overlay
+  // that centers it in the cell (avoids the table-cell percentage-positioning bug).
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      onPointerMove={isDesktop ? handlePointerMove : undefined}
-      onPointerLeave={isDesktop ? handlePointerLeave : undefined}
-      style={{ '--mx': '50%', '--my': '28%' } as React.CSSProperties}
-      className={`glass-play-btn ${variantClass} ${sizeClass}${rowPosition} disabled:opacity-40 disabled:pointer-events-none`}
+      className={`glass-play-btn ${variantClass} ${sizeClass} disabled:opacity-40 disabled:pointer-events-none`}
       aria-label={ariaLabel ?? (isPlaying ? 'Pause' : 'Play')}
       tabIndex={isRow ? -1 : 0}
     >
