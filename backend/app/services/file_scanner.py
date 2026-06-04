@@ -297,6 +297,15 @@ def extract_metadata(file_path: str) -> dict | None:
     bleed_region_x = bleed_region_y = bleed_region_w = bleed_region_h = 0
     try:
         art_data = _get_art_bytes(audio)
+        if not art_data:
+            # `audio` was loaded with easy=True (EasyMP3 etc.), which does not
+            # expose embedded APIC picture frames. Retry with a full handle so
+            # dominant_color / bleed_thumb get populated. Without this, the
+            # player-bar color bleed falls back to the default color.
+            try:
+                art_data = _get_art_bytes(mutagen.File(file_path))
+            except Exception:
+                art_data = None
         if art_data:
             dominant_color, dominant_color_2 = extract_dominant_colors(art_data)
             from app.services.color_utils import extract_bright_region
@@ -440,7 +449,11 @@ def import_scanned_songs(
     Scan folder, import new songs, optionally add to playlist.
     Format-aware dedup: if (title, artist) already exists at lower quality,
     the existing song is replaced and its tags/playlists are migrated.
+    When playlist_name is given, the playlist is filled from EVERY scanned file
+    that maps to a DB row (imported, replaced, AND skipped duplicates), so a
+    re-scan of an already-imported folder still creates/populates the playlist.
     Supports cancel_event (threading.Event) and progress_cb(dict) for SSE streaming.
+    The streamed song dicts omit bleed_thumb (raw bytes, not JSON serializable).
     Returns a detailed summary dict.
     """
     # 1. Quick file enumeration for total count
@@ -456,6 +469,10 @@ def import_scanned_songs(
 
     imported: list[dict] = []
     replaced: list[dict] = []
+    # Every scanned file that maps to a DB row (imported, replaced, OR skipped as a
+    # duplicate) contributes its song id here, so a re-scan of an already-imported
+    # folder still populates the target playlist.
+    playlist_song_ids: list[int] = []
     skipped_exact = 0       # exact file_path match, mtime unchanged
     skipped_same_fmt = 0    # (title, artist) match, same tier, different path
     skipped_lower_fmt = 0   # (title, artist) match, lower quality incoming
@@ -494,6 +511,7 @@ def import_scanned_songs(
             # If mtime unchanged → true duplicate, skip
             if stored_mtime is not None and incoming_mtime is not None and abs(incoming_mtime - stored_mtime) < 1.0:
                 skipped_exact += 1
+                playlist_song_ids.append(exact[0])
                 continue
             # mtime changed → update in place (preserves tags + playlist memberships)
             try:
@@ -523,6 +541,7 @@ def import_scanned_songs(
                      incoming_mtime, now, exact[0]),
                 )
                 imported.append({"id": exact[0], **metadata})
+                playlist_song_ids.append(exact[0])
             except Exception as exc:
                 scan_errors.append({"file": incoming_path, "error": f"Update failed: {exc}"})
             continue  # done with this file, don't fall through
@@ -559,6 +578,8 @@ def import_scanned_songs(
                         "replaced_path": existing_path,
                         **metadata,
                     })
+                    playlist_song_ids.append(new_id)
+                    existing_id = new_id  # avoid FK violation: later append of existing_id uses the live row
                 except Exception as exc:
                     scan_errors.append({
                         "file": incoming_path,
@@ -568,6 +589,7 @@ def import_scanned_songs(
                 skipped_same_fmt += 1
             else:
                 skipped_lower_fmt += 1
+            playlist_song_ids.append(existing_id)
             continue
 
         # No (title, artist) match → fresh import
@@ -603,9 +625,13 @@ def import_scanned_songs(
         )
         song_id = cursor.lastrowid
         imported.append({"id": song_id, **metadata})
+        playlist_song_ids.append(song_id)
 
-    # 3. Optionally add newly imported songs to a playlist
-    if playlist_name and imported:
+    # 3. Optionally add every scanned song to a playlist. Uses playlist_song_ids
+    #    (imported + replaced + skipped duplicates) so re-scanning an already-imported
+    #    folder still creates/fills the playlist. Order-preserving dedupe.
+    ordered_ids = list(dict.fromkeys(playlist_song_ids))
+    if playlist_name and ordered_ids:
         existing_playlist = db_connection.execute(
             "SELECT id FROM playlists WHERE name = ?",
             (playlist_name,)
@@ -625,15 +651,21 @@ def import_scanned_songs(
             (playlist_id,)
         ).fetchone()[0]
 
-        for i, song in enumerate(imported):
+        for i, song_id in enumerate(ordered_ids):
             db_connection.execute(
                 "INSERT OR IGNORE INTO playlist_songs (playlist_id, song_id, position, added_at) VALUES (?, ?, ?, ?)",
-                (playlist_id, song["id"], max_pos + 1 + i, now),
+                (playlist_id, song_id, max_pos + 1 + i, now),
             )
 
     db_connection.commit()
 
     skipped_total = skipped_exact + skipped_same_fmt + skipped_lower_fmt
+
+    # Strip non-JSON-serializable byte fields (bleed_thumb) before streaming.
+    # The raw thumb is already persisted to the DB and is served separately via
+    # GET /api/songs/{id}/bleed-thumb, so it must not be in the SSE payload.
+    def _json_safe(songs):
+        return [{k: v for k, v in s.items() if k != "bleed_thumb"} for s in songs]
 
     result = {
         "scanned": done,
@@ -644,8 +676,8 @@ def import_scanned_songs(
         "skipped_same_format": skipped_same_fmt,
         "skipped_lower_quality": skipped_lower_fmt,
         "errors": scan_errors,
-        "songs": imported,
-        "replaced_songs": replaced,
+        "songs": _json_safe(imported),
+        "replaced_songs": _json_safe(replaced),
         "art_extracted": art_extracted,
     }
 
