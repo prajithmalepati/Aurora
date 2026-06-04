@@ -579,6 +579,7 @@ def import_scanned_songs(
                         **metadata,
                     })
                     playlist_song_ids.append(new_id)
+                    existing_id = new_id  # avoid FK violation: later append of existing_id uses the live row
                 except Exception as exc:
                     scan_errors.append({
                         "file": incoming_path,
@@ -662,7 +663,7 @@ def import_scanned_songs(
 
     # Strip non-JSON-serializable byte fields (bleed_thumb) before streaming.
     # The raw thumb is already persisted to the DB and is served separately via
-    # GET /songs/{id}/bleed-thumb, so it must not be in the SSE payload.
+    # GET /api/songs/{id}/bleed-thumb, so it must not be in the SSE payload.
     def _json_safe(songs):
         return [{k: v for k, v in s.items() if k != "bleed_thumb"} for s in songs]
 
