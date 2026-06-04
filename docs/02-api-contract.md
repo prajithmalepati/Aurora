@@ -555,7 +555,7 @@ The `song_ids` array contains all song IDs in the playlist in their new order. P
 4. If artist is missing from metadata, use "Unknown Artist"
 5. Skip files whose `file_path` already exists in `songs` table (duplicate prevention)
 6. Insert new songs with `source = 'local_scan'`
-7. If `playlist_name` is provided, create the playlist if it doesn't exist, then add all newly imported songs to it
+7. If `playlist_name` is provided, create the playlist if it doesn't exist, then add **every scanned song that maps to a DB row** to it — newly imported, replaced, and skipped duplicates alike. Re-scanning an already-imported folder therefore still creates/populates the playlist (membership insert is `INSERT OR IGNORE`, so it is idempotent).
 
 **Response (200):**
 ```json
