@@ -247,6 +247,31 @@ def import_scanned_songs(
     }
 ```
 
+> The block above is illustrative. The shipped `import_scanned_songs`
+> (`backend/app/services/file_scanner.py`) additionally performs tier-based
+> replacement, mtime-based in-place updates, and album-art / bleed-region
+> extraction. Two behaviors below are authoritative and override the simplified
+> sample.
+
+### Playlist membership on re-scan (authoritative)
+
+When `playlist_name` is given, the playlist is filled from **every scanned file
+that maps to a DB row** — newly imported, replaced, *and* skipped duplicates —
+not only newly imported songs. This means re-scanning an already-imported folder
+still creates and populates the playlist (`imported: 0, skipped: N` will still
+yield an N-song playlist). IDs are deduplicated in scan order, and rows are
+inserted with `INSERT OR IGNORE`, so re-running is idempotent.
+
+### SSE `done` event payload (authoritative)
+
+The streaming endpoint (`POST /api/scan/stream`) emits a final
+`{"type": "done", ...}` event whose `songs` / `replaced_songs` entries **omit the
+`bleed_thumb` field**. `bleed_thumb` is raw image `bytes` (not JSON
+serializable); it is persisted to the DB during the scan and served separately
+via `GET /api/songs/{id}/bleed-thumb`. Including it previously crashed
+`json.dumps` mid-stream, surfacing in the UI as an "input stream error" after the
+progress bar completed.
+
 ---
 
 ## Windows Path Handling
