@@ -15,6 +15,7 @@ import { SongTable } from "@/components/songs/SongTable"
 import { PlaylistDetail } from "@/components/playlists/PlaylistDetail"
 import { QueryBuilder } from "@/components/filter/QueryBuilder"
 import { SettingsView } from "@/components/settings/SettingsView"
+import { FoldersView } from "@/components/folders/FoldersView"
 import { AnimatePresence, motion } from "motion/react"
 import { AuroraColorBridge } from '@/components/aurora/AuroraColorBridge'
 import { Search } from "lucide-react"
@@ -125,6 +126,8 @@ function App() {
       content = <QueryBuilder />
     } else if (view.kind === "playlist") {
       content = <PlaylistDetail key={view.playlistId} playlistId={view.playlistId} />
+    } else if (view.kind === "folders") {
+      content = <FoldersView />
     } else {
       content = <SettingsView />
     }
