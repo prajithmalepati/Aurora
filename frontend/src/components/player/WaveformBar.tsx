@@ -1,8 +1,10 @@
-import { useId, useRef, useEffect, useCallback } from 'react'
+import { useId, useRef, useEffect, useCallback, useMemo } from 'react'
 
 interface WaveformBarProps {
   duration: number
   seek: number
+  dragSeek?: number | null
+  waveformPeaks?: number[] | null
 }
 
 const VIEW_W = 600
@@ -24,9 +26,27 @@ function buildWavePath(t: number, phase: number, ampScale: number): string {
   return pts.join('')
 }
 
+function buildPeaksPath(peaks: number[], maxBars: number): string {
+  if (!peaks.length) return ''
+  // Sample peaks to fit the viewport
+  const step = Math.max(1, Math.floor(peaks.length / maxBars))
+  const barWidth = VIEW_W / maxBars
+  const pts: string[] = []
+  for (let i = 0; i < maxBars; i++) {
+    const idx = Math.min(i * step, peaks.length - 1)
+    // peaks are 0-1, map to 1..MID_Y*2 pixels (center-out)
+    const val = Math.max(0, Math.min(1, peaks[idx]))
+    const barH = Math.max(1, val * (VIEW_H - 2))
+    const x = i * barWidth
+    const y = (VIEW_H - barH) / 2
+    pts.push(`M${x.toFixed(1)},${y.toFixed(1)}h${barWidth.toFixed(1)}v${barH.toFixed(1)}h${-barWidth.toFixed(1)}Z`)
+  }
+  return pts.join('')
+}
+
 // PURELY VISUAL — aria-hidden, pointer-events-none.
 // Seek interaction handled by native <input type="range"> overlaid in PlayerBar.
-export function WaveformBar({ duration, seek }: WaveformBarProps) {
+export function WaveformBar({ duration, seek, dragSeek, waveformPeaks }: WaveformBarProps) {
   const clipId      = useId()
   const wave1DimRef = useRef<SVGPathElement>(null)
   const wave2DimRef = useRef<SVGPathElement>(null)
@@ -38,19 +58,34 @@ export function WaveformBar({ duration, seek }: WaveformBarProps) {
   const startRef    = useRef<number>(performance.now())
   const seekRef     = useRef(seek)
   const durationRef = useRef(duration)
+  const dragSeekRef = useRef(dragSeek)
 
   seekRef.current    = seek
   durationRef.current = duration
+  dragSeekRef.current = dragSeek
+
+  // Active playhead position: use dragSeek if dragging, otherwise seek
+  const playheadX = useMemo(() => {
+    const s = dragSeek != null ? dragSeek : seek
+    if (!duration) return 0
+    return (s / duration) * VIEW_W
+  }, [seek, dragSeek, duration])
+
+  // Precompute peaks path once when peaks change
+  const peaksPath = useMemo(() => {
+    if (!waveformPeaks || !waveformPeaks.length) return null
+    return buildPeaksPath(waveformPeaks, 120)
+  }, [waveformPeaks])
 
   // Under reduced-motion: write playhead position directly (RAF is stopped)
   useEffect(() => {
     if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
     if (!durationRef.current) return
-    const x = (seek / durationRef.current) * VIEW_W
+    const x = playheadX
     clipRectRef.current?.setAttribute('width', String(x))
     playlineRef.current?.setAttribute('x1', String(x))
     playlineRef.current?.setAttribute('x2', String(x))
-  }, [seek])
+  }, [playheadX])
 
   const tick = useCallback(() => {
     const t    = (performance.now() - startRef.current) / 1000
@@ -63,7 +98,8 @@ export function WaveformBar({ duration, seek }: WaveformBarProps) {
     wave2LitRef.current?.setAttribute('d', d2)
 
     if (durationRef.current) {
-      const x = (seekRef.current / durationRef.current) * VIEW_W
+      const s = dragSeekRef.current != null ? dragSeekRef.current : seekRef.current
+      const x = (s / durationRef.current) * VIEW_W
       clipRectRef.current?.setAttribute('width', String(x))
       playlineRef.current?.setAttribute('x1', String(x))
       playlineRef.current?.setAttribute('x2', String(x))
@@ -106,6 +142,25 @@ export function WaveformBar({ duration, seek }: WaveformBarProps) {
           <rect ref={clipRectRef} x="0" y="0" width="0" height={VIEW_H} />
         </clipPath>
       </defs>
+
+      {/* Waveform peaks layer — static background, full width dimmed */}
+      {peaksPath && (
+        <path
+          d={peaksPath}
+          fill="rgba(255,255,255,0.06)"
+          stroke="none"
+        />
+      )}
+
+      {/* Waveform peaks layer — clipped to playhead, brighter */}
+      {peaksPath && (
+        <path
+          d={peaksPath}
+          fill="rgba(255,255,255,0.14)"
+          stroke="none"
+          clipPath={`url(#${clipId})`}
+        />
+      )}
 
       {/* Dim waves — full width, right of playhead */}
       <path ref={wave1DimRef} d="" stroke="rgba(255,255,255,0.13)" strokeWidth="1.5" fill="none" strokeLinecap="round" />
