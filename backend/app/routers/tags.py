@@ -173,9 +173,18 @@ def assign_tags_to_song(song_id: int, tag_assign: TagAssign):
             s.album,
             s.duration,
             s.file_path,
+            s.file_format,
+            s.album_art_path,
             s.source,
+            s.waveform_peaks,
+            s.dominant_color,
+            s.dominant_color_2,
+            s.replaygain_track_gain,
+            s.replaygain_track_peak,
+            s.replaygain_album_gain,
+            s.replaygain_album_peak,
             GROUP_CONCAT(t.name) as tags,
-            GROUP_CONCAT(p.name) as playlists,
+            GROUP_CONCAT(p.id || ':' || p.name) as playlists,
             s.created_at,
             s.updated_at
         FROM songs s
@@ -186,14 +195,14 @@ def assign_tags_to_song(song_id: int, tag_assign: TagAssign):
         WHERE s.id = ?
         GROUP BY s.id
     """
-    
+
     cursor.execute(query, (song_id,))
     row = cursor.fetchone()
     conn.close()
-    
+
     if row is None:
         raise HTTPException(status_code=404, detail="Song not found")
-    
+
     return song_row_to_dict(row)
 
 
@@ -239,9 +248,18 @@ def remove_tag_from_song(song_id: int, tag_id: int):
             s.album,
             s.duration,
             s.file_path,
+            s.file_format,
+            s.album_art_path,
             s.source,
+            s.waveform_peaks,
+            s.dominant_color,
+            s.dominant_color_2,
+            s.replaygain_track_gain,
+            s.replaygain_track_peak,
+            s.replaygain_album_gain,
+            s.replaygain_album_peak,
             GROUP_CONCAT(t.name) as tags,
-            GROUP_CONCAT(p.name) as playlists,
+            GROUP_CONCAT(p.id || ':' || p.name) as playlists,
             s.created_at,
             s.updated_at
         FROM songs s

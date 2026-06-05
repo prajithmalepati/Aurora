@@ -124,6 +124,8 @@ def filter_songs(db_connection, query_string: str) -> list[dict]:
             s.id, s.title, s.artist, s.album, s.duration,
             s.file_path, s.file_format, s.album_art_path, s.source,
             s.waveform_peaks, s.dominant_color, s.dominant_color_2,
+            s.replaygain_track_gain, s.replaygain_track_peak,
+            s.replaygain_album_gain, s.replaygain_album_peak,
             s.created_at, s.updated_at,
             GROUP_CONCAT(DISTINCT t.name) AS tag_names,
             GROUP_CONCAT(DISTINCT p.id || ':' || p.name) AS playlist_ids_names
@@ -169,6 +171,10 @@ def filter_songs(db_connection, query_string: str) -> list[dict]:
                 "waveform_peaks": waveform_peaks,
                 "dominant_color": row["dominant_color"] if "dominant_color" in row.keys() else None,
                 "dominant_color_2": row["dominant_color_2"] if "dominant_color_2" in row.keys() else None,
+                "replaygain_track_gain": row["replaygain_track_gain"] if "replaygain_track_gain" in row.keys() else None,
+                "replaygain_track_peak": row["replaygain_track_peak"] if "replaygain_track_peak" in row.keys() else None,
+                "replaygain_album_gain": row["replaygain_album_gain"] if "replaygain_album_gain" in row.keys() else None,
+                "replaygain_album_peak": row["replaygain_album_peak"] if "replaygain_album_peak" in row.keys() else None,
             })
     
     # Sort by title

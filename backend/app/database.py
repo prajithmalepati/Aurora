@@ -164,6 +164,14 @@ def init_db():
         conn.commit()
     except Exception:
         pass
+    # Migration: add ReplayGain columns
+    for col in ("replaygain_track_gain", "replaygain_track_peak",
+                "replaygain_album_gain", "replaygain_album_peak"):
+        try:
+            conn.execute(f"ALTER TABLE songs ADD COLUMN {col} REAL")
+            conn.commit()
+        except Exception:
+            pass
     conn.close()
 
 

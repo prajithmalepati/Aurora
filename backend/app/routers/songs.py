@@ -63,6 +63,10 @@ def song_row_to_dict(row: sqlite3.Row) -> dict:
         "waveform_peaks": waveform_peaks,
         "dominant_color": row["dominant_color"] if "dominant_color" in row.keys() else None,
         "dominant_color_2": row["dominant_color_2"] if "dominant_color_2" in row.keys() else None,
+        "replaygain_track_gain": row["replaygain_track_gain"] if "replaygain_track_gain" in row.keys() else None,
+        "replaygain_track_peak": row["replaygain_track_peak"] if "replaygain_track_peak" in row.keys() else None,
+        "replaygain_album_gain": row["replaygain_album_gain"] if "replaygain_album_gain" in row.keys() else None,
+        "replaygain_album_peak": row["replaygain_album_peak"] if "replaygain_album_peak" in row.keys() else None,
     }
 
 
@@ -104,6 +108,8 @@ def list_songs(
             s.id, s.title, s.artist, s.album, s.duration,
             s.file_path, s.file_format, s.album_art_path, s.source,
             s.waveform_peaks, s.dominant_color, s.dominant_color_2,
+            s.replaygain_track_gain, s.replaygain_track_peak,
+            s.replaygain_album_gain, s.replaygain_album_peak,
             GROUP_CONCAT(DISTINCT t.name) as tags,
             GROUP_CONCAT(DISTINCT p.id || ':' || p.name) as playlists,
             s.created_at, s.updated_at
@@ -182,6 +188,10 @@ def get_song(song_id: int):
             s.waveform_peaks,
             s.dominant_color,
             s.dominant_color_2,
+            s.replaygain_track_gain,
+            s.replaygain_track_peak,
+            s.replaygain_album_gain,
+            s.replaygain_album_peak,
             GROUP_CONCAT(DISTINCT t.name) as tags,
             GROUP_CONCAT(DISTINCT p.id || ':' || p.name) as playlists,
             s.created_at,
@@ -446,6 +456,10 @@ def update_song(song_id: int, song_update: SongUpdate):
             s.waveform_peaks,
             s.dominant_color,
             s.dominant_color_2,
+            s.replaygain_track_gain,
+            s.replaygain_track_peak,
+            s.replaygain_album_gain,
+            s.replaygain_album_peak,
             GROUP_CONCAT(DISTINCT t.name) as tags,
             GROUP_CONCAT(DISTINCT p.id || ':' || p.name) as playlists,
             s.created_at,

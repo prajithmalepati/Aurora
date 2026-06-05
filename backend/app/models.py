@@ -40,6 +40,10 @@ class SongResponse(BaseModel):
     waveform_peaks: Optional[list[float]] = None
     dominant_color: Optional[str] = None
     dominant_color_2: Optional[str] = None
+    replaygain_track_gain: Optional[float] = None
+    replaygain_track_peak: Optional[float] = None
+    replaygain_album_gain: Optional[float] = None
+    replaygain_album_peak: Optional[float] = None
 
 
 # ---- Tags ----
