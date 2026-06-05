@@ -7,6 +7,7 @@ interface PlaylistState {
   playlists: Playlist[]
   activePlaylist: PlaylistDetail | null
   loading: boolean
+  detailLoading: boolean
   error: string | null
 
   fetchPlaylists: () => Promise<void>
@@ -34,6 +35,7 @@ export const usePlaylistStore = create<PlaylistState>((set, get) => ({
   playlists: [],
   activePlaylist: null,
   loading: false,
+  detailLoading: false,
   error: null,
 
   fetchPlaylists: async () => {
@@ -47,12 +49,12 @@ export const usePlaylistStore = create<PlaylistState>((set, get) => ({
   },
 
   fetchPlaylistDetail: async (id) => {
-    set({ loading: true, error: null })
+    set({ detailLoading: true, error: null })
     try {
       const res = await api.get<ApiResponse<PlaylistDetail>>(`/playlists/${id}`)
-      set({ activePlaylist: res.data, loading: false })
+      set({ activePlaylist: res.data, detailLoading: false })
     } catch (e: any) {
-      set({ error: e.message, loading: false })
+      set({ error: e.message, detailLoading: false })
     }
   },
 

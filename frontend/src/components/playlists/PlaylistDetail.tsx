@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { toast } from "@/lib/toast"
-import { Pencil, Trash2, ChevronUp, ChevronDown, X, Search, Scissors, Sparkles, ArrowUpDown } from "lucide-react"
+import { Pencil, Trash2, ChevronUp, ChevronDown, X, Search, Scissors, Sparkles, ArrowUpDown, ArrowLeft, AlertTriangle } from "lucide-react"
 import { AuroraPlayButton } from "@/components/player/AuroraPlayButton"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { useSettingsStore } from "@/stores/settingsStore"
@@ -50,7 +50,8 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
 
   const playSong = usePlayerStore((state) => state.playSong)
   const activePlaylist = usePlaylistStore((state) => state.activePlaylist)
-  const loading = usePlaylistStore((state) => state.loading)
+  const loading = usePlaylistStore((state) => state.detailLoading)
+  const error = usePlaylistStore((state) => state.error)
 
   const [openTrimId, setOpenTrimId] = useState<number | null>(null)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
@@ -258,6 +259,31 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
   }
 
   if (!activePlaylist) {
+    if (error) {
+      return (
+        <div className="p-10 flex flex-col items-center justify-center gap-3">
+          <AlertTriangle className="h-8 w-8 text-[var(--aurora-danger)] opacity-50" />
+          <p className="font-display-italic text-[20px] text-[var(--aurora-danger)]">
+            Failed to load playlist
+          </p>
+          <p className="text-xs text-[var(--aurora-text-secondary)] max-w-xs text-center">
+            {error}
+          </p>
+          <button
+            onClick={() => setView({ kind: "all-songs" })}
+            className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-[12px] font-semibold aurora-btn-press transition-colors duration-150"
+            style={{
+              background: "var(--aurora-surface)",
+              color: "var(--aurora-text-secondary)",
+              boxShadow: "inset 0 0 0 1px var(--aurora-rim)",
+            }}
+          >
+            <ArrowLeft className="h-3 w-3" />
+            Go back
+          </button>
+        </div>
+      )
+    }
     return (
       <div className="p-10">
         <span className="font-display-italic text-[20px] text-[var(--aurora-text-tertiary)]">
