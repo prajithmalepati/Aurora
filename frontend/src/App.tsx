@@ -24,6 +24,7 @@ function App() {
   const fetchSongs = useSongStore((state) => state.fetchSongs)
   const songs = useSongStore((state) => state.songs)
   const songsLoading = useSongStore((state) => state.loading)
+  const songsError = useSongStore((state) => state.error)
   const view = useSongStore((state) => state.view)
   const setView = useSongStore((state) => state.setView)
   const fetchPlaylists = usePlaylistStore((state) => state.fetchPlaylists)
@@ -165,7 +166,7 @@ function App() {
               className="w-full bg-transparent border-0 outline-none pl-11 pr-5 py-2.5 text-[13px] text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-tertiary)] placeholder:font-display-italic placeholder:text-[14px]"
             />
           </div>
-          <SongTable songs={songs} loading={songsLoading} onPlay={handlePlaySong} />
+          <SongTable songs={songs} loading={songsLoading} error={songsError} onPlay={handlePlaySong} />
         </div>
       )
     } else if (view.kind === "filter") {
@@ -194,13 +195,36 @@ function App() {
   return (
     <>
       <AuroraColorBridge />
-      <AppShell
-        children={{
-          sidebar: <Sidebar currentView={view} onViewChange={setView} />,
-          main: <ErrorBoundary>{renderMainContent()}</ErrorBoundary>,
-          playerBar: <PlayerBar />,
-        }}
-      />
+      <ErrorBoundary
+        fallback={
+          <div className="flex flex-col items-center justify-center h-screen gap-4 p-10 bg-[var(--aurora-obsidian)]">
+            <p className="font-display text-[24px] text-[var(--aurora-text)]">
+              Something went wrong
+            </p>
+            <p className="text-[13px] text-[var(--aurora-text-secondary)]">
+              An unexpected error occurred. Please reload the app.
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-2 px-5 py-2 rounded-full text-[12px] font-semibold aurora-btn-press"
+              style={{
+                background: "var(--aurora-accent-interactive)",
+                color: "var(--aurora-slate)",
+              }}
+            >
+              Reload App
+            </button>
+          </div>
+        }
+      >
+        <AppShell
+          children={{
+            sidebar: <Sidebar currentView={view} onViewChange={setView} />,
+            main: <ErrorBoundary>{renderMainContent()}</ErrorBoundary>,
+            playerBar: <PlayerBar />,
+          }}
+        />
+      </ErrorBoundary>
       <Toaster
         position="top-right"
         theme="dark"

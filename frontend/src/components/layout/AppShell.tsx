@@ -3,6 +3,7 @@ import { useState } from "react"
 import { Menu, X } from "lucide-react"
 import { motion } from "motion/react"
 import { AuroraCanvas } from '@/components/aurora/AuroraCanvas'
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 
 interface AppShellProps {
   children: {
@@ -59,19 +60,19 @@ export function AppShell({ children }: AppShellProps) {
         >
           <X className="h-4 w-4" strokeWidth={1.5} />
         </button>
-        {children.sidebar}
+        <ErrorBoundary>{children.sidebar}</ErrorBoundary>
       </div>
 
       <motion.div layout transition={{ type: "spring", stiffness: 400, damping: 33 }} className="relative z-10 grid grid-cols-1 md:grid-cols-[240px_1fr] grid-rows-[1fr_auto] h-screen overflow-hidden">
         {/* Desktop sidebar */}
         <motion.div layout="position" className="hidden md:block overflow-y-auto aurora-keyline-right">
-          {children.sidebar}
+          <ErrorBoundary>{children.sidebar}</ErrorBoundary>
         </motion.div>
         <div className="overflow-y-auto relative">
           <div className="aurora-scrim-top" aria-hidden="true" />
           {children.main}
         </div>
-        <div className="md:col-span-2">{children.playerBar}</div>
+        <div className="md:col-span-2"><ErrorBoundary>{children.playerBar}</ErrorBoundary></div>
       </motion.div>
 
     </>
