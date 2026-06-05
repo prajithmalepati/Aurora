@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react"
+import { useEffect, useState, useMemo, useCallback, useRef } from "react"
 import type { PlaylistSong, PlaylistDetail as PlaylistDetailType } from "@/types"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { useSongStore } from "@/stores/songStore"
@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { toast } from "@/lib/toast"
-import { Pencil, Trash2, ChevronUp, ChevronDown, X, Search, Scissors, Sparkles, ArrowUpDown, ArrowLeft, AlertTriangle } from "lucide-react"
+import { Pencil, Trash2, X, Search, Scissors, Sparkles, ArrowUpDown, ArrowLeft, AlertTriangle, Play, ListPlus } from "lucide-react"
 import { AuroraPlayButton } from "@/components/player/AuroraPlayButton"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { useSettingsStore } from "@/stores/settingsStore"
@@ -47,8 +47,10 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
   const deletePlaylist = usePlaylistStore((state) => state.deletePlaylist)
   const removeSongFromPlaylist = usePlaylistStore((state) => state.removeSongFromPlaylist)
   const reorderSongs = usePlaylistStore((state) => state.reorderSongs)
+  const fetchPlaylists = usePlaylistStore((state) => state.fetchPlaylists)
 
   const playSong = usePlayerStore((state) => state.playSong)
+  const addToQueue = usePlayerStore((state) => state.addToQueue)
   const activePlaylist = usePlaylistStore((state) => state.activePlaylist)
   const loading = usePlaylistStore((state) => state.detailLoading)
   const error = usePlaylistStore((state) => state.error)
@@ -64,9 +66,39 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
   const [sortField, setSortField] = useState<'position'|'title'|'artist'|'album'|'duration'>('position')
   const [sortOrder, setSortOrder] = useState<'asc'|'desc'>('asc')
 
+  // Multi-select state
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [lastCheckedId, setLastCheckedId] = useState<number | null>(null)
+  const showBulkBar = selectedIds.size > 0
+
+  // Drag-and-drop state
+  const [dragId, setDragId] = useState<number | null>(null)
+  const [dragOverId, setDragOverId] = useState<number | null>(null)
+
+  // Bulk remove confirmation dialog
+  const [bulkRemoveDialogOpen, setBulkRemoveDialogOpen] = useState(false)
+
+  // Undo state for bulk remove
+  const [removedSongs, setRemovedSongs] = useState<PlaylistSong[] | null>(null)
+  const undoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   useEffect(() => {
     fetchPlaylistDetail(playlistId)
+    // Clear selection and undo state when changing playlists
+    setSelectedIds(new Set())
+    setLastCheckedId(null)
+    setRemovedSongs(null)
+    if (undoTimeoutRef.current) {
+      clearTimeout(undoTimeoutRef.current)
+      undoTimeoutRef.current = null
+    }
   }, [playlistId, fetchPlaylistDetail])
+
+  // Clear selection when filter changes
+  useEffect(() => {
+    setSelectedIds(new Set())
+    setLastCheckedId(null)
+  }, [searchQuery])
 
   const filteredSongs = useMemo(() => {
     if (!activePlaylist) return []
@@ -189,16 +221,283 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
     }
   }
 
-  const handleRemoveSong = async (songId: number) => {
+  // ── Selection helpers ──
+
+  const isAllSelected = sortedSongs.length > 0 && sortedSongs.every(s => selectedIds.has(s.id))
+
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(sortedSongs.map(s => s.id)))
+    }
+    setLastCheckedId(null)
+  }
+
+  const toggleSelectOne = (songId: number, shiftKey: boolean) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (shiftKey && lastCheckedId !== null) {
+        // Range select: find indices in sortedSongs
+        const ids = sortedSongs.map(s => s.id)
+        const lastIdx = ids.indexOf(lastCheckedId)
+        const currIdx = ids.indexOf(songId)
+        if (lastIdx !== -1 && currIdx !== -1) {
+          const [from, to] = lastIdx < currIdx ? [lastIdx, currIdx] : [currIdx, lastIdx]
+          for (let i = from; i <= to; i++) {
+            next.add(ids[i])
+          }
+        } else {
+          if (next.has(songId)) next.delete(songId)
+          else next.add(songId)
+        }
+      } else {
+        if (next.has(songId)) next.delete(songId)
+        else next.add(songId)
+      }
+      return next
+    })
+    setLastCheckedId(songId)
+  }
+
+  // ── Single song remove with undo ──
+
+  const handleRemoveSong = async (song: PlaylistSong) => {
     if (!activePlaylist) return
     try {
-      await removeSongFromPlaylist(activePlaylist.id, songId)
-      toast.success("Song removed from playlist")
+      await removeSongFromPlaylist(activePlaylist.id, song.id)
+      setSelectedIds(prev => {
+        const next = new Set(prev)
+        next.delete(song.id)
+        return next
+      })
+      showUndoToast([song])
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Failed to remove song"
       toast.error(message)
     }
   }
+
+  // ── Undo toast ──
+
+  const showUndoToast = (songs: PlaylistSong[]) => {
+    setRemovedSongs(songs)
+    const count = songs.length
+    const label = count === 1 ? "1 song removed" : `${count} songs removed`
+
+    // Clear any previous timeout
+    if (undoTimeoutRef.current) {
+      clearTimeout(undoTimeoutRef.current)
+    }
+
+    const toastId = toast(label, {
+      duration: 5000,
+      action: {
+        label: "Undo",
+        onClick: () => handleUndoRemove(),
+      },
+    })
+
+    // Auto-clear undo state after 5s
+    undoTimeoutRef.current = setTimeout(() => {
+      setRemovedSongs(null)
+      toast.dismiss(toastId)
+    }, 5000)
+  }
+
+  const handleUndoRemove = async () => {
+    if (!activePlaylist || !removedSongs) return
+    const songs = removedSongs
+    setRemovedSongs(null)
+    if (undoTimeoutRef.current) {
+      clearTimeout(undoTimeoutRef.current)
+      undoTimeoutRef.current = null
+    }
+
+    try {
+      // Re-add each song (they'll be appended at the end)
+      for (const s of songs) {
+        await api.post(`/playlists/${activePlaylist.id}/songs`, { song_id: s.id })
+      }
+      // Reorder to restore original positions
+      const currentSongs = activePlaylist.songs
+      const restoredSongs = [...currentSongs]
+      for (const s of songs) {
+        if (!restoredSongs.find(x => x.id === s.id)) {
+          restoredSongs.push(s)
+        }
+      }
+      // Reorder: place each restored song at its original position
+      // First, remove all restored songs, then insert them at their positions
+      const withoutRestored = restoredSongs.filter(s => !songs.find(rs => rs.id === s.id))
+      // Insert restored songs at their positions, sorted by position ascending
+      const sortedRestored = [...songs].sort((a, b) => a.position - b.position)
+      for (const rs of sortedRestored) {
+        const insertAt = Math.min(rs.position, withoutRestored.length)
+        withoutRestored.splice(insertAt, 0, rs)
+      }
+      const orderedIds = withoutRestored.map(s => s.id)
+      await reorderSongs(activePlaylist.id, orderedIds)
+      await fetchPlaylistDetail(activePlaylist.id)
+      toast.success("Undo successful")
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to undo"
+      toast.error(message)
+      // Refetch to ensure consistent state
+      if (activePlaylist) fetchPlaylistDetail(activePlaylist.id)
+    }
+  }
+
+  // ── Bulk operations ──
+
+  const getSelectedSongs = (): PlaylistSong[] => {
+    if (!activePlaylist) return []
+    return activePlaylist.songs.filter(s => selectedIds.has(s.id))
+  }
+
+  const handlePlaySelected = () => {
+    const selected = getSelectedSongs()
+    if (selected.length === 0) return
+    const songsWithFile = selected.filter(s => s.file_path)
+    if (songsWithFile.length === 0) {
+      toast.error("No playable files in selection")
+      return
+    }
+    const asSongs = songsWithFile.map(s => ({
+      ...s,
+      source: "local" as const,
+      playlists: [],
+      created_at: "",
+      updated_at: "",
+    }))
+    playSong(asSongs[0], asSongs, activePlaylist?.id ?? null)
+  }
+
+  const handleAddSelectedToQueue = () => {
+    const selected = getSelectedSongs()
+    if (selected.length === 0) return
+    const songsWithFile = selected.filter(s => s.file_path)
+    if (songsWithFile.length === 0) {
+      toast.error("No playable files in selection")
+      return
+    }
+    for (const s of songsWithFile) {
+      addToQueue({
+        ...s,
+        source: "local" as const,
+        playlists: [],
+        created_at: "",
+        updated_at: "",
+      })
+    }
+    toast.success(`${songsWithFile.length} song${songsWithFile.length === 1 ? '' : 's'} added to queue`)
+  }
+
+  const handleBulkRemove = async () => {
+    if (!activePlaylist) return
+    const selected = getSelectedSongs()
+    if (selected.length === 0) return
+
+    // Snapshot before removal for undo
+    const snapshot = [...selected]
+
+    try {
+      // Remove each song individually via the API
+      for (const s of selected) {
+        await api.delete(`/playlists/${activePlaylist.id}/songs/${s.id}`)
+      }
+      // Update sidebar counts and refetch detail
+      await fetchPlaylists()
+      await fetchPlaylistDetail(activePlaylist.id)
+      setSelectedIds(new Set())
+      setLastCheckedId(null)
+      setBulkRemoveDialogOpen(false)
+      showUndoToast(snapshot)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to remove songs"
+      toast.error(message)
+      setBulkRemoveDialogOpen(false)
+    }
+  }
+
+  // ── Drag-and-drop ──
+
+  const isDragEnabled = sortField === 'position'
+
+  const handleDragStart = useCallback((e: React.DragEvent, songId: number) => {
+    if (!isDragEnabled) {
+      e.preventDefault()
+      return
+    }
+    setDragId(songId)
+    e.dataTransfer.effectAllowed = "move"
+    e.dataTransfer.setData("text/plain", String(songId))
+    // Slight delay for visual feedback
+    requestAnimationFrame(() => {
+      const el = e.currentTarget as HTMLElement
+      el.style.opacity = "0.4"
+    })
+  }, [isDragEnabled])
+
+  const handleDragOver = useCallback((e: React.DragEvent, songId: number) => {
+    e.preventDefault()
+    if (dragId !== songId) {
+      setDragOverId(songId)
+    }
+    e.dataTransfer.dropEffect = "move"
+  }, [dragId])
+
+  const handleDragLeave = useCallback(() => {
+    setDragOverId(null)
+  }, [])
+
+  const handleDrop = useCallback(async (e: React.DragEvent, targetId: number) => {
+    e.preventDefault()
+    if (!activePlaylist || !dragId || dragId === targetId) {
+      setDragId(null)
+      setDragOverId(null)
+      return
+    }
+
+    const songs = activePlaylist.songs
+    const dragIndex = songs.findIndex(s => s.id === dragId)
+    const dropIndex = songs.findIndex(s => s.id === targetId)
+    if (dragIndex === -1 || dropIndex === -1) {
+      setDragId(null)
+      setDragOverId(null)
+      return
+    }
+
+    // Compute new order
+    const newSongs = [...songs]
+    const [moved] = newSongs.splice(dragIndex, 1)
+    newSongs.splice(dropIndex, 0, moved)
+    const newOrderedIds = newSongs.map(s => s.id)
+
+    // Optimistic update
+    usePlaylistStore.setState({
+      activePlaylist: { ...activePlaylist, songs: newSongs }
+    })
+
+    setDragId(null)
+    setDragOverId(null)
+
+    try {
+      await reorderSongs(activePlaylist.id, newOrderedIds)
+    } catch (err: unknown) {
+      // Revert on failure
+      const message = err instanceof Error ? err.message : "Failed to reorder songs"
+      toast.error(message)
+      fetchPlaylistDetail(activePlaylist.id)
+    }
+  }, [activePlaylist, dragId, reorderSongs, fetchPlaylistDetail])
+
+  const handleDragEnd = useCallback((e: React.DragEvent) => {
+    const el = e.currentTarget as HTMLElement
+    el.style.opacity = ""
+    setDragId(null)
+    setDragOverId(null)
+  }, [])
 
   const handlePlaySong = (song: PlaylistSong) => {
     if (!song.file_path || !activePlaylist) return
@@ -213,29 +512,6 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
       }))
     const asSong = { ...song, source: "local" as const, playlists: [], created_at: "", updated_at: "" }
     playSong(asSong, queue, activePlaylist.id)
-  }
-
-  const handleReorder = async (songId: number, direction: "up" | "down") => {
-    if (!activePlaylist) return
-    const songs = activePlaylist.songs
-    const currentIndex = songs.findIndex((s) => s.id === songId)
-    if (currentIndex === -1) return
-
-    const newIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1
-    if (newIndex < 0 || newIndex >= songs.length) return
-
-    const newSongIds = songs.map((s) => s.id)
-    ;[newSongIds[currentIndex], newSongIds[newIndex]] = [
-      newSongIds[newIndex],
-      newSongIds[currentIndex],
-    ]
-
-    try {
-      await reorderSongs(activePlaylist.id, newSongIds)
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Failed to reorder songs"
-      toast.error(message)
-    }
   }
 
   if (loading) {
@@ -434,13 +710,53 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
                     >
                       <span>{label}</span>
                       {active && (sortOrder === 'asc'
-                        ? <ChevronUp className="h-3 w-3" />
-                        : <ChevronDown className="h-3 w-3" />)}
+                        ? <span className="h-3 w-3">↑</span>
+                        : <span className="h-3 w-3">↓</span>)}
                     </button>
                   )
                 })}
               </PopoverContent>
             </Popover>
+          </div>
+        )}
+
+        {/* ── Bulk Actions Bar ── */}
+        {showBulkBar && (
+          <div
+            className="flex items-center gap-3 px-4 py-2 mb-2 rounded-lg aurora-fade-in"
+            style={{
+              background: "var(--aurora-surface-2)",
+              border: "1px solid var(--aurora-rim)",
+            }}
+          >
+            <span className="text-[12px] font-medium text-[var(--aurora-text)] tabular-nums">
+              {selectedIds.size} selected
+            </span>
+            <div className="flex-1" />
+            <button
+              onClick={handlePlaySelected}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-[var(--aurora-text)] hover:bg-white/[0.06] transition-colors duration-150"
+              title="Play selected"
+            >
+              <Play className="h-3.5 w-3.5" />
+              Play
+            </button>
+            <button
+              onClick={handleAddSelectedToQueue}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-[var(--aurora-text)] hover:bg-white/[0.06] transition-colors duration-150"
+              title="Add to queue"
+            >
+              <ListPlus className="h-3.5 w-3.5" />
+              Queue
+            </button>
+            <button
+              onClick={() => setBulkRemoveDialogOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-[var(--aurora-danger)] hover:bg-[var(--aurora-danger)]/10 transition-colors duration-150"
+              title="Remove selected"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Remove
+            </button>
           </div>
         )}
 
@@ -460,6 +776,14 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
           <table className="w-full border-separate border-spacing-0">
             <thead>
               <tr>
+                <th className="px-2 py-3 w-10 text-center">
+                  <Checkbox
+                    checked={isAllSelected}
+                    indeterminate={!isAllSelected && selectedIds.size > 0}
+                    onChange={toggleSelectAll}
+                    ariaLabel="Select all songs"
+                  />
+                </th>
                 <th className="px-4 py-3 text-left label-micro text-[10px] text-[var(--aurora-text-tertiary)] w-12 text-center">
                   #
                 </th>
@@ -467,13 +791,13 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
                   className={`px-4 py-3 text-left label-micro text-[10px] cursor-pointer select-none transition-colors duration-150 hover:text-[var(--aurora-text-secondary)] ${sortField === 'title' ? 'text-[var(--aurora-text)]' : 'text-[var(--aurora-text-tertiary)]'}`}
                   onClick={() => sortField === 'title' ? setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc') : (setSortField('title'), setSortOrder('asc'))}
                 >
-                  <span className="inline-flex items-center gap-1">Title{sortField === 'title' && (sortOrder === 'asc' ? <ChevronUp className="h-2.5 w-2.5" /> : <ChevronDown className="h-2.5 w-2.5" />)}</span>
+                  <span className="inline-flex items-center gap-1">Title{sortField === 'title' && (sortOrder === 'asc' ? <span>↑</span> : <span>↓</span>)}</span>
                 </th>
                 <th
                   className={`px-4 py-3 text-left label-micro text-[10px] w-24 cursor-pointer select-none transition-colors duration-150 hover:text-[var(--aurora-text-secondary)] ${sortField === 'duration' ? 'text-[var(--aurora-text)]' : 'text-[var(--aurora-text-tertiary)]'}`}
                   onClick={() => sortField === 'duration' ? setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc') : (setSortField('duration'), setSortOrder('asc'))}
                 >
-                  <span className="inline-flex items-center gap-1">Duration{sortField === 'duration' && (sortOrder === 'asc' ? <ChevronUp className="h-2.5 w-2.5" /> : <ChevronDown className="h-2.5 w-2.5" />)}</span>
+                  <span className="inline-flex items-center gap-1">Duration{sortField === 'duration' && (sortOrder === 'asc' ? <span>↑</span> : <span>↓</span>)}</span>
                 </th>
                 <th className="px-4 py-3 text-left label-micro text-[10px] text-[var(--aurora-text-tertiary)]">
                   Tags
@@ -491,14 +815,24 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
                     key={song.id}
                     song={song}
                     index={originalIndex}
-                    total={activePlaylist.songs.length}
-                    onRemove={() => handleRemoveSong(song.id)}
-                    onReorder={(direction) => handleReorder(song.id, direction)}
+                    onRemove={() => handleRemoveSong(song)}
                     onPlay={handlePlaySong}
                     openTrimId={openTrimId}
                     setOpenTrimId={setOpenTrimId}
                     playlistId={playlistId}
                     onRefresh={() => fetchPlaylistDetail(playlistId)}
+                    // Multi-select
+                    isSelected={selectedIds.has(song.id)}
+                    onToggleSelect={(shiftKey) => toggleSelectOne(song.id, shiftKey)}
+                    // Drag-and-drop
+                    isDragEnabled={isDragEnabled}
+                    dragId={dragId}
+                    dragOverId={dragOverId}
+                    onDragStart={handleDragStart}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    onDragEnd={handleDragEnd}
                   />
                 )
               })}
@@ -608,30 +942,109 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Bulk Remove Confirmation */}
+      <AlertDialog open={bulkRemoveDialogOpen} onOpenChange={setBulkRemoveDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-display text-[22px]">
+              Remove {selectedIds.size} song{selectedIds.size === 1 ? '' : 's'} from playlist?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              You can undo this action within 5 seconds.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={handleBulkRemove}
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
 
+// ── Checkbox (custom, no shadcn dependency) ──
+
+interface CheckboxProps {
+  checked: boolean
+  indeterminate?: boolean
+  onChange: () => void
+  ariaLabel: string
+}
+
+function Checkbox({ checked, indeterminate, onChange, ariaLabel }: CheckboxProps) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={indeterminate ? "mixed" : checked}
+      aria-label={ariaLabel}
+      onClick={(e) => { e.stopPropagation(); onChange() }}
+      className="h-4 w-4 rounded-[3px] flex items-center justify-center transition-all duration-150 aurora-focus"
+      style={{
+        background: checked || indeterminate ? "var(--aurora-accent-interactive)" : "transparent",
+        border: checked || indeterminate ? "1.5px solid var(--aurora-accent-interactive)" : "1.5px solid var(--aurora-text-tertiary)",
+      }}
+    >
+      {checked && !indeterminate && (
+        <svg width="10" height="8" viewBox="0 0 10 8" fill="none" className="text-black">
+          <path d="M1 4L3.5 6.5L9 1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      )}
+      {indeterminate && (
+        <svg width="8" height="2" viewBox="0 0 8 2" fill="none" className="text-black">
+          <path d="M0 1H8" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+        </svg>
+      )}
+    </button>
+  )
+}
+
+// ── PlaylistSongRow ──
+
 interface PlaylistSongRowProps {
   song: PlaylistSong
   index: number
-  total: number
   onRemove: () => void
-  onReorder: (direction: "up" | "down") => void
   onPlay: (song: PlaylistSong) => void
   openTrimId: number | null
   setOpenTrimId: (id: number | null) => void
   playlistId: number
   onRefresh: () => void
+  // Multi-select
+  isSelected: boolean
+  onToggleSelect: (shiftKey: boolean) => void
+  // Drag-and-drop
+  isDragEnabled: boolean
+  dragId: number | null
+  dragOverId: number | null
+  onDragStart: (e: React.DragEvent, songId: number) => void
+  onDragOver: (e: React.DragEvent, songId: number) => void
+  onDragLeave: () => void
+  onDrop: (e: React.DragEvent, songId: number) => void
+  onDragEnd: (e: React.DragEvent) => void
 }
 
-function PlaylistSongRow({ song, index, total, onRemove, onReorder, onPlay, openTrimId, setOpenTrimId, playlistId, onRefresh }: PlaylistSongRowProps) {
+function PlaylistSongRow({
+  song, index, onRemove, onPlay,
+  openTrimId, setOpenTrimId, playlistId, onRefresh,
+  isSelected, onToggleSelect,
+  isDragEnabled, dragId, dragOverId, onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd
+}: PlaylistSongRowProps) {
   const trimOpen = openTrimId === song.id
   const currentSong = usePlayerStore((s) => s.currentSong)
   const isPlaying = usePlayerStore((s) => s.isPlaying)
 
   const isCurrent = currentSong?.id === song.id
   const hasFile = song.file_path !== null
+  const isDragging = dragId === song.id
+  const isDragOver = dragOverId === song.id && dragId !== song.id
 
   const handlePlay = () => {
     if (!hasFile) return
@@ -642,10 +1055,40 @@ function PlaylistSongRow({ song, index, total, onRemove, onReorder, onPlay, open
     <>
     <tr
       onClick={handlePlay}
-      className={`group relative transition-colors duration-200 ${
+      draggable={isDragEnabled}
+      onDragStart={(e) => onDragStart(e, song.id)}
+      onDragOver={(e) => onDragOver(e, song.id)}
+      onDragLeave={onDragLeave}
+      onDrop={(e) => onDrop(e, song.id)}
+      onDragEnd={onDragEnd}
+      className={`group relative transition-all duration-200 ${
         hasFile ? "cursor-pointer" : "cursor-not-allowed opacity-40"
-      }`}
+      } ${isDragging ? "opacity-40" : ""}`}
+      style={{
+        ...(isDragOver ? {
+          borderTop: "2px solid var(--aurora-accent-interactive)",
+        } : {}),
+      }}
     >
+      {/* Checkbox cell */}
+      <td className="relative px-2 py-3 w-10 text-center" onClick={(e) => e.stopPropagation()}>
+        <span
+          className="absolute inset-0 transition-colors duration-200 pointer-events-none"
+          style={isCurrent ? {
+            background: "linear-gradient(to right, rgba(94,234,212,0.06) 0%, transparent 60%)",
+          } : undefined}
+          aria-hidden="true"
+        />
+        <span className="relative z-10 flex items-center justify-center">
+          <Checkbox
+            checked={isSelected}
+            onChange={() => onToggleSelect(false)}
+            ariaLabel={`Select ${song.title}`}
+          />
+        </span>
+      </td>
+
+      {/* # cell */}
       <td className="relative px-4 py-3 w-12 text-center">
         {isCurrent && (
           <span
@@ -692,6 +1135,7 @@ function PlaylistSongRow({ song, index, total, onRemove, onReorder, onPlay, open
         )}
       </td>
 
+      {/* Title cell */}
       <td className="relative px-4 py-3">
         <span
           className={`absolute inset-0 transition-colors duration-200 pointer-events-none ${
@@ -716,6 +1160,7 @@ function PlaylistSongRow({ song, index, total, onRemove, onReorder, onPlay, open
         </div>
       </td>
 
+      {/* Duration cell */}
       <td className="relative px-4 py-3 w-28 text-[12px] text-[var(--aurora-text-secondary)] tabular-nums">
         <span
           className={`absolute inset-0 transition-colors duration-200 pointer-events-none ${
@@ -729,6 +1174,7 @@ function PlaylistSongRow({ song, index, total, onRemove, onReorder, onPlay, open
         </span>
       </td>
 
+      {/* Tags cell */}
       <td className="relative px-4 py-3">
         <span
           className={`absolute inset-0 transition-colors duration-200 pointer-events-none ${
@@ -741,6 +1187,7 @@ function PlaylistSongRow({ song, index, total, onRemove, onReorder, onPlay, open
         </div>
       </td>
 
+      {/* Actions cell */}
       <td className="relative px-4 py-3 w-36">
         <span
           className={`absolute inset-0 transition-colors duration-200 pointer-events-none ${
@@ -758,26 +1205,6 @@ function PlaylistSongRow({ song, index, total, onRemove, onReorder, onPlay, open
             }}
           >
             <Scissors className="h-3.5 w-3.5" />
-          </IconBtn>
-          <IconBtn
-            label="Move up"
-            disabled={index === 0}
-            onClick={(e) => {
-              e.stopPropagation()
-              onReorder("up")
-            }}
-          >
-            <ChevronUp className="h-3.5 w-3.5" />
-          </IconBtn>
-          <IconBtn
-            label="Move down"
-            disabled={index === total - 1}
-            onClick={(e) => {
-              e.stopPropagation()
-              onReorder("down")
-            }}
-          >
-            <ChevronDown className="h-3.5 w-3.5" />
           </IconBtn>
           <IconBtn
             label="Remove"
@@ -803,6 +1230,8 @@ function PlaylistSongRow({ song, index, total, onRemove, onReorder, onPlay, open
     </>
   )
 }
+
+// ── IconBtn ──
 
 interface IconBtnProps {
   children: React.ReactNode
@@ -832,6 +1261,8 @@ function IconBtn({ children, label, danger, active, disabled, onClick }: IconBtn
     </button>
   )
 }
+
+// ── TrimPanel ──
 
 interface TrimPanelProps {
   song: PlaylistSong
@@ -910,7 +1341,7 @@ function TrimPanel({ song, playlistId, onClose, onSaved }: TrimPanelProps) {
   return (
     <tr>
       <td
-        colSpan={5}
+        colSpan={6}
         className="px-6 pb-3 aurora-fade-in"
         style={{ background: "var(--aurora-surface)", borderTop: "1px solid var(--aurora-rim)" }}
       >
@@ -1070,6 +1501,8 @@ function TrimPanel({ song, playlistId, onClose, onSaved }: TrimPanelProps) {
     </tr>
   )
 }
+
+// ── CrossfadeChip ──
 
 interface CrossfadeChipProps {
   playlist: PlaylistDetailType
