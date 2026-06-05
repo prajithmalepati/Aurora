@@ -1,6 +1,15 @@
 # Aurora &mdash; A beautiful offline music library for your desktop
 
-<!-- TODO: add screenshots -->
+<p align="center">
+  <img src="docs/screenshots/01-all-songs.png" alt="All Songs view" width="640" />
+  <img src="docs/screenshots/02-mix-filter.png" alt="Mix filter view" width="640" />
+  <img src="docs/screenshots/03-folders.png" alt="Folders view" width="640" />
+  <img src="docs/screenshots/04-playlist-detail.png" alt="Playlist detail" width="640" />
+  <img src="docs/screenshots/05-queue-panel.png" alt="Queue panel" width="640" />
+  <img src="docs/screenshots/06-settings.png" alt="Settings" width="640" />
+  <img src="docs/screenshots/07-keyboard-shortcuts.png" alt="Keyboard shortcuts" width="640" />
+  <img src="docs/screenshots/08-welcome.png" alt="Welcome screen" width="640" />
+</p>
 
 Aurora is a personal music library that lives on your machine. No cloud, no accounts, no ads &mdash; just your music, beautifully organized. Tag songs your way, filter with boolean expressions, and enjoy playback with gapless transitions, reactive visualizations, and smart crossfade.
 

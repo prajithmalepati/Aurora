@@ -19,7 +19,7 @@ import {
 import { useSongStore } from "@/stores/songStore"
 import { usePlayerStore } from "@/stores/playerStore"
 import { toast } from "@/lib/toast"
-import { useState, useCallback, useRef } from "react"
+import { useState, useCallback, useRef, memo } from "react"
 import { TagList } from "@/components/tags/TagList"
 import { TagEditor } from "@/components/tags/TagEditor"
 
@@ -49,7 +49,7 @@ function FormatBadge({ format }: { format: string | null | undefined }) {
   )
 }
 
-export function SongRow({ song, index, animIndex, onPlay }: SongRowProps) {
+export const SongRow = memo(function SongRow({ song, index, animIndex, onPlay }: SongRowProps) {
   const deleteSong = useSongStore((state) => state.deleteSong)
   const playSong = usePlayerStore((state) => state.playSong)
   const currentSong = usePlayerStore((state) => state.currentSong)
@@ -432,7 +432,7 @@ export function SongRow({ song, index, animIndex, onPlay }: SongRowProps) {
       />
     </>
   )
-}
+})
 
 interface IconBtnProps {
   children: React.ReactNode

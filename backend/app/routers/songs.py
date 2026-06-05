@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 
 from app.database import get_db
 from app.models import SongCreate, SongResponse, SongUpdate
+from app.cache import song_cache
 
 router = APIRouter(tags=["songs"])
 
@@ -110,6 +111,13 @@ def list_songs(
     order_str = "ASC" if order == "asc" else "DESC"
     sort_col = SORT_COL_MAP[sort]
 
+    # Check cache for identical query (only cache non-search queries)
+    cache_key = f"songs:{sort}:{order}:{limit}:{offset}"
+    if not search:
+        cached = song_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
     conn = get_db()
     cursor = conn.cursor()
 
@@ -175,7 +183,13 @@ def list_songs(
 
     data = [song_row_to_dict(row) for row in rows]
 
-    return {"data": data, "total": total, "message": "ok"}
+    result = {"data": data, "total": total, "message": "ok"}
+
+    # Cache non-search results
+    if not search:
+        song_cache.set(cache_key, result)
+
+    return result
 
 
 @router.get("/songs/{song_id}")
@@ -339,7 +353,10 @@ def delete_song(song_id: int):
     cursor.execute("DELETE FROM songs WHERE id = ?", (song_id,))
     conn.commit()
     conn.close()
-    
+
+    # Invalidate song caches
+    song_cache.invalidate_prefix("songs:")
+
     return {"message": "Song deleted successfully"}
 
 
@@ -375,6 +392,9 @@ def create_song(song: SongCreate):
     except sqlite3.IntegrityError:
         conn.close()
         raise HTTPException(status_code=409, detail="file_path already exists")
+
+    # Invalidate song caches
+    song_cache.invalidate_prefix("songs:")
 
     # Return the created song with empty tags and playlists
     import os as _os
@@ -458,7 +478,10 @@ def update_song(song_id: int, song_update: SongUpdate):
         params
     )
     conn.commit()
-    
+
+    # Invalidate song caches (update can happen from any view)
+    song_cache.invalidate_prefix("songs:")
+
     # Fetch the updated song with joined query
     query = """
         SELECT

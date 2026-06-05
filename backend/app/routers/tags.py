@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from app.database import get_db
 from app.models import TagCreate, TagResponse, TagAssign
 from app.routers.songs import song_row_to_dict
+from app.cache import tag_cache, song_cache
 
 router = APIRouter(tags=["tags"])
 
@@ -43,6 +44,9 @@ def create_tag(tag: TagCreate):
         conn.close()
         raise HTTPException(status_code=409, detail="tag with this name already exists")
     
+    # Invalidate tag cache
+    tag_cache.invalidate("tags:list")
+
     # Return the created tag with song_count = 0
     conn.close()
     return TagResponse(
@@ -56,6 +60,12 @@ def create_tag(tag: TagCreate):
 @router.get("/tags")
 def list_tags():
     """List all tags with song_count using LEFT JOIN on song_tags, ordered alphabetically."""
+    # Check cache
+    cache_key = "tags:list"
+    cached = tag_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     conn = get_db()
     cursor = conn.cursor()
     
@@ -85,11 +95,14 @@ def list_tags():
         for row in rows
     ]
     
-    return {
+    result = {
         "data": data,
         "total": len(data),
         "message": "ok",
     }
+
+    tag_cache.set(cache_key, result)
+    return result
 
 
 @router.delete("/tags/{tag_id}", response_model=dict[str, str])
@@ -108,7 +121,11 @@ def delete_tag(tag_id: int):
     cursor.execute("DELETE FROM tags WHERE id = ?", (tag_id,))
     conn.commit()
     conn.close()
-    
+
+    # Invalidate tag + song caches
+    tag_cache.invalidate("tags:list")
+    song_cache.invalidate_prefix("songs:")
+
     return {"message": "Tag deleted successfully"}
 
 
@@ -163,7 +180,11 @@ def assign_tags_to_song(song_id: int, tag_assign: TagAssign):
         )
     
     conn.commit()
-    
+
+    # Invalidate song + tag caches
+    song_cache.invalidate_prefix("songs:")
+    tag_cache.invalidate("tags:list")
+
     # Fetch the updated song with joined query
     query = """
         SELECT 
@@ -238,7 +259,11 @@ def remove_tag_from_song(song_id: int, tag_id: int):
         (song_id, tag_id)
     )
     conn.commit()
-    
+
+    # Invalidate song + tag caches
+    song_cache.invalidate_prefix("songs:")
+    tag_cache.invalidate("tags:list")
+
     # Fetch the updated song with joined query
     query = """
         SELECT 
