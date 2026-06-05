@@ -127,6 +127,7 @@ def filter_songs(db_connection, query_string: str) -> list[dict]:
             s.replaygain_track_gain, s.replaygain_track_peak,
             s.replaygain_album_gain, s.replaygain_album_peak,
             s.artists, s.featured_artists,
+            s.bitrate, s.sample_rate, s.bit_depth, s.file_size,
             s.created_at, s.updated_at,
             GROUP_CONCAT(DISTINCT t.name) AS tag_names,
             GROUP_CONCAT(DISTINCT p.id || ':' || p.name) AS playlist_ids_names
@@ -182,6 +183,10 @@ def filter_songs(db_connection, query_string: str) -> list[dict]:
                 "replaygain_track_peak": row["replaygain_track_peak"] if "replaygain_track_peak" in row.keys() else None,
                 "replaygain_album_gain": row["replaygain_album_gain"] if "replaygain_album_gain" in row.keys() else None,
                 "replaygain_album_peak": row["replaygain_album_peak"] if "replaygain_album_peak" in row.keys() else None,
+                "bitrate": row["bitrate"] if "bitrate" in row.keys() else None,
+                "sample_rate": row["sample_rate"] if "sample_rate" in row.keys() else None,
+                "bit_depth": row["bit_depth"] if "bit_depth" in row.keys() else None,
+                "file_size": row["file_size"] if "file_size" in row.keys() else None,
             })
     
     # Sort by title
