@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { toast } from "@/lib/toast"
-import { Pencil, Trash2, X, Search, Scissors, Sparkles, ArrowUpDown, ArrowLeft, AlertTriangle, Play, ListPlus } from "lucide-react"
+import { Pencil, Trash2, X, Search, Scissors, Sparkles, ArrowUpDown, ArrowLeft, AlertTriangle, Play, ListPlus, Download } from "lucide-react"
 import { AuroraPlayButton } from "@/components/player/AuroraPlayButton"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { useSettingsStore } from "@/stores/settingsStore"
@@ -158,6 +158,30 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
   )
   const showArtGrid = songsWithArt.length >= 4
   const gridSongs = showArtGrid ? songsWithArt.slice(0, 4) : []
+
+  const handleExport = async (format: 'm3u' | 'm3u8' | 'json') => {
+    if (!activePlaylist) return
+    try {
+      const response = await fetch(`http://localhost:8000/api/playlists/${activePlaylist.id}/export?format=${format}`)
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ detail: 'Export failed' }))
+        throw new Error(err.detail || 'Export failed')
+      }
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      const ext = format === 'json' ? 'aurora.json' : format
+      a.href = url
+      a.download = `${activePlaylist.name.replace(/[\\/*?:"<>|]/g, '_')}.${ext}`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Export failed'
+      toast.error(message)
+    }
+  }
 
   const handleEdit = () => {
     if (activePlaylist) {
@@ -634,6 +658,30 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
             {activePlaylist && (
               <CrossfadeChip playlist={activePlaylist} />
             )}
+            <Popover>
+              <PopoverTrigger
+                title="Export playlist"
+                aria-label="Export playlist"
+                className="h-9 w-9 rounded-md flex items-center justify-center text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] hover:bg-white/[0.04] transition-all duration-150"
+              >
+                <Download className="h-4 w-4" />
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-44 p-1">
+                {([
+                  { format: 'm3u8', label: 'M3U8 (UTF-8)' },
+                  { format: 'm3u', label: 'M3U' },
+                  { format: 'json', label: 'Aurora JSON' },
+                ] as const).map(({ format, label }) => (
+                  <button
+                    key={format}
+                    className="w-full text-left px-3 py-1.5 text-[12px] rounded-sm transition-colors duration-100 hover:bg-[var(--aurora-surface-hover)] text-[var(--aurora-text-secondary)]"
+                    onClick={() => handleExport(format)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </PopoverContent>
+            </Popover>
             <button
               onClick={handleEdit}
               title="Edit playlist"
