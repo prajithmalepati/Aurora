@@ -1,6 +1,61 @@
 # Aurora — Session Handoff
 
-## Completed This Session (2026-06-04 — Session 37 — v1.0 Phase 1: Ship Blockers)
+## ✅ AURORA v1.0 — COMPLETE (2026-06-04)
+
+All 23 tasks across 4 phases executed. **12 agents dispatched over 6 waves.** All builds pass. All commits made.
+
+### Phase 1: Ship Blockers (7 tasks)
+| Task | What | Commit |
+|---|---|---|
+| 1.1 | Playlist flash fix: `detailLoading` decoupled from sidebar `loading` | `cd26c83` |
+| 1.2 | M8 relative import: `./playerStore` → `@/stores/playerStore` | `ab2900e` |
+| 1.3 | B4 audio prebuffer: `nextHowlRef` preloads next song in last 5s | `3e2c143` |
+| 1.4 | Error Boundaries: 5 boundaries wrapping all key component trees | `b4ebad7` |
+| 1.5 | Empty/loading/error states: 21 audited, 5 gaps fixed | `3e2c143` |
+| 1.6 | Scan flow verified: Session 36 fixes confirmed, runtime PASS | `6f006ca` |
+| 1.7 | Commit & docs: HANDOFF updated, v1.0 plan committed | `6f006ca` |
+
+### Phase 2: Core Music Player (6 tasks)
+| Task | What | Commit |
+|---|---|---|
+| 2.1 | True gapless: play-before-stop + preload readiness tracking | `1615f07` |
+| 2.2 | ReplayGain: extract during scan, 4 DB columns, volume normalization | `15c221a` / `c95d4a3` |
+| 2.3 | Queue management: history, reorder, Play Next, QueuePanel, context menu | `e53a9a2` |
+| 2.4 | Keyboard shortcuts: 16 total, useKeyboardShortcuts hook, overlay modal | `63063f4` |
+| 2.5 | Waveform seek: smooth scrubbing, real peaks, hover tooltip, wheel seek | `921d5a6` |
+| 2.6 | Crossfade: 3 curves (Linear/Equal Power/Overlap), presets, visual indicator | `a989d37` |
+
+### Phase 3: Library Management (5 tasks)
+| Task | What | Commit |
+|---|---|---|
+| 3.1 | Multi-artist tags: split on delimiters, primary/all/featured artists | `062f353` |
+| 3.2 | Better metadata: format badge, bitrate, sample rate, file size, file type | `3893096` |
+| 3.3 | Drag-to-reorder + multi-select + bulk operations + undo-remove | `9c1007f` |
+| 3.4 | Import/export playlists (M3U/M3U8/JSON) | `0980c9e` |
+| 3.5 | Folder-level browsing with tree navigation + breadcrumbs | `9710778` |
+
+### Phase 4: Polish for Public Release (5 tasks)
+| Task | What | Commit |
+|---|---|---|
+| 4.1 | README.md: comprehensive with features, tech stack, quick start, usage | `e3eb140` |
+| 4.2 | Screenshots: 8 Playwright-captured views for GitHub README | final |
+| 4.3 | About view: version, credits, full keyboard ref, filter syntax guide | `e3eb140` |
+| 4.4 | First-run WelcomeOverlay with 3 action cards, auto-dismiss | `e3eb140` |
+| 4.5 | Performance audit: 2 new indexes, TTLCache layer, React.memo on SongRow | final |
+
+### Bugs resolved this session
+B1-B4 all resolved. M1 (useSongTransition never created) and M3 (doc mismatch) remain trivial.
+
+### Files changed
+~40 files modified, ~12 new files created, ~3,000+ lines of code added.
+
+### Build
+`frontend/ npm run build` passes clean. Bundle: 781KB JS, 107KB CSS.
+
+### Claude Code (Opus 4.8)
+Produced the initial plan via ACP transport (410s, 15 API calls, 30+ files read).
+
+---
 
 ### Phase 1 complete — 7 tasks, 7 commits
 
