@@ -5,6 +5,7 @@ from typing import Optional
 
 from app.database import get_db
 from app.routers.songs import song_row_to_dict
+from app.cache import folder_cache, song_cache
 
 router = APIRouter(tags=["folders"])
 
@@ -65,6 +66,12 @@ def _build_tree(paths: list[str]) -> list[dict]:
 @router.get("/folders")
 def get_folder_tree():
     """Return the folder tree built from all songs' file_path directories."""
+    # Check cache
+    cache_key = "folders:tree"
+    cached = folder_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     conn = get_db()
     cursor = conn.cursor()
 
@@ -86,16 +93,14 @@ def get_folder_tree():
     # Build and return the tree
     tree = _build_tree(list(dirs))
 
-    # Compute total unique songs across all folders
-    total_songs = sum(
-        _sum_counts(tree) if True else 0 for _ in [None]  # just compute once
-    )
-
-    return {
+    result = {
         "folders": tree,
         "total_folders": _count_nodes(tree),
         "total_songs": _sum_counts(tree),
     }
+
+    folder_cache.set(cache_key, result)
+    return result
 
 
 def _sum_counts(nodes: list[dict]) -> int:

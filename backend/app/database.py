@@ -55,6 +55,8 @@ CREATE TABLE IF NOT EXISTS song_tags (
 
 CREATE INDEX IF NOT EXISTS idx_songs_title            ON songs(title);
 CREATE INDEX IF NOT EXISTS idx_songs_artist           ON songs(artist);
+CREATE INDEX IF NOT EXISTS idx_songs_album            ON songs(album);
+CREATE INDEX IF NOT EXISTS idx_songs_created_at       ON songs(created_at);
 CREATE INDEX IF NOT EXISTS idx_songs_source           ON songs(source);
 CREATE INDEX IF NOT EXISTS idx_tags_name              ON tags(name);
 CREATE INDEX IF NOT EXISTS idx_playlist_songs_playlist ON playlist_songs(playlist_id);

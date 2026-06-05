@@ -112,19 +112,42 @@ export function WaveformBar({ duration, seek, dragSeek, waveformPeaks }: Wavefor
     const mql = window.matchMedia('(prefers-reduced-motion: reduce)')
     if (mql.matches) return
 
-    rafRef.current = requestAnimationFrame(tick)
+    let running = true
+
+    function loop() {
+      if (!running) return
+      tick()
+      rafRef.current = requestAnimationFrame(loop)
+    }
+    rafRef.current = requestAnimationFrame(loop)
 
     const onMotionChange = (e: MediaQueryListEvent) => {
       if (e.matches) {
+        running = false
         if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null }
       } else {
-        rafRef.current = requestAnimationFrame(tick)
+        running = true
+        rafRef.current = requestAnimationFrame(loop)
       }
     }
     mql.addEventListener('change', onMotionChange)
 
+    // Pause RAF when tab is hidden to save CPU
+    const onVisibility = () => {
+      if (document.hidden) {
+        running = false
+        if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null }
+      } else {
+        running = true
+        rafRef.current = requestAnimationFrame(loop)
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+
     return () => {
       mql.removeEventListener('change', onMotionChange)
+      document.removeEventListener('visibilitychange', onVisibility)
+      running = false
       if (rafRef.current) cancelAnimationFrame(rafRef.current)
     }
   }, [tick])
