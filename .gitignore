@@ -65,17 +65,22 @@ docs/aurora-handoff-*.md
 # Visual brainstorming companion sessions
 .
 
-#  generated artifacts (keep GRAPH_REPORT.md)
-graph.html
-graph.json
-cache/
-cost.json
-manifest.json
+# ALL  generated artifacts — blanket exclusion, never commit these
+**/
+
+# Verification screenshots (test artifacts, never commit)
+verify-*.png
+verify-*.jpeg
+verify-*.jpg
 
 # Tool session artifacts (playwright-mcp snapshots, tool session artifacts)
 .playwright-mcp/
 
 
+
+# Research / process docs (never commit — local only)
+docs/research/
+docs/*.docx
 
 # Code-only repo: exclude AI/agent + process docs (kept local, synced via WinSCP)
 
@@ -87,4 +92,3 @@ docs/design/
 docs/audits/
 docs/qa/
 docs/deferred-ideas.md
-GRAPH_REPORT.md
