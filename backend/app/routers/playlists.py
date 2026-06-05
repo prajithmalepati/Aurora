@@ -1,8 +1,11 @@
 """Playlists router."""
+import io
 import json
+import re
 import sqlite3
 from pathlib import Path
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, HTTPException, UploadFile, File, Query, Form
+from fastapi.responses import Response, StreamingResponse
 
 from datetime import datetime, timezone
 
@@ -977,3 +980,389 @@ def update_song_timing(playlist_id: int, song_id: int, timing: PlaylistSongTimin
     conn.close()
 
     return {"start_time_ms": timing.start_time_ms, "end_time_ms": end_ms, "message": "ok"}
+
+
+# ── Playlist Export ──
+
+def _get_playlist_songs_for_export(playlist_id: int):
+    """Fetch playlist metadata + songs ordered by position. Returns (playlist_row, songs_list)."""
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        SELECT id, name, color, emoji, image_url, crossfade_enabled, crossfade_duration_s, created_at, updated_at
+        FROM playlists WHERE id = ?
+        """,
+        (playlist_id,),
+    )
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
+        return None, None
+
+    conn = get_db()
+    cursor = conn.cursor()
+    query = """
+        SELECT
+            s.id, s.title, s.artist, s.album, s.duration, s.file_path, s.file_format,
+            s.album_art_path, s.source, s.waveform_peaks, s.dominant_color, s.dominant_color_2,
+            s.replaygain_track_gain, s.replaygain_track_peak,
+            s.replaygain_album_gain, s.replaygain_album_peak,
+            s.artists, s.featured_artists,
+            GROUP_CONCAT(t.name) as tags,
+            ps.start_time_ms, ps.end_time_ms, ps.position
+        FROM songs s
+        JOIN playlist_songs ps ON s.id = ps.song_id
+        LEFT JOIN song_tags st ON s.id = st.song_id
+        LEFT JOIN tags t ON st.tag_id = t.id
+        WHERE ps.playlist_id = ?
+        GROUP BY s.id
+        ORDER BY ps.position ASC
+    """
+    cursor.execute(query, (playlist_id,))
+    song_rows = cursor.fetchall()
+    conn.close()
+
+    songs = []
+    for sr in song_rows:
+        tags_str = sr["tags"]
+        tags = tags_str.split(",") if tags_str else []
+        raw_peaks = sr["waveform_peaks"] if "waveform_peaks" in sr.keys() else None
+        songs.append(SongResponse(
+            id=sr["id"],
+            title=sr["title"],
+            artist=sr["artist"],
+            album=sr["album"],
+            artists=json.loads(sr["artists"]) if sr.get("artists") else None,
+            featured_artists=json.loads(sr["featured_artists"]) if sr.get("featured_artists") else None,
+            duration=sr["duration"],
+            file_path=sr["file_path"],
+            file_format=sr["file_format"] if "file_format" in sr.keys() else None,
+            album_art_path=(sr["album_art_path"] or None) if "album_art_path" in sr.keys() else None,
+            source=sr["source"],
+            tags=tags,
+            playlists=[],
+            created_at="",
+            updated_at="",
+            start_time_ms=sr["start_time_ms"],
+            end_time_ms=sr["end_time_ms"],
+            position=sr["position"],
+            waveform_peaks=json.loads(raw_peaks) if raw_peaks else None,
+            dominant_color=sr["dominant_color"] if "dominant_color" in sr.keys() else None,
+            dominant_color_2=sr["dominant_color_2"] if "dominant_color_2" in sr.keys() else None,
+            replaygain_track_gain=sr["replaygain_track_gain"] if "replaygain_track_gain" in sr.keys() else None,
+            replaygain_track_peak=sr["replaygain_track_peak"] if "replaygain_track_peak" in sr.keys() else None,
+            replaygain_album_gain=sr["replaygain_album_gain"] if "replaygain_album_gain" in sr.keys() else None,
+            replaygain_album_peak=sr["replaygain_album_peak"] if "replaygain_album_peak" in sr.keys() else None,
+        ))
+
+    return row, songs
+
+
+@router.get("/playlists/{playlist_id}/export")
+def export_playlist(playlist_id: int, format: str = Query("m3u8", regex="^(m3u|m3u8|json)$")):
+    """Export a playlist in M3U, M3U8 (UTF-8), or Aurora JSON format."""
+    row, songs = _get_playlist_songs_for_export(playlist_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Playlist not found")
+
+    playlist_name = row["name"]
+
+    if format == "json":
+        # Aurora-specific JSON export
+        export_data = {
+            "aurora_version": "1.0",
+            "playlist": {
+                "name": playlist_name,
+                "color": row["color"],
+                "emoji": row["emoji"],
+                "crossfade_enabled": row["crossfade_enabled"],
+                "crossfade_duration_s": row["crossfade_duration_s"],
+            },
+            "songs": [
+                {
+                    "title": s.title,
+                    "artist": s.artist,
+                    "album": s.album,
+                    "duration": s.duration,
+                    "file_path": s.file_path,
+                    "file_format": s.file_format,
+                    "tags": s.tags,
+                    "start_time_ms": s.start_time_ms,
+                    "end_time_ms": s.end_time_ms,
+                }
+                for s in songs
+            ],
+        }
+        json_bytes = json.dumps(export_data, ensure_ascii=False, indent=2).encode("utf-8")
+        safe_name = re.sub(r'[\\/*?:"<>|]', "_", playlist_name)
+        return Response(
+            content=json_bytes,
+            media_type="application/json",
+            headers={
+                "Content-Disposition": f'attachment; filename="{safe_name}.aurora.json"',
+            },
+        )
+
+    # M3U / M3U8 export
+    lines = ["#EXTM3U"]
+    if format == "m3u8":
+        # M3U8 explicitly declares UTF-8 (though we always emit UTF-8)
+        lines[0] = "#EXTM3U"
+    for s in songs:
+        duration_sec = s.duration if s.duration else -1
+        artist_title = f"{s.artist} - {s.title}" if s.artist else s.title
+        lines.append(f"#EXTINF:{duration_sec},{artist_title}")
+        # Use forward slashes for cross-platform compatibility
+        file_path = (s.file_path or "").replace("\\", "/")
+        lines.append(file_path)
+
+    content = "\n".join(lines) + "\n"
+    content_bytes = content.encode("utf-8")
+
+    safe_name = re.sub(r'[\\/*?:"<>|]', "_", playlist_name)
+    ext = "m3u8" if format == "m3u8" else "m3u"
+
+    return Response(
+        content=content_bytes,
+        media_type="audio/x-mpegurl" if format == "m3u" else "application/vnd.apple.mpegurl",
+        headers={
+            "Content-Disposition": f'attachment; filename="{safe_name}.{ext}"',
+        },
+    )
+
+
+# ── Playlist Import ──
+
+def _parse_m3u(content: str) -> list[dict]:
+    """Parse M3U/M3U8 content and return a list of {duration, artist, title, file_path} dicts."""
+    entries = []
+    lines = content.splitlines()
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
+        if not line or line.startswith("#EXTM3U"):
+            i += 1
+            continue
+        if line.startswith("#EXTINF:"):
+            # Parse #EXTINF:<duration>,<title>
+            header = line
+            i += 1
+            # Collect any continued lines
+            file_path = ""
+            while i < len(lines):
+                next_line = lines[i].strip()
+                if next_line.startswith("#") and not next_line.startswith("#EXTINF:"):
+                    # Metadata comment, skip
+                    i += 1
+                    continue
+                elif next_line.startswith("#EXTINF:"):
+                    # Another track starts before we got a path — skip this orphaned header
+                    break
+                elif next_line:
+                    file_path = next_line
+                    i += 1
+                    break
+                else:
+                    i += 1
+                    continue
+
+            if not file_path:
+                continue
+
+            # Parse #EXTINF
+            inf_match = re.match(r'^#EXTINF:\s*(-?\d+)\s*,\s*(.*)', header)
+            if inf_match:
+                duration = int(inf_match.group(1))
+                title_part = inf_match.group(2).strip()
+                # Try to split "Artist - Title"
+                if " - " in title_part:
+                    artist, title = title_part.split(" - ", 1)
+                else:
+                    artist = ""
+                    title = title_part
+                entries.append({
+                    "duration": duration if duration >= 0 else None,
+                    "artist": artist.strip(),
+                    "title": title.strip(),
+                    "file_path": file_path.strip(),
+                })
+        elif line.startswith("#"):
+            i += 1
+            continue
+        else:
+            # Plain file path without EXTINF
+            entries.append({
+                "duration": None,
+                "artist": "",
+                "title": "",
+                "file_path": line.strip(),
+            })
+            i += 1
+
+    return entries
+
+
+@router.post("/playlists/import")
+async def import_playlist(
+    file: UploadFile = File(...),
+    playlist_name: str = Form(None),
+):
+    """Import a playlist from an M3U/M3U8 or Aurora JSON file.
+
+    Returns: {playlist_id, name, matched_count, unmatched_paths}
+    """
+    content_bytes = await file.read()
+    filename = file.filename or ""
+
+    # Determine format from extension or content
+    is_json = filename.lower().endswith(".json") or (
+        content_bytes.strip().startswith(b"{")
+    )
+
+    entries = []
+    color = None
+    emoji = None
+    crossfade_enabled = None
+    crossfade_duration_s = None
+
+    if is_json:
+        try:
+            data = json.loads(content_bytes.decode("utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            raise HTTPException(status_code=400, detail="Invalid JSON file")
+
+        pl_data = data.get("playlist", {})
+        if not playlist_name:
+            playlist_name = pl_data.get("name", "Imported Playlist")
+        color = pl_data.get("color")
+        emoji = pl_data.get("emoji")
+        crossfade_enabled = pl_data.get("crossfade_enabled")
+        crossfade_duration_s = pl_data.get("crossfade_duration_s")
+
+        for s in data.get("songs", []):
+            entries.append({
+                "duration": s.get("duration"),
+                "artist": s.get("artist", ""),
+                "title": s.get("title", ""),
+                "file_path": s.get("file_path", ""),
+            })
+    else:
+        # M3U/M3U8
+        try:
+            content = content_bytes.decode("utf-8")
+        except UnicodeDecodeError:
+            try:
+                content = content_bytes.decode("latin-1")
+            except UnicodeDecodeError:
+                raise HTTPException(status_code=400, detail="Cannot decode file as UTF-8 or Latin-1")
+
+        entries = _parse_m3u(content)
+        if not playlist_name:
+            # Derive name from filename
+            base = Path(filename).stem or "Imported Playlist"
+            playlist_name = base
+
+    if not entries:
+        raise HTTPException(status_code=400, detail="No tracks found in file")
+
+    # Build a lookup of file_path -> song_id from the library
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, file_path FROM songs WHERE file_path IS NOT NULL AND file_path != ''")
+    db_rows = cursor.fetchall()
+    conn.close()
+
+    # Normalize paths for matching
+    def norm(p: str) -> str:
+        return p.replace("\\", "/").strip()
+
+    path_to_id = {}
+    for dr in db_rows:
+        fp = norm(dr["file_path"])
+        if fp:
+            path_to_id[fp] = dr["id"]
+
+    matched_ids = []
+    unmatched_paths = []
+
+    for entry in entries:
+        fp = norm(entry["file_path"])
+        if fp in path_to_id:
+            matched_ids.append(path_to_id[fp])
+        else:
+            # Try matching by filename only
+            filename_only = Path(fp).name
+            matched = False
+            for db_fp, db_id in path_to_id.items():
+                if Path(db_fp).name == filename_only:
+                    matched_ids.append(db_id)
+                    matched = True
+                    break
+            if not matched:
+                unmatched_paths.append(entry["file_path"])
+
+    if not matched_ids:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No songs matched from the library. {len(unmatched_paths)} file(s) not found.",
+        )
+
+    # Remove duplicate song IDs while preserving order
+    seen = set()
+    unique_ids = []
+    for sid in matched_ids:
+        if sid not in seen:
+            seen.add(sid)
+            unique_ids.append(sid)
+
+    # Create playlist
+    now = _get_utc_now()
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # Check for name collision
+    cursor.execute("SELECT id FROM playlists WHERE name = ?", (playlist_name,))
+    existing = cursor.fetchone()
+    if existing:
+        base = playlist_name
+        suffix = 1
+        while True:
+            playlist_name = f"{base} ({suffix})"
+            cursor.execute("SELECT id FROM playlists WHERE name = ?", (playlist_name,))
+            if not cursor.fetchone():
+                break
+            suffix += 1
+
+    try:
+        cursor.execute(
+            """INSERT INTO playlists (name, color, emoji, crossfade_enabled, crossfade_duration_s, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (playlist_name, color, emoji, crossfade_enabled, crossfade_duration_s, now, now),
+        )
+        conn.commit()
+        new_playlist_id = cursor.lastrowid
+
+        # Add songs
+        for pos, sid in enumerate(unique_ids):
+            cursor.execute(
+                """INSERT INTO playlist_songs (playlist_id, song_id, position, added_at, start_time_ms, end_time_ms)
+                   VALUES (?, ?, ?, ?, 0, 0)""",
+                (new_playlist_id, sid, pos, now),
+            )
+        conn.commit()
+    except sqlite3.IntegrityError:
+        conn.close()
+        raise HTTPException(status_code=409, detail="Failed to create playlist")
+    finally:
+        conn.close()
+
+    return {
+        "playlist_id": new_playlist_id,
+        "name": playlist_name,
+        "matched_count": len(unique_ids),
+        "unmatched_paths": unmatched_paths,
+        "message": "ok",
+    }

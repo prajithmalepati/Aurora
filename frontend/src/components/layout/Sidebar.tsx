@@ -2,6 +2,7 @@ type View =
   | { kind: "all-songs" }
   | { kind: "filter" }
   | { kind: "playlist"; playlistId: number }
+  | { kind: "folders" }
   | { kind: "settings" }
 import { motion } from "motion/react"
 import { usePlaylistStore } from "@/stores/playlistStore"
@@ -12,10 +13,11 @@ import { BorderGlow } from "@/components/ui/BorderGlow"
 import { CreatePlaylistDialog } from "@/components/playlists/CreatePlaylistDialog"
 import { ScanDialog } from "@/components/scanner/ScanDialog"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useState } from "react"
-import { Library, SlidersHorizontal, Plus, FolderSearch, Music, Settings } from "lucide-react"
+import { useRef, useState } from "react"
+import { Library, SlidersHorizontal, Plus, FolderSearch, Music, Settings, Upload, FolderOpen } from "lucide-react"
 import { AddSongDialog } from "@/components/songs/AddSongDialog"
 import { AuroraWordmark } from "@/components/aurora/AuroraWordmark"
+import { toast } from "@/lib/toast"
 
 function hexToGlowHSL(hex: string | null | undefined): string {
   if (!hex || !/^#[0-9a-fA-F]{6}$/.test(hex)) return '185 60 60'
@@ -49,6 +51,8 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [scanOpen, setScanOpen] = useState(false)
   const [addSongOpen, setAddSongOpen] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [importLoading, setImportLoading] = useState(false)
   const playlists = usePlaylistStore((state) => state.playlists)
   const playlistsLoading = usePlaylistStore((state) => state.loading)
   const playlistsError = usePlaylistStore((state) => state.error)
@@ -65,6 +69,45 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
     setIsQuickTagView(true)
     executeFilter()
     onViewChange({ kind: "filter" })
+  }
+
+  const fetchPlaylists = usePlaylistStore((state) => state.fetchPlaylists)
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImportLoading(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await fetch('http://localhost:8000/api/playlists/import', {
+        method: 'POST',
+        body: formData,
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Import failed' }))
+        throw new Error(err.detail || 'Import failed')
+      }
+      const data = await res.json()
+      toast.success(`Created playlist "${data.name}" with ${data.matched_count} songs.`)
+      if (data.unmatched_paths && data.unmatched_paths.length > 0) {
+        toast(`${data.unmatched_paths.length} file(s) not found in library`, { duration: 6000 })
+      }
+      await fetchPlaylists()
+      // Navigate to the new playlist
+      if (data.playlist_id) {
+        onViewChange({ kind: 'playlist', playlistId: data.playlist_id })
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Import failed'
+      toast.error(message)
+    } finally {
+      setImportLoading(false)
+      // Reset the input so the same file can be picked again
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    }
   }
 
   const isActive = (view: View) => {
@@ -111,6 +154,12 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
               setIsQuickTagView(false)
               onViewChange({ kind: "filter" })
             }}
+          />
+          <NavItem
+            icon={<FolderOpen className="h-4 w-4" strokeWidth={1.5} />}
+            label="Folders"
+            active={isActive({ kind: "folders" })}
+            onClick={() => onViewChange({ kind: "folders" })}
           />
         </nav>
 
@@ -238,6 +287,15 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
             onClick={() => setAddSongOpen(true)}
           />
           <FooterAction
+            icon={importLoading ? (
+              <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+            ) : (
+              <Upload className="h-3.5 w-3.5" strokeWidth={1.5} />
+            )}
+            label="Import"
+            onClick={() => fileInputRef.current?.click()}
+          />
+          <FooterAction
             icon={<Settings className="h-3.5 w-3.5" strokeWidth={1.5} />}
             label="Settings"
             active={currentView.kind === "settings"}
@@ -245,6 +303,15 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
           />
         </div>
       </aside>
+
+      {/* Hidden file input for import */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".m3u,.m3u8,.json"
+        className="hidden"
+        onChange={handleImport}
+      />
 
       <CreatePlaylistDialog
         open={createDialogOpen}
