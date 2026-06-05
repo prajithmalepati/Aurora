@@ -6,6 +6,7 @@ import { toast } from "@/lib/toast"
 interface TagState {
   tags: Tag[]
   loading: boolean
+  error: string | null
 
   fetchTags: () => Promise<void>
   deleteTag: (id: number) => Promise<void>
@@ -14,14 +15,16 @@ interface TagState {
 export const useTagStore = create<TagState>((set, get) => ({
   tags: [],
   loading: false,
+  error: null,
 
   fetchTags: async () => {
-    set({ loading: true })
+    set({ loading: true, error: null })
     try {
       const res = await api.get<ApiResponse<Tag[]>>("/tags")
       set({ tags: res.data, loading: false })
-    } catch {
-      set({ loading: false })
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Failed to load tags"
+      set({ error: message, loading: false })
     }
   },
 
