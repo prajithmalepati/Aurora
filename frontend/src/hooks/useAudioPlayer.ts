@@ -18,9 +18,32 @@ export function useAudioPlayer() {
   const currentSong = usePlayerStore((state) => state.currentSong)
   const isPlaying = usePlayerStore((state) => state.isPlaying)
   const volume = usePlayerStore((state) => state.volume)
+  const replaygainMode = useSettingsStore((state) => state.replaygainMode)
   const updateSeek = usePlayerStore((state) => state.updateSeek)
   const setDuration = usePlayerStore((state) => state.setDuration)
   const next = usePlayerStore((state) => state.next)
+
+  /** Compute Howler volume with ReplayGain applied.
+   *  Returns a value clamped to [0, 1]. */
+  function resolveVolume(): number {
+    const rgMode = useSettingsStore.getState().replaygainMode
+    if (rgMode === "off") return volume
+
+    const song = usePlayerStore.getState().currentSong
+    let gainDb: number | null | undefined = null
+
+    if (rgMode === "track") {
+      gainDb = song?.replaygain_track_gain
+    } else if (rgMode === "album") {
+      // Prefer album gain, fall back to track gain if album is missing
+      gainDb = song?.replaygain_album_gain ?? song?.replaygain_track_gain
+    }
+
+    if (gainDb == null) return volume
+
+    const gain = Math.pow(10, gainDb / 20)
+    return Math.max(0, Math.min(1, volume * gain))
+  }
 
   function resolveXfade(): { enabled: boolean; duration: number } {
     const { queuePlaylistId } = usePlayerStore.getState()
@@ -273,13 +296,13 @@ export function useAudioPlayer() {
       if (crossfadeIn) {
         howl.volume(0)
         howl.play()
-        howl.fade(0, volume, duration * 1000)
+        howl.fade(0, resolveVolume(), duration * 1000)
       } else {
-        howl.volume(volume)
+        howl.volume(resolveVolume())
         howl.play()
       }
     } else {
-      howl.volume(volume)
+      howl.volume(resolveVolume())
     }
 
     return () => {
@@ -312,12 +335,12 @@ export function useAudioPlayer() {
     }
   }, [isPlaying])
 
-  // Volume sync
+  // Volume sync (includes ReplayGain)
   useEffect(() => {
     if (!howlRef.current) return
-    howlRef.current.volume(volume)
+    howlRef.current.volume(resolveVolume())
     // Don't touch prevHowlRef — it's mid-fade
-  }, [volume])
+  }, [volume, replaygainMode])
 
   const seekTo = useCallback((seconds: number) => {
     seekingRef.current = true
