@@ -4,6 +4,7 @@ type View =
   | { kind: "playlist"; playlistId: number }
   | { kind: "folders" }
   | { kind: "settings" }
+  | { kind: "about" }
 import { motion } from "motion/react"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { useTagStore } from "@/stores/tagStore"
@@ -14,7 +15,7 @@ import { CreatePlaylistDialog } from "@/components/playlists/CreatePlaylistDialo
 import { ScanDialog } from "@/components/scanner/ScanDialog"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useRef, useState } from "react"
-import { Library, SlidersHorizontal, Plus, FolderSearch, Music, Settings, Upload, FolderOpen } from "lucide-react"
+import { Library, SlidersHorizontal, Plus, FolderSearch, Music, Settings, Upload, FolderOpen, Info } from "lucide-react"
 import { AddSongDialog } from "@/components/songs/AddSongDialog"
 import { AuroraWordmark } from "@/components/aurora/AuroraWordmark"
 import { toast } from "@/lib/toast"
@@ -300,6 +301,12 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
             label="Settings"
             active={currentView.kind === "settings"}
             onClick={() => onViewChange({ kind: "settings" })}
+          />
+          <FooterAction
+            icon={<Info className="h-3.5 w-3.5" strokeWidth={1.5} />}
+            label="About"
+            active={currentView.kind === "about"}
+            onClick={() => onViewChange({ kind: "about" })}
           />
         </div>
       </aside>

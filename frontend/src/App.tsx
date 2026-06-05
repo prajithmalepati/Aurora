@@ -16,8 +16,10 @@ import { PlaylistDetail } from "@/components/playlists/PlaylistDetail"
 import { QueryBuilder } from "@/components/filter/QueryBuilder"
 import { SettingsView } from "@/components/settings/SettingsView"
 import { FoldersView } from "@/components/folders/FoldersView"
+import { AboutView } from "@/components/about/AboutView"
 import { AnimatePresence, motion } from "motion/react"
 import { AuroraColorBridge } from '@/components/aurora/AuroraColorBridge'
+import { WelcomeOverlay, dismissWelcome, isWelcomeDismissed } from "@/components/welcome/WelcomeOverlay"
 import { Search } from "lucide-react"
 import type { Song } from "@/types"
 
@@ -78,6 +80,13 @@ function App() {
     }
   }, [isPlaying])
 
+  // Dismiss welcome overlay once songs exist
+  useEffect(() => {
+    if (songs.length > 0 && !songsLoading) {
+      dismissWelcome()
+    }
+  }, [songs.length, songsLoading])
+
   // Global keyboard shortcuts
   const { isOverlayOpen, closeOverlay } = useKeyboardShortcuts()
 
@@ -86,6 +95,11 @@ function App() {
   }
 
   const renderMainContent = () => {
+    // Show welcome overlay when library is empty and not yet dismissed
+    if (songs.length === 0 && !songsLoading && !isWelcomeDismissed()) {
+      return <WelcomeOverlay />
+    }
+
     let content: ReactNode
     if (view.kind === "all-songs") {
       content = (
@@ -128,6 +142,8 @@ function App() {
       content = <PlaylistDetail key={view.playlistId} playlistId={view.playlistId} />
     } else if (view.kind === "folders") {
       content = <FoldersView />
+    } else if (view.kind === "about") {
+      content = <AboutView />
     } else {
       content = <SettingsView />
     }
