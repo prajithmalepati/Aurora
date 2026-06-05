@@ -1,6 +1,6 @@
 import type { Song } from "@/types"
 import { motion } from "motion/react"
-import { formatDuration } from "@/lib/utils"
+import { formatDuration, formatFileSize, qualityLabel } from "@/lib/utils"
 import { AlbumArt } from "@/components/songs/AlbumArt"
 import { Equalizer } from "@/components/ui/Equalizer"
 import { Trash2, Tag as TagIcon, Pencil, ListPlus } from "lucide-react"
@@ -28,6 +28,25 @@ interface SongRowProps {
   index: number
   animIndex?: number
   onPlay?: (song: Song, index: number) => void
+}
+
+function FormatBadge({ format }: { format: string | null | undefined }) {
+  if (!format) return null
+  const fmt = format.toLowerCase()
+  const isLossless = fmt === "flac" || fmt === "m4a_alac" || fmt === "wav" || fmt === "aiff" || fmt === "wv" || fmt === "ape"
+  const isHiRes = isLossless && fmt !== "m4a_alac" // ALAC is lossless but not typically hi-res
+  const bg = isHiRes
+    ? "bg-emerald-500/15 text-emerald-400"
+    : isLossless
+      ? "bg-emerald-500/10 text-emerald-300"
+      : fmt === "mp3"
+        ? "bg-neutral-500/15 text-neutral-400"
+        : "bg-amber-500/10 text-amber-300"
+  return (
+    <span className={`inline-flex items-center px-1.5 py-0 text-[9px] font-semibold uppercase tracking-wider rounded ${bg}`}>
+      {format.toUpperCase()}
+    </span>
+  )
 }
 
 export function SongRow({ song, index, animIndex, onPlay }: SongRowProps) {
@@ -184,22 +203,41 @@ export function SongRow({ song, index, animIndex, onPlay }: SongRowProps) {
               </span>
               <span className="truncate text-[12px] text-[var(--aurora-text-secondary)] mt-0.5">
                 {song.artist}
+                {song.featured_artists && song.featured_artists.length > 0 && (
+                  <span className="text-[var(--aurora-text-tertiary)]">
+                    {" "}feat. {song.featured_artists.join(", ")}
+                  </span>
+                )}
               </span>
             </div>
           </div>
         </td>
 
-        {/* Duration · Format */}
-        <td className="relative px-4 py-3 w-28 text-[12px] text-[var(--aurora-text-secondary)] tabular-nums hidden lg:table-cell">
+        {/* Duration · Format · Quality */}
+        <td className="relative px-4 py-3 w-36 text-[12px] text-[var(--aurora-text-secondary)] tabular-nums hidden lg:table-cell">
           <span
             className={`absolute inset-0 transition-colors duration-150 pointer-events-none ${
               isCurrentSong ? "" : "group-hover:bg-[var(--aurora-surface-hover)]"
             }`}
             aria-hidden="true"
           />
-          <span className="relative z-10">
-            {formatDuration(song.duration)}
-            {song.file_format && <> · {song.file_format.toUpperCase()}</>}
+          <span className="relative z-10 flex flex-col gap-0.5">
+            <span className="tabular-nums whitespace-nowrap">
+              {formatDuration(song.duration)}
+            </span>
+            <span className="flex items-center gap-1 flex-wrap">
+              <FormatBadge format={song.file_format} />
+              {qualityLabel(song) && (
+                <span className="text-[10px] text-[var(--aurora-text-tertiary)] whitespace-nowrap">
+                  {qualityLabel(song)}
+                </span>
+              )}
+              {formatFileSize(song.file_size) && (
+                <span className="text-[10px] text-[var(--aurora-text-tertiary)] whitespace-nowrap">
+                  {formatFileSize(song.file_size)}
+                </span>
+              )}
+            </span>
           </span>
         </td>
 

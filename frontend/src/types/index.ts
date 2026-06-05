@@ -9,12 +9,18 @@ export interface Song {
   album_art_path?: string | null
   source: string
   external_id?: string | null
+  artists?: string[] | null
+  featured_artists?: string[] | null
   start_time_ms?: number
   end_time_ms?: number
   tags: string[]
   playlists: Playlist[]
   created_at: string
   updated_at: string
+  bitrate?: number | null
+  sample_rate?: number | null
+  bit_depth?: number | null
+  file_size?: number | null
   waveform_peaks?: number[] | null
   dominant_color?: string | null
   dominant_color_2?: string | null
@@ -49,10 +55,16 @@ export interface PlaylistSong {
   file_path: string | null
   file_format?: string | null
   album_art_path?: string | null
+  artists?: string[] | null
+  featured_artists?: string[] | null
   start_time_ms?: number
   end_time_ms?: number
   tags: string[]
   position: number
+  bitrate?: number | null
+  sample_rate?: number | null
+  bit_depth?: number | null
+  file_size?: number | null
   waveform_peaks?: number[] | null
   dominant_color?: string | null
   dominant_color_2?: string | null
@@ -78,10 +90,16 @@ export interface FilterResult {
   file_format?: string | null
   album_art_path?: string | null
   source: string
+  artists?: string[] | null
+  featured_artists?: string[] | null
   tags: string[]
   playlists: Playlist[]
   created_at: string
   updated_at: string
+  bitrate?: number | null
+  sample_rate?: number | null
+  bit_depth?: number | null
+  file_size?: number | null
   waveform_peaks?: number[] | null
   dominant_color?: string | null
   dominant_color_2?: string | null

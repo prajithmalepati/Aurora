@@ -8,6 +8,21 @@ import { AuroraPlayButton } from "@/components/player/AuroraPlayButton"
 import { SeekScrubber } from "@/components/player/SeekScrubber"
 import { QueuePanel } from "@/components/player/QueuePanel"
 import { useState } from "react"
+import { formatFileSize, qualityLabel } from "@/lib/utils"
+import type { Song } from "@/types"
+
+function AudioMetadataLine({ song }: { song: Song }) {
+  const fmt = song.file_format
+  const quality = qualityLabel(song)
+  const size = formatFileSize(song.file_size)
+  if (!fmt && !quality && !size) return null
+  const parts = [fmt?.toUpperCase(), quality, size].filter(Boolean)
+  return (
+    <span className="text-[9px] text-[var(--aurora-text-tertiary)] truncate mt-0.5">
+      {parts.join(" · ")}
+    </span>
+  )
+}
 
 export function PlayerBar() {
   const { seekTo } = useAudioPlayer()
@@ -123,6 +138,7 @@ export function PlayerBar() {
                     <span className="text-[10px] text-[var(--aurora-text-secondary)] truncate">
                       {currentSong.artist}
                     </span>
+                    <AudioMetadataLine song={currentSong!} />
                     {/* Crossfade indicator */}
                     {isCrossfading && crossfadeFromTitle && (
                       <div className="flex items-center gap-1 mt-0.5 aurora-fade-in">
@@ -258,6 +274,7 @@ export function PlayerBar() {
                     <span className="text-[11px] text-[var(--aurora-text-secondary)] truncate mt-0.5 tracking-wide">
                       {currentSong.artist}
                     </span>
+                    <AudioMetadataLine song={currentSong!} />
                     {/* Crossfade indicator */}
                     {isCrossfading && crossfadeFromTitle && (
                       <div className="flex items-center gap-1.5 mt-1 aurora-fade-in">
