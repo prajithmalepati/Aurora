@@ -11,6 +11,8 @@ export function useAudioPlayer() {
   const prevHowlRef = useRef<Howl | null>(null)
   // Preloaded next song's Howl — created ~5s before song end to eliminate silence gap
   const nextHowlRef = useRef<{ howl: Howl; songId: string } | null>(null)
+  // Tracks whether the preloaded Howl's onload has fired (fully decoded, ready to play)
+  const preloadReadyRef = useRef<boolean>(false)
   const intervalRef = useRef<number | null>(null)
   const currentSongRef = useRef<string | null>(null)
   const seekingRef = useRef(false)
@@ -159,10 +161,13 @@ export function useAudioPlayer() {
   }
 
   /** Create a new Howl for the next song and store in nextHowlRef.
-   *  Replaces stale preloads when queue order changes (shuffle, etc.). */
+   *  Replaces stale preloads when queue order changes (shuffle, etc.).
+   *  Attaches onload/loaderror so preloadReadyRef stays accurate. */
   function preloadNextIfNeeded(currentSeekSec: number) {
     const hDuration = howlRef.current?.duration()
-    if (!hDuration || hDuration <= 0 || currentSeekSec < hDuration - 5) return
+    if (!hDuration || hDuration <= 0) return
+    // For songs > 5s: preload in last 5 seconds. For short songs: preload immediately.
+    if (hDuration > 5 && currentSeekSec < hDuration - 5) return
 
     const state = usePlayerStore.getState()
     const { queue, queueIndex, repeatMode, currentSong } = state
@@ -178,6 +183,7 @@ export function useAudioPlayer() {
       if (nextHowlRef.current) {
         nextHowlRef.current.howl.unload()
         nextHowlRef.current = null
+        preloadReadyRef.current = false
       }
       return
     }
@@ -193,6 +199,7 @@ export function useAudioPlayer() {
     if (nextHowlRef.current) {
       nextHowlRef.current.howl.unload()
       nextHowlRef.current = null
+      preloadReadyRef.current = false
     }
 
     const preExt = nextSong.file_path.split('.').pop()?.toLowerCase()
@@ -202,6 +209,17 @@ export function useAudioPlayer() {
         format: preExt ? [preExt] : undefined,
         html5: true,
         preload: true,
+        onload: () => {
+          preloadReadyRef.current = true
+        },
+        onloaderror: () => {
+          console.error(`Gapless preload failed for song ${preId} — falling back to normal load`)
+          if (nextHowlRef.current?.songId === preId) {
+            nextHowlRef.current.howl.unload()
+            nextHowlRef.current = null
+            preloadReadyRef.current = false
+          }
+        },
       }),
       songId: preId,
     }
@@ -212,7 +230,7 @@ export function useAudioPlayer() {
     return () => {
       if (howlRef.current) { howlRef.current.stop(); howlRef.current.unload() }
       if (prevHowlRef.current) { prevHowlRef.current.stop(); prevHowlRef.current.unload() }
-      if (nextHowlRef.current) { nextHowlRef.current.howl.unload(); nextHowlRef.current = null }
+      if (nextHowlRef.current) { nextHowlRef.current.howl.unload(); nextHowlRef.current = null; preloadReadyRef.current = false }
       if (intervalRef.current) window.clearInterval(intervalRef.current)
     }
   }, [])
@@ -233,23 +251,18 @@ export function useAudioPlayer() {
     const { enabled, duration } = resolveXfade()
     const crossfadeIn = enabled && (prev?.playing() ?? false)
 
-    // Fade out / stop the outgoing howl
-    if (prev) {
-      if (crossfadeIn) {
-        prev.fade(prev.volume(), 0, duration * 1000)
-        setTimeout(() => { prev.stop(); prev.unload() }, duration * 1000)
-      } else {
-        prev.stop()
-        prev.unload()
-      }
-    }
-
     if (!currentSong?.file_path) {
       currentSongRef.current = null
       // Clear stale preloaded Howl when queue ends
       if (nextHowlRef.current) {
         nextHowlRef.current.howl.unload()
         nextHowlRef.current = null
+        preloadReadyRef.current = false
+      }
+      // Clean up the outgoing Howl (no new song to transition to)
+      if (prev) {
+        prev.stop()
+        prev.unload()
       }
       return
     }
@@ -257,23 +270,26 @@ export function useAudioPlayer() {
     const songId = String(currentSong.id)
     currentSongRef.current = songId
 
-    // --- Check for preloaded Howl (B4 fix: eliminate silence gap) ---
+    // --- Check for preloaded Howl (gapless: only promote when fully decoded) ---
     const preloaded = nextHowlRef.current
+    const preloadIsReady = preloadReadyRef.current
     let howl: Howl
 
-    if (preloaded && preloaded.songId === songId) {
-      // Promote preloaded Howl — audio already buffered, just attach handlers
+    if (preloaded && preloaded.songId === songId && preloadIsReady) {
+      // Promote preloaded Howl — fully decoded and ready for gapless transition
       howl = preloaded.howl
       nextHowlRef.current = null
+      preloadReadyRef.current = false
       bindHowlHandlers(howl, songId)
       // Run post-load init now (onload already fired during preload)
       initHowlAfterLoad(howl)
       usePlayerStore.getState().setIsBuffering(false)
     } else {
-      // Destroy stale preload (wrong song, or user skipped)
+      // Destroy stale or unready preload (wrong song, user skipped, load error, or not yet loaded)
       if (preloaded) {
         preloaded.howl.unload()
         nextHowlRef.current = null
+        preloadReadyRef.current = false
       }
 
       usePlayerStore.getState().setIsBuffering(true)
@@ -290,9 +306,24 @@ export function useAudioPlayer() {
 
     howlRef.current = howl
 
+    // --- Gapless transition: play new Howl BEFORE stopping the old one ---
+    // This eliminates the silence gap by starting the new audio source
+    // while the old one is still finishing its final samples.
     if (usePlayerStore.getState().isPlaying) {
       const ctx: AudioContext | undefined = (window as any).Howler?.ctx
       if (ctx?.state === 'suspended') ctx.resume().catch(() => {})
+
+      // For non-crossfade gapless: reset the Audio element to start
+      // so the transition is sample-precise.
+      if (!crossfadeIn) {
+        try {
+          const audioNode = (howl as any)._sounds?.[0]?._node as HTMLAudioElement | undefined
+          if (audioNode) {
+            audioNode.currentTime = 0
+          }
+        } catch { /* private API access — safe to ignore */ }
+      }
+
       if (crossfadeIn) {
         howl.volume(0)
         howl.play()
@@ -303,6 +334,18 @@ export function useAudioPlayer() {
       }
     } else {
       howl.volume(resolveVolume())
+    }
+
+    // NOW handle the outgoing Howl — after the new one is already playing.
+    // The momentary overlap of two audio sources produces the gapless transition.
+    if (prev) {
+      if (crossfadeIn) {
+        prev.fade(prev.volume(), 0, duration * 1000)
+        setTimeout(() => { prev.stop(); prev.unload() }, duration * 1000)
+      } else {
+        prev.stop()
+        prev.unload()
+      }
     }
 
     return () => {
