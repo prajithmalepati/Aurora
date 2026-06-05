@@ -247,6 +247,10 @@ def reorder_playlist_songs(playlist_id: int, reorder: PlaylistReorder):
             s.waveform_peaks,
             s.dominant_color,
             s.dominant_color_2,
+            s.replaygain_track_gain,
+            s.replaygain_track_peak,
+            s.replaygain_album_gain,
+            s.replaygain_album_peak,
             GROUP_CONCAT(t.name) as tags,
             ps.start_time_ms,
             ps.end_time_ms,
@@ -292,6 +296,10 @@ def reorder_playlist_songs(playlist_id: int, reorder: PlaylistReorder):
                 waveform_peaks=json.loads(raw_peaks) if raw_peaks else None,
                 dominant_color=song_row["dominant_color"] if "dominant_color" in song_row.keys() else None,
                 dominant_color_2=song_row["dominant_color_2"] if "dominant_color_2" in song_row.keys() else None,
+                replaygain_track_gain=song_row["replaygain_track_gain"] if "replaygain_track_gain" in song_row.keys() else None,
+                replaygain_track_peak=song_row["replaygain_track_peak"] if "replaygain_track_peak" in song_row.keys() else None,
+                replaygain_album_gain=song_row["replaygain_album_gain"] if "replaygain_album_gain" in song_row.keys() else None,
+                replaygain_album_peak=song_row["replaygain_album_peak"] if "replaygain_album_peak" in song_row.keys() else None,
             )
         )
 
@@ -409,6 +417,10 @@ def delete_song_from_playlist(playlist_id: int, song_id: int):
             s.waveform_peaks,
             s.dominant_color,
             s.dominant_color_2,
+            s.replaygain_track_gain,
+            s.replaygain_track_peak,
+            s.replaygain_album_gain,
+            s.replaygain_album_peak,
             GROUP_CONCAT(t.name) as tags,
             ps.start_time_ms,
             ps.end_time_ms,
@@ -454,6 +466,10 @@ def delete_song_from_playlist(playlist_id: int, song_id: int):
                 waveform_peaks=json.loads(raw_peaks) if raw_peaks else None,
                 dominant_color=song_row["dominant_color"] if "dominant_color" in song_row.keys() else None,
                 dominant_color_2=song_row["dominant_color_2"] if "dominant_color_2" in song_row.keys() else None,
+                replaygain_track_gain=song_row["replaygain_track_gain"] if "replaygain_track_gain" in song_row.keys() else None,
+                replaygain_track_peak=song_row["replaygain_track_peak"] if "replaygain_track_peak" in song_row.keys() else None,
+                replaygain_album_gain=song_row["replaygain_album_gain"] if "replaygain_album_gain" in song_row.keys() else None,
+                replaygain_album_peak=song_row["replaygain_album_peak"] if "replaygain_album_peak" in song_row.keys() else None,
             )
         )
 
@@ -531,6 +547,10 @@ def get_playlist(playlist_id: int):
             s.waveform_peaks,
             s.dominant_color,
             s.dominant_color_2,
+            s.replaygain_track_gain,
+            s.replaygain_track_peak,
+            s.replaygain_album_gain,
+            s.replaygain_album_peak,
             GROUP_CONCAT(t.name) as tags,
             ps.start_time_ms,
             ps.end_time_ms,
@@ -576,6 +596,10 @@ def get_playlist(playlist_id: int):
                 waveform_peaks=json.loads(raw_peaks) if raw_peaks else None,
                 dominant_color=song_row["dominant_color"] if "dominant_color" in song_row.keys() else None,
                 dominant_color_2=song_row["dominant_color_2"] if "dominant_color_2" in song_row.keys() else None,
+                replaygain_track_gain=song_row["replaygain_track_gain"] if "replaygain_track_gain" in song_row.keys() else None,
+                replaygain_track_peak=song_row["replaygain_track_peak"] if "replaygain_track_peak" in song_row.keys() else None,
+                replaygain_album_gain=song_row["replaygain_album_gain"] if "replaygain_album_gain" in song_row.keys() else None,
+                replaygain_album_peak=song_row["replaygain_album_peak"] if "replaygain_album_peak" in song_row.keys() else None,
             )
         )
 
@@ -814,6 +838,10 @@ def add_song_to_playlist(playlist_id: int, song_add: PlaylistSongAdd):
             s.waveform_peaks,
             s.dominant_color,
             s.dominant_color_2,
+            s.replaygain_track_gain,
+            s.replaygain_track_peak,
+            s.replaygain_album_gain,
+            s.replaygain_album_peak,
             GROUP_CONCAT(t.name) as tags,
             ps.start_time_ms,
             ps.end_time_ms,
@@ -859,6 +887,10 @@ def add_song_to_playlist(playlist_id: int, song_add: PlaylistSongAdd):
                 waveform_peaks=json.loads(raw_peaks) if raw_peaks else None,
                 dominant_color=song_row["dominant_color"] if "dominant_color" in song_row.keys() else None,
                 dominant_color_2=song_row["dominant_color_2"] if "dominant_color_2" in song_row.keys() else None,
+                replaygain_track_gain=song_row["replaygain_track_gain"] if "replaygain_track_gain" in song_row.keys() else None,
+                replaygain_track_peak=song_row["replaygain_track_peak"] if "replaygain_track_peak" in song_row.keys() else None,
+                replaygain_album_gain=song_row["replaygain_album_gain"] if "replaygain_album_gain" in song_row.keys() else None,
+                replaygain_album_peak=song_row["replaygain_album_peak"] if "replaygain_album_peak" in song_row.keys() else None,
             )
         )
 

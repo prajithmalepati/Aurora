@@ -251,6 +251,97 @@ def _get_art_bytes(audio) -> bytes | None:
     return None
 
 
+def extract_replaygain(file_path: str, audio=None) -> dict[str, float | None]:
+    """Extract ReplayGain tags from an audio file.
+
+    Returns a dict with keys track_gain, track_peak, album_gain, album_peak.
+    Values are floats or None if the tag is missing or unparseable.
+    Supports MP3 (ID3 TXXX), FLAC/Vorbis, MP4/M4A (iTunes), and OGG.
+    """
+    result: dict[str, float | None] = {
+        "track_gain": None, "track_peak": None,
+        "album_gain": None, "album_peak": None,
+    }
+    ext = Path(file_path).suffix.lower()
+
+    try:
+        if ext in (".mp3",):
+            # ID3: TXXX frames with desc='replaygain_track_gain', etc.
+            from mutagen.id3 import ID3
+            id3 = ID3(file_path)
+            mapping = {
+                "replaygain_track_gain": "track_gain",
+                "replaygain_track_peak": "track_peak",
+                "replaygain_album_gain": "album_gain",
+                "replaygain_album_peak": "album_peak",
+            }
+            for txxx in id3.getall("TXXX"):
+                desc = getattr(txxx, "desc", "").lower()
+                text = str(txxx.text[0]) if txxx.text else ""
+                key = mapping.get(desc)
+                if key and text:
+                    try:
+                        # Strip " dB" suffix if present
+                        val = text.replace(" dB", "").strip()
+                        result[key] = float(val)
+                    except (ValueError, IndexError):
+                        pass
+
+        elif ext in (".flac", ".ogg", ".opus", ".wv"):
+            # Vorbis comments: REPLAYGAIN_TRACK_GAIN, etc.
+            f = mutagen.File(file_path)
+            if f and f.tags:
+                mapping = {
+                    "REPLAYGAIN_TRACK_GAIN": "track_gain",
+                    "replaygain_track_gain": "track_gain",
+                    "REPLAYGAIN_TRACK_PEAK": "track_peak",
+                    "replaygain_track_peak": "track_peak",
+                    "REPLAYGAIN_ALBUM_GAIN": "album_gain",
+                    "replaygain_album_gain": "album_gain",
+                    "REPLAYGAIN_ALBUM_PEAK": "album_peak",
+                    "replaygain_album_peak": "album_peak",
+                }
+                for tag_key, result_key in mapping.items():
+                    vals = f.tags.get(tag_key)
+                    if vals and len(vals) > 0:
+                        try:
+                            text = str(vals[0]).replace(" dB", "").strip()
+                            result[result_key] = float(text)
+                        except (ValueError, IndexError):
+                            pass
+
+        elif ext in (".m4a", ".mp4", ".aac", ".alac"):
+            # iTunes-style MP4 atoms
+            f = mutagen.File(file_path)
+            if f and f.tags:
+                mapping = {
+                    "----:com.apple.iTunes:replaygain_track_gain": "track_gain",
+                    "----:com.apple.iTunes:Replaygain Track Gain": "track_gain",
+                    "----:com.apple.iTunes:REPLAYGAIN_TRACK_GAIN": "track_gain",
+                    "----:com.apple.iTunes:replaygain_track_peak": "track_peak",
+                    "----:com.apple.iTunes:Replaygain Track Peak": "track_peak",
+                    "----:com.apple.iTunes:REPLAYGAIN_TRACK_PEAK": "track_peak",
+                    "----:com.apple.iTunes:replaygain_album_gain": "album_gain",
+                    "----:com.apple.iTunes:Replaygain Album Gain": "album_gain",
+                    "----:com.apple.iTunes:REPLAYGAIN_ALBUM_GAIN": "album_gain",
+                    "----:com.apple.iTunes:replaygain_album_peak": "album_peak",
+                    "----:com.apple.iTunes:Replaygain Album Peak": "album_peak",
+                    "----:com.apple.iTunes:REPLAYGAIN_ALBUM_PEAK": "album_peak",
+                }
+                for tag_key, result_key in mapping.items():
+                    vals = f.tags.get(tag_key)
+                    if vals and len(vals) > 0:
+                        try:
+                            text = str(vals[0]).replace(" dB", "").strip()
+                            result[result_key] = float(text)
+                        except (ValueError, IndexError):
+                            pass
+    except Exception:
+        pass
+
+    return result
+
+
 def extract_metadata(file_path: str) -> dict | None:
     """
     Extract metadata from an audio file.
@@ -320,12 +411,15 @@ def extract_metadata(file_path: str) -> dict | None:
     except OSError:
         pass
 
+    # Extract ReplayGain tags
+    rg = extract_replaygain(str(path))
+
     return {
         "title": title.strip(),
         "artist": artist.strip(),
         "album": album.strip() if album else None,
         "duration": duration,
-        "file_path": str(path.resolve()),  # absolute path
+        "file_path": str(path.resolve()),
         "file_format": file_format,
         "file_mtime": file_mtime,
         "waveform_peaks": waveform_peaks,
@@ -336,6 +430,10 @@ def extract_metadata(file_path: str) -> dict | None:
         "bleed_region_y": bleed_region_y,
         "bleed_region_w": bleed_region_w,
         "bleed_region_h": bleed_region_h,
+        "replaygain_track_gain": rg["track_gain"],
+        "replaygain_track_peak": rg["track_peak"],
+        "replaygain_album_gain": rg["album_gain"],
+        "replaygain_album_peak": rg["album_peak"],
     }
 
 
@@ -394,8 +492,11 @@ def _replace_song(
                    (title, artist, album, duration, file_path, file_format,
                     album_art_path, source, waveform_peaks, dominant_color,
                     dominant_color_2, bleed_thumb, bleed_region_x, bleed_region_y,
-                    bleed_region_w, bleed_region_h, file_mtime, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, 'local_scan', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    bleed_region_w, bleed_region_h, file_mtime,
+                    replaygain_track_gain, replaygain_track_peak,
+                    replaygain_album_gain, replaygain_album_peak,
+                    created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, 'local_scan', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (metadata["title"], metadata["artist"], metadata["album"],
              metadata["duration"], metadata["file_path"], metadata.get("file_format"),
              album_art_path,
@@ -408,6 +509,10 @@ def _replace_song(
              metadata.get("bleed_region_w", 0),
              metadata.get("bleed_region_h", 0),
              metadata.get("file_mtime"),
+             metadata.get("replaygain_track_gain"),
+             metadata.get("replaygain_track_peak"),
+             metadata.get("replaygain_album_gain"),
+             metadata.get("replaygain_album_peak"),
              now, now),
         )
         new_id = cursor.lastrowid
@@ -529,7 +634,10 @@ def import_scanned_songs(
                        album_art_path=COALESCE(?, album_art_path),
                        waveform_peaks=?, dominant_color=?, dominant_color_2=?,
                        bleed_thumb=?, bleed_region_x=?, bleed_region_y=?,
-                       bleed_region_w=?, bleed_region_h=?, file_mtime=?, updated_at=?
+                       bleed_region_w=?, bleed_region_h=?, file_mtime=?,
+                       replaygain_track_gain=?, replaygain_track_peak=?,
+                       replaygain_album_gain=?, replaygain_album_peak=?,
+                       updated_at=?
                        WHERE id=?""",
                     (metadata["title"], metadata["artist"], metadata["album"],
                      metadata["duration"], incoming_fmt, art_path_update,
@@ -538,7 +646,12 @@ def import_scanned_songs(
                      metadata.get("bleed_thumb"),
                      metadata.get("bleed_region_x", 0), metadata.get("bleed_region_y", 0),
                      metadata.get("bleed_region_w", 0), metadata.get("bleed_region_h", 0),
-                     incoming_mtime, now, exact[0]),
+                     incoming_mtime,
+                     metadata.get("replaygain_track_gain"),
+                     metadata.get("replaygain_track_peak"),
+                     metadata.get("replaygain_album_gain"),
+                     metadata.get("replaygain_album_peak"),
+                     now, exact[0]),
                 )
                 imported.append({"id": exact[0], **metadata})
                 playlist_song_ids.append(exact[0])
@@ -607,8 +720,11 @@ def import_scanned_songs(
                    (title, artist, album, duration, file_path, file_format,
                     album_art_path, source, waveform_peaks, dominant_color,
                     dominant_color_2, bleed_thumb, bleed_region_x, bleed_region_y,
-                    bleed_region_w, bleed_region_h, file_mtime, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, 'local_scan', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    bleed_region_w, bleed_region_h, file_mtime,
+                    replaygain_track_gain, replaygain_track_peak,
+                    replaygain_album_gain, replaygain_album_peak,
+                    created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, 'local_scan', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (metadata["title"], metadata["artist"], metadata["album"],
              metadata["duration"], incoming_path, incoming_fmt,
              album_art_path,
@@ -621,6 +737,10 @@ def import_scanned_songs(
              metadata.get("bleed_region_w", 0),
              metadata.get("bleed_region_h", 0),
              metadata.get("file_mtime"),
+             metadata.get("replaygain_track_gain"),
+             metadata.get("replaygain_track_peak"),
+             metadata.get("replaygain_album_gain"),
+             metadata.get("replaygain_album_peak"),
              now, now),
         )
         song_id = cursor.lastrowid
