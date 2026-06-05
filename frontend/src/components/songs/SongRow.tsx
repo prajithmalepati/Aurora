@@ -3,7 +3,7 @@ import { motion } from "motion/react"
 import { formatDuration } from "@/lib/utils"
 import { AlbumArt } from "@/components/songs/AlbumArt"
 import { Equalizer } from "@/components/ui/Equalizer"
-import { Trash2, Tag as TagIcon, Pencil } from "lucide-react"
+import { Trash2, Tag as TagIcon, Pencil, ListPlus } from "lucide-react"
 import { AuroraPlayButton } from "@/components/player/AuroraPlayButton"
 import { EditSongDialog } from "@/components/songs/EditSongDialog"
 import {
@@ -19,7 +19,7 @@ import {
 import { useSongStore } from "@/stores/songStore"
 import { usePlayerStore } from "@/stores/playerStore"
 import { toast } from "@/lib/toast"
-import { useState } from "react"
+import { useState, useCallback, useRef } from "react"
 import { TagList } from "@/components/tags/TagList"
 import { TagEditor } from "@/components/tags/TagEditor"
 
@@ -35,9 +35,17 @@ export function SongRow({ song, index, animIndex, onPlay }: SongRowProps) {
   const playSong = usePlayerStore((state) => state.playSong)
   const currentSong = usePlayerStore((state) => state.currentSong)
   const isPlaying = usePlayerStore((state) => state.isPlaying)
+  const playNext = usePlayerStore((state) => state.playNext)
+  const addToQueue = usePlayerStore((state) => state.addToQueue)
+  const queue = usePlayerStore((state) => state.queue)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [tagEditorOpen, setTagEditorOpen] = useState(false)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
+  const rowRef = useRef<HTMLTableRowElement>(null)
+
+  // Check if song is already in queue
+  const inQueue = queue.some((s) => s.id === song.id)
 
   const handleDelete = async () => {
     setDeleteDialogOpen(false)
@@ -49,6 +57,36 @@ export function SongRow({ song, index, animIndex, onPlay }: SongRowProps) {
       toast.error(`Failed to delete song: ${message}`)
     }
   }
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setContextMenu({ x: e.clientX, y: e.clientY })
+  }, [])
+
+  const closeContextMenu = useCallback(() => {
+    setContextMenu(null)
+  }, [])
+
+  const handlePlayNext = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    playNext(song)
+    toast.success(`"${song.title}" will play next`)
+    closeContextMenu()
+  }, [song, playNext, closeContextMenu])
+
+  const handleAddToQueue = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    addToQueue(song)
+    toast.success(`"${song.title}" added to queue`)
+    closeContextMenu()
+  }, [song, addToQueue, closeContextMenu])
+
+  const handlePlayNow = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    playSong(song)
+    closeContextMenu()
+  }, [song, playSong, closeContextMenu])
 
   const handlePlay = () => {
     if (!song.file_path) return
@@ -67,7 +105,9 @@ export function SongRow({ song, index, animIndex, onPlay }: SongRowProps) {
   return (
     <>
       <motion.tr
+        ref={rowRef}
         onClick={handlePlay}
+        onContextMenu={handleContextMenu}
         className={`group relative transition-colors duration-150 ${
           hasFile ? "cursor-pointer" : "cursor-not-allowed opacity-40"
         }`}
@@ -224,6 +264,18 @@ export function SongRow({ song, index, animIndex, onPlay }: SongRowProps) {
           />
           <div className="relative z-10 flex items-center gap-0.5 justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-200">
             <IconBtn
+              label={inQueue ? "Already in queue" : "Add to queue"}
+              onClick={(e) => {
+                e.stopPropagation()
+                if (!inQueue) {
+                  addToQueue(song)
+                  toast.success(`"${song.title}" added to queue`)
+                }
+              }}
+            >
+              <ListPlus className={`h-3.5 w-3.5 ${inQueue ? "opacity-40" : ""}`} />
+            </IconBtn>
+            <IconBtn
               label="Edit tags"
               onClick={(e) => {
                 e.stopPropagation()
@@ -254,6 +306,56 @@ export function SongRow({ song, index, animIndex, onPlay }: SongRowProps) {
           </div>
         </td>
       </motion.tr>
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <>
+          {/* Click-away backdrop */}
+          <div
+            className="fixed inset-0 z-40"
+            onClick={closeContextMenu}
+            onContextMenu={(e) => { e.preventDefault(); closeContextMenu() }}
+          />
+          <div
+            className="fixed z-50 min-w-[180px] py-1.5 rounded-lg shadow-xl border"
+            style={{
+              left: `${contextMenu.x}px`,
+              top: `${contextMenu.y}px`,
+              background: "var(--aurora-surface)",
+              borderColor: "var(--aurora-rim)",
+              boxShadow: "0 8px 30px rgba(0,0,0,0.4)",
+            }}
+          >
+            <button
+              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-[13px] text-[var(--aurora-text)] hover:bg-[var(--aurora-surface-hover)] transition-colors text-left"
+              onClick={handlePlayNow}
+            >
+              <span className="w-4 h-4 flex items-center justify-center text-[var(--aurora-accent)]">
+                ▶
+              </span>
+              Play Now
+            </button>
+            <button
+              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-[13px] text-[var(--aurora-text)] hover:bg-[var(--aurora-surface-hover)] transition-colors text-left"
+              onClick={handlePlayNext}
+            >
+              <span className="w-4 h-4 flex items-center justify-center text-[var(--aurora-text-secondary)]">
+                ↳
+              </span>
+              Play Next
+            </button>
+            <button
+              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-[13px] text-[var(--aurora-text)] hover:bg-[var(--aurora-surface-hover)] transition-colors text-left"
+              onClick={handleAddToQueue}
+            >
+              <span className="w-4 h-4 flex items-center justify-center text-[var(--aurora-text-secondary)]">
+                <ListPlus className="h-3.5 w-3.5" />
+              </span>
+              {inQueue ? "Already in Queue" : "Add to Queue"}
+            </button>
+          </div>
+        </>
+      )}
 
       {/* Delete confirmation */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

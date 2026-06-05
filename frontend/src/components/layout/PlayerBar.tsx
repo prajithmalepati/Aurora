@@ -2,10 +2,12 @@ import { usePlayerStore } from "@/stores/playerStore"
 import { useAudioPlayer } from "@/hooks/useAudioPlayer"
 import { AlbumArt } from "@/components/songs/AlbumArt"
 import { Equalizer } from "@/components/ui/Equalizer"
-import { SkipBack, SkipForward, Volume2, VolumeX, Shuffle, Repeat, Repeat1 } from "lucide-react"
+import { SkipBack, SkipForward, Volume2, VolumeX, Shuffle, Repeat, Repeat1, ListMusic } from "lucide-react"
 import { motion, AnimatePresence } from "motion/react"
 import { AuroraPlayButton } from "@/components/player/AuroraPlayButton"
 import { SeekScrubber } from "@/components/player/SeekScrubber"
+import { QueuePanel } from "@/components/player/QueuePanel"
+import { useState } from "react"
 
 export function PlayerBar() {
   const { seekTo } = useAudioPlayer()
@@ -22,6 +24,9 @@ export function PlayerBar() {
   const isShuffled = usePlayerStore((state) => state.isShuffled)
   const toggleShuffle = usePlayerStore((state) => state.toggleShuffle)
   const isBuffering = usePlayerStore((state) => state.isBuffering)
+  const queue = usePlayerStore((state) => state.queue)
+
+  const [queueOpen, setQueueOpen] = useState(false)
 
   // isIdle = no song ever selected (initial app load only).
   // Once currentSong is set it never returns to null, so this only fires once.
@@ -174,6 +179,20 @@ export function PlayerBar() {
               >
                 <RepeatIcon className="h-3.5 w-3.5" strokeWidth={1.5} />
               </button>
+
+              <button
+                onClick={() => setQueueOpen(true)}
+                disabled={!hasSong}
+                className={`${transportBtnClass(false)} relative`}
+                aria-label="Open queue"
+              >
+                <ListMusic className="h-3.5 w-3.5" strokeWidth={1.5} />
+                {queue.length > 1 && (
+                  <span className="absolute -top-0.5 -right-1.5 text-[8px] tabular-nums text-[var(--aurora-text-tertiary)] leading-none">
+                    {queue.length}
+                  </span>
+                )}
+              </button>
             </div>
           </div>
         )}
@@ -284,6 +303,20 @@ export function PlayerBar() {
                 >
                   <RepeatIcon className="h-[15px] w-[15px]" strokeWidth={1.5} />
                 </button>
+
+                <button
+                  onClick={() => setQueueOpen(true)}
+                  disabled={!hasSong}
+                  className={`${transportBtnClass(false)} relative`}
+                  aria-label="Open queue"
+                >
+                  <ListMusic className="h-[15px] w-[15px]" strokeWidth={1.5} />
+                  {queue.length > 1 && (
+                    <span className="absolute -top-0.5 -right-1.5 text-[9px] tabular-nums text-[var(--aurora-text-tertiary)] leading-none">
+                      {queue.length}
+                    </span>
+                  )}
+                </button>
               </div>
 
               <SeekScrubber hasSong={hasSong} seekTo={seekTo} />
@@ -325,6 +358,8 @@ export function PlayerBar() {
           </div>
         )}
       </div>
+
+      <QueuePanel open={queueOpen} onClose={() => setQueueOpen(false)} />
     </div>
   )
 }

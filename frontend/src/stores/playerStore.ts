@@ -1,10 +1,13 @@
 import { create } from "zustand"
 import type { Song } from "@/types"
 
+const MAX_HISTORY = 100
+
 interface PlayerState {
   currentSong: Song | null
   queue: Song[]
   queueIndex: number
+  queueHistory: Song[]
   isPlaying: boolean
   volume: number          // 0 to 1
   preMuteVolume: number   // volume to restore when unmuting
@@ -29,6 +32,11 @@ interface PlayerState {
   stop: () => void
   cycleRepeat: () => void
   toggleShuffle: () => void
+  playNext: (song: Song) => void
+  addToQueue: (song: Song) => void
+  reorderQueue: (fromIndex: number, toIndex: number) => void
+  removeFromQueue: (index: number) => void
+  clearQueue: () => void
 }
 
 function loadStoredVolume(): number {
@@ -51,6 +59,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   currentSong: null,
   queue: [],
   queueIndex: 0,
+  queueHistory: [],
   isPlaying: false,
   volume: _initVol,
   preMuteVolume: _initVol > 0 ? _initVol : 0.7,
@@ -66,10 +75,16 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     if (!song.file_path) return
     const newQueue = queue?.filter((s) => s.file_path) ?? [song]
     const index = newQueue.findIndex((s) => s.id === song.id)
+    const prev = get().currentSong
+    const prevHistory = get().queueHistory
+    const history = prev && prev.id !== song.id
+      ? [...prevHistory, prev].slice(-MAX_HISTORY)
+      : prevHistory
     set({
       currentSong: song,
       queue: newQueue,
       queueIndex: index >= 0 ? index : 0,
+      queueHistory: history,
       isPlaying: true,
       seek: 0,
       duration: song.duration ?? 0,
@@ -86,22 +101,30 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   next: () => {
-    const { queue, queueIndex, repeatMode } = get()
+    const { queue, queueIndex, repeatMode, currentSong, queueHistory } = get()
     // repeat-one is handled by useAudioPlayer onend — pressing Next still advances
     if (queueIndex < queue.length - 1) {
       const nextSong = queue[queueIndex + 1]
+      const history = currentSong
+        ? [...queueHistory, currentSong].slice(-MAX_HISTORY)
+        : queueHistory
       set({
         currentSong: nextSong,
         queueIndex: queueIndex + 1,
+        queueHistory: history,
         isPlaying: true,
         seek: 0,
         duration: nextSong.duration ?? 0,
       })
     } else if (repeatMode === "all") {
       const firstSong = queue[0]
+      const history = currentSong
+        ? [...queueHistory, currentSong].slice(-MAX_HISTORY)
+        : queueHistory
       set({
         currentSong: firstSong,
         queueIndex: 0,
+        queueHistory: history,
         isPlaying: true,
         seek: 0,
         duration: firstSong.duration ?? 0,
@@ -113,9 +136,23 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   previous: () => {
-    const { queue, queueIndex, seek } = get()
+    const { queue, queueIndex, seek, queueHistory } = get()
     if (seek > 3) {
       set({ seek: 0 })
+      return
+    }
+    // Try history first — pop the last played song
+    if (queueHistory.length > 0) {
+      const historySong = queueHistory[queueHistory.length - 1]
+      const idx = queue.findIndex((s) => s.id === historySong.id)
+      set({
+        currentSong: historySong,
+        queueIndex: idx >= 0 ? idx : queueIndex,
+        queueHistory: queueHistory.slice(0, -1),
+        isPlaying: true,
+        seek: 0,
+        duration: historySong.duration ?? 0,
+      })
       return
     }
     if (queueIndex > 0) {
@@ -165,6 +202,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     duration: 0,
     queue: [],
     queueIndex: 0,
+    queueHistory: [],
     isShuffled: false,
     originalQueue: [],
     queuePlaylistId: null,
@@ -203,6 +241,87 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         queueIndex: newIndex >= 0 ? newIndex : 0,
         originalQueue: [],
       })
+    }
+  },
+
+  playNext: (song) => {
+    if (!song.file_path) return
+    const { queue, queueIndex, isShuffled, originalQueue } = get()
+    // Insert after current song
+    const newQueue = [...queue]
+    newQueue.splice(queueIndex + 1, 0, song)
+    // If shuffled, also update originalQueue so toggling off preserves the insert
+    if (isShuffled && originalQueue.length > 0) {
+      const newOrig = [...originalQueue]
+      newOrig.splice(queueIndex + 1, 0, song)
+      set({ queue: newQueue, originalQueue: newOrig })
+    } else {
+      set({ queue: newQueue })
+    }
+  },
+
+  addToQueue: (song) => {
+    if (!song.file_path) return
+    const { isShuffled, originalQueue } = get()
+    set({ queue: [...get().queue, song] })
+    if (isShuffled && originalQueue.length > 0) {
+      set({ originalQueue: [...originalQueue, song] })
+    }
+  },
+
+  reorderQueue: (fromIndex, toIndex) => {
+    const { queue, queueIndex } = get()
+    if (fromIndex < 0 || fromIndex >= queue.length) return
+    if (toIndex < 0 || toIndex >= queue.length) return
+    if (fromIndex === toIndex) return
+    const newQueue = [...queue]
+    const [moved] = newQueue.splice(fromIndex, 1)
+    newQueue.splice(toIndex, 0, moved)
+    // Adjust queueIndex if the current song was moved
+    let newIndex = queueIndex
+    if (fromIndex === queueIndex) {
+      newIndex = toIndex
+    } else if (fromIndex < queueIndex && toIndex >= queueIndex) {
+      newIndex = queueIndex - 1
+    } else if (fromIndex > queueIndex && toIndex <= queueIndex) {
+      newIndex = queueIndex + 1
+    }
+    set({ queue: newQueue, queueIndex: newIndex })
+  },
+
+  removeFromQueue: (index) => {
+    const { queue, queueIndex, currentSong } = get()
+    if (index < 0 || index >= queue.length) return
+    if (index === queueIndex && currentSong) {
+      // Removing current song — advance to next or stop
+      const newQueue = queue.filter((_, i) => i !== index)
+      if (newQueue.length === 0) {
+        get().stop()
+        return
+      }
+      const newIndex = Math.min(index, newQueue.length - 1)
+      const nextSong = newQueue[newIndex]
+      set({
+        queue: newQueue,
+        queueIndex: newIndex,
+        currentSong: nextSong,
+        isPlaying: true,
+        seek: 0,
+        duration: nextSong.duration ?? 0,
+      })
+    } else {
+      const newQueue = queue.filter((_, i) => i !== index)
+      const newIndex = index < queueIndex ? queueIndex - 1 : queueIndex
+      set({ queue: newQueue, queueIndex: newIndex })
+    }
+  },
+
+  clearQueue: () => {
+    const current = get().currentSong
+    if (current) {
+      set({ queue: [current], queueIndex: 0 })
+    } else {
+      get().stop()
     }
   },
 }))
