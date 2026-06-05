@@ -45,11 +45,17 @@ def song_row_to_dict(row: sqlite3.Row) -> dict:
     raw_art = row["album_art_path"] if "album_art_path" in row.keys() else None
     raw_peaks = row["waveform_peaks"] if "waveform_peaks" in row.keys() else None
     waveform_peaks = json.loads(raw_peaks) if raw_peaks else None
+    raw_artists = row["artists"] if "artists" in row.keys() else None
+    raw_featured = row["featured_artists"] if "featured_artists" in row.keys() else None
+    artists = json.loads(raw_artists) if raw_artists else None
+    featured_artists = json.loads(raw_featured) if raw_featured else None
     return {
         "id": row["id"],
         "title": row["title"],
         "artist": row["artist"],
         "album": row["album"],
+        "artists": artists,
+        "featured_artists": featured_artists,
         "duration": row["duration"],
         "file_path": row["file_path"],
         "file_format": row["file_format"] if "file_format" in row.keys() else None,
@@ -60,6 +66,10 @@ def song_row_to_dict(row: sqlite3.Row) -> dict:
         "playlists": playlists,
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
+        "bitrate": row["bitrate"] if "bitrate" in row.keys() else None,
+        "sample_rate": row["sample_rate"] if "sample_rate" in row.keys() else None,
+        "bit_depth": row["bit_depth"] if "bit_depth" in row.keys() else None,
+        "file_size": row["file_size"] if "file_size" in row.keys() else None,
         "waveform_peaks": waveform_peaks,
         "dominant_color": row["dominant_color"] if "dominant_color" in row.keys() else None,
         "dominant_color_2": row["dominant_color_2"] if "dominant_color_2" in row.keys() else None,
@@ -107,9 +117,11 @@ def list_songs(
         SELECT
             s.id, s.title, s.artist, s.album, s.duration,
             s.file_path, s.file_format, s.album_art_path, s.source,
+            s.bitrate, s.sample_rate, s.bit_depth, s.file_size,
             s.waveform_peaks, s.dominant_color, s.dominant_color_2,
             s.replaygain_track_gain, s.replaygain_track_peak,
             s.replaygain_album_gain, s.replaygain_album_peak,
+            s.artists, s.featured_artists,
             GROUP_CONCAT(DISTINCT t.name) as tags,
             GROUP_CONCAT(DISTINCT p.id || ':' || p.name) as playlists,
             s.created_at, s.updated_at
@@ -185,6 +197,10 @@ def get_song(song_id: int):
             s.file_format,
             s.album_art_path,
             s.source,
+            s.bitrate,
+            s.sample_rate,
+            s.bit_depth,
+            s.file_size,
             s.waveform_peaks,
             s.dominant_color,
             s.dominant_color_2,
@@ -192,6 +208,8 @@ def get_song(song_id: int):
             s.replaygain_track_peak,
             s.replaygain_album_gain,
             s.replaygain_album_peak,
+            s.artists,
+            s.featured_artists,
             GROUP_CONCAT(DISTINCT t.name) as tags,
             GROUP_CONCAT(DISTINCT p.id || ':' || p.name) as playlists,
             s.created_at,
@@ -453,6 +471,10 @@ def update_song(song_id: int, song_update: SongUpdate):
             s.file_format,
             s.album_art_path,
             s.source,
+            s.bitrate,
+            s.sample_rate,
+            s.bit_depth,
+            s.file_size,
             s.waveform_peaks,
             s.dominant_color,
             s.dominant_color_2,
