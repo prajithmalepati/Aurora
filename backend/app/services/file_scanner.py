@@ -1,6 +1,7 @@
 """File scanner for audio files using mutagen."""
 import hashlib
 import json
+import re
 import sqlite3
 import threading
 import mutagen
@@ -342,6 +343,51 @@ def extract_replaygain(file_path: str, audio=None) -> dict[str, float | None]:
     return result
 
 
+def _split_on_delimiters(s: str) -> list[str]:
+    """Split a string on common artist delimiters."""
+    return [p.strip() for p in re.split(r'\s*[;/\\,]\s*|\s*&\s*|\x00', s) if p.strip()]
+
+
+def parse_artists(artist_string: str) -> tuple[str, list[str], list[str] | None]:
+    """Parse a multi-artist string into primary artist, all artists, and featured artists.
+
+    Splits on common delimiters: ; / \\ , & plus NULL bytes.
+    Artists after 'feat.' / 'ft.' are treated as featured/guest artists.
+    Returns (primary_artist, all_artists_list, featured_artists_list_or_None).
+    """
+    if not artist_string or not artist_string.strip():
+        return "Unknown Artist", [], None
+
+    s = artist_string.strip()
+
+    # Detect feat/ft sections (with optional leading whitespace or start-of-string)
+    feat_parts = re.split(r'(?:\s+|^)(?:feat\.|ft\.)\s+', s, maxsplit=1, flags=re.IGNORECASE)
+    before_feat = feat_parts[0].strip() if feat_parts else s
+    featured_raw = feat_parts[1].strip() if len(feat_parts) > 1 else ""
+
+    # Split the before-feat part on all delimiters
+    primary_parts = _split_on_delimiters(before_feat)
+
+    # Split the featured part on delimiters
+    featured_parts = _split_on_delimiters(featured_raw) if featured_raw else []
+
+    if not primary_parts:
+        if featured_parts:
+            primary_artist = featured_parts[0]
+            all_artists = featured_parts
+            featured = featured_parts[1:] if len(featured_parts) > 1 else None
+        else:
+            primary_artist = s
+            all_artists = [s]
+            featured = None
+    else:
+        primary_artist = primary_parts[0]
+        all_artists = primary_parts + featured_parts
+        featured = featured_parts if featured_parts else None
+
+    return primary_artist, all_artists, featured
+
+
 def extract_metadata(file_path: str) -> dict | None:
     """
     Extract metadata from an audio file.
@@ -362,12 +408,33 @@ def extract_metadata(file_path: str) -> dict | None:
             return None
 
     # Duration in seconds (float → round to int)
-    duration = int(audio.info.length) if audio.info and audio.info.length else None
+    info = audio.info
+    duration = int(info.length) if info and info.length else None
+
+    # Extract audio quality metadata from mutagen info
+    bitrate = int(info.bitrate / 1000) if info and getattr(info, "bitrate", None) else None  # kbps
+    sample_rate = int(info.sample_rate) if info and getattr(info, "sample_rate", None) else None
+    bit_depth = int(info.bits_per_sample) if info and getattr(info, "bits_per_sample", None) else None
+    file_size = path.stat().st_size if path.exists() else None
 
     # Extract tags — mutagen returns lists for multi-value fields
     title = _first_or_none(audio.get("title"))
-    artist = _first_or_none(audio.get("artist"))
     album = _first_or_none(audio.get("album"))
+
+    # Get all artist values (FLAC/Vorbis may have multiple ARTIST keys)
+    raw_artist_values = audio.get("artist")
+    if raw_artist_values and isinstance(raw_artist_values, list):
+        raw_artist = "; ".join(str(v) for v in raw_artist_values)
+    elif raw_artist_values:
+        raw_artist = str(raw_artist_values[0]) if isinstance(raw_artist_values, list) else str(raw_artist_values)
+    else:
+        raw_artist = ""
+
+    # Parse multi-artist string
+    primary_artist, all_artists, featured_artists = parse_artists(raw_artist)
+
+    # Use parsed primary as the main artist field
+    artist = primary_artist
 
     # Fallbacks
     if not title:
@@ -418,10 +485,16 @@ def extract_metadata(file_path: str) -> dict | None:
         "title": title.strip(),
         "artist": artist.strip(),
         "album": album.strip() if album else None,
+        "artists": all_artists,
+        "featured_artists": featured_artists,
         "duration": duration,
         "file_path": str(path.resolve()),
         "file_format": file_format,
         "file_mtime": file_mtime,
+        "bitrate": bitrate,
+        "sample_rate": sample_rate,
+        "bit_depth": bit_depth,
+        "file_size": file_size,
         "waveform_peaks": waveform_peaks,
         "dominant_color": dominant_color,
         "dominant_color_2": dominant_color_2,
@@ -493,10 +566,12 @@ def _replace_song(
                     album_art_path, source, waveform_peaks, dominant_color,
                     dominant_color_2, bleed_thumb, bleed_region_x, bleed_region_y,
                     bleed_region_w, bleed_region_h, file_mtime,
+                    bitrate, sample_rate, bit_depth, file_size,
                     replaygain_track_gain, replaygain_track_peak,
                     replaygain_album_gain, replaygain_album_peak,
+                    artists, featured_artists,
                     created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, 'local_scan', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?, 'local_scan', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (metadata["title"], metadata["artist"], metadata["album"],
              metadata["duration"], metadata["file_path"], metadata.get("file_format"),
              album_art_path,
@@ -509,10 +584,16 @@ def _replace_song(
              metadata.get("bleed_region_w", 0),
              metadata.get("bleed_region_h", 0),
              metadata.get("file_mtime"),
+             metadata.get("bitrate"),
+             metadata.get("sample_rate"),
+             metadata.get("bit_depth"),
+             metadata.get("file_size"),
              metadata.get("replaygain_track_gain"),
              metadata.get("replaygain_track_peak"),
              metadata.get("replaygain_album_gain"),
              metadata.get("replaygain_album_peak"),
+             json.dumps(metadata.get("artists")) if metadata.get("artists") else None,
+             json.dumps(metadata.get("featured_artists")) if metadata.get("featured_artists") else None,
              now, now),
         )
         new_id = cursor.lastrowid
@@ -635,8 +716,10 @@ def import_scanned_songs(
                        waveform_peaks=?, dominant_color=?, dominant_color_2=?,
                        bleed_thumb=?, bleed_region_x=?, bleed_region_y=?,
                        bleed_region_w=?, bleed_region_h=?, file_mtime=?,
+                       bitrate=?, sample_rate=?, bit_depth=?, file_size=?,
                        replaygain_track_gain=?, replaygain_track_peak=?,
                        replaygain_album_gain=?, replaygain_album_peak=?,
+                       artists=?, featured_artists=?,
                        updated_at=?
                        WHERE id=?""",
                     (metadata["title"], metadata["artist"], metadata["album"],
@@ -647,10 +730,16 @@ def import_scanned_songs(
                      metadata.get("bleed_region_x", 0), metadata.get("bleed_region_y", 0),
                      metadata.get("bleed_region_w", 0), metadata.get("bleed_region_h", 0),
                      incoming_mtime,
+                     metadata.get("bitrate"),
+                     metadata.get("sample_rate"),
+                     metadata.get("bit_depth"),
+                     metadata.get("file_size"),
                      metadata.get("replaygain_track_gain"),
                      metadata.get("replaygain_track_peak"),
                      metadata.get("replaygain_album_gain"),
                      metadata.get("replaygain_album_peak"),
+                     json.dumps(metadata.get("artists")) if metadata.get("artists") else None,
+                     json.dumps(metadata.get("featured_artists")) if metadata.get("featured_artists") else None,
                      now, exact[0]),
                 )
                 imported.append({"id": exact[0], **metadata})
@@ -721,10 +810,12 @@ def import_scanned_songs(
                     album_art_path, source, waveform_peaks, dominant_color,
                     dominant_color_2, bleed_thumb, bleed_region_x, bleed_region_y,
                     bleed_region_w, bleed_region_h, file_mtime,
+                    bitrate, sample_rate, bit_depth, file_size,
                     replaygain_track_gain, replaygain_track_peak,
                     replaygain_album_gain, replaygain_album_peak,
+                    artists, featured_artists,
                     created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, 'local_scan', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?, 'local_scan', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (metadata["title"], metadata["artist"], metadata["album"],
              metadata["duration"], incoming_path, incoming_fmt,
              album_art_path,
@@ -737,10 +828,16 @@ def import_scanned_songs(
              metadata.get("bleed_region_w", 0),
              metadata.get("bleed_region_h", 0),
              metadata.get("file_mtime"),
+             metadata.get("bitrate"),
+             metadata.get("sample_rate"),
+             metadata.get("bit_depth"),
+             metadata.get("file_size"),
              metadata.get("replaygain_track_gain"),
              metadata.get("replaygain_track_peak"),
              metadata.get("replaygain_album_gain"),
              metadata.get("replaygain_album_peak"),
+             json.dumps(metadata.get("artists")) if metadata.get("artists") else None,
+             json.dumps(metadata.get("featured_artists")) if metadata.get("featured_artists") else None,
              now, now),
         )
         song_id = cursor.lastrowid

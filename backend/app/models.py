@@ -32,11 +32,17 @@ class SongResponse(BaseModel):
     source: str
     tags: list[str]
     playlists: list[str]
+    artists: Optional[list[str]] = None
+    featured_artists: Optional[list[str]] = None
     created_at: str
     updated_at: str
     start_time_ms: int = 0
     end_time_ms: int = 0
     position: Optional[int] = None
+    bitrate: Optional[int] = None
+    sample_rate: Optional[int] = None
+    bit_depth: Optional[int] = None
+    file_size: Optional[int] = None
     waveform_peaks: Optional[list[float]] = None
     dominant_color: Optional[str] = None
     dominant_color_2: Optional[str] = None

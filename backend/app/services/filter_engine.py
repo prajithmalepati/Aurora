@@ -126,6 +126,7 @@ def filter_songs(db_connection, query_string: str) -> list[dict]:
             s.waveform_peaks, s.dominant_color, s.dominant_color_2,
             s.replaygain_track_gain, s.replaygain_track_peak,
             s.replaygain_album_gain, s.replaygain_album_peak,
+            s.artists, s.featured_artists,
             s.created_at, s.updated_at,
             GROUP_CONCAT(DISTINCT t.name) AS tag_names,
             GROUP_CONCAT(DISTINCT p.id || ':' || p.name) AS playlist_ids_names
@@ -153,12 +154,18 @@ def filter_songs(db_connection, query_string: str) -> list[dict]:
             # Parse waveform_peaks JSON
             raw_peaks = row["waveform_peaks"] if "waveform_peaks" in row.keys() else None
             waveform_peaks = json.loads(raw_peaks) if raw_peaks else None
+            raw_artists = row["artists"] if "artists" in row.keys() else None
+            raw_featured = row["featured_artists"] if "featured_artists" in row.keys() else None
+            artists_list = json.loads(raw_artists) if raw_artists else None
+            featured_list = json.loads(raw_featured) if raw_featured else None
 
             results.append({
                 "id": row["id"],
                 "title": row["title"],
                 "artist": row["artist"],
                 "album": row["album"],
+                "artists": artists_list,
+                "featured_artists": featured_list,
                 "duration": row["duration"],
                 "file_path": row["file_path"],
                 "file_format": row["file_format"] if "file_format" in row.keys() else None,

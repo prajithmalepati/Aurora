@@ -172,6 +172,25 @@ def init_db():
             conn.commit()
         except Exception:
             pass
+    # Migration: add audio quality metadata columns
+    for col, col_type in [("bitrate", "INTEGER"), ("sample_rate", "INTEGER"),
+                           ("bit_depth", "INTEGER"), ("file_size", "INTEGER")]:
+        try:
+            conn.execute(f"ALTER TABLE songs ADD COLUMN {col} {col_type}")
+            conn.commit()
+        except Exception:
+            pass
+    # Migration: add multi-artist columns
+    try:
+        conn.execute("ALTER TABLE songs ADD COLUMN artists TEXT")
+        conn.commit()
+    except Exception:
+        pass  # Column already exists
+    try:
+        conn.execute("ALTER TABLE songs ADD COLUMN featured_artists TEXT")
+        conn.commit()
+    except Exception:
+        pass  # Column already exists
     conn.close()
 
 
