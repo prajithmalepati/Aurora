@@ -11,6 +11,7 @@ type View =
   | { kind: "playlist"; playlistId: number }
   | { kind: "folders" }
   | { kind: "settings" }
+  | { kind: "about" }
 
 type SortField = "title" | "artist" | "album" | "duration" | "created_at"
 

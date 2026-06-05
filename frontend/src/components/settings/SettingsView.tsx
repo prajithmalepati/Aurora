@@ -1,5 +1,6 @@
 import { useSettingsStore } from "@/stores/settingsStore"
 import type { CrossfadeCurve } from "@/stores/settingsStore"
+import { resetWelcome } from "@/components/welcome/WelcomeOverlay"
 
 export function SettingsView() {
   const crossfadeEnabled = useSettingsStore((s) => s.crossfadeEnabled)
@@ -178,6 +179,19 @@ export function SettingsView() {
           <p className="text-[13px] text-[var(--aurora-text-secondary)]">Manual skip fade</p>
           <span className="text-[13px] tabular-nums text-[var(--aurora-text-tertiary)]">1s (fixed)</span>
         </div>
+      </div>
+
+      {/* Reset welcome */}
+      <div className="mt-8 text-center">
+        <button
+          onClick={() => {
+            resetWelcome()
+            window.location.reload()
+          }}
+          className="text-[12px] text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-accent-interactive)] transition-colors duration-150"
+        >
+          Reset welcome screen
+        </button>
       </div>
     </div>
   )
