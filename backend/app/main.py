@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import init_db
-from app.routers import songs, tags, playlists, filter, scanner
+from app.routers import songs, tags, playlists, filter, scanner, folders
 
 app = FastAPI(title="Aurora", version="0.1.0")
 
@@ -22,6 +22,7 @@ app.include_router(tags.router, prefix="/api")
 app.include_router(playlists.router, prefix="/api")
 app.include_router(filter.router, prefix="/api")
 app.include_router(scanner.router, prefix="/api")
+app.include_router(folders.router, prefix="/api")
 
 
 @app.on_event("startup")

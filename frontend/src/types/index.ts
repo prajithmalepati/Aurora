@@ -122,6 +122,27 @@ export interface ScanResult {
   art_extracted: number
 }
 
+export interface FolderNode {
+  name: string
+  path: string
+  song_count: number
+  subfolders?: FolderNode[]
+}
+
+export interface FolderTreeResponse {
+  folders: FolderNode[]
+  total_folders: number
+  total_songs: number
+}
+
+export interface FolderSongsResponse {
+  data: Song[]
+  total: number
+  path: string
+  recursive: boolean
+  message: string
+}
+
 export interface ApiResponse<T> {
   data: T
   message: string
