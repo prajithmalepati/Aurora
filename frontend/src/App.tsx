@@ -1,8 +1,10 @@
-import { useEffect, useState, useCallback, type ReactNode } from "react"
+import { useEffect, useState, type ReactNode } from "react"
 import { useSongStore } from "@/stores/songStore"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { useTagStore } from "@/stores/tagStore"
 import { usePlayerStore } from "@/stores/playerStore"
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts"
+import { KeyboardShortcutsOverlay } from "@/components/ui/KeyboardShortcutsOverlay"
 import { AppShell } from "@/components/layout/AppShell"
 import { Sidebar } from "@/components/layout/Sidebar"
 import { PlayerBar } from "@/components/layout/PlayerBar"
@@ -51,10 +53,6 @@ function App() {
   }, [searchQuery, fetchSongs])
 
   const isPlaying = usePlayerStore((state) => state.isPlaying)
-  const togglePlay = usePlayerStore((state) => state.togglePlay)
-  const next = usePlayerStore((state) => state.next)
-  const previous = usePlayerStore((state) => state.previous)
-  const toggleMute = usePlayerStore((state) => state.toggleMute)
 
   // Wake lock — prevent tab suspension while audio plays
   useEffect(() => {
@@ -80,53 +78,7 @@ function App() {
   }, [isPlaying])
 
   // Global keyboard shortcuts
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    const tag = (document.activeElement as HTMLElement)?.tagName
-    const isTyping = tag === "INPUT" || tag === "TEXTAREA"
-
-    // Escape — blur any focused input
-    if (e.key === "Escape") {
-      ;(document.activeElement as HTMLElement)?.blur()
-      return
-    }
-
-    // All remaining shortcuts only fire when NOT typing
-    if (isTyping) return
-
-    switch (e.code) {
-      case "Space":
-        e.preventDefault()
-        togglePlay()
-        break
-      case "ArrowRight":
-        e.preventDefault()
-        next()
-        break
-      case "ArrowLeft":
-        e.preventDefault()
-        previous()
-        break
-      case "KeyM":
-        toggleMute()
-        break
-      case "Slash":
-        e.preventDefault()
-        if (view.kind !== "filter") {
-          setView({ kind: "filter" })
-        }
-        // Focus the Mix query input on next tick
-        setTimeout(() => {
-          const input = document.querySelector<HTMLInputElement>('.mix-query-bar input[type="text"]')
-          input?.focus()
-        }, 50)
-        break
-    }
-  }, [togglePlay, next, previous, toggleMute, view.kind, setView])
-
-  useEffect(() => {
-    window.addEventListener("keydown", handleKeyDown)
-    return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [handleKeyDown])
+  const { isOverlayOpen, closeOverlay } = useKeyboardShortcuts()
 
   const handlePlaySong = (song: Song) => {
     playSong(song, songs)
@@ -239,6 +191,12 @@ function App() {
         }}
       />
       <ToastClickDismiss />
+      <KeyboardShortcutsOverlay
+        open={isOverlayOpen}
+        onOpenChange={(open) => {
+          if (!open) closeOverlay()
+        }}
+      />
     </>
   )
 }
