@@ -3,8 +3,10 @@ import { useSettingsStore } from "@/stores/settingsStore"
 export function SettingsView() {
   const crossfadeEnabled = useSettingsStore((s) => s.crossfadeEnabled)
   const crossfadeDuration = useSettingsStore((s) => s.crossfadeDuration)
+  const replaygainMode = useSettingsStore((s) => s.replaygainMode)
   const setCrossfadeEnabled = useSettingsStore((s) => s.setCrossfadeEnabled)
   const setCrossfadeDuration = useSettingsStore((s) => s.setCrossfadeDuration)
+  const setReplaygainMode = useSettingsStore((s) => s.setReplaygainMode)
 
   const durPct = ((crossfadeDuration - 1) / 11) * 100
 
@@ -78,6 +80,33 @@ export function SettingsView() {
               aria-label="Crossfade duration"
             />
             <span className="text-[11px] text-[var(--aurora-text-tertiary)] w-5">12s</span>
+          </div>
+        </div>
+
+        {/* ReplayGain mode */}
+        <div className="px-5 py-4 border-t border-[var(--aurora-rim)]">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <p className="text-[14px] text-[var(--aurora-text)] font-medium">ReplayGain</p>
+              <p className="text-[12px] text-[var(--aurora-text-secondary)] mt-0.5">
+                Normalize loudness across songs
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            {(["off", "track", "album"] as const).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => setReplaygainMode(mode)}
+                className={`px-3 py-1.5 rounded-lg text-[13px] font-medium transition-colors ${
+                  replaygainMode === mode
+                    ? "bg-[var(--aurora-accent-interactive)] text-white"
+                    : "bg-white/[0.08] text-[var(--aurora-text-secondary)] hover:bg-white/[0.12]"
+                }`}
+              >
+                {mode === "off" ? "Off" : mode === "track" ? "Track" : "Album"}
+              </button>
+            ))}
           </div>
         </div>
 

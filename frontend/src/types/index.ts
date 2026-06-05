@@ -18,8 +18,11 @@ export interface Song {
   waveform_peaks?: number[] | null
   dominant_color?: string | null
   dominant_color_2?: string | null
+  replaygain_track_gain?: number | null
+  replaygain_track_peak?: number | null
+  replaygain_album_gain?: number | null
+  replaygain_album_peak?: number | null
 }
-
 export interface Playlist {
   id: number
   name: string
@@ -53,8 +56,11 @@ export interface PlaylistSong {
   waveform_peaks?: number[] | null
   dominant_color?: string | null
   dominant_color_2?: string | null
+  replaygain_track_gain?: number | null
+  replaygain_track_peak?: number | null
+  replaygain_album_gain?: number | null
+  replaygain_album_peak?: number | null
 }
-
 export interface Tag {
   id: number
   name: string
@@ -79,8 +85,11 @@ export interface FilterResult {
   waveform_peaks?: number[] | null
   dominant_color?: string | null
   dominant_color_2?: string | null
+  replaygain_track_gain?: number | null
+  replaygain_track_peak?: number | null
+  replaygain_album_gain?: number | null
+  replaygain_album_peak?: number | null
 }
-
 export interface ScanResult {
   scanned: number
   imported: number
