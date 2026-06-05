@@ -2,11 +2,12 @@ import { useSongStore } from "@/stores/songStore"
 import type { Song } from "@/types"
 import { SongRow } from "./SongRow"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Music, ChevronUp, ChevronDown } from "lucide-react"
+import { Music, ChevronUp, ChevronDown, AlertTriangle, RefreshCw } from "lucide-react"
 
 interface SongTableProps {
   songs: Song[]
   loading?: boolean
+  error?: string | null
   onPlay?: (song: Song, index: number) => void
   animKey?: number
   showSort?: boolean
@@ -63,7 +64,7 @@ function TableHeader({ sortField, sortOrder, onSort }: TableHeaderProps) {
   )
 }
 
-export function SongTable({ songs, loading = false, onPlay, animKey, showSort = true }: SongTableProps) {
+export function SongTable({ songs, loading = false, error = null, onPlay, animKey, showSort = true }: SongTableProps) {
   const sortField = useSongStore((state) => state.sortField)
   const sortOrder = useSongStore((state) => state.sortOrder)
   const sortSongs = useSongStore((state) => state.sortSongs)
@@ -147,6 +148,38 @@ export function SongTable({ songs, loading = false, onPlay, animKey, showSort = 
             ))}
           </tbody>
         </table>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="w-full aurora-fade-in">
+        {toolbar}
+        <table className="w-full border-separate border-spacing-0">
+          <TableHeader sortField={sortField} sortOrder={sortOrder} onSort={handleColumnSort} />
+        </table>
+        <div className="py-20 flex flex-col items-center justify-center gap-3">
+          <AlertTriangle className="h-8 w-8 text-[var(--aurora-danger)] opacity-50" />
+          <p className="font-display-italic text-[20px] text-[var(--aurora-danger)]">
+            Failed to load songs
+          </p>
+          <p className="text-xs text-[var(--aurora-text-secondary)] max-w-xs text-center">
+            {error}
+          </p>
+          <button
+            onClick={() => useSongStore.getState().fetchSongs()}
+            className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-[12px] font-semibold aurora-btn-press transition-colors duration-150"
+            style={{
+              background: "var(--aurora-surface)",
+              color: "var(--aurora-text-secondary)",
+              boxShadow: "inset 0 0 0 1px var(--aurora-rim)",
+            }}
+          >
+            <RefreshCw className="h-3 w-3" />
+            Retry
+          </button>
+        </div>
       </div>
     )
   }

@@ -51,8 +51,10 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
   const [addSongOpen, setAddSongOpen] = useState(false)
   const playlists = usePlaylistStore((state) => state.playlists)
   const playlistsLoading = usePlaylistStore((state) => state.loading)
+  const playlistsError = usePlaylistStore((state) => state.error)
   const tags = useTagStore((state) => state.tags)
   const tagsLoading = useTagStore((state) => state.loading)
+  const tagsError = useTagStore((state) => state.error)
   const setQuery = useFilterStore((state) => state.setQuery)
   const executeFilter = useFilterStore((state) => state.executeFilter)
   const setIsQuickTagView = useFilterStore((state) => state.setIsQuickTagView)
@@ -132,6 +134,12 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
                   <Skeleton key={i} className="h-8 w-full rounded-md" />
                 ))}
               </div>
+            ) : playlistsError ? (
+              <div className="px-3 py-3 text-center">
+                <p className="text-[11px] text-[var(--aurora-danger)]">
+                  Failed to load playlists
+                </p>
+              </div>
             ) : playlists.length === 0 ? (
               <div className="px-3 py-6 text-center">
                 <p className="font-display-italic text-[13px] text-[var(--aurora-text-tertiary)]">
@@ -183,6 +191,12 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
                 {[...Array(3)].map((_, i) => (
                   <Skeleton key={i} className="h-7 w-full rounded-md" />
                 ))}
+              </div>
+            ) : tagsError ? (
+              <div className="px-3 py-3 text-center">
+                <p className="text-[11px] text-[var(--aurora-danger)]">
+                  Failed to load tags
+                </p>
               </div>
             ) : tags.length === 0 ? (
               <div className="px-3 py-6 text-center">

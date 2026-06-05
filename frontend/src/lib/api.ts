@@ -10,10 +10,15 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { "Content-Type": "application/json", ...options.headers },
-    ...options,
-  })
+  let res: Response
+  try {
+    res = await fetch(`${BASE_URL}${path}`, {
+      headers: { "Content-Type": "application/json", ...options.headers },
+      ...options,
+    })
+  } catch {
+    throw new ApiError("Cannot reach server — check that the backend is running", 0)
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: "Unknown error" }))
     throw new ApiError(err.detail || res.statusText, res.status)
@@ -23,7 +28,12 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 // Multipart upload — lets the browser set Content-Type with the boundary
 async function uploadRequest<T>(path: string, formData: FormData): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, { method: "PUT", body: formData })
+  let res: Response
+  try {
+    res = await fetch(`${BASE_URL}${path}`, { method: "PUT", body: formData })
+  } catch {
+    throw new ApiError("Cannot reach server — check that the backend is running", 0)
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: "Unknown error" }))
     throw new ApiError(err.detail || res.statusText, res.status)
