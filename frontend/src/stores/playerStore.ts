@@ -18,7 +18,10 @@ interface PlayerState {
   originalQueue: Song[]
   queuePlaylistId: number | null
   isBuffering: boolean
+  isCrossfading: boolean
+  crossfadeFromTitle: string | null
   setIsBuffering: (v: boolean) => void
+  setCrossfading: (crossfading: boolean, fromTitle?: string) => void
 
   playSong: (song: Song, queue?: Song[], playlistId?: number | null) => void
   togglePlay: () => void
@@ -70,6 +73,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   originalQueue: [],
   queuePlaylistId: null,
   isBuffering: false,
+  isCrossfading: false,
+  crossfadeFromTitle: null,
 
   playSong: (song, queue, playlistId = null) => {
     if (!song.file_path) return
@@ -209,6 +214,11 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   }),
 
   setIsBuffering: (v) => set({ isBuffering: v }),
+
+  setCrossfading: (crossfading, fromTitle) => set({
+    isCrossfading: crossfading,
+    crossfadeFromTitle: crossfading ? (fromTitle ?? null) : null,
+  }),
 
   cycleRepeat: () => {
     const { repeatMode } = get()

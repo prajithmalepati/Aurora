@@ -2,7 +2,7 @@ import { usePlayerStore } from "@/stores/playerStore"
 import { useAudioPlayer } from "@/hooks/useAudioPlayer"
 import { AlbumArt } from "@/components/songs/AlbumArt"
 import { Equalizer } from "@/components/ui/Equalizer"
-import { SkipBack, SkipForward, Volume2, VolumeX, Shuffle, Repeat, Repeat1, ListMusic } from "lucide-react"
+import { SkipBack, SkipForward, Volume2, VolumeX, Shuffle, Repeat, Repeat1, ListMusic, Sparkles } from "lucide-react"
 import { motion, AnimatePresence } from "motion/react"
 import { AuroraPlayButton } from "@/components/player/AuroraPlayButton"
 import { SeekScrubber } from "@/components/player/SeekScrubber"
@@ -25,6 +25,8 @@ export function PlayerBar() {
   const toggleShuffle = usePlayerStore((state) => state.toggleShuffle)
   const isBuffering = usePlayerStore((state) => state.isBuffering)
   const queue = usePlayerStore((state) => state.queue)
+  const isCrossfading = usePlayerStore((state) => state.isCrossfading)
+  const crossfadeFromTitle = usePlayerStore((state) => state.crossfadeFromTitle)
 
   const [queueOpen, setQueueOpen] = useState(false)
 
@@ -121,6 +123,15 @@ export function PlayerBar() {
                     <span className="text-[10px] text-[var(--aurora-text-secondary)] truncate">
                       {currentSong.artist}
                     </span>
+                    {/* Crossfade indicator */}
+                    {isCrossfading && crossfadeFromTitle && (
+                      <div className="flex items-center gap-1 mt-0.5 aurora-fade-in">
+                        <Sparkles className="h-2.5 w-2.5 text-[var(--aurora-accent-interactive)] flex-shrink-0" />
+                        <span className="text-[9px] text-[var(--aurora-text-tertiary)] truncate">
+                          from <span className="text-[var(--aurora-accent-interactive)]">{crossfadeFromTitle}</span>
+                        </span>
+                      </div>
+                    )}
                   </>
                 ) : (
                   <span className="font-display-italic text-[13px] text-[var(--aurora-text-tertiary)]">
@@ -247,6 +258,15 @@ export function PlayerBar() {
                     <span className="text-[11px] text-[var(--aurora-text-secondary)] truncate mt-0.5 tracking-wide">
                       {currentSong.artist}
                     </span>
+                    {/* Crossfade indicator */}
+                    {isCrossfading && crossfadeFromTitle && (
+                      <div className="flex items-center gap-1.5 mt-1 aurora-fade-in">
+                        <Sparkles className="h-3 w-3 text-[var(--aurora-accent-interactive)] flex-shrink-0" />
+                        <span className="text-[10px] text-[var(--aurora-text-tertiary)] truncate">
+                          from <span className="text-[var(--aurora-accent-interactive)]">{crossfadeFromTitle}</span>
+                        </span>
+                      </div>
+                    )}
                   </>
                 ) : (
                   <span className="font-display-italic text-[15px] text-[var(--aurora-text-tertiary)]">
