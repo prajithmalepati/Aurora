@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback } from "react"
 import { Howl } from "howler"
 import { usePlayerStore } from "@/stores/playerStore"
 import { useSettingsStore } from "@/stores/settingsStore"
+import type { CrossfadeCurve } from "@/stores/settingsStore"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { toast } from "@/lib/toast"
 
@@ -9,11 +10,14 @@ export function useAudioPlayer() {
   const howlRef = useRef<Howl | null>(null)
   // Holds the outgoing howl being faded out — cleanup passes it here instead of stopping
   const prevHowlRef = useRef<Howl | null>(null)
+  // Title of the outgoing song (for crossfade indicator)
+  const prevTitleRef = useRef<string | null>(null)
   // Preloaded next song's Howl — created ~5s before song end to eliminate silence gap
   const nextHowlRef = useRef<{ howl: Howl; songId: string } | null>(null)
   // Tracks whether the preloaded Howl's onload has fired (fully decoded, ready to play)
   const preloadReadyRef = useRef<boolean>(false)
   const intervalRef = useRef<number | null>(null)
+  const xfadeIntervalRef = useRef<number | null>(null) // equal-power crossfade interval
   const currentSongRef = useRef<string | null>(null)
   const seekingRef = useRef(false)
 
@@ -47,7 +51,11 @@ export function useAudioPlayer() {
     return Math.max(0, Math.min(1, volume * gain))
   }
 
-  function resolveXfade(): { enabled: boolean; duration: number } {
+  function resolveXfade(): {
+    enabled: boolean
+    duration: number
+    curve: CrossfadeCurve
+  } {
     const { queuePlaylistId } = usePlayerStore.getState()
     const settings = useSettingsStore.getState()
     if (queuePlaylistId) {
@@ -56,10 +64,15 @@ export function useAudioPlayer() {
         return {
           enabled: playlist.crossfade_enabled === 1,
           duration: playlist.crossfade_duration_s ?? settings.crossfadeDuration,
+          curve: settings.crossfadeCurve,
         }
       }
     }
-    return { enabled: settings.crossfadeEnabled, duration: settings.crossfadeDuration }
+    return {
+      enabled: settings.crossfadeEnabled,
+      duration: settings.crossfadeDuration,
+      curve: settings.crossfadeCurve,
+    }
   }
 
   /** Run post-load initialization (set duration, seek to start_time_ms).
@@ -97,13 +110,13 @@ export function useAudioPlayer() {
             return
           }
 
-          // Crossfade early trigger
+          // Crossfade early trigger — fires at crossfadeDuration seconds before end
           const { enabled: xEnabled, duration: xDuration } = resolveXfade()
           if (xEnabled) {
             const howlDuration = howlRef.current.duration()
             if (howlDuration > 0) {
-              const effectiveDuration = Math.min(xDuration, howlDuration / 2)
-              if (seekSec >= howlDuration - effectiveDuration) {
+              const triggerPoint = Math.max(0, howlDuration - xDuration)
+              if (seekSec >= triggerPoint) {
                 window.clearInterval(intervalRef.current!)
                 intervalRef.current = null
                 next()
@@ -228,6 +241,7 @@ export function useAudioPlayer() {
   // Unmount cleanup — stop everything that's still playing
   useEffect(() => {
     return () => {
+      if (xfadeIntervalRef.current) { window.clearInterval(xfadeIntervalRef.current); xfadeIntervalRef.current = null }
       if (howlRef.current) { howlRef.current.stop(); howlRef.current.unload() }
       if (prevHowlRef.current) { prevHowlRef.current.stop(); prevHowlRef.current.unload() }
       if (nextHowlRef.current) { nextHowlRef.current.howl.unload(); nextHowlRef.current = null; preloadReadyRef.current = false }
@@ -248,7 +262,7 @@ export function useAudioPlayer() {
     const prev = prevHowlRef.current
     prevHowlRef.current = null
 
-    const { enabled, duration } = resolveXfade()
+    const { enabled, duration, curve } = resolveXfade()
     const crossfadeIn = enabled && (prev?.playing() ?? false)
 
     if (!currentSong?.file_path) {
@@ -325,9 +339,51 @@ export function useAudioPlayer() {
       }
 
       if (crossfadeIn) {
+        // crossfadeIn guarantees prev is non-null (derived from prev?.playing())
+        const outgoing = prev!
         howl.volume(0)
         howl.play()
-        howl.fade(0, resolveVolume(), duration * 1000)
+
+        const fadeDurationMs = duration * 1000
+        const targetVol = resolveVolume()
+
+        if (curve === 'overlap') {
+          // Overlap: play both at full volume, then cut old one after duration
+          howl.volume(targetVol)
+          usePlayerStore.getState().setCrossfading(true, prevTitleRef.current ?? undefined)
+          setTimeout(() => {
+            outgoing.stop()
+            outgoing.unload()
+            usePlayerStore.getState().setCrossfading(false)
+          }, fadeDurationMs)
+        } else if (curve === 'equalpower') {
+          // Equal Power: cosine curve for constant-power transition
+          const prevVol = outgoing.volume()
+          const startTime = performance.now()
+          usePlayerStore.getState().setCrossfading(true, prevTitleRef.current ?? undefined)
+
+          const equalPowerInterval = setInterval(() => {
+            const elapsed = performance.now() - startTime
+            const t = Math.min(1, elapsed / fadeDurationMs)
+            // Cosine curves: sin² + cos² = 1 → constant power
+            const fadeInVol = Math.sin(t * Math.PI / 2) * targetVol
+            const fadeOutVol = Math.cos(t * Math.PI / 2) * prevVol
+            howl.volume(fadeInVol)
+            if (outgoing.playing()) outgoing.volume(fadeOutVol)
+            if (t >= 1) {
+              clearInterval(equalPowerInterval)
+              xfadeIntervalRef.current = null
+              outgoing.stop()
+              outgoing.unload()
+              usePlayerStore.getState().setCrossfading(false)
+            }
+          }, 33) // ~30fps
+          xfadeIntervalRef.current = equalPowerInterval as unknown as number
+        } else {
+          // Linear: default Howler fade behavior
+          usePlayerStore.getState().setCrossfading(true, prevTitleRef.current ?? undefined)
+          howl.fade(0, targetVol, fadeDurationMs)
+        }
       } else {
         howl.volume(resolveVolume())
         howl.play()
@@ -340,8 +396,22 @@ export function useAudioPlayer() {
     // The momentary overlap of two audio sources produces the gapless transition.
     if (prev) {
       if (crossfadeIn) {
-        prev.fade(prev.volume(), 0, duration * 1000)
-        setTimeout(() => { prev.stop(); prev.unload() }, duration * 1000)
+        const fadeDurationMs = duration * 1000
+        if (curve === 'overlap') {
+          // Already handled above via setTimeout
+          // prev continues at full volume until the timeout fires
+        } else if (curve === 'equalpower') {
+          // Already handled above via setInterval
+          // prev volume is being manually ramped down
+        } else {
+          // Linear: use Howler's built-in fade
+          prev.fade(prev.volume(), 0, fadeDurationMs)
+          setTimeout(() => {
+            prev.stop()
+            prev.unload()
+            usePlayerStore.getState().setCrossfading(false)
+          }, fadeDurationMs)
+        }
       } else {
         prev.stop()
         prev.unload()
@@ -351,10 +421,17 @@ export function useAudioPlayer() {
     return () => {
       // Hand off to prevHowlRef — DO NOT stop here, let the next body crossfade
       prevHowlRef.current = howl
+      prevTitleRef.current = currentSong?.title ?? null
       if (howlRef.current === howl) howlRef.current = null
       if (intervalRef.current) {
         window.clearInterval(intervalRef.current)
         intervalRef.current = null
+      }
+      if (xfadeIntervalRef.current) {
+        window.clearInterval(xfadeIntervalRef.current)
+        xfadeIntervalRef.current = null
+        // If crossfade was interrupted, ensure state is cleaned up
+        usePlayerStore.getState().setCrossfading(false)
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
