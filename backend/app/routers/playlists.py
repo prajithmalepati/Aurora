@@ -1,11 +1,10 @@
 """Playlists router."""
-import io
 import json
 import re
 import sqlite3
 from pathlib import Path
 from fastapi import APIRouter, HTTPException, UploadFile, File, Query, Form
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import Response
 
 from datetime import datetime, timezone
 
@@ -32,36 +31,45 @@ async def upload_playlist_image(playlist_id: int, file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="File must be an image")
 
     conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT id FROM playlists WHERE id = ?", (playlist_id,))
-    if not cursor.fetchone():
+    filepath = None
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM playlists WHERE id = ?", (playlist_id,))
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Playlist not found")
+
+        # Derive extension from MIME type
+        mime = file.content_type or "image/jpeg"
+        ext = {"image/png": "png", "image/gif": "gif", "image/webp": "webp"}.get(mime, "jpg")
+
+        IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+
+        # Remove any existing image files for this playlist
+        for old in IMAGES_DIR.glob(f"{playlist_id}.*"):
+            old.unlink()
+
+        filename = f"{playlist_id}.{ext}"
+        filepath = IMAGES_DIR / filename
+        with open(filepath, "wb") as f:
+            f.write(await file.read())
+
+        image_url = f"/playlist-images/{filename}"
+
+        conn.execute(
+            "UPDATE playlists SET image_url = ?, updated_at = ? WHERE id = ?",
+            (image_url, _get_utc_now(), playlist_id),
+        )
+        conn.commit()
+    except Exception:
+        # Clean up the written file on any DB failure
+        try:
+            if filepath is not None and filepath.exists():
+                filepath.unlink()
+        except Exception:
+            pass
+        raise
+    finally:
         conn.close()
-        raise HTTPException(status_code=404, detail="Playlist not found")
-    conn.close()
-
-    # Derive extension from MIME type
-    mime = file.content_type or "image/jpeg"
-    ext = {"image/png": "png", "image/gif": "gif", "image/webp": "webp"}.get(mime, "jpg")
-
-    IMAGES_DIR.mkdir(parents=True, exist_ok=True)
-
-    # Remove any existing image files for this playlist
-    for old in IMAGES_DIR.glob(f"{playlist_id}.*"):
-        old.unlink()
-
-    filename = f"{playlist_id}.{ext}"
-    with open(IMAGES_DIR / filename, "wb") as f:
-        f.write(await file.read())
-
-    image_url = f"/playlist-images/{filename}"
-
-    conn = get_db()
-    conn.execute(
-        "UPDATE playlists SET image_url = ?, updated_at = ? WHERE id = ?",
-        (image_url, _get_utc_now(), playlist_id),
-    )
-    conn.commit()
-    conn.close()
 
     return {"image_url": image_url}
 

@@ -24,7 +24,7 @@ interface SongState {
   sortOrder: "asc" | "desc"
 
   fetchSongs: (search?: string) => Promise<void>
-  sortSongs: (field: SortField, order: "asc" | "desc") => void
+  sortSongs: (field: SortField, order: "asc" | "desc") => Promise<void>
   createSong: (data: {
     title: string
     artist: string
@@ -68,9 +68,9 @@ export const useSongStore = create<SongState>((set, get) => ({
     }
   },
 
-  sortSongs: (field, order) => {
+  sortSongs: async (field, order) => {
     set({ sortField: field, sortOrder: order })
-    get().fetchSongs()
+    await get().fetchSongs()
   },
 
   createSong: async (data) => {
@@ -114,7 +114,7 @@ export const useSongStore = create<SongState>((set, get) => ({
       await api.post(`/songs/${songId}/tags`, { tag_names: tagNames })
       await get().fetchSongs()
       const filterState = useFilterStore.getState()
-      if (filterState.query.trim()) filterState.executeFilter()
+      if (filterState.query.trim()) await filterState.executeFilter()
     } catch (e: any) {
       set({ error: e.message })
       toast.error(e.message ?? "Failed to update tags")
@@ -127,7 +127,7 @@ export const useSongStore = create<SongState>((set, get) => ({
       await api.delete(`/songs/${songId}/tags/${tagId}`)
       await get().fetchSongs()
       const filterState = useFilterStore.getState()
-      if (filterState.query.trim()) filterState.executeFilter()
+      if (filterState.query.trim()) await filterState.executeFilter()
     } catch (e: any) {
       set({ error: e.message })
       toast.error(e.message ?? "Failed to remove tag")
@@ -156,7 +156,7 @@ export const useSongStore = create<SongState>((set, get) => ({
       await api.delete(`/songs/${songId}/tags/${matchingTag.id}`)
       await get().fetchSongs()
       const filterState = useFilterStore.getState()
-      if (filterState.query.trim()) filterState.executeFilter()
+      if (filterState.query.trim()) await filterState.executeFilter()
       toast.success("Tag removed")
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to remove tag")

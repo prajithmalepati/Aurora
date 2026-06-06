@@ -1,7 +1,7 @@
 """Filter router."""
 from fastapi import APIRouter, HTTPException
 from app.services.filter_engine import filter_songs
-from app.database import get_db
+from app.database import get_db_ctx
 from app.models import FilterRequest
 
 router = APIRouter(tags=["filter"])
@@ -18,8 +18,8 @@ def filter_endpoint(request: FilterRequest):
     Raises 400 for invalid query syntax or empty query.
     """
     try:
-        db = get_db()
-        results = filter_songs(db, request.query)
+        with get_db_ctx() as db:
+            results = filter_songs(db, request.query)
         return {
             "data": results,
             "total": len(results),

@@ -260,8 +260,8 @@ export const SongRow = memo(function SongRow({ song, index, animIndex, onPlay }:
                     <span
                       className="w-[5px] h-[5px] rounded-sm flex-shrink-0"
                       style={{
-                        backgroundColor: playlist.color || "var(--aurora-accent-vivid)",
-                        boxShadow: playlist.color ? `0 0 4px ${playlist.color}60` : "0 0 4px var(--aurora-accent-interactive-glow)",
+                        backgroundColor: "var(--aurora-accent-vivid)",
+                        boxShadow: "0 0 4px var(--aurora-accent-interactive-glow)",
                       }}
                     />
                     {playlist.name}
