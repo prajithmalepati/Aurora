@@ -1,5 +1,7 @@
 const BASE_URL = "http://localhost:8000/api"
 
+export { BASE_URL }
+
 export class ApiError extends Error {
   status: number
   constructor(message: string, status: number) {
@@ -41,6 +43,21 @@ async function uploadRequest<T>(path: string, formData: FormData): Promise<T> {
   return res.json()
 }
 
+// POST multipart upload — for file imports (the existing upload helper uses PUT)
+async function postUploadRequest<T>(path: string, formData: FormData): Promise<T> {
+  let res: Response
+  try {
+    res = await fetch(`${BASE_URL}${path}`, { method: "POST", body: formData })
+  } catch {
+    throw new ApiError("Cannot reach server — check that the backend is running", 0)
+  }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Unknown error" }))
+    throw new ApiError(err.detail || res.statusText, res.status)
+  }
+  return res.json()
+}
+
 export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body: unknown) => request<T>(path, { method: "POST", body: JSON.stringify(body) }),
@@ -48,4 +65,5 @@ export const api = {
   patch: <T>(path: string, body: unknown) => request<T>(path, { method: "PATCH", body: JSON.stringify(body) }),
   delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
   upload: <T>(path: string, formData: FormData) => uploadRequest<T>(path, formData),
+  postUpload: <T>(path: string, formData: FormData) => postUploadRequest<T>(path, formData),
 }

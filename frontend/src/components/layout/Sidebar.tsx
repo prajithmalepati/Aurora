@@ -10,6 +10,7 @@ import { motion } from "motion/react"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { useTagStore } from "@/stores/tagStore"
 import { useFilterStore } from "@/stores/filterStore"
+import { api } from "@/lib/api"
 import { PlaylistItem } from "@/components/playlists/PlaylistItem"
 import { BorderGlow } from "@/components/ui/BorderGlow"
 import { CreatePlaylistDialog } from "@/components/playlists/CreatePlaylistDialog"
@@ -82,23 +83,16 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
     try {
       const formData = new FormData()
       formData.append('file', file)
-      const res = await fetch('http://localhost:8000/api/playlists/import', {
-        method: 'POST',
-        body: formData,
-      })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: 'Import failed' }))
-        throw new Error(err.detail || 'Import failed')
-      }
-      const data = await res.json()
-      toast.success(`Created playlist "${data.name}" with ${data.matched_count} songs.`)
-      if (data.unmatched_paths && data.unmatched_paths.length > 0) {
-        toast(`${data.unmatched_paths.length} file(s) not found in library`, { duration: 6000 })
+      const res = await api.postUpload<{data: {playlist_id: number, name: string, matched_count: number, unmatched_paths: string[]}, message: string}>('/playlists/import', formData)
+      const { playlist_id, name, matched_count, unmatched_paths } = res.data
+      toast.success(`Imported: ${matched_count} songs matched to "${name}"`)
+      if (unmatched_paths && unmatched_paths.length > 0) {
+        toast(`${unmatched_paths.length} file(s) not found in library`, { duration: 6000 })
       }
       await fetchPlaylists()
       // Navigate to the new playlist
-      if (data.playlist_id) {
-        onViewChange({ kind: 'playlist', playlistId: data.playlist_id })
+      if (playlist_id) {
+        onViewChange({ kind: 'playlist', playlistId: playlist_id })
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Import failed'
