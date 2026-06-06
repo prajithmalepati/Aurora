@@ -60,10 +60,10 @@ export const usePlaylistStore = create<PlaylistState>((set, get) => ({
 
   createPlaylist: async (data) => {
     try {
-      const res = await api.post<{ id: number; name: string }>("/playlists", data)
+      const res = await api.post<{ data: { id: number; name: string }; message: string }>("/playlists", data)
       await get().fetchPlaylists()
       toast.success("Playlist created")
-      return res.id
+      return res.data.id
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Failed to create playlist"
       set({ error: msg })

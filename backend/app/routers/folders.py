@@ -93,9 +93,9 @@ def get_folder_tree():
     tree = _build_tree(list(dirs))
 
     result = {
-        "folders": tree,
-        "total_folders": _count_nodes(tree),
-        "total_songs": _sum_counts(tree),
+        "data": {"folders": tree},
+        "meta": {"total_folders": _count_nodes(tree), "total_songs": _sum_counts(tree)},
+        "message": "ok",
     }
 
     folder_cache.set(cache_key, result)
@@ -179,10 +179,4 @@ def get_folder_songs(
 
     data = [song_row_to_dict(row) for row in rows]
 
-    return {
-        "data": data,
-        "total": total,
-        "path": path,
-        "recursive": recursive,
-        "message": "ok",
-    }
+    return {"data": data, "meta": {"total": total, "path": path, "recursive": recursive}, "message": "ok"}

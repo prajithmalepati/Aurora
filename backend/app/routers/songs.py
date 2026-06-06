@@ -173,7 +173,7 @@ def list_songs(
 
     data = [song_row_to_dict(row) for row in rows]
 
-    result = {"data": data, "total": total, "message": "ok"}
+    result = {"data": data, "meta": {"total": total}, "message": "ok"}
 
     # Cache non-search results
     if not search:
@@ -197,8 +197,8 @@ def get_song(song_id: int):
     
     if row is None:
         raise HTTPException(status_code=404, detail="Song not found")
-    
-    return song_row_to_dict(row)
+
+    return {"data": song_row_to_dict(row), "message": "ok"}
 
 
 @router.get("/songs/{song_id}/stream")
@@ -281,10 +281,10 @@ def delete_song(song_id: int):
     # Invalidate song caches
     song_cache.invalidate_prefix("songs:")
 
-    return {"message": "Song deleted successfully"}
+    return {"data": None, "message": "Song deleted successfully"}
 
 
-@router.post("/songs", status_code=201, response_model=SongResponse)
+@router.post("/songs", status_code=201)
 def create_song(song: SongCreate):
     """Create a new song."""
     # Validate title and artist are non-empty (Pydantic already enforces min_length=1)
@@ -322,20 +322,20 @@ def create_song(song: SongCreate):
     # Return the created song with empty tags and playlists
     import os as _os
     file_fmt = _os.path.splitext(song.file_path)[1].lstrip(".").lower() if song.file_path else None
-    return SongResponse(
-        id=song_id,
-        title=song.title,
-        artist=song.artist,
-        album=song.album,
-        duration=song.duration,
-        file_path=song.file_path,
-        file_format=file_fmt,
-        source="manual",
-        tags=[],
-        playlists=[],
-        created_at=now,
-        updated_at=now,
-    )
+    return {"data": {
+        "id": song_id,
+        "title": song.title,
+        "artist": song.artist,
+        "album": song.album,
+        "duration": song.duration,
+        "file_path": song.file_path,
+        "file_format": file_fmt,
+        "source": "manual",
+        "tags": [],
+        "playlists": [],
+        "created_at": now,
+        "updated_at": now,
+    }, "message": "Song created successfully"}
 
 
 @router.get("/album-art/{filename}")
@@ -351,7 +351,7 @@ def serve_album_art(filename: str):
     return FileResponse(str(art_path), media_type=mime)
 
 
-@router.put("/songs/{song_id}", response_model=SongResponse)
+@router.put("/songs/{song_id}")
 def update_song(song_id: int, song_update: SongUpdate):
     """Update a song by ID."""
     with get_db_ctx() as conn:
@@ -409,5 +409,5 @@ def update_song(song_id: int, song_update: SongUpdate):
     
     if row is None:
         raise HTTPException(status_code=404, detail="Song not found")
-    
-    return song_row_to_dict(row)
+
+    return {"data": song_row_to_dict(row), "message": "ok"}
