@@ -7,6 +7,16 @@ import boolean
 algebra = boolean.BooleanAlgebra()
 
 
+def _safe_json_loads(raw):
+    """Safely parse JSON, returning None on any failure."""
+    if not raw:
+        return None
+    try:
+        return json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return None
+
+
 def parse_query(query_string: str):
     """
     Parse a user query string into a boolean expression.
@@ -154,11 +164,11 @@ def filter_songs(db_connection, query_string: str) -> list[dict]:
             
             # Parse waveform_peaks JSON
             raw_peaks = row["waveform_peaks"] if "waveform_peaks" in row.keys() else None
-            waveform_peaks = json.loads(raw_peaks) if raw_peaks else None
+            waveform_peaks = _safe_json_loads(raw_peaks)
             raw_artists = row["artists"] if "artists" in row.keys() else None
             raw_featured = row["featured_artists"] if "featured_artists" in row.keys() else None
-            artists_list = json.loads(raw_artists) if raw_artists else None
-            featured_list = json.loads(raw_featured) if raw_featured else None
+            artists_list = _safe_json_loads(raw_artists)
+            featured_list = _safe_json_loads(raw_featured)
 
             results.append({
                 "id": row["id"],

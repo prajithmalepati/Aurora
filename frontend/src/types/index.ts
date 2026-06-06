@@ -14,7 +14,7 @@ export interface Song {
   start_time_ms?: number
   end_time_ms?: number
   tags: string[]
-  playlists: Playlist[]
+  playlists: PlaylistRef[]
   created_at: string
   updated_at: string
   bitrate?: number | null
@@ -40,6 +40,11 @@ export interface Playlist {
   song_count: number
   created_at: string
   updated_at: string
+}
+
+export interface PlaylistRef {
+  id: number
+  name: string
 }
 
 export interface PlaylistDetail extends Playlist {
@@ -93,7 +98,7 @@ export interface FilterResult {
   artists?: string[] | null
   featured_artists?: string[] | null
   tags: string[]
-  playlists: Playlist[]
+  playlists: PlaylistRef[]
   created_at: string
   updated_at: string
   bitrate?: number | null

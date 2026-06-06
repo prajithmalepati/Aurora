@@ -8,11 +8,21 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
 from datetime import datetime, timezone
 
-from app.database import get_db
+from app.database import get_db, get_db_ctx
 from app.models import SongCreate, SongResponse, SongUpdate
 from app.cache import song_cache
 
 router = APIRouter(tags=["songs"])
+
+
+def _safe_json_loads(raw):
+    """Safely parse JSON, returning None on any failure."""
+    if not raw:
+        return None
+    try:
+        return json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return None
 
 
 def _get_utc_now() -> str:
@@ -45,11 +55,11 @@ def song_row_to_dict(row: sqlite3.Row) -> dict:
     
     raw_art = row["album_art_path"] if "album_art_path" in row.keys() else None
     raw_peaks = row["waveform_peaks"] if "waveform_peaks" in row.keys() else None
-    waveform_peaks = json.loads(raw_peaks) if raw_peaks else None
+    waveform_peaks = _safe_json_loads(raw_peaks)
     raw_artists = row["artists"] if "artists" in row.keys() else None
     raw_featured = row["featured_artists"] if "featured_artists" in row.keys() else None
-    artists = json.loads(raw_artists) if raw_artists else None
-    featured_artists = json.loads(raw_featured) if raw_featured else None
+    artists = _safe_json_loads(raw_artists)
+    featured_artists = _safe_json_loads(raw_featured)
     return {
         "id": row["id"],
         "title": row["title"],

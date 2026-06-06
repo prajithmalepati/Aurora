@@ -75,6 +75,19 @@ def get_db() -> sqlite3.Connection:
     return conn
 
 
+from contextlib import contextmanager
+
+
+@contextmanager
+def get_db_ctx():
+    """Context manager that yields a DB connection and closes it on exit."""
+    conn = get_db()
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+
 def init_db():
     """Initialize the database — create tables if they don't exist."""
     import os
@@ -84,13 +97,13 @@ def init_db():
     try:
         conn.execute("ALTER TABLE playlists ADD COLUMN image_url TEXT")
         conn.commit()
-    except Exception:
+    except sqlite3.OperationalError:
         pass  # Column already exists
     # Migration: add file_format column to songs table
     try:
         conn.execute("ALTER TABLE songs ADD COLUMN file_format TEXT")
         conn.commit()
-    except Exception:
+    except sqlite3.OperationalError:
         pass  # Column already exists
     # Backfill file_format from file_path extension for existing rows
     rows = conn.execute(
@@ -106,7 +119,7 @@ def init_db():
     try:
         conn.execute("ALTER TABLE songs ADD COLUMN album_art_path TEXT")
         conn.commit()
-    except Exception:
+    except sqlite3.OperationalError:
         pass  # Column already exists
     # Backfill album_art_path for songs that have a file but no art extracted yet
     _backfill_album_art(conn)
@@ -114,57 +127,57 @@ def init_db():
     try:
         conn.execute("ALTER TABLE playlist_songs ADD COLUMN start_time_ms INTEGER NOT NULL DEFAULT 0")
         conn.commit()
-    except Exception:
+    except sqlite3.OperationalError:
         pass
     try:
         conn.execute("ALTER TABLE playlist_songs ADD COLUMN end_time_ms INTEGER NOT NULL DEFAULT 0")
         conn.commit()
-    except Exception:
+    except sqlite3.OperationalError:
         pass
     # Migration: add crossfade columns to playlists
     try:
         conn.execute("ALTER TABLE playlists ADD COLUMN crossfade_enabled INTEGER DEFAULT NULL")
         conn.commit()
-    except Exception:
+    except sqlite3.OperationalError:
         pass
     try:
         conn.execute("ALTER TABLE playlists ADD COLUMN crossfade_duration_s INTEGER DEFAULT NULL")
         conn.commit()
-    except Exception:
+    except sqlite3.OperationalError:
         pass
     # Migration: add visual pipeline columns (waveform peaks + dominant colors)
     try:
         conn.execute("ALTER TABLE songs ADD COLUMN waveform_peaks TEXT")
         conn.commit()
-    except Exception:
+    except sqlite3.OperationalError:
         pass  # Column already exists
     try:
         conn.execute("ALTER TABLE songs ADD COLUMN dominant_color TEXT")
         conn.commit()
-    except Exception:
+    except sqlite3.OperationalError:
         pass
     try:
         conn.execute("ALTER TABLE songs ADD COLUMN dominant_color_2 TEXT")
         conn.commit()
-    except Exception:
+    except sqlite3.OperationalError:
         pass
     # Migration: add image-region bleed columns
     try:
         conn.execute("ALTER TABLE songs ADD COLUMN bleed_thumb BLOB")
         conn.commit()
-    except Exception:
+    except sqlite3.OperationalError:
         pass
     for col in ("bleed_region_x", "bleed_region_y", "bleed_region_w", "bleed_region_h"):
         try:
             conn.execute(f"ALTER TABLE songs ADD COLUMN {col} INTEGER")
             conn.commit()
-        except Exception:
+        except sqlite3.OperationalError:
             pass
     # Migration: add file_mtime for re-scan detection of edited files
     try:
         conn.execute("ALTER TABLE songs ADD COLUMN file_mtime REAL")
         conn.commit()
-    except Exception:
+    except sqlite3.OperationalError:
         pass
     # Migration: add ReplayGain columns
     for col in ("replaygain_track_gain", "replaygain_track_peak",
@@ -172,7 +185,7 @@ def init_db():
         try:
             conn.execute(f"ALTER TABLE songs ADD COLUMN {col} REAL")
             conn.commit()
-        except Exception:
+        except sqlite3.OperationalError:
             pass
     # Migration: add audio quality metadata columns
     for col, col_type in [("bitrate", "INTEGER"), ("sample_rate", "INTEGER"),
@@ -180,18 +193,18 @@ def init_db():
         try:
             conn.execute(f"ALTER TABLE songs ADD COLUMN {col} {col_type}")
             conn.commit()
-        except Exception:
+        except sqlite3.OperationalError:
             pass
     # Migration: add multi-artist columns
     try:
         conn.execute("ALTER TABLE songs ADD COLUMN artists TEXT")
         conn.commit()
-    except Exception:
+    except sqlite3.OperationalError:
         pass  # Column already exists
     try:
         conn.execute("ALTER TABLE songs ADD COLUMN featured_artists TEXT")
         conn.commit()
-    except Exception:
+    except sqlite3.OperationalError:
         pass  # Column already exists
     conn.close()
 

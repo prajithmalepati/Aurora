@@ -34,13 +34,16 @@ def startup():
 def health_check():
     from app.database import get_db
     db = get_db()
-    song_count = db.execute("SELECT COUNT(*) FROM songs").fetchone()[0]
-    tag_count = db.execute("SELECT COUNT(*) FROM tags").fetchone()[0]
-    playlist_count = db.execute("SELECT COUNT(*) FROM playlists").fetchone()[0]
-    return {
-        "status": "ok",
-        "database": "connected",
-        "song_count": song_count,
-        "tag_count": tag_count,
-        "playlist_count": playlist_count,
-    }
+    try:
+        song_count = db.execute("SELECT COUNT(*) FROM songs").fetchone()[0]
+        tag_count = db.execute("SELECT COUNT(*) FROM tags").fetchone()[0]
+        playlist_count = db.execute("SELECT COUNT(*) FROM playlists").fetchone()[0]
+        return {
+            "status": "ok",
+            "database": "connected",
+            "song_count": song_count,
+            "tag_count": tag_count,
+            "playlist_count": playlist_count,
+        }
+    finally:
+        db.close()

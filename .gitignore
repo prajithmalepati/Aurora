@@ -73,6 +73,13 @@ verify-*.png
 verify-*.jpeg
 verify-*.jpg
 
+# Test cache
+.pytest_cache/
+
+# SQLite database files
+*.sqlite
+*.sqlite3
+
 # Tool session artifacts (playwright-mcp snapshots, tool session artifacts)
 .playwright-mcp/
 

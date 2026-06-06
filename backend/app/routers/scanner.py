@@ -5,28 +5,13 @@ import queue
 import threading
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
 from pathlib import Path
 
+from app.models import ScanRequest
 from app.services.file_scanner import import_scanned_songs
 
 
 router = APIRouter(tags=["scanner"])
-
-
-class ScanRequest(BaseModel):
-    """Request body for POST /scan."""
-    folder_path: str
-    playlist_name: str | None = None
-
-
-class ScanResponse(BaseModel):
-    """Response body for POST /scan."""
-    scanned: int
-    imported: int
-    skipped: int
-    errors: list[dict]
-    songs: list[dict]
 
 
 @router.post("/scan")

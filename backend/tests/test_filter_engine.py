@@ -19,6 +19,16 @@ CREATE TABLE songs (
     waveform_peaks  TEXT,
     dominant_color  TEXT,
     dominant_color_2 TEXT,
+    replaygain_track_gain REAL,
+    replaygain_track_peak REAL,
+    replaygain_album_gain REAL,
+    replaygain_album_peak REAL,
+    artists          TEXT,
+    featured_artists TEXT,
+    bitrate          INTEGER,
+    sample_rate      INTEGER,
+    bit_depth        INTEGER,
+    file_size        INTEGER,
     created_at      TEXT    NOT NULL DEFAULT '2024-01-01T00:00:00',
     updated_at      TEXT    NOT NULL DEFAULT '2024-01-01T00:00:00'
 );
@@ -37,6 +47,10 @@ CREATE TABLE playlists (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     name       TEXT    NOT NULL UNIQUE,
     color      TEXT,
+    emoji      TEXT,
+    image_url  TEXT,
+    crossfade_enabled   INTEGER,
+    crossfade_duration_s INTEGER,
     created_at TEXT    NOT NULL DEFAULT '2024-01-01T00:00:00',
     updated_at TEXT    NOT NULL DEFAULT '2024-01-01T00:00:00'
 );
@@ -45,6 +59,8 @@ CREATE TABLE playlist_songs (
     playlist_id INTEGER NOT NULL REFERENCES playlists(id),
     song_id     INTEGER NOT NULL REFERENCES songs(id),
     position    INTEGER NOT NULL DEFAULT 0,
+    start_time_ms INTEGER NOT NULL DEFAULT 0,
+    end_time_ms   INTEGER NOT NULL DEFAULT 0,
     added_at    TEXT    NOT NULL DEFAULT '2024-01-01T00:00:00'
 );
 """

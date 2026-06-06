@@ -31,7 +31,7 @@ class SongResponse(BaseModel):
     album_art_path: Optional[str] = None
     source: str
     tags: list[str]
-    playlists: list[str]
+    playlists: list[dict]
     artists: Optional[list[str]] = None
     featured_artists: Optional[list[str]] = None
     created_at: str
