@@ -36,7 +36,7 @@ import { Equalizer } from "@/components/ui/Equalizer"
 import { AlbumArt } from "@/components/songs/AlbumArt"
 import { PlaylistImagePicker } from "@/components/playlists/PlaylistImagePicker"
 import { WaveformTrimEditor } from "@/components/player/WaveformTrimEditor"
-import { api } from "@/lib/api"
+import { api, BASE_URL } from "@/lib/api"
 
 interface PlaylistDetailProps {
   playlistId: number
@@ -63,6 +63,8 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
   const [editColor, setEditColor] = useState("")
   const [editEmoji, setEditEmoji] = useState("")
   const [editImageDataUrl, setEditImageDataUrl] = useState<string | null>(null)
+  const [editCrossfadeEnabled, setEditCrossfadeEnabled] = useState(false)
+  const [editCrossfadeDuration, setEditCrossfadeDuration] = useState(5)
   const [searchQuery, setSearchQuery] = useState("")
   const [sortField, setSortField] = useState<'position'|'title'|'artist'|'album'|'duration'>('position')
   const [sortOrder, setSortOrder] = useState<'asc'|'desc'>('asc')
@@ -163,7 +165,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
   const handleExport = async (format: 'm3u' | 'm3u8' | 'json') => {
     if (!activePlaylist) return
     try {
-      const response = await fetch(`http://localhost:8000/api/playlists/${activePlaylist.id}/export?format=${format}`)
+      const response = await fetch(`${BASE_URL}/playlists/${activePlaylist.id}/export?format=${format}`)
       if (!response.ok) {
         const err = await response.json().catch(() => ({ detail: 'Export failed' }))
         throw new Error(err.detail || 'Export failed')
@@ -191,6 +193,15 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
       setEditEmoji(activePlaylist.emoji || "")
       // Seed picker with the current server URL (displays as <img src>)
       setEditImageDataUrl(activePlaylist.image_url || null)
+      // Seed crossfade settings
+      setEditCrossfadeEnabled(
+        activePlaylist.crossfade_enabled !== null && activePlaylist.crossfade_enabled !== undefined
+          ? activePlaylist.crossfade_enabled === 1
+          : useSettingsStore.getState().crossfadeEnabled
+      )
+      setEditCrossfadeDuration(
+        activePlaylist.crossfade_duration_s ?? useSettingsStore.getState().crossfadeDuration
+      )
       setEditDialogOpen(true)
     }
   }
@@ -224,6 +235,8 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
         name: editName.trim(),
         color: editColor.trim() || undefined,
         emoji: editEmoji.trim(),
+        crossfade_enabled: editCrossfadeEnabled ? 1 : 0,
+        crossfade_duration_s: editCrossfadeEnabled ? editCrossfadeDuration : null,
       })
       setEditDialogOpen(false)
     } catch (err: unknown) {
@@ -950,6 +963,58 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
                       Clear
                     </button>
                   )}
+                </div>
+              </div>
+
+              {/* Crossfade settings */}
+              <div className="space-y-3 pt-2 border-t border-[var(--aurora-rim)]">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="label-micro text-[10px]">Crossfade</p>
+                    <p className="text-[12px] text-[var(--aurora-text-secondary)] mt-0.5">
+                      Blend songs during transitions
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEditCrossfadeEnabled(!editCrossfadeEnabled)}
+                    role="switch"
+                    aria-checked={editCrossfadeEnabled}
+                    className={`relative rounded-full transition-colors duration-200 flex-shrink-0 ${
+                      editCrossfadeEnabled
+                        ? "bg-[var(--aurora-accent-interactive)]"
+                        : "bg-white/[0.12]"
+                    }`}
+                    style={{ height: "22px", width: "40px" }}
+                  >
+                    <span
+                      className="absolute top-0.5 left-0.5 w-[18px] h-[18px] rounded-full bg-white shadow-sm transition-transform duration-200"
+                      style={{ transform: editCrossfadeEnabled ? "translateX(18px)" : "translateX(0)" }}
+                    />
+                  </button>
+                </div>
+                <div
+                  className="transition-opacity duration-200"
+                  style={{ opacity: editCrossfadeEnabled ? 1 : 0.35, pointerEvents: editCrossfadeEnabled ? "auto" : "none" }}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[12px] text-[var(--aurora-text-secondary)]">Duration</span>
+                    <span className="text-[12px] tabular-nums text-[var(--aurora-text)]">{editCrossfadeDuration.toFixed(1)}s</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={10}
+                    step={0.5}
+                    value={editCrossfadeDuration}
+                    onChange={(e) => setEditCrossfadeDuration(Number(e.target.value))}
+                    className="aurora-range w-full"
+                    style={{ ["--aurora-range-pct" as string]: `${(editCrossfadeDuration / 10) * 100}%` }}
+                  />
+                  <div className="flex justify-between mt-1">
+                    <span className="text-[10px] text-[var(--aurora-text-tertiary)]">0s</span>
+                    <span className="text-[10px] text-[var(--aurora-text-tertiary)]">10s</span>
+                  </div>
                 </div>
               </div>
             </div>

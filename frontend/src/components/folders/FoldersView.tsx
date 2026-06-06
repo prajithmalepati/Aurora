@@ -5,7 +5,7 @@ import { api } from "@/lib/api"
 import { SongTable } from "@/components/songs/SongTable"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { ChevronRight, ChevronDown, FolderOpen, Home, Play } from "lucide-react"
+import { ChevronRight, ChevronDown, FolderOpen, Home, Play, Shuffle } from "lucide-react"
 
 interface FoldersViewProps { }
 
@@ -93,6 +93,12 @@ export function FoldersView({ }: FoldersViewProps) {
   const handlePlayAll = useCallback(() => {
     if (songs.length === 0) return
     playSong(songs[0], songs)
+  }, [songs, playSong])
+
+  const handleShuffleAll = useCallback(() => {
+    if (songs.length === 0) return
+    const shuffled = [...songs].sort(() => Math.random() - 0.5)
+    playSong(shuffled[0], shuffled)
   }, [songs, playSong])
 
   // Navigate to a folder
@@ -285,6 +291,16 @@ export function FoldersView({ }: FoldersViewProps) {
                     <span className="text-[11px] text-[var(--aurora-text-secondary)]">Subfolders</span>
                   </label>
 
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 h-8 text-[12px]"
+                    onClick={handleShuffleAll}
+                    disabled={songs.length === 0}
+                  >
+                    <Shuffle className="h-3 w-3" strokeWidth={1.5} />
+                    Shuffle
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
