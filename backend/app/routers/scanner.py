@@ -29,10 +29,8 @@ def scan_folder(request: ScanRequest):
         raise HTTPException(status_code=404, detail="folder_path does not exist or is not a directory")
     
     # Import the database connection
-    from app.database import get_db
-    conn = get_db()
-    
-    try:
+    from app.database import get_db_ctx
+    with get_db_ctx() as conn:
         result = import_scanned_songs(conn, request.folder_path, request.playlist_name)
         
         # Build message
@@ -52,8 +50,6 @@ def scan_folder(request: ScanRequest):
             "data": result,
             "message": message,
         }
-    finally:
-        conn.close()
 
 
 @router.post("/scan/stream")
@@ -69,21 +65,20 @@ async def scan_folder_stream(request: ScanRequest, req: Request):
     cancel_event = threading.Event()
 
     def worker() -> None:
-        from app.database import get_db
-        conn = get_db()
-        try:
-            import_scanned_songs(
-                conn,
-                request.folder_path,
-                request.playlist_name,
-                cancel_event=cancel_event,
-                progress_cb=lambda evt: event_queue.put(evt),
-            )
-        except Exception as exc:
-            event_queue.put({"type": "error", "message": str(exc)})
-        finally:
-            conn.close()
-            event_queue.put(None)  # sentinel
+        from app.database import get_db_ctx
+        with get_db_ctx() as conn:
+            try:
+                import_scanned_songs(
+                    conn,
+                    request.folder_path,
+                    request.playlist_name,
+                    cancel_event=cancel_event,
+                    progress_cb=lambda evt: event_queue.put(evt),
+                )
+            except Exception as exc:
+                event_queue.put({"type": "error", "message": str(exc)})
+            finally:
+                event_queue.put(None)  # sentinel
 
     thread = threading.Thread(target=worker, daemon=True)
     thread.start()

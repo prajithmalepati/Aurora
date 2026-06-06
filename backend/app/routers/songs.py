@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
 from datetime import datetime, timezone
 
-from app.database import get_db, get_db_ctx
+from app.database import get_db, get_db_ctx, SONG_SELECT_QUERY, COUNT_SONG_QUERY
 from app.models import SongCreate, SongResponse, SongUpdate
 from app.cache import song_cache
 
@@ -23,7 +23,6 @@ def _safe_json_loads(raw):
         return json.loads(raw)
     except (json.JSONDecodeError, TypeError):
         return None
-
 
 def _get_utc_now() -> str:
     """Return current UTC timestamp in ISO format."""
@@ -128,68 +127,49 @@ def list_songs(
         if cached is not None:
             return cached
 
-    conn = get_db()
-    cursor = conn.cursor()
+    with get_db_ctx() as conn:
+        cursor = conn.cursor()
 
-    query = """
-        SELECT
-            s.id, s.title, s.artist, s.album, s.duration,
-            s.file_path, s.file_format, s.album_art_path, s.source,
-            s.bitrate, s.sample_rate, s.bit_depth, s.file_size,
-            s.waveform_peaks, s.dominant_color, s.dominant_color_2,
-            s.replaygain_track_gain, s.replaygain_track_peak,
-            s.replaygain_album_gain, s.replaygain_album_peak,
-            s.artists, s.featured_artists,
-            GROUP_CONCAT(DISTINCT t.name) as tags,
-            GROUP_CONCAT(DISTINCT p.id || ':' || p.name) as playlists,
-            s.created_at, s.updated_at
-        FROM songs s
-        LEFT JOIN song_tags st ON s.id = st.song_id
-        LEFT JOIN tags t ON st.tag_id = t.id
-        LEFT JOIN playlist_songs ps ON s.id = ps.song_id
-        LEFT JOIN playlists p ON ps.playlist_id = p.id
-    """
+        query = SONG_SELECT_QUERY
 
-    params = []
-    where_clauses = []
+        params = []
+        where_clauses = []
 
-    if search:
-        where_clauses.append("(s.title LIKE ? OR s.artist LIKE ?)")
-        search_pattern = f"%{search}%"
-        params.extend([search_pattern, search_pattern])
+        if search:
+            where_clauses.append("(s.title LIKE ? OR s.artist LIKE ?)")
+            search_pattern = f"%{search}%"
+            params.extend([search_pattern, search_pattern])
 
-    if where_clauses:
-        query += " WHERE " + " AND ".join(where_clauses)
+        if where_clauses:
+            query += " WHERE " + " AND ".join(where_clauses)
 
-    query += f" GROUP BY s.id ORDER BY {sort_col} {order_str}, s.id ASC"
+        query += f" GROUP BY s.id ORDER BY {sort_col} {order_str}, s.id ASC"
 
-    if limit is not None and limit > 0:
-        query += " LIMIT ?"
-        params.append(limit)
+        if limit is not None and limit > 0:
+            query += " LIMIT ?"
+            params.append(limit)
 
-    if offset is not None and offset >= 0:
-        query += " OFFSET ?"
-        params.append(offset)
+        if offset is not None and offset >= 0:
+            query += " OFFSET ?"
+            params.append(offset)
 
-    cursor.execute(query, params)
-    rows = cursor.fetchall()
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
 
-    count_query = "SELECT COUNT(*) as total FROM songs s"
-    count_params = []
-    count_where = []
+        count_query = COUNT_SONG_QUERY
+        count_params = []
+        count_where = []
 
-    if search:
-        count_where.append("(s.title LIKE ? OR s.artist LIKE ?)")
-        search_pattern = f"%{search}%"
-        count_params.extend([search_pattern, search_pattern])
+        if search:
+            count_where.append("(s.title LIKE ? OR s.artist LIKE ?)")
+            search_pattern = f"%{search}%"
+            count_params.extend([search_pattern, search_pattern])
 
-    if count_where:
-        count_query += " WHERE " + " AND ".join(count_where)
+        if count_where:
+            count_query += " WHERE " + " AND ".join(count_where)
 
-    cursor.execute(count_query, count_params)
-    total = cursor.fetchone()["total"]
-
-    conn.close()
+        cursor.execute(count_query, count_params)
+        total = cursor.fetchone()["total"]
 
     data = [song_row_to_dict(row) for row in rows]
 
@@ -206,51 +186,14 @@ def list_songs(
 def get_song(song_id: int):
     """Get a song by ID."""
     
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    # Build the query with LEFT JOINs for tags and playlists
-    query = """
-        SELECT
-            s.id,
-            s.title,
-            s.artist,
-            s.album,
-            s.duration,
-            s.file_path,
-            s.file_format,
-            s.album_art_path,
-            s.source,
-            s.bitrate,
-            s.sample_rate,
-            s.bit_depth,
-            s.file_size,
-            s.waveform_peaks,
-            s.dominant_color,
-            s.dominant_color_2,
-            s.replaygain_track_gain,
-            s.replaygain_track_peak,
-            s.replaygain_album_gain,
-            s.replaygain_album_peak,
-            s.artists,
-            s.featured_artists,
-            GROUP_CONCAT(DISTINCT t.name) as tags,
-            GROUP_CONCAT(DISTINCT p.id || ':' || p.name) as playlists,
-            s.created_at,
-            s.updated_at
-        FROM songs s
-        LEFT JOIN song_tags st ON s.id = st.song_id
-        LEFT JOIN tags t ON st.tag_id = t.id
-        LEFT JOIN playlist_songs ps ON s.id = ps.song_id
-        LEFT JOIN playlists p ON ps.playlist_id = p.id
-        WHERE s.id = ?
-        GROUP BY s.id
-    """
+    with get_db_ctx() as conn:
+        cursor = conn.cursor()
+        
+        # Build the query with LEFT JOINs for tags and playlists
+        query = SONG_SELECT_QUERY + " WHERE s.id = ? GROUP BY s.id"
 
-    cursor.execute(query, (song_id,))
-    row = cursor.fetchone()
-    
-    conn.close()
+        cursor.execute(query, (song_id,))
+        row = cursor.fetchone()
     
     if row is None:
         raise HTTPException(status_code=404, detail="Song not found")
@@ -274,38 +217,14 @@ def stream_song(song_id: int):
         ".opus": "audio/opus",
     }
     
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    # Get the song by ID
-    query = """
-        SELECT
-            s.id,
-            s.title,
-            s.artist,
-            s.album,
-            s.duration,
-            s.file_path,
-            s.file_format,
-            s.album_art_path,
-            s.source,
-            GROUP_CONCAT(DISTINCT t.name) as tags,
-            GROUP_CONCAT(DISTINCT p.id || ':' || p.name) as playlists,
-            s.created_at,
-            s.updated_at
-        FROM songs s
-        LEFT JOIN song_tags st ON s.id = st.song_id
-        LEFT JOIN tags t ON st.tag_id = t.id
-        LEFT JOIN playlist_songs ps ON s.id = ps.song_id
-        LEFT JOIN playlists p ON ps.playlist_id = p.id
-        WHERE s.id = ?
-        GROUP BY s.id
-    """
+    with get_db_ctx() as conn:
+        cursor = conn.cursor()
+        
+        # Get the song by ID
+        query = SONG_SELECT_QUERY + " WHERE s.id = ? GROUP BY s.id"
 
-    cursor.execute(query, (song_id,))
-    row = cursor.fetchone()
-    
-    conn.close()
+        cursor.execute(query, (song_id,))
+        row = cursor.fetchone()
     
     if row is None:
         raise HTTPException(status_code=404, detail="Song not found")
@@ -329,13 +248,10 @@ def stream_song(song_id: int):
 def get_bleed_thumb(song_id: int):
     """Return the 64×64 PNG bleed thumbnail for a song's album art bright region."""
     from fastapi.responses import Response
-    conn = get_db()
-    try:
+    with get_db_ctx() as conn:
         row = conn.execute(
             "SELECT bleed_thumb FROM songs WHERE id = ?", (song_id,)
         ).fetchone()
-    finally:
-        conn.close()
 
     if not row or not row["bleed_thumb"]:
         raise HTTPException(status_code=404, detail="No bleed thumb available")
@@ -350,19 +266,17 @@ def get_bleed_thumb(song_id: int):
 @router.delete("/songs/{song_id}")
 def delete_song(song_id: int):
     """Delete a song by ID."""
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    # Check if song exists
-    cursor.execute("SELECT id FROM songs WHERE id = ?", (song_id,))
-    if cursor.fetchone() is None:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Song not found")
-    
-    # Delete the song (cascading deletes handle song_tags and playlist_songs)
-    cursor.execute("DELETE FROM songs WHERE id = ?", (song_id,))
-    conn.commit()
-    conn.close()
+    with get_db_ctx() as conn:
+        cursor = conn.cursor()
+        
+        # Check if song exists
+        cursor.execute("SELECT id FROM songs WHERE id = ?", (song_id,))
+        if cursor.fetchone() is None:
+            raise HTTPException(status_code=404, detail="Song not found")
+        
+        # Delete the song (cascading deletes handle song_tags and playlist_songs)
+        cursor.execute("DELETE FROM songs WHERE id = ?", (song_id,))
+        conn.commit()
 
     # Invalidate song caches
     song_cache.invalidate_prefix("songs:")
@@ -377,39 +291,37 @@ def create_song(song: SongCreate):
     if not song.title or not song.artist:
         raise HTTPException(status_code=400, detail="title and artist must be non-empty")
 
-    conn = get_db()
-    cursor = conn.cursor()
-    now = _get_utc_now()
+    with get_db_ctx() as conn:
+        cursor = conn.cursor()
+        now = _get_utc_now()
 
-    try:
-        cursor.execute(
-            """
-            INSERT INTO songs (title, artist, album, duration, file_path, source, external_id, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, 'manual', NULL, ?, ?)
-            """,
-            (
-                song.title,
-                song.artist,
-                song.album,
-                song.duration,
-                song.file_path,
-                now,
-                now,
-            ),
-        )
-        conn.commit()
-        song_id = cursor.lastrowid
-    except sqlite3.IntegrityError:
-        conn.close()
-        raise HTTPException(status_code=409, detail="file_path already exists")
+        try:
+            cursor.execute(
+                """
+                INSERT INTO songs (title, artist, album, duration, file_path, source, external_id, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, 'manual', NULL, ?, ?)
+                """,
+                (
+                    song.title,
+                    song.artist,
+                    song.album,
+                    song.duration,
+                    song.file_path,
+                    now,
+                    now,
+                ),
+            )
+            conn.commit()
+            song_id = cursor.lastrowid
+        except sqlite3.IntegrityError:
+            raise HTTPException(status_code=409, detail="file_path already exists")
 
-    # Invalidate song caches
-    song_cache.invalidate_prefix("songs:")
+        # Invalidate song caches
+        song_cache.invalidate_prefix("songs:")
 
     # Return the created song with empty tags and playlists
     import os as _os
     file_fmt = _os.path.splitext(song.file_path)[1].lstrip(".").lower() if song.file_path else None
-    conn.close()
     return SongResponse(
         id=song_id,
         title=song.title,
@@ -442,95 +354,58 @@ def serve_album_art(filename: str):
 @router.put("/songs/{song_id}", response_model=SongResponse)
 def update_song(song_id: int, song_update: SongUpdate):
     """Update a song by ID."""
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    # Check if song exists
-    cursor.execute("SELECT id FROM songs WHERE id = ?", (song_id,))
-    if cursor.fetchone() is None:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Song not found")
-    
-    # Validate title and artist are non-empty if provided
-    if song_update.title is not None and not song_update.title:
-        conn.close()
-        raise HTTPException(status_code=400, detail="title must be non-empty")
-    if song_update.artist is not None and not song_update.artist:
-        conn.close()
-        raise HTTPException(status_code=400, detail="artist must be non-empty")
-    
-    now = _get_utc_now()
-    
-    # Build update query with only non-None fields
-    update_fields = []
-    params = []
-    
-    if song_update.title is not None:
-        update_fields.append("title = ?")
-        params.append(song_update.title)
-    if song_update.artist is not None:
-        update_fields.append("artist = ?")
-        params.append(song_update.artist)
-    if song_update.album is not None:
-        update_fields.append("album = ?")
-        params.append(song_update.album)
-    if song_update.duration is not None:
-        update_fields.append("duration = ?")
-        params.append(song_update.duration)
-    
-    update_fields.append("updated_at = ?")
-    params.append(now)
-    
-    params.append(song_id)
-    
-    cursor.execute(
-        f"UPDATE songs SET {', '.join(update_fields)} WHERE id = ?",
-        params
-    )
-    conn.commit()
+    with get_db_ctx() as conn:
+        cursor = conn.cursor()
+        
+        # Check if song exists
+        cursor.execute("SELECT id FROM songs WHERE id = ?", (song_id,))
+        if cursor.fetchone() is None:
+            raise HTTPException(status_code=404, detail="Song not found")
+        
+        # Validate title and artist are non-empty if provided
+        if song_update.title is not None and not song_update.title:
+            raise HTTPException(status_code=400, detail="title must be non-empty")
+        if song_update.artist is not None and not song_update.artist:
+            raise HTTPException(status_code=400, detail="artist must be non-empty")
+        
+        now = _get_utc_now()
+        
+        # Build update query with only non-None fields
+        update_fields = []
+        params = []
+        
+        if song_update.title is not None:
+            update_fields.append("title = ?")
+            params.append(song_update.title)
+        if song_update.artist is not None:
+            update_fields.append("artist = ?")
+            params.append(song_update.artist)
+        if song_update.album is not None:
+            update_fields.append("album = ?")
+            params.append(song_update.album)
+        if song_update.duration is not None:
+            update_fields.append("duration = ?")
+            params.append(song_update.duration)
+        
+        update_fields.append("updated_at = ?")
+        params.append(now)
+        
+        params.append(song_id)
+        
+        cursor.execute(
+            f"UPDATE songs SET {', '.join(update_fields)} WHERE id = ?",
+            params
+        )
+        conn.commit()
 
-    # Invalidate song caches (update can happen from any view)
-    song_cache.invalidate_prefix("songs:")
+        # Invalidate song caches (update can happen from any view)
+        song_cache.invalidate_prefix("songs:")
 
-    # Fetch the updated song with joined query
-    query = """
-        SELECT
-            s.id,
-            s.title,
-            s.artist,
-            s.album,
-            s.duration,
-            s.file_path,
-            s.file_format,
-            s.album_art_path,
-            s.source,
-            s.bitrate,
-            s.sample_rate,
-            s.bit_depth,
-            s.file_size,
-            s.waveform_peaks,
-            s.dominant_color,
-            s.dominant_color_2,
-            s.replaygain_track_gain,
-            s.replaygain_track_peak,
-            s.replaygain_album_gain,
-            s.replaygain_album_peak,
-            GROUP_CONCAT(DISTINCT t.name) as tags,
-            GROUP_CONCAT(DISTINCT p.id || ':' || p.name) as playlists,
-            s.created_at,
-            s.updated_at
-        FROM songs s
-        LEFT JOIN song_tags st ON s.id = st.song_id
-        LEFT JOIN tags t ON st.tag_id = t.id
-        LEFT JOIN playlist_songs ps ON s.id = ps.song_id
-        LEFT JOIN playlists p ON ps.playlist_id = p.id
-        WHERE s.id = ?
-        GROUP BY s.id
-    """
+        # Fetch the updated song with joined query
+        query = SONG_SELECT_QUERY + " WHERE s.id = ? GROUP BY s.id"
 
-    cursor.execute(query, (song_id,))
-    row = cursor.fetchone()
-    conn.close()
+        cursor.execute(query, (song_id,))
+        row = cursor.fetchone()
     
     if row is None:
         raise HTTPException(status_code=404, detail="Song not found")

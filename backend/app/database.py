@@ -91,122 +91,121 @@ def get_db_ctx():
 def init_db():
     """Initialize the database — create tables if they don't exist."""
     import os
-    conn = get_db()
-    conn.executescript(INIT_SQL)
-    # Migration: add image_url column to existing databases
-    try:
-        conn.execute("ALTER TABLE playlists ADD COLUMN image_url TEXT")
-        conn.commit()
-    except sqlite3.OperationalError:
-        pass  # Column already exists
-    # Migration: add file_format column to songs table
-    try:
-        conn.execute("ALTER TABLE songs ADD COLUMN file_format TEXT")
-        conn.commit()
-    except sqlite3.OperationalError:
-        pass  # Column already exists
-    # Backfill file_format from file_path extension for existing rows
-    rows = conn.execute(
-        "SELECT id, file_path FROM songs WHERE file_format IS NULL AND file_path IS NOT NULL"
-    ).fetchall()
-    for row in rows:
-        ext = os.path.splitext(row["file_path"])[1].lstrip(".").lower()
-        if ext:
-            conn.execute("UPDATE songs SET file_format = ? WHERE id = ?", (ext, row["id"]))
-    if rows:
-        conn.commit()
-    # Migration: add album_art_path column to songs table
-    try:
-        conn.execute("ALTER TABLE songs ADD COLUMN album_art_path TEXT")
-        conn.commit()
-    except sqlite3.OperationalError:
-        pass  # Column already exists
-    # Backfill album_art_path for songs that have a file but no art extracted yet
-    _backfill_album_art(conn)
-    # Migration: add trim columns to playlist_songs
-    try:
-        conn.execute("ALTER TABLE playlist_songs ADD COLUMN start_time_ms INTEGER NOT NULL DEFAULT 0")
-        conn.commit()
-    except sqlite3.OperationalError:
-        pass
-    try:
-        conn.execute("ALTER TABLE playlist_songs ADD COLUMN end_time_ms INTEGER NOT NULL DEFAULT 0")
-        conn.commit()
-    except sqlite3.OperationalError:
-        pass
-    # Migration: add crossfade columns to playlists
-    try:
-        conn.execute("ALTER TABLE playlists ADD COLUMN crossfade_enabled INTEGER DEFAULT NULL")
-        conn.commit()
-    except sqlite3.OperationalError:
-        pass
-    try:
-        conn.execute("ALTER TABLE playlists ADD COLUMN crossfade_duration_s INTEGER DEFAULT NULL")
-        conn.commit()
-    except sqlite3.OperationalError:
-        pass
-    # Migration: add visual pipeline columns (waveform peaks + dominant colors)
-    try:
-        conn.execute("ALTER TABLE songs ADD COLUMN waveform_peaks TEXT")
-        conn.commit()
-    except sqlite3.OperationalError:
-        pass  # Column already exists
-    try:
-        conn.execute("ALTER TABLE songs ADD COLUMN dominant_color TEXT")
-        conn.commit()
-    except sqlite3.OperationalError:
-        pass
-    try:
-        conn.execute("ALTER TABLE songs ADD COLUMN dominant_color_2 TEXT")
-        conn.commit()
-    except sqlite3.OperationalError:
-        pass
-    # Migration: add image-region bleed columns
-    try:
-        conn.execute("ALTER TABLE songs ADD COLUMN bleed_thumb BLOB")
-        conn.commit()
-    except sqlite3.OperationalError:
-        pass
-    for col in ("bleed_region_x", "bleed_region_y", "bleed_region_w", "bleed_region_h"):
+    with get_db_ctx() as conn:
+        conn.executescript(INIT_SQL)
+        # Migration: add image_url column to existing databases
         try:
-            conn.execute(f"ALTER TABLE songs ADD COLUMN {col} INTEGER")
+            conn.execute("ALTER TABLE playlists ADD COLUMN image_url TEXT")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+        # Migration: add file_format column to songs table
+        try:
+            conn.execute("ALTER TABLE songs ADD COLUMN file_format TEXT")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+        # Backfill file_format from file_path extension for existing rows
+        rows = conn.execute(
+            "SELECT id, file_path FROM songs WHERE file_format IS NULL AND file_path IS NOT NULL"
+        ).fetchall()
+        for row in rows:
+            ext = os.path.splitext(row["file_path"])[1].lstrip(".").lower()
+            if ext:
+                conn.execute("UPDATE songs SET file_format = ? WHERE id = ?", (ext, row["id"]))
+        if rows:
+            conn.commit()
+        # Migration: add album_art_path column to songs table
+        try:
+            conn.execute("ALTER TABLE songs ADD COLUMN album_art_path TEXT")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+        # Backfill album_art_path for songs that have a file but no art extracted yet
+        _backfill_album_art(conn)
+        # Migration: add trim columns to playlist_songs
+        try:
+            conn.execute("ALTER TABLE playlist_songs ADD COLUMN start_time_ms INTEGER NOT NULL DEFAULT 0")
             conn.commit()
         except sqlite3.OperationalError:
             pass
-    # Migration: add file_mtime for re-scan detection of edited files
-    try:
-        conn.execute("ALTER TABLE songs ADD COLUMN file_mtime REAL")
-        conn.commit()
-    except sqlite3.OperationalError:
-        pass
-    # Migration: add ReplayGain columns
-    for col in ("replaygain_track_gain", "replaygain_track_peak",
-                "replaygain_album_gain", "replaygain_album_peak"):
         try:
-            conn.execute(f"ALTER TABLE songs ADD COLUMN {col} REAL")
+            conn.execute("ALTER TABLE playlist_songs ADD COLUMN end_time_ms INTEGER NOT NULL DEFAULT 0")
             conn.commit()
         except sqlite3.OperationalError:
             pass
-    # Migration: add audio quality metadata columns
-    for col, col_type in [("bitrate", "INTEGER"), ("sample_rate", "INTEGER"),
-                           ("bit_depth", "INTEGER"), ("file_size", "INTEGER")]:
+        # Migration: add crossfade columns to playlists
         try:
-            conn.execute(f"ALTER TABLE songs ADD COLUMN {col} {col_type}")
+            conn.execute("ALTER TABLE playlists ADD COLUMN crossfade_enabled INTEGER DEFAULT NULL")
             conn.commit()
         except sqlite3.OperationalError:
             pass
-    # Migration: add multi-artist columns
-    try:
-        conn.execute("ALTER TABLE songs ADD COLUMN artists TEXT")
-        conn.commit()
-    except sqlite3.OperationalError:
-        pass  # Column already exists
-    try:
-        conn.execute("ALTER TABLE songs ADD COLUMN featured_artists TEXT")
-        conn.commit()
-    except sqlite3.OperationalError:
-        pass  # Column already exists
-    conn.close()
+        try:
+            conn.execute("ALTER TABLE playlists ADD COLUMN crossfade_duration_s INTEGER DEFAULT NULL")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass
+        # Migration: add visual pipeline columns (waveform peaks + dominant colors)
+        try:
+            conn.execute("ALTER TABLE songs ADD COLUMN waveform_peaks TEXT")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+        try:
+            conn.execute("ALTER TABLE songs ADD COLUMN dominant_color TEXT")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass
+        try:
+            conn.execute("ALTER TABLE songs ADD COLUMN dominant_color_2 TEXT")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass
+        # Migration: add image-region bleed columns
+        try:
+            conn.execute("ALTER TABLE songs ADD COLUMN bleed_thumb BLOB")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass
+        for col in ("bleed_region_x", "bleed_region_y", "bleed_region_w", "bleed_region_h"):
+            try:
+                conn.execute(f"ALTER TABLE songs ADD COLUMN {col} INTEGER")
+                conn.commit()
+            except sqlite3.OperationalError:
+                pass
+        # Migration: add file_mtime for re-scan detection of edited files
+        try:
+            conn.execute("ALTER TABLE songs ADD COLUMN file_mtime REAL")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass
+        # Migration: add ReplayGain columns
+        for col in ("replaygain_track_gain", "replaygain_track_peak",
+                    "replaygain_album_gain", "replaygain_album_peak"):
+            try:
+                conn.execute(f"ALTER TABLE songs ADD COLUMN {col} REAL")
+                conn.commit()
+            except sqlite3.OperationalError:
+                pass
+        # Migration: add audio quality metadata columns
+        for col, col_type in [("bitrate", "INTEGER"), ("sample_rate", "INTEGER"),
+                               ("bit_depth", "INTEGER"), ("file_size", "INTEGER")]:
+            try:
+                conn.execute(f"ALTER TABLE songs ADD COLUMN {col} {col_type}")
+                conn.commit()
+            except sqlite3.OperationalError:
+                pass
+        # Migration: add multi-artist columns
+        try:
+            conn.execute("ALTER TABLE songs ADD COLUMN artists TEXT")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+        try:
+            conn.execute("ALTER TABLE songs ADD COLUMN featured_artists TEXT")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass  # Column already exists
 
 
 def _backfill_album_art(conn) -> None:
@@ -230,3 +229,51 @@ def _backfill_album_art(conn) -> None:
             pass
     if rows:
         conn.commit()
+
+
+# ── Canonical song SELECT query ──────────────────────────────────────────
+# Every endpoint that fetches a full song row (with tags + playlists) should
+# use these constants instead of inlining the SQL.
+
+SONG_SELECT_COLUMNS = """
+    s.id, s.title, s.artist, s.album, s.duration,
+    s.file_path, s.file_format, s.album_art_path, s.source,
+    s.bitrate, s.sample_rate, s.bit_depth, s.file_size,
+    s.waveform_peaks, s.dominant_color, s.dominant_color_2,
+    s.replaygain_track_gain, s.replaygain_track_peak,
+    s.replaygain_album_gain, s.replaygain_album_peak,
+    s.artists, s.featured_artists,
+    GROUP_CONCAT(DISTINCT t.name) as tags,
+    GROUP_CONCAT(DISTINCT p.id || ':' || p.name) as playlists,
+    s.created_at, s.updated_at"""
+
+SONG_SELECT_FROM = """
+FROM songs s
+LEFT JOIN song_tags st ON s.id = st.song_id
+LEFT JOIN tags t ON st.tag_id = t.id
+LEFT JOIN playlist_songs ps ON s.id = ps.song_id
+LEFT JOIN playlists p ON ps.playlist_id = p.id"""
+
+SONG_SELECT_QUERY = f"SELECT{SONG_SELECT_COLUMNS}{SONG_SELECT_FROM}"
+
+COUNT_SONG_QUERY = "SELECT COUNT(*) as total FROM songs s"
+
+# Playlist variant: adds ps.start_time_ms/end_time_ms/position,
+# uses JOIN (not LEFT JOIN) for playlist_songs, no playlist aggregation.
+PLAYLIST_SONG_SELECT_COLUMNS = """
+    s.id, s.title, s.artist, s.album, s.duration,
+    s.file_path, s.file_format, s.album_art_path, s.source,
+    s.waveform_peaks, s.dominant_color, s.dominant_color_2,
+    s.replaygain_track_gain, s.replaygain_track_peak,
+    s.replaygain_album_gain, s.replaygain_album_peak,
+    s.artists, s.featured_artists,
+    GROUP_CONCAT(t.name) as tags,
+    ps.start_time_ms, ps.end_time_ms, ps.position"""
+
+PLAYLIST_SONG_SELECT_FROM = """
+FROM songs s
+JOIN playlist_songs ps ON s.id = ps.song_id
+LEFT JOIN song_tags st ON s.id = st.song_id
+LEFT JOIN tags t ON st.tag_id = t.id"""
+
+PLAYLIST_SONG_SELECT_QUERY = f"SELECT{PLAYLIST_SONG_SELECT_COLUMNS}{PLAYLIST_SONG_SELECT_FROM}"

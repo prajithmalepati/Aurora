@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Query
 from typing import Optional
 
-from app.database import get_db
+from app.database import get_db_ctx, SONG_SELECT_QUERY, COUNT_SONG_QUERY
 from app.routers.songs import song_row_to_dict
 from app.cache import folder_cache, song_cache
 
@@ -72,14 +72,13 @@ def get_folder_tree():
     if cached is not None:
         return cached
 
-    conn = get_db()
-    cursor = conn.cursor()
+    with get_db_ctx() as conn:
+        cursor = conn.cursor()
 
-    cursor.execute(
-        "SELECT file_path FROM songs WHERE file_path IS NOT NULL AND file_path != ''"
-    )
-    rows = cursor.fetchall()
-    conn.close()
+        cursor.execute(
+            "SELECT file_path FROM songs WHERE file_path IS NOT NULL AND file_path != ''"
+        )
+        rows = cursor.fetchall()
 
     # Extract unique directory paths (parent directory of each file)
     import os
@@ -136,70 +135,47 @@ def get_folder_songs(
     path: the exact directory path (e.g., /home/user/Music/Anime)
     recursive: if true, include songs from all subfolders
     """
-    conn = get_db()
-    cursor = conn.cursor()
+    with get_db_ctx() as conn:
+        cursor = conn.cursor()
 
-    # Normalize path: ensure it doesn't end with / for LIKE matching
-    normalized_path = path.rstrip("/")
+        # Normalize path: ensure it doesn't end with / for LIKE matching
+        normalized_path = path.rstrip("/")
 
-    # Match path and any subdirectory (always needed as base filter)
-    like_pattern = normalized_path + "/%"
-    # For non-recursive, exclude files with deeper paths
-    deeper_pattern = normalized_path + "/%/%" if not recursive else None
+        # Match path and any subdirectory (always needed as base filter)
+        like_pattern = normalized_path + "/%"
+        # For non-recursive, exclude files with deeper paths
+        deeper_pattern = normalized_path + "/%/%" if not recursive else None
 
-    query = """
-        SELECT
-            s.id, s.title, s.artist, s.album, s.duration,
-            s.file_path, s.file_format, s.album_art_path, s.source,
-            s.bitrate, s.sample_rate, s.bit_depth, s.file_size,
-            s.waveform_peaks, s.dominant_color, s.dominant_color_2,
-            s.replaygain_track_gain, s.replaygain_track_peak,
-            s.replaygain_album_gain, s.replaygain_album_peak,
-            s.artists, s.featured_artists,
-            GROUP_CONCAT(DISTINCT t.name) as tags,
-            GROUP_CONCAT(DISTINCT p.id || ':' || p.name) as playlists,
-            s.created_at, s.updated_at
-        FROM songs s
-        LEFT JOIN song_tags st ON s.id = st.song_id
-        LEFT JOIN tags t ON st.tag_id = t.id
-        LEFT JOIN playlist_songs ps ON s.id = ps.song_id
-        LEFT JOIN playlists p ON ps.playlist_id = p.id
-        WHERE s.file_path LIKE ?
-    """
+        query = SONG_SELECT_QUERY + " WHERE s.file_path LIKE ?"
 
-    params: list = [like_pattern]
+        params: list = [like_pattern]
 
-    if not recursive and deeper_pattern is not None:
-        query += " AND s.file_path NOT LIKE ?"
-        params.append(deeper_pattern)
+        if not recursive and deeper_pattern is not None:
+            query += " AND s.file_path NOT LIKE ?"
+            params.append(deeper_pattern)
 
-    query += " GROUP BY s.id ORDER BY s.title COLLATE NOCASE, s.id ASC"
+        query += " GROUP BY s.id ORDER BY s.title COLLATE NOCASE, s.id ASC"
 
-    # Count query
-    count_query = """
-        SELECT COUNT(*) as total FROM songs s
-        WHERE s.file_path LIKE ?
-    """
-    count_params: list = [like_pattern]
-    if not recursive and deeper_pattern is not None:
-        count_query += " AND s.file_path NOT LIKE ?"
-        count_params.append(deeper_pattern)
+        # Count query
+        count_query = COUNT_SONG_QUERY + " WHERE s.file_path LIKE ?"
+        count_params: list = [like_pattern]
+        if not recursive and deeper_pattern is not None:
+            count_query += " AND s.file_path NOT LIKE ?"
+            count_params.append(deeper_pattern)
 
-    if limit is not None and limit > 0:
-        query += " LIMIT ?"
-        params.append(limit)
+        if limit is not None and limit > 0:
+            query += " LIMIT ?"
+            params.append(limit)
 
-    if offset is not None and offset >= 0:
-        query += " OFFSET ?"
-        params.append(offset)
+        if offset is not None and offset >= 0:
+            query += " OFFSET ?"
+            params.append(offset)
 
-    cursor.execute(query, params)
-    rows = cursor.fetchall()
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
 
-    cursor.execute(count_query, count_params)
-    total = cursor.fetchone()["total"]
-
-    conn.close()
+        cursor.execute(count_query, count_params)
+        total = cursor.fetchone()["total"]
 
     data = [song_row_to_dict(row) for row in rows]
 
