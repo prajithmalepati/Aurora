@@ -151,7 +151,7 @@ export function AlbumsView() {
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {albums.map((album) => (
             <AlbumCard
-              key={album.album_name}
+              key={`${album.album_name}-${album.album_artist}`}
               album={album}
               onClick={() => fetchAlbumDetail(album.album_name)}
               onPlay={() => handlePlayAlbum(album.album_name)}
@@ -180,11 +180,14 @@ function AlbumCard({ album, onClick, onPlay, onShuffle }: AlbumCardProps) {
     : null
 
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick() }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className="group relative flex flex-col rounded-xl overflow-hidden text-left transition-all duration-200 aurora-focus"
+      className="group relative flex flex-col rounded-xl overflow-hidden text-left transition-all duration-200 aurora-focus cursor-pointer"
       style={{
         background: "var(--aurora-surface)",
         boxShadow: "inset 0 0 0 1px var(--aurora-rim)",
@@ -263,7 +266,7 @@ function AlbumCard({ album, onClick, onPlay, onShuffle }: AlbumCardProps) {
           )}
         </p>
       </div>
-    </button>
+    </div>
   )
 }
 

@@ -271,7 +271,7 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
         </div>
 
         {/* Footer actions */}
-        <div className="px-3 pb-4 pt-2 space-y-0.5">
+        <div className="px-3 pb-4 pt-2 space-y-0.5 shrink-0">
           <div className="aurora-divider-h mx-3 mb-3" />
           <FooterAction
             icon={<Plus className="h-3.5 w-3.5" strokeWidth={1.5} />}
