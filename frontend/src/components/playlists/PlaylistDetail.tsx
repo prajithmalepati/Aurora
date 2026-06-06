@@ -35,6 +35,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Equalizer } from "@/components/ui/Equalizer"
 import { AlbumArt } from "@/components/songs/AlbumArt"
 import { PlaylistImagePicker } from "@/components/playlists/PlaylistImagePicker"
+import { WaveformTrimEditor } from "@/components/player/WaveformTrimEditor"
 import { api } from "@/lib/api"
 
 interface PlaylistDetailProps {
@@ -867,8 +868,6 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
                     onPlay={handlePlaySong}
                     openTrimId={openTrimId}
                     setOpenTrimId={setOpenTrimId}
-                    playlistId={playlistId}
-                    onRefresh={() => fetchPlaylistDetail(playlistId)}
                     // Multi-select
                     isSelected={selectedIds.has(song.id)}
                     onToggleSelect={(shiftKey) => toggleSelectOne(song.id, shiftKey)}
@@ -1013,6 +1012,20 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Waveform Trim Editor */}
+      {openTrimId !== null && activePlaylist && (() => {
+        const trimSong = activePlaylist.songs.find((s) => s.id === openTrimId)
+        if (!trimSong) return null
+        return (
+          <WaveformTrimEditor
+            song={trimSong}
+            open={true}
+            onClose={() => setOpenTrimId(null)}
+            onSaved={() => fetchPlaylistDetail(playlistId)}
+          />
+        )
+      })()}
     </div>
   )
 }
@@ -1063,8 +1076,6 @@ interface PlaylistSongRowProps {
   onPlay: (song: PlaylistSong) => void
   openTrimId: number | null
   setOpenTrimId: (id: number | null) => void
-  playlistId: number
-  onRefresh: () => void
   // Multi-select
   isSelected: boolean
   onToggleSelect: (shiftKey: boolean) => void
@@ -1081,7 +1092,7 @@ interface PlaylistSongRowProps {
 
 function PlaylistSongRow({
   song, index, onRemove, onPlay,
-  openTrimId, setOpenTrimId, playlistId, onRefresh,
+  openTrimId, setOpenTrimId,
   isSelected, onToggleSelect,
   isDragEnabled, dragId, dragOverId, onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd
 }: PlaylistSongRowProps) {
@@ -1267,14 +1278,6 @@ function PlaylistSongRow({
         </div>
       </td>
     </tr>
-    {trimOpen && (
-      <TrimPanel
-        song={song}
-        playlistId={playlistId}
-        onClose={() => setOpenTrimId(null)}
-        onSaved={onRefresh}
-      />
-    )}
     </>
   )
 }
@@ -1307,246 +1310,6 @@ function IconBtn({ children, label, danger, active, disabled, onClick }: IconBtn
     >
       {children}
     </button>
-  )
-}
-
-// ── TrimPanel ──
-
-interface TrimPanelProps {
-  song: PlaylistSong
-  playlistId: number
-  onClose: () => void
-  onSaved: () => void
-}
-
-function TrimPanel({ song, playlistId, onClose, onSaved }: TrimPanelProps) {
-  const currentSong = usePlayerStore((s) => s.currentSong)
-  const seek = usePlayerStore((s) => s.seek)
-
-  const durationMs = (song.duration ?? 0) * 1000
-  const isCurrent = currentSong?.id === song.id
-
-  const [startMs, setStartMs] = useState(song.start_time_ms ?? 0)
-  const [endMs, setEndMs] = useState(
-    song.end_time_ms && song.end_time_ms > 0 ? song.end_time_ms : durationMs
-  )
-  const [saving, setSaving] = useState(false)
-  const [editingStart, setEditingStart] = useState(false)
-  const [editingEnd, setEditingEnd] = useState(false)
-  const [startText, setStartText] = useState("")
-  const [endText, setEndText] = useState("")
-
-  const isInvalid = startMs > 0 && endMs > 0 && startMs >= endMs
-  const seekMs = seek * 1000
-  const startPct = durationMs > 0 ? (startMs / durationMs) * 100 : 0
-  const endPct = durationMs > 0 ? (endMs / durationMs) * 100 : 100
-  const seekPct = durationMs > 0 ? Math.min((seekMs / durationMs) * 100, 100) : 0
-
-  function msToMSS(ms: number) {
-    const s = Math.floor(ms / 1000)
-    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`
-  }
-
-  function parseMSS(text: string): number | null {
-    const m = text.match(/^(\d+):(\d{2})$/)
-    if (!m) return null
-    return (parseInt(m[1]) * 60 + parseInt(m[2])) * 1000
-  }
-
-  async function handleSave() {
-    if (isInvalid) return
-    setSaving(true)
-    try {
-      await api.patch(`/playlists/${playlistId}/songs/${song.id}/timing`, {
-        start_time_ms: startMs,
-        end_time_ms: endMs === durationMs ? endMs : endMs,
-      })
-      toast.success("Trim saved")
-      onSaved()
-      onClose()
-    } catch {
-      toast.error("Failed to save trim")
-      setSaving(false)
-    }
-  }
-
-  async function handleReset() {
-    setSaving(true)
-    try {
-      await api.patch(`/playlists/${playlistId}/songs/${song.id}/timing`, {
-        start_time_ms: 0,
-        end_time_ms: 0,
-      })
-      toast.success("Trim reset")
-      onSaved()
-      onClose()
-    } catch {
-      toast.error("Failed to reset trim")
-      setSaving(false)
-    }
-  }
-
-  return (
-    <tr>
-      <td
-        colSpan={6}
-        className="px-6 pb-3 aurora-fade-in"
-        style={{ background: "var(--aurora-surface)", borderTop: "1px solid var(--aurora-rim)" }}
-      >
-        <div className="space-y-3 pt-3">
-          {/* Visual zone bar */}
-          <div className="relative h-5 flex items-center">
-            <div
-              className="absolute inset-x-0 h-1.5 rounded-full"
-              style={{
-                background: `linear-gradient(to right,
-                  rgba(255,255,255,0.08) 0%,
-                  rgba(255,255,255,0.08) ${startPct}%,
-                  var(--aurora-accent-interactive) ${startPct}%,
-                  var(--aurora-accent-interactive) ${endPct}%,
-                  rgba(255,255,255,0.08) ${endPct}%,
-                  rgba(255,255,255,0.08) 100%
-                )`,
-              }}
-            />
-            {isCurrent && (
-              <div
-                className="absolute w-2 h-2 rounded-full bg-white -translate-x-1/2 z-10"
-                style={{
-                  left: `${seekPct}%`,
-                  boxShadow: "0 0 6px 2px rgba(255,255,255,0.5)",
-                }}
-              />
-            )}
-          </div>
-
-          {/* Start slider */}
-          <div className="flex items-center gap-3">
-            <span className="label-micro w-10 text-right shrink-0">Start</span>
-            <input
-              type="range"
-              min={0}
-              max={durationMs || 100}
-              step={1000}
-              value={startMs}
-              onChange={(e) =>
-                setStartMs(Math.min(Number(e.target.value), endMs > 1000 ? endMs - 1000 : 0))
-              }
-              className="aurora-range flex-1"
-              style={{ ["--aurora-range-pct" as string]: `${startPct}%` }}
-            />
-            {editingStart ? (
-              <input
-                type="text"
-                value={startText}
-                autoFocus
-                onChange={(e) => setStartText(e.target.value)}
-                onBlur={() => {
-                  const parsed = parseMSS(startText)
-                  if (parsed !== null) setStartMs(Math.min(parsed, endMs - 1000))
-                  setEditingStart(false)
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") e.currentTarget.blur()
-                  if (e.key === "Escape") setEditingStart(false)
-                }}
-                className="w-14 text-center text-[12px] bg-[var(--aurora-surface-3)] border border-[var(--aurora-rim)] rounded px-1 py-0.5 text-[var(--aurora-text)] outline-none"
-              />
-            ) : (
-              <button
-                onClick={() => { setStartText(msToMSS(startMs)); setEditingStart(true) }}
-                className="w-14 text-center text-[12px] tabular-nums text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] transition-colors"
-              >
-                {msToMSS(startMs)}
-              </button>
-            )}
-          </div>
-
-          {/* End slider */}
-          <div className="flex items-center gap-3">
-            <span className="label-micro w-10 text-right shrink-0">End</span>
-            <input
-              type="range"
-              min={0}
-              max={durationMs || 100}
-              step={1000}
-              value={endMs}
-              onChange={(e) =>
-                setEndMs(Math.max(Number(e.target.value), startMs + 1000))
-              }
-              className="aurora-range flex-1"
-              style={{ ["--aurora-range-pct" as string]: `${endPct}%` }}
-            />
-            {editingEnd ? (
-              <input
-                type="text"
-                value={endText}
-                autoFocus
-                onChange={(e) => setEndText(e.target.value)}
-                onBlur={() => {
-                  const parsed = parseMSS(endText)
-                  if (parsed !== null) setEndMs(Math.max(parsed, startMs + 1000))
-                  setEditingEnd(false)
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") e.currentTarget.blur()
-                  if (e.key === "Escape") setEditingEnd(false)
-                }}
-                className="w-14 text-center text-[12px] bg-[var(--aurora-surface-3)] border border-[var(--aurora-rim)] rounded px-1 py-0.5 text-[var(--aurora-text)] outline-none"
-              />
-            ) : (
-              <button
-                onClick={() => { setEndText(msToMSS(endMs)); setEditingEnd(true) }}
-                className="w-14 text-center text-[12px] tabular-nums text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] transition-colors"
-              >
-                {msToMSS(endMs)}
-              </button>
-            )}
-          </div>
-
-          {isInvalid && (
-            <p className="text-[11px] text-[var(--aurora-danger)] pl-16">
-              Start must be before end
-            </p>
-          )}
-
-          {/* Action row */}
-          <div className="flex items-center gap-2 pt-1 pl-16">
-            <button
-              onClick={() => setStartMs(Math.floor(seekMs / 1000) * 1000)}
-              disabled={!isCurrent}
-              title={isCurrent ? undefined : "Play song first"}
-              className="text-[11px] px-2.5 py-1 rounded border border-[var(--aurora-rim)] text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] hover:border-[var(--aurora-accent-interactive)] transition-all duration-150 disabled:opacity-30 disabled:pointer-events-none"
-            >
-              Mark In
-            </button>
-            <button
-              onClick={() => setEndMs(Math.floor(seekMs / 1000) * 1000)}
-              disabled={!isCurrent}
-              title={isCurrent ? undefined : "Play song first"}
-              className="text-[11px] px-2.5 py-1 rounded border border-[var(--aurora-rim)] text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] hover:border-[var(--aurora-accent-interactive)] transition-all duration-150 disabled:opacity-30 disabled:pointer-events-none"
-            >
-              Mark Out
-            </button>
-            <span className="flex-1" />
-            <button
-              onClick={handleReset}
-              disabled={saving}
-              className="text-[11px] px-2.5 py-1 rounded text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-danger)] transition-colors duration-150 disabled:opacity-30"
-            >
-              Reset
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving || isInvalid}
-              className="text-[11px] px-3 py-1 rounded bg-[var(--aurora-accent-interactive)] text-black font-medium hover:opacity-90 transition-opacity disabled:opacity-30 disabled:pointer-events-none"
-            >
-              {saving ? "Saving…" : "Save"}
-            </button>
-          </div>
-        </div>
-      </td>
-    </tr>
   )
 }
 

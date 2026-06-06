@@ -20,7 +20,7 @@ import { AboutView } from "@/components/about/AboutView"
 import { AnimatePresence, motion } from "motion/react"
 import { AuroraColorBridge } from '@/components/aurora/AuroraColorBridge'
 import { WelcomeOverlay, dismissWelcome, isWelcomeDismissed } from "@/components/welcome/WelcomeOverlay"
-import { Search } from "lucide-react"
+import { Search, Shuffle } from "lucide-react"
 import type { Song } from "@/types"
 
 function App() {
@@ -108,6 +108,20 @@ function App() {
             <h1 className="font-display text-[28px] leading-none tracking-tight text-[var(--aurora-text)]">
               All Songs
             </h1>
+            <button
+              onClick={() => {
+                const shuffled = [...songs].sort(() => Math.random() - 0.5)
+                if (shuffled.length > 0) {
+                  usePlayerStore.getState().playSong(shuffled[0], shuffled)
+                }
+              }}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full text-[12px] text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] transition-colors duration-150"
+              style={{ background: "var(--aurora-surface)", boxShadow: "inset 0 0 0 1px var(--aurora-rim)" }}
+              aria-label="Shuffle all songs"
+            >
+              <Shuffle className="h-3.5 w-3.5" strokeWidth={1.5} />
+              <span>Shuffle</span>
+            </button>
             <span className="label-micro text-[var(--aurora-text-secondary)]">
               {songs.length} {songs.length === 1 ? "song" : "songs"}
             </span>

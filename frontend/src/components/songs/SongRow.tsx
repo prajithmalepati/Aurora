@@ -28,6 +28,8 @@ interface SongRowProps {
   index: number
   animIndex?: number
   onPlay?: (song: Song, index: number) => void
+  isSelected?: boolean
+  onToggleSelect?: (shiftKey: boolean) => void
 }
 
 function FormatBadge({ format }: { format: string | null | undefined }) {
@@ -49,7 +51,7 @@ function FormatBadge({ format }: { format: string | null | undefined }) {
   )
 }
 
-export const SongRow = memo(function SongRow({ song, index, animIndex, onPlay }: SongRowProps) {
+export const SongRow = memo(function SongRow({ song, index, animIndex, onPlay, isSelected, onToggleSelect }: SongRowProps) {
   const deleteSong = useSongStore((state) => state.deleteSong)
   const playSong = usePlayerStore((state) => state.playSong)
   const currentSong = usePlayerStore((state) => state.currentSong)
@@ -129,11 +131,59 @@ export const SongRow = memo(function SongRow({ song, index, animIndex, onPlay }:
         onContextMenu={handleContextMenu}
         className={`group relative transition-colors duration-150 ${
           hasFile ? "cursor-pointer" : "cursor-not-allowed opacity-40"
-        }`}
+        } ${isSelected ? "bg-white/[0.04]" : ""}`}
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: staggerDelay, type: "spring", stiffness: 300, damping: 28 }}
       >
+        {/* Checkbox column (when multi-select is active) */}
+        {onToggleSelect && (
+          <td
+            className="relative px-2 py-3 w-10 text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span
+              className={`absolute inset-0 transition-colors duration-150 pointer-events-none ${
+                isCurrentSong ? "" : isSelected ? "bg-white/[0.04]" : ""
+              }`}
+              style={
+                isCurrentSong
+                  ? {
+                      background:
+                        "linear-gradient(to right, rgba(94,234,212,0.06) 0%, transparent 60%)",
+                    }
+                  : undefined
+              }
+              aria-hidden="true"
+            />
+            <span className="relative z-10 flex items-center justify-center">
+              <button
+                type="button"
+                role="checkbox"
+                aria-checked={!!isSelected}
+                aria-label={`Select ${song.title}`}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onToggleSelect(e.nativeEvent.shiftKey)
+                }}
+                className="h-4 w-4 rounded-[3px] flex items-center justify-center transition-all duration-150 aurora-focus"
+                style={{
+                  background: isSelected ? "var(--aurora-accent-interactive)" : "transparent",
+                  border: isSelected
+                    ? "1.5px solid var(--aurora-accent-interactive)"
+                    : "1.5px solid var(--aurora-text-tertiary)",
+                }}
+              >
+                {isSelected && (
+                  <svg width="10" height="8" viewBox="0 0 10 8" fill="none" className="text-black">
+                    <path d="M1 4L3.5 6.5L9 1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                )}
+              </button>
+            </span>
+          </td>
+        )}
+
         {/* # column / play indicator */}
         <td
           className={`relative px-4 py-3 w-12 text-center ${
