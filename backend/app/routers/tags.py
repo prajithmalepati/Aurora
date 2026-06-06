@@ -16,7 +16,7 @@ def _get_utc_now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-@router.post("/tags", status_code=201, response_model=TagResponse)
+@router.post("/tags", status_code=201)
 def create_tag(tag: TagCreate):
     """Create a new tag."""
     # Lowercase and trim the name
@@ -47,12 +47,12 @@ def create_tag(tag: TagCreate):
         tag_cache.invalidate("tags:list")
 
     # Return the created tag with song_count = 0
-    return TagResponse(
-        id=tag_id,
-        name=name,
-        song_count=0,
-        created_at=now,
-    )
+    return {"data": {
+        "id": tag_id,
+        "name": name,
+        "song_count": 0,
+        "created_at": now,
+    }, "message": "Tag created successfully"}
 
 
 @router.get("/tags")
@@ -92,11 +92,7 @@ def list_tags():
         for row in rows
     ]
     
-    result = {
-        "data": data,
-        "total": len(data),
-        "message": "ok",
-    }
+    result = {"data": data, "meta": {"total": len(data)}, "message": "ok"}
 
     tag_cache.set(cache_key, result)
     return result
@@ -121,10 +117,10 @@ def delete_tag(tag_id: int):
     tag_cache.invalidate("tags:list")
     song_cache.invalidate_prefix("songs:")
 
-    return {"message": "Tag deleted successfully"}
+    return {"data": None, "message": "Tag deleted successfully"}
 
 
-@router.post("/songs/{song_id}/tags", response_model=dict)
+@router.post("/songs/{song_id}/tags")
 def assign_tags_to_song(song_id: int, tag_assign: TagAssign):
     """Add tags to a song. Creates tags and song_tags links as needed."""
     # Validate tag_names is not empty
@@ -188,10 +184,10 @@ def assign_tags_to_song(song_id: int, tag_assign: TagAssign):
     if row is None:
         raise HTTPException(status_code=404, detail="Song not found")
 
-    return song_row_to_dict(row)
+    return {"data": song_row_to_dict(row), "message": "ok"}
 
 
-@router.delete("/songs/{song_id}/tags/{tag_id}", response_model=dict)
+@router.delete("/songs/{song_id}/tags/{tag_id}")
 def remove_tag_from_song(song_id: int, tag_id: int):
     """Remove a tag from a song. Returns 404 if song, tag, or song_tags link not found."""
     with get_db_ctx() as conn:
@@ -233,5 +229,5 @@ def remove_tag_from_song(song_id: int, tag_id: int):
     
     if row is None:
         raise HTTPException(status_code=404, detail="Song not found")
-    
-    return song_row_to_dict(row)
+
+    return {"data": song_row_to_dict(row), "message": "ok"}

@@ -22,8 +22,7 @@ def filter_endpoint(request: FilterRequest):
             results = filter_songs(db, request.query)
         return {
             "data": results,
-            "total": len(results),
-            "query": request.query,
+            "meta": {"total": len(results), "query": request.query},
             "message": "ok"
         }
     except ValueError as e:

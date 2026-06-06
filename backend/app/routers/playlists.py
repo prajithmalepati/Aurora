@@ -69,7 +69,7 @@ async def upload_playlist_image(playlist_id: int, file: UploadFile = File(...)):
                 pass
             raise
 
-    return {"image_url": image_url}
+    return {"data": {"image_url": image_url}, "message": "ok"}
 
 
 @router.delete("/playlists/{playlist_id}/image", status_code=200)
@@ -95,7 +95,7 @@ def delete_playlist_image(playlist_id: int):
         )
         conn.commit()
 
-    return {"message": "Image removed"}
+    return {"data": None, "message": "Image removed"}
 
 
 @router.post("/playlists", status_code=201)
@@ -123,15 +123,15 @@ def create_playlist(playlist: PlaylistCreate):
         except sqlite3.IntegrityError:
             raise HTTPException(status_code=409, detail="playlist with this name already exists")
 
-    return PlaylistResponse(
-        id=playlist_id,
-        name=name,
-        color=playlist.color,
-        emoji=playlist.emoji,
-        song_count=0,
-        created_at=now,
-        updated_at=now,
-    )
+    return {"data": {
+        "id": playlist_id,
+        "name": name,
+        "color": playlist.color,
+        "emoji": playlist.emoji,
+        "song_count": 0,
+        "created_at": now,
+        "updated_at": now,
+    }, "message": "Playlist created successfully"}
 
 
 @router.get("/playlists")
@@ -179,7 +179,7 @@ def list_playlists():
     
     return {
         "data": data,
-        "total": len(data),
+        "meta": {"total": len(data)},
         "message": "ok",
     }
 
@@ -623,18 +623,18 @@ def update_playlist(playlist_id: int, playlist: PlaylistUpdate):
         )
         row = cursor.fetchone()
 
-    return PlaylistResponse(
-        id=row["id"],
-        name=row["name"],
-        color=row["color"],
-        emoji=row["emoji"],
-        image_url=row["image_url"],
-        crossfade_enabled=row["crossfade_enabled"],
-        crossfade_duration_s=row["crossfade_duration_s"],
-        song_count=row["song_count"],
-        created_at=row["created_at"],
-        updated_at=row["updated_at"],
-    )
+    return {"data": {
+        "id": row["id"],
+        "name": row["name"],
+        "color": row["color"],
+        "emoji": row["emoji"],
+        "image_url": row["image_url"],
+        "crossfade_enabled": row["crossfade_enabled"],
+        "crossfade_duration_s": row["crossfade_duration_s"],
+        "song_count": row["song_count"],
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }, "message": "ok"}
 
 
 @router.delete("/playlists/{playlist_id}", status_code=200)
@@ -660,7 +660,7 @@ def delete_playlist(playlist_id: int):
         )
         conn.commit()
     
-    return {"message": "Playlist deleted successfully"}
+    return {"data": None, "message": "Playlist deleted successfully"}
 
 
 @router.post("/playlists/{playlist_id}/songs", status_code=200)
@@ -829,7 +829,7 @@ def update_song_timing(playlist_id: int, song_id: int, timing: PlaylistSongTimin
         )
         conn.commit()
 
-    return {"start_time_ms": timing.start_time_ms, "end_time_ms": end_ms, "message": "ok"}
+    return {"data": {"start_time_ms": timing.start_time_ms, "end_time_ms": end_ms}, "message": "ok"}
 
 
 # ── Playlist Export ──
@@ -1187,9 +1187,11 @@ async def import_playlist(
             raise HTTPException(status_code=409, detail="Failed to create playlist")
 
     return {
-        "playlist_id": new_playlist_id,
-        "name": playlist_name,
-        "matched_count": len(unique_ids),
-        "unmatched_paths": unmatched_paths,
+        "data": {
+            "playlist_id": new_playlist_id,
+            "name": playlist_name,
+            "matched_count": len(unique_ids),
+            "unmatched_paths": unmatched_paths,
+        },
         "message": "ok",
     }

@@ -36,7 +36,7 @@ export function FoldersView({ }: FoldersViewProps) {
     setTreeError(null)
     api.get<FolderTreeResponse>("/folders")
       .then((res) => {
-        setTree(res.folders)
+        setTree(res.data.folders)
         setTreeLoading(false)
       })
       .catch((err) => {

@@ -127,6 +127,16 @@ export interface ScanResult {
   art_extracted: number
 }
 
+export interface ApiResponse<T> {
+  data: T
+  message: string
+  meta?: {
+    total?: number
+    query?: string
+    [key: string]: unknown
+  }
+}
+
 export interface FolderNode {
   name: string
   path: string
@@ -135,22 +145,13 @@ export interface FolderNode {
 }
 
 export interface FolderTreeResponse {
-  folders: FolderNode[]
-  total_folders: number
-  total_songs: number
+  data: { folders: FolderNode[] }
+  meta: { total_folders: number; total_songs: number }
+  message: string
 }
 
 export interface FolderSongsResponse {
   data: Song[]
-  total: number
-  path: string
-  recursive: boolean
+  meta: { total: number; path: string; recursive: boolean }
   message: string
-}
-
-export interface ApiResponse<T> {
-  data: T
-  message: string
-  total?: number
-  query?: string
 }
