@@ -8,7 +8,7 @@ from fastapi.responses import Response
 
 from datetime import datetime, timezone
 
-from app.database import get_db
+from app.database import get_db_ctx, PLAYLIST_SONG_SELECT_QUERY
 from app.models import PlaylistCreate, PlaylistUpdate, PlaylistResponse, SongResponse, PlaylistSongAdd, PlaylistReorder, PlaylistSongTiming
 
 # Playlist cover images are saved into the Vite public folder so they're
@@ -30,46 +30,44 @@ async def upload_playlist_image(playlist_id: int, file: UploadFile = File(...)):
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image")
 
-    conn = get_db()
-    filepath = None
-    try:
-        cursor = conn.cursor()
-        cursor.execute("SELECT id FROM playlists WHERE id = ?", (playlist_id,))
-        if not cursor.fetchone():
-            raise HTTPException(status_code=404, detail="Playlist not found")
-
-        # Derive extension from MIME type
-        mime = file.content_type or "image/jpeg"
-        ext = {"image/png": "png", "image/gif": "gif", "image/webp": "webp"}.get(mime, "jpg")
-
-        IMAGES_DIR.mkdir(parents=True, exist_ok=True)
-
-        # Remove any existing image files for this playlist
-        for old in IMAGES_DIR.glob(f"{playlist_id}.*"):
-            old.unlink()
-
-        filename = f"{playlist_id}.{ext}"
-        filepath = IMAGES_DIR / filename
-        with open(filepath, "wb") as f:
-            f.write(await file.read())
-
-        image_url = f"/playlist-images/{filename}"
-
-        conn.execute(
-            "UPDATE playlists SET image_url = ?, updated_at = ? WHERE id = ?",
-            (image_url, _get_utc_now(), playlist_id),
-        )
-        conn.commit()
-    except Exception:
-        # Clean up the written file on any DB failure
+    with get_db_ctx() as conn:
+        filepath = None
         try:
-            if filepath is not None and filepath.exists():
-                filepath.unlink()
+            cursor = conn.cursor()
+            cursor.execute("SELECT id FROM playlists WHERE id = ?", (playlist_id,))
+            if not cursor.fetchone():
+                raise HTTPException(status_code=404, detail="Playlist not found")
+
+            # Derive extension from MIME type
+            mime = file.content_type or "image/jpeg"
+            ext = {"image/png": "png", "image/gif": "gif", "image/webp": "webp"}.get(mime, "jpg")
+
+            IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+
+            # Remove any existing image files for this playlist
+            for old in IMAGES_DIR.glob(f"{playlist_id}.*"):
+                old.unlink()
+
+            filename = f"{playlist_id}.{ext}"
+            filepath = IMAGES_DIR / filename
+            with open(filepath, "wb") as f:
+                f.write(await file.read())
+
+            image_url = f"/playlist-images/{filename}"
+
+            conn.execute(
+                "UPDATE playlists SET image_url = ?, updated_at = ? WHERE id = ?",
+                (image_url, _get_utc_now(), playlist_id),
+            )
+            conn.commit()
         except Exception:
-            pass
-        raise
-    finally:
-        conn.close()
+            # Clean up the written file on any DB failure
+            try:
+                if filepath is not None and filepath.exists():
+                    filepath.unlink()
+            except Exception:
+                pass
+            raise
 
     return {"image_url": image_url}
 
@@ -77,11 +75,10 @@ async def upload_playlist_image(playlist_id: int, file: UploadFile = File(...)):
 @router.delete("/playlists/{playlist_id}/image", status_code=200)
 def delete_playlist_image(playlist_id: int):
     """Remove the cover image for a playlist."""
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, image_url FROM playlists WHERE id = ?", (playlist_id,))
-    row = cursor.fetchone()
-    conn.close()
+    with get_db_ctx() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, image_url FROM playlists WHERE id = ?", (playlist_id,))
+        row = cursor.fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="Playlist not found")
 
@@ -91,13 +88,12 @@ def delete_playlist_image(playlist_id: int):
         if file_path.exists():
             file_path.unlink()
 
-    conn = get_db()
-    conn.execute(
-        "UPDATE playlists SET image_url = NULL, updated_at = ? WHERE id = ?",
-        (_get_utc_now(), playlist_id),
-    )
-    conn.commit()
-    conn.close()
+    with get_db_ctx() as conn:
+        conn.execute(
+            "UPDATE playlists SET image_url = NULL, updated_at = ? WHERE id = ?",
+            (_get_utc_now(), playlist_id),
+        )
+        conn.commit()
 
     return {"message": "Image removed"}
 
@@ -110,25 +106,23 @@ def create_playlist(playlist: PlaylistCreate):
     if not name:
         raise HTTPException(status_code=400, detail="name is empty")
     
-    conn = get_db()
-    cursor = conn.cursor()
-    now = _get_utc_now()
-    
-    try:
-        cursor.execute(
-            """
-            INSERT INTO playlists (name, color, emoji, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            (name, playlist.color, playlist.emoji, now, now),
-        )
-        conn.commit()
-        playlist_id = cursor.lastrowid
-    except sqlite3.IntegrityError:
-        conn.close()
-        raise HTTPException(status_code=409, detail="playlist with this name already exists")
-    
-    conn.close()
+    with get_db_ctx() as conn:
+        cursor = conn.cursor()
+        now = _get_utc_now()
+        
+        try:
+            cursor.execute(
+                """
+                INSERT INTO playlists (name, color, emoji, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (name, playlist.color, playlist.emoji, now, now),
+            )
+            conn.commit()
+            playlist_id = cursor.lastrowid
+        except sqlite3.IntegrityError:
+            raise HTTPException(status_code=409, detail="playlist with this name already exists")
+
     return PlaylistResponse(
         id=playlist_id,
         name=name,
@@ -143,30 +137,29 @@ def create_playlist(playlist: PlaylistCreate):
 @router.get("/playlists")
 def list_playlists():
     """List all playlists with song_count using LEFT JOIN on playlist_songs, ordered by name."""
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    query = """
-        SELECT
-            p.id,
-            p.name,
-            p.color,
-            p.emoji,
-            p.image_url,
-            p.crossfade_enabled,
-            p.crossfade_duration_s,
-            COUNT(ps.song_id) as song_count,
-            p.created_at,
-            p.updated_at
-        FROM playlists p
-        LEFT JOIN playlist_songs ps ON p.id = ps.playlist_id
-        GROUP BY p.id
-        ORDER BY p.name ASC
-    """
+    with get_db_ctx() as conn:
+        cursor = conn.cursor()
+        
+        query = """
+            SELECT
+                p.id,
+                p.name,
+                p.color,
+                p.emoji,
+                p.image_url,
+                p.crossfade_enabled,
+                p.crossfade_duration_s,
+                COUNT(ps.song_id) as song_count,
+                p.created_at,
+                p.updated_at
+            FROM playlists p
+            LEFT JOIN playlist_songs ps ON p.id = ps.playlist_id
+            GROUP BY p.id
+            ORDER BY p.name ASC
+        """
 
-    cursor.execute(query)
-    rows = cursor.fetchall()
-    conn.close()
+        cursor.execute(query)
+        rows = cursor.fetchall()
 
     data = [
         PlaylistResponse(
@@ -194,92 +187,57 @@ def list_playlists():
 @router.put("/playlists/{playlist_id}/songs/reorder")
 def reorder_playlist_songs(playlist_id: int, reorder: PlaylistReorder):
     """Reorder songs in a playlist based on the provided song_ids array."""
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    # Verify playlist exists
-    cursor.execute(
-        "SELECT id FROM playlists WHERE id = ?",
-        (playlist_id,),
-    )
-    playlist_row = cursor.fetchone()
-    
-    if not playlist_row:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Playlist not found")
-    
-    # Get current songs in the playlist
-    cursor.execute(
-        "SELECT song_id FROM playlist_songs WHERE playlist_id = ? ORDER BY position",
-        (playlist_id,),
-    )
-    current_rows = cursor.fetchall()
-    current_song_ids = [row["song_id"] for row in current_rows]
-    
-    # Verify song_ids matches exactly the current songs (as a set comparison)
-    if set(reorder.song_ids) != set(current_song_ids):
-        conn.close()
-        raise HTTPException(
-            status_code=400, 
-            detail="song_ids doesn't match the actual songs in the playlist"
-        )
-    
-    now = _get_utc_now()
-    
-    # Update position for each song based on its index in the array
-    for new_position, song_id in enumerate(reorder.song_ids):
+    with get_db_ctx() as conn:
+        cursor = conn.cursor()
+        
+        # Verify playlist exists
         cursor.execute(
-            """
-            UPDATE playlist_songs
-            SET position = ?
-            WHERE playlist_id = ? AND song_id = ?
-            """,
-            (new_position, playlist_id, song_id),
+            "SELECT id FROM playlists WHERE id = ?",
+            (playlist_id,),
         )
-    
-    conn.commit()
-    conn.close()
-    
-    # Fetch and return the full playlist with songs in new order
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    query = """
-        SELECT
-            s.id,
-            s.title,
-            s.artist,
-            s.album,
-            s.duration,
-            s.file_path,
-            s.file_format,
-            s.album_art_path,
-            s.source,
-            s.waveform_peaks,
-            s.dominant_color,
-            s.dominant_color_2,
-            s.replaygain_track_gain,
-            s.replaygain_track_peak,
-            s.replaygain_album_gain,
-            s.replaygain_album_peak,
-            s.artists,
-            s.featured_artists,
-            GROUP_CONCAT(t.name) as tags,
-            ps.start_time_ms,
-            ps.end_time_ms,
-            ps.position
-        FROM songs s
-        JOIN playlist_songs ps ON s.id = ps.song_id
-        LEFT JOIN song_tags st ON s.id = st.song_id
-        LEFT JOIN tags t ON st.tag_id = t.id
-        WHERE ps.playlist_id = ?
-        GROUP BY s.id
-        ORDER BY ps.position ASC
-    """
+        playlist_row = cursor.fetchone()
+        
+        if not playlist_row:
+            raise HTTPException(status_code=404, detail="Playlist not found")
+        
+        # Get current songs in the playlist
+        cursor.execute(
+            "SELECT song_id FROM playlist_songs WHERE playlist_id = ? ORDER BY position",
+            (playlist_id,),
+        )
+        current_rows = cursor.fetchall()
+        current_song_ids = [row["song_id"] for row in current_rows]
+        
+        # Verify song_ids matches exactly the current songs (as a set comparison)
+        if set(reorder.song_ids) != set(current_song_ids):
+            raise HTTPException(
+                status_code=400, 
+                detail="song_ids doesn't match the actual songs in the playlist"
+            )
+        
+        now = _get_utc_now()
+        
+        # Update position for each song based on its index in the array
+        for new_position, song_id in enumerate(reorder.song_ids):
+            cursor.execute(
+                """
+                UPDATE playlist_songs
+                SET position = ?
+                WHERE playlist_id = ? AND song_id = ?
+                """,
+                (new_position, playlist_id, song_id),
+            )
+        
+        conn.commit()
 
-    cursor.execute(query, (playlist_id,))
-    song_rows = cursor.fetchall()
-    conn.close()
+    # Fetch and return the full playlist with songs in new order
+    with get_db_ctx() as conn:
+        cursor = conn.cursor()
+        
+        query = PLAYLIST_SONG_SELECT_QUERY + " WHERE ps.playlist_id = ? GROUP BY s.id ORDER BY ps.position ASC"
+
+        cursor.execute(query, (playlist_id,))
+        song_rows = cursor.fetchall()
 
     # Build songs list with tags parsed from GROUP_CONCAT
     songs = []
@@ -319,19 +277,18 @@ def reorder_playlist_songs(playlist_id: int, reorder: PlaylistReorder):
         )
 
     # Fetch playlist metadata
-    conn = get_db()
-    cursor = conn.cursor()
+    with get_db_ctx() as conn:
+        cursor = conn.cursor()
 
-    cursor.execute(
-        """
-        SELECT id, name, color, emoji, image_url, crossfade_enabled, crossfade_duration_s, created_at, updated_at
-        FROM playlists
-        WHERE id = ?
-        """,
-        (playlist_id,),
-    )
-    row = cursor.fetchone()
-    conn.close()
+        cursor.execute(
+            """
+            SELECT id, name, color, emoji, image_url, crossfade_enabled, crossfade_duration_s, created_at, updated_at
+            FROM playlists
+            WHERE id = ?
+            """,
+            (playlist_id,),
+        )
+        row = cursor.fetchone()
 
     song_count = len(songs)
 
@@ -356,104 +313,68 @@ def reorder_playlist_songs(playlist_id: int, reorder: PlaylistReorder):
 @router.delete("/playlists/{playlist_id}/songs/{song_id}", status_code=200)
 def delete_song_from_playlist(playlist_id: int, song_id: int):
     """Remove a song from a playlist and recompact positions."""
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    # Verify playlist exists
-    cursor.execute(
-        "SELECT id FROM playlists WHERE id = ?",
-        (playlist_id,),
-    )
-    playlist_row = cursor.fetchone()
-    
-    if not playlist_row:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Playlist not found")
-    
-    # Verify song exists
-    cursor.execute(
-        "SELECT id FROM songs WHERE id = ?",
-        (song_id,),
-    )
-    song_row = cursor.fetchone()
-    
-    if not song_row:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Song not found")
-    
-    # Verify song is in the playlist
-    cursor.execute(
-        "SELECT id, position FROM playlist_songs WHERE playlist_id = ? AND song_id = ?",
-        (playlist_id, song_id),
-    )
-    existing = cursor.fetchone()
-    
-    if not existing:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Song not in playlist")
-    
-    # Get the position of the song being deleted
-    deleted_position = existing["position"]
-    
-    # Delete the playlist_songs row
-    cursor.execute(
-        "DELETE FROM playlist_songs WHERE playlist_id = ? AND song_id = ?",
-        (playlist_id, song_id),
-    )
-    conn.commit()
-    
-    # Recompack positions: decrement position for all songs after the deleted one
-    cursor.execute(
-        """
-        UPDATE playlist_songs
-        SET position = position - 1
-        WHERE playlist_id = ? AND position > ?
-        """,
-        (playlist_id, deleted_position),
-    )
-    conn.commit()
-    conn.close()
-    
+    with get_db_ctx() as conn:
+        cursor = conn.cursor()
+        
+        # Verify playlist exists
+        cursor.execute(
+            "SELECT id FROM playlists WHERE id = ?",
+            (playlist_id,),
+        )
+        playlist_row = cursor.fetchone()
+        
+        if not playlist_row:
+            raise HTTPException(status_code=404, detail="Playlist not found")
+        
+        # Verify song exists
+        cursor.execute(
+            "SELECT id FROM songs WHERE id = ?",
+            (song_id,),
+        )
+        song_row = cursor.fetchone()
+        
+        if not song_row:
+            raise HTTPException(status_code=404, detail="Song not found")
+        
+        # Verify song is in the playlist
+        cursor.execute(
+            "SELECT id, position FROM playlist_songs WHERE playlist_id = ? AND song_id = ?",
+            (playlist_id, song_id),
+        )
+        existing = cursor.fetchone()
+        
+        if not existing:
+            raise HTTPException(status_code=404, detail="Song not in playlist")
+        
+        # Get the position of the song being deleted
+        deleted_position = existing["position"]
+        
+        # Delete the playlist_songs row
+        cursor.execute(
+            "DELETE FROM playlist_songs WHERE playlist_id = ? AND song_id = ?",
+            (playlist_id, song_id),
+        )
+        conn.commit()
+        
+        # Recompack positions: decrement position for all songs after the deleted one
+        cursor.execute(
+            """
+            UPDATE playlist_songs
+            SET position = position - 1
+            WHERE playlist_id = ? AND position > ?
+            """,
+            (playlist_id, deleted_position),
+        )
+        conn.commit()
+
     # Fetch and return the full playlist with songs
-    conn = get_db()
-    cursor = conn.cursor()
+    with get_db_ctx() as conn:
+        cursor = conn.cursor()
 
-    query = """
-        SELECT
-            s.id,
-            s.title,
-            s.artist,
-            s.album,
-            s.duration,
-            s.file_path,
-            s.file_format,
-            s.album_art_path,
-            s.source,
-            s.waveform_peaks,
-            s.dominant_color,
-            s.dominant_color_2,
-            s.replaygain_track_gain,
-            s.replaygain_track_peak,
-            s.replaygain_album_gain,
-            s.replaygain_album_peak,
-            s.artists,
-            s.featured_artists,
-            GROUP_CONCAT(t.name) as tags,
-            ps.start_time_ms,
-            ps.end_time_ms,
-            ps.position
-        FROM songs s
-        JOIN playlist_songs ps ON s.id = ps.song_id
-        LEFT JOIN song_tags st ON s.id = st.song_id
-        LEFT JOIN tags t ON st.tag_id = t.id
-        WHERE ps.playlist_id = ?
-        GROUP BY s.id
-        ORDER BY ps.position ASC
-    """
+        query = PLAYLIST_SONG_SELECT_QUERY + " WHERE ps.playlist_id = ? GROUP BY s.id ORDER BY ps.position ASC"
 
-    cursor.execute(query, (playlist_id,))
-    song_rows = cursor.fetchall()
-    conn.close()
+        cursor.execute(query, (playlist_id,))
+        song_rows = cursor.fetchall()
 
     # Build songs list with tags parsed from GROUP_CONCAT
     songs = []
@@ -493,19 +414,18 @@ def delete_song_from_playlist(playlist_id: int, song_id: int):
         )
 
     # Fetch playlist metadata
-    conn = get_db()
-    cursor = conn.cursor()
+    with get_db_ctx() as conn:
+        cursor = conn.cursor()
 
-    cursor.execute(
-        """
-        SELECT id, name, color, emoji, image_url, crossfade_enabled, crossfade_duration_s, created_at, updated_at
-        FROM playlists
-        WHERE id = ?
-        """,
-        (playlist_id,),
-    )
-    row = cursor.fetchone()
-    conn.close()
+        cursor.execute(
+            """
+            SELECT id, name, color, emoji, image_url, crossfade_enabled, crossfade_duration_s, created_at, updated_at
+            FROM playlists
+            WHERE id = ?
+            """,
+            (playlist_id,),
+        )
+        row = cursor.fetchone()
 
     song_count = len(songs)
 
@@ -530,64 +450,31 @@ def delete_song_from_playlist(playlist_id: int, song_id: int):
 @router.get("/playlists/{playlist_id}")
 def get_playlist(playlist_id: int):
     """Get playlist with its songs ordered by position, each song includes tags."""
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    # Fetch playlist metadata
-    cursor.execute(
-        """
-        SELECT id, name, color, emoji, image_url, crossfade_enabled, crossfade_duration_s, created_at, updated_at
-        FROM playlists
-        WHERE id = ?
-        """,
-        (playlist_id,),
-    )
-    row = cursor.fetchone()
-    conn.close()
+    with get_db_ctx() as conn:
+        cursor = conn.cursor()
+        
+        # Fetch playlist metadata
+        cursor.execute(
+            """
+            SELECT id, name, color, emoji, image_url, crossfade_enabled, crossfade_duration_s, created_at, updated_at
+            FROM playlists
+            WHERE id = ?
+            """,
+            (playlist_id,),
+        )
+        row = cursor.fetchone()
 
     if not row:
         raise HTTPException(status_code=404, detail="Playlist not found")
     
     # Fetch songs with tags ordered by position
-    conn = get_db()
-    cursor = conn.cursor()
+    with get_db_ctx() as conn:
+        cursor = conn.cursor()
 
-    query = """
-        SELECT
-            s.id,
-            s.title,
-            s.artist,
-            s.album,
-            s.duration,
-            s.file_path,
-            s.file_format,
-            s.album_art_path,
-            s.source,
-            s.waveform_peaks,
-            s.dominant_color,
-            s.dominant_color_2,
-            s.replaygain_track_gain,
-            s.replaygain_track_peak,
-            s.replaygain_album_gain,
-            s.replaygain_album_peak,
-            s.artists,
-            s.featured_artists,
-            GROUP_CONCAT(t.name) as tags,
-            ps.start_time_ms,
-            ps.end_time_ms,
-            ps.position
-        FROM songs s
-        JOIN playlist_songs ps ON s.id = ps.song_id
-        LEFT JOIN song_tags st ON s.id = st.song_id
-        LEFT JOIN tags t ON st.tag_id = t.id
-        WHERE ps.playlist_id = ?
-        GROUP BY s.id
-        ORDER BY ps.position ASC
-    """
+        query = PLAYLIST_SONG_SELECT_QUERY + " WHERE ps.playlist_id = ? GROUP BY s.id ORDER BY ps.position ASC"
 
-    cursor.execute(query, (playlist_id,))
-    song_rows = cursor.fetchall()
-    conn.close()
+        cursor.execute(query, (playlist_id,))
+        song_rows = cursor.fetchall()
 
     # Build songs list with tags parsed from GROUP_CONCAT
     songs = []
@@ -650,95 +537,91 @@ def get_playlist(playlist_id: int):
 @router.put("/playlists/{playlist_id}")
 def update_playlist(playlist_id: int, playlist: PlaylistUpdate):
     """Update playlist metadata. Only update fields that are not None."""
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    # Check if playlist exists
-    cursor.execute(
-        "SELECT id, name FROM playlists WHERE id = ?",
-        (playlist_id,),
-    )
-    row = cursor.fetchone()
-    
-    if not row:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Playlist not found")
-    
-    # Check name uniqueness if name is being changed
-    if playlist.name is not None and playlist.name.strip() != row["name"]:
-        new_name = playlist.name.strip()
+    with get_db_ctx() as conn:
+        cursor = conn.cursor()
+        
+        # Check if playlist exists
         cursor.execute(
-            "SELECT id FROM playlists WHERE name = ? AND id != ?",
-            (new_name, playlist_id),
+            "SELECT id, name FROM playlists WHERE id = ?",
+            (playlist_id,),
         )
-        existing = cursor.fetchone()
-        if existing:
-            conn.close()
-            raise HTTPException(status_code=409, detail="playlist with this name already exists")
-    
-    now = _get_utc_now()
-    
-    # Build update query dynamically based on provided fields
-    updates = []
-    params = []
-    
-    if playlist.name is not None:
-        updates.append("name = ?")
-        params.append(playlist.name.strip())
-    
-    if playlist.color is not None:
-        updates.append("color = ?")
-        params.append(playlist.color)
-    
-    if playlist.emoji is not None:
-        updates.append("emoji = ?")
-        params.append(playlist.emoji if playlist.emoji else None)
+        row = cursor.fetchone()
+        
+        if not row:
+            raise HTTPException(status_code=404, detail="Playlist not found")
+        
+        # Check name uniqueness if name is being changed
+        if playlist.name is not None and playlist.name.strip() != row["name"]:
+            new_name = playlist.name.strip()
+            cursor.execute(
+                "SELECT id FROM playlists WHERE name = ? AND id != ?",
+                (new_name, playlist_id),
+            )
+            existing = cursor.fetchone()
+            if existing:
+                raise HTTPException(status_code=409, detail="playlist with this name already exists")
+        
+        now = _get_utc_now()
+        
+        # Build update query dynamically based on provided fields
+        updates = []
+        params = []
+        
+        if playlist.name is not None:
+            updates.append("name = ?")
+            params.append(playlist.name.strip())
+        
+        if playlist.color is not None:
+            updates.append("color = ?")
+            params.append(playlist.color)
+        
+        if playlist.emoji is not None:
+            updates.append("emoji = ?")
+            params.append(playlist.emoji if playlist.emoji else None)
 
-    if "crossfade_enabled" in playlist.model_fields_set:
-        updates.append("crossfade_enabled = ?")
-        params.append(playlist.crossfade_enabled)
+        if "crossfade_enabled" in playlist.model_fields_set:
+            updates.append("crossfade_enabled = ?")
+            params.append(playlist.crossfade_enabled)
 
-    if "crossfade_duration_s" in playlist.model_fields_set:
-        updates.append("crossfade_duration_s = ?")
-        params.append(playlist.crossfade_duration_s)
+        if "crossfade_duration_s" in playlist.model_fields_set:
+            updates.append("crossfade_duration_s = ?")
+            params.append(playlist.crossfade_duration_s)
 
-    updates.append("updated_at = ?")
-    params.append(now)
-    
-    params.append(playlist_id)
-    
-    query = f"UPDATE playlists SET {', '.join(updates)} WHERE id = ?"
-    
-    cursor.execute(query, params)
-    conn.commit()
-    conn.close()
-    
+        updates.append("updated_at = ?")
+        params.append(now)
+        
+        params.append(playlist_id)
+        
+        query = f"UPDATE playlists SET {', '.join(updates)} WHERE id = ?"
+        
+        cursor.execute(query, params)
+        conn.commit()
+
     # Fetch updated playlist with song_count
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    cursor.execute(
-        """
-        SELECT
-            p.id,
-            p.name,
-            p.color,
-            p.emoji,
-            p.image_url,
-            p.crossfade_enabled,
-            p.crossfade_duration_s,
-            COUNT(ps.song_id) as song_count,
-            p.created_at,
-            p.updated_at
-        FROM playlists p
-        LEFT JOIN playlist_songs ps ON p.id = ps.playlist_id
-        WHERE p.id = ?
-        GROUP BY p.id
-        """,
-        (playlist_id,),
-    )
-    row = cursor.fetchone()
-    conn.close()
+    with get_db_ctx() as conn:
+        cursor = conn.cursor()
+        
+        cursor.execute(
+            """
+            SELECT
+                p.id,
+                p.name,
+                p.color,
+                p.emoji,
+                p.image_url,
+                p.crossfade_enabled,
+                p.crossfade_duration_s,
+                COUNT(ps.song_id) as song_count,
+                p.created_at,
+                p.updated_at
+            FROM playlists p
+            LEFT JOIN playlist_songs ps ON p.id = ps.playlist_id
+            WHERE p.id = ?
+            GROUP BY p.id
+            """,
+            (playlist_id,),
+        )
+        row = cursor.fetchone()
 
     return PlaylistResponse(
         id=row["id"],
@@ -757,27 +640,25 @@ def update_playlist(playlist_id: int, playlist: PlaylistUpdate):
 @router.delete("/playlists/{playlist_id}", status_code=200)
 def delete_playlist(playlist_id: int):
     """Delete a playlist. Songs are NOT deleted. Returns success message."""
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    # Check if playlist exists
-    cursor.execute(
-        "SELECT id FROM playlists WHERE id = ?",
-        (playlist_id,),
-    )
-    row = cursor.fetchone()
-    
-    if not row:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Playlist not found")
-    
-    # Delete the playlist (cascading handles playlist_songs)
-    cursor.execute(
-        "DELETE FROM playlists WHERE id = ?",
-        (playlist_id,),
-    )
-    conn.commit()
-    conn.close()
+    with get_db_ctx() as conn:
+        cursor = conn.cursor()
+        
+        # Check if playlist exists
+        cursor.execute(
+            "SELECT id FROM playlists WHERE id = ?",
+            (playlist_id,),
+        )
+        row = cursor.fetchone()
+        
+        if not row:
+            raise HTTPException(status_code=404, detail="Playlist not found")
+        
+        # Delete the playlist (cascading handles playlist_songs)
+        cursor.execute(
+            "DELETE FROM playlists WHERE id = ?",
+            (playlist_id,),
+        )
+        conn.commit()
     
     return {"message": "Playlist deleted successfully"}
 
@@ -785,104 +666,68 @@ def delete_playlist(playlist_id: int):
 @router.post("/playlists/{playlist_id}/songs", status_code=200)
 def add_song_to_playlist(playlist_id: int, song_add: PlaylistSongAdd):
     """Add a song to a playlist at the end (position = max position + 1)."""
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    # Verify playlist exists
-    cursor.execute(
-        "SELECT id FROM playlists WHERE id = ?",
-        (playlist_id,),
-    )
-    playlist_row = cursor.fetchone()
-    
-    if not playlist_row:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Playlist not found")
-    
-    # Verify song exists
-    cursor.execute(
-        "SELECT id FROM songs WHERE id = ?",
-        (song_add.song_id,),
-    )
-    song_row = cursor.fetchone()
-    
-    if not song_row:
-        conn.close()
-        raise HTTPException(status_code=404, detail="Song not found")
-    
-    # Check song not already in playlist
-    cursor.execute(
-        "SELECT id FROM playlist_songs WHERE playlist_id = ? AND song_id = ?",
-        (playlist_id, song_add.song_id),
-    )
-    existing = cursor.fetchone()
-    
-    if existing:
-        conn.close()
-        raise HTTPException(status_code=409, detail="Song already in playlist")
-    
-    # Get current max position
-    cursor.execute(
-        "SELECT COALESCE(MAX(position), -1) as max_pos FROM playlist_songs WHERE playlist_id = ?",
-        (playlist_id,),
-    )
-    max_pos_row = cursor.fetchone()
-    max_pos = max_pos_row["max_pos"]
-    
-    # Insert at position = current max position + 1
-    new_position = max_pos + 1
-    now = _get_utc_now()
-    
-    cursor.execute(
-        """
-        INSERT INTO playlist_songs (playlist_id, song_id, position, added_at, start_time_ms, end_time_ms)
-        VALUES (?, ?, ?, ?, ?, ?)
-        """,
-        (playlist_id, song_add.song_id, new_position, now, song_add.start_time_ms, song_add.end_time_ms),
-    )
-    conn.commit()
-    conn.close()
-    
+    with get_db_ctx() as conn:
+        cursor = conn.cursor()
+        
+        # Verify playlist exists
+        cursor.execute(
+            "SELECT id FROM playlists WHERE id = ?",
+            (playlist_id,),
+        )
+        playlist_row = cursor.fetchone()
+        
+        if not playlist_row:
+            raise HTTPException(status_code=404, detail="Playlist not found")
+        
+        # Verify song exists
+        cursor.execute(
+            "SELECT id FROM songs WHERE id = ?",
+            (song_add.song_id,),
+        )
+        song_row = cursor.fetchone()
+        
+        if not song_row:
+            raise HTTPException(status_code=404, detail="Song not found")
+        
+        # Check song not already in playlist
+        cursor.execute(
+            "SELECT id FROM playlist_songs WHERE playlist_id = ? AND song_id = ?",
+            (playlist_id, song_add.song_id),
+        )
+        existing = cursor.fetchone()
+        
+        if existing:
+            raise HTTPException(status_code=409, detail="Song already in playlist")
+        
+        # Get current max position
+        cursor.execute(
+            "SELECT COALESCE(MAX(position), -1) as max_pos FROM playlist_songs WHERE playlist_id = ?",
+            (playlist_id,),
+        )
+        max_pos_row = cursor.fetchone()
+        max_pos = max_pos_row["max_pos"]
+        
+        # Insert at position = current max position + 1
+        new_position = max_pos + 1
+        now = _get_utc_now()
+        
+        cursor.execute(
+            """
+            INSERT INTO playlist_songs (playlist_id, song_id, position, added_at, start_time_ms, end_time_ms)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (playlist_id, song_add.song_id, new_position, now, song_add.start_time_ms, song_add.end_time_ms),
+        )
+        conn.commit()
+
     # Fetch and return the full playlist with songs (reuse the same query from GET /playlists/{id})
-    conn = get_db()
-    cursor = conn.cursor()
+    with get_db_ctx() as conn:
+        cursor = conn.cursor()
 
-    query = """
-        SELECT
-            s.id,
-            s.title,
-            s.artist,
-            s.album,
-            s.duration,
-            s.file_path,
-            s.file_format,
-            s.album_art_path,
-            s.source,
-            s.waveform_peaks,
-            s.dominant_color,
-            s.dominant_color_2,
-            s.replaygain_track_gain,
-            s.replaygain_track_peak,
-            s.replaygain_album_gain,
-            s.replaygain_album_peak,
-            s.artists,
-            s.featured_artists,
-            GROUP_CONCAT(t.name) as tags,
-            ps.start_time_ms,
-            ps.end_time_ms,
-            ps.position
-        FROM songs s
-        JOIN playlist_songs ps ON s.id = ps.song_id
-        LEFT JOIN song_tags st ON s.id = st.song_id
-        LEFT JOIN tags t ON st.tag_id = t.id
-        WHERE ps.playlist_id = ?
-        GROUP BY s.id
-        ORDER BY ps.position ASC
-    """
+        query = PLAYLIST_SONG_SELECT_QUERY + " WHERE ps.playlist_id = ? GROUP BY s.id ORDER BY ps.position ASC"
 
-    cursor.execute(query, (playlist_id,))
-    song_rows = cursor.fetchall()
-    conn.close()
+        cursor.execute(query, (playlist_id,))
+        song_rows = cursor.fetchall()
 
     # Build songs list with tags parsed from GROUP_CONCAT
     songs = []
@@ -922,19 +767,18 @@ def add_song_to_playlist(playlist_id: int, song_add: PlaylistSongAdd):
         )
 
     # Fetch playlist metadata
-    conn = get_db()
-    cursor = conn.cursor()
+    with get_db_ctx() as conn:
+        cursor = conn.cursor()
 
-    cursor.execute(
-        """
-        SELECT id, name, color, emoji, image_url, crossfade_enabled, crossfade_duration_s, created_at, updated_at
-        FROM playlists
-        WHERE id = ?
-        """,
-        (playlist_id,),
-    )
-    row = cursor.fetchone()
-    conn.close()
+        cursor.execute(
+            """
+            SELECT id, name, color, emoji, image_url, crossfade_enabled, crossfade_duration_s, created_at, updated_at
+            FROM playlists
+            WHERE id = ?
+            """,
+            (playlist_id,),
+        )
+        row = cursor.fetchone()
 
     song_count = len(songs)
 
@@ -962,30 +806,28 @@ def update_song_timing(playlist_id: int, song_id: int, timing: PlaylistSongTimin
         if timing.start_time_ms >= timing.end_time_ms:
             raise HTTPException(status_code=422, detail="start_time_ms must be less than end_time_ms")
 
-    conn = get_db()
-    cursor = conn.cursor()
+    with get_db_ctx() as conn:
+        cursor = conn.cursor()
 
-    cursor.execute(
-        "SELECT id FROM playlist_songs WHERE playlist_id = ? AND song_id = ?",
-        (playlist_id, song_id),
-    )
-    if not cursor.fetchone():
-        conn.close()
-        raise HTTPException(status_code=404, detail="Song not in playlist")
+        cursor.execute(
+            "SELECT id FROM playlist_songs WHERE playlist_id = ? AND song_id = ?",
+            (playlist_id, song_id),
+        )
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Song not in playlist")
 
-    end_ms = timing.end_time_ms
-    if end_ms > 0:
-        cursor.execute("SELECT duration FROM songs WHERE id = ?", (song_id,))
-        song_row = cursor.fetchone()
-        if song_row and song_row["duration"] and end_ms > song_row["duration"] * 1000:
-            end_ms = song_row["duration"] * 1000
+        end_ms = timing.end_time_ms
+        if end_ms > 0:
+            cursor.execute("SELECT duration FROM songs WHERE id = ?", (song_id,))
+            song_row = cursor.fetchone()
+            if song_row and song_row["duration"] and end_ms > song_row["duration"] * 1000:
+                end_ms = song_row["duration"] * 1000
 
-    cursor.execute(
-        "UPDATE playlist_songs SET start_time_ms = ?, end_time_ms = ? WHERE playlist_id = ? AND song_id = ?",
-        (timing.start_time_ms, end_ms, playlist_id, song_id),
-    )
-    conn.commit()
-    conn.close()
+        cursor.execute(
+            "UPDATE playlist_songs SET start_time_ms = ?, end_time_ms = ? WHERE playlist_id = ? AND song_id = ?",
+            (timing.start_time_ms, end_ms, playlist_id, song_id),
+        )
+        conn.commit()
 
     return {"start_time_ms": timing.start_time_ms, "end_time_ms": end_ms, "message": "ok"}
 
@@ -994,44 +836,26 @@ def update_song_timing(playlist_id: int, song_id: int, timing: PlaylistSongTimin
 
 def _get_playlist_songs_for_export(playlist_id: int):
     """Fetch playlist metadata + songs ordered by position. Returns (playlist_row, songs_list)."""
-    conn = get_db()
-    cursor = conn.cursor()
+    with get_db_ctx() as conn:
+        cursor = conn.cursor()
 
-    cursor.execute(
-        """
-        SELECT id, name, color, emoji, image_url, crossfade_enabled, crossfade_duration_s, created_at, updated_at
-        FROM playlists WHERE id = ?
-        """,
-        (playlist_id,),
-    )
-    row = cursor.fetchone()
-    conn.close()
+        cursor.execute(
+            """
+            SELECT id, name, color, emoji, image_url, crossfade_enabled, crossfade_duration_s, created_at, updated_at
+            FROM playlists WHERE id = ?
+            """,
+            (playlist_id,),
+        )
+        row = cursor.fetchone()
 
     if not row:
         return None, None
 
-    conn = get_db()
-    cursor = conn.cursor()
-    query = """
-        SELECT
-            s.id, s.title, s.artist, s.album, s.duration, s.file_path, s.file_format,
-            s.album_art_path, s.source, s.waveform_peaks, s.dominant_color, s.dominant_color_2,
-            s.replaygain_track_gain, s.replaygain_track_peak,
-            s.replaygain_album_gain, s.replaygain_album_peak,
-            s.artists, s.featured_artists,
-            GROUP_CONCAT(t.name) as tags,
-            ps.start_time_ms, ps.end_time_ms, ps.position
-        FROM songs s
-        JOIN playlist_songs ps ON s.id = ps.song_id
-        LEFT JOIN song_tags st ON s.id = st.song_id
-        LEFT JOIN tags t ON st.tag_id = t.id
-        WHERE ps.playlist_id = ?
-        GROUP BY s.id
-        ORDER BY ps.position ASC
-    """
-    cursor.execute(query, (playlist_id,))
-    song_rows = cursor.fetchall()
-    conn.close()
+    with get_db_ctx() as conn:
+        cursor = conn.cursor()
+        query = PLAYLIST_SONG_SELECT_QUERY + " WHERE ps.playlist_id = ? GROUP BY s.id ORDER BY ps.position ASC"
+        cursor.execute(query, (playlist_id,))
+        song_rows = cursor.fetchall()
 
     songs = []
     for sr in song_rows:
@@ -1179,7 +1003,6 @@ def _parse_m3u(content: str) -> list[dict]:
 
             if not file_path:
                 continue
-
             # Parse #EXTINF
             inf_match = re.match(r'^#EXTINF:\s*(-?\d+)\s*,\s*(.*)', header)
             if inf_match:
@@ -1277,11 +1100,10 @@ async def import_playlist(
         raise HTTPException(status_code=400, detail="No tracks found in file")
 
     # Build a lookup of file_path -> song_id from the library
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, file_path FROM songs WHERE file_path IS NOT NULL AND file_path != ''")
-    db_rows = cursor.fetchall()
-    conn.close()
+    with get_db_ctx() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, file_path FROM songs WHERE file_path IS NOT NULL AND file_path != ''")
+        db_rows = cursor.fetchall()
 
     # Normalize paths for matching
     def norm(p: str) -> str:
@@ -1328,44 +1150,41 @@ async def import_playlist(
 
     # Create playlist
     now = _get_utc_now()
-    conn = get_db()
-    cursor = conn.cursor()
+    with get_db_ctx() as conn:
+        cursor = conn.cursor()
 
-    # Check for name collision
-    cursor.execute("SELECT id FROM playlists WHERE name = ?", (playlist_name,))
-    existing = cursor.fetchone()
-    if existing:
-        base = playlist_name
-        suffix = 1
-        while True:
-            playlist_name = f"{base} ({suffix})"
-            cursor.execute("SELECT id FROM playlists WHERE name = ?", (playlist_name,))
-            if not cursor.fetchone():
-                break
-            suffix += 1
+        # Check for name collision
+        cursor.execute("SELECT id FROM playlists WHERE name = ?", (playlist_name,))
+        existing = cursor.fetchone()
+        if existing:
+            base = playlist_name
+            suffix = 1
+            while True:
+                playlist_name = f"{base} ({suffix})"
+                cursor.execute("SELECT id FROM playlists WHERE name = ?", (playlist_name,))
+                if not cursor.fetchone():
+                    break
+                suffix += 1
 
-    try:
-        cursor.execute(
-            """INSERT INTO playlists (name, color, emoji, crossfade_enabled, crossfade_duration_s, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (playlist_name, color, emoji, crossfade_enabled, crossfade_duration_s, now, now),
-        )
-        conn.commit()
-        new_playlist_id = cursor.lastrowid
-
-        # Add songs
-        for pos, sid in enumerate(unique_ids):
+        try:
             cursor.execute(
-                """INSERT INTO playlist_songs (playlist_id, song_id, position, added_at, start_time_ms, end_time_ms)
-                   VALUES (?, ?, ?, ?, 0, 0)""",
-                (new_playlist_id, sid, pos, now),
+                """INSERT INTO playlists (name, color, emoji, crossfade_enabled, crossfade_duration_s, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (playlist_name, color, emoji, crossfade_enabled, crossfade_duration_s, now, now),
             )
-        conn.commit()
-    except sqlite3.IntegrityError:
-        conn.close()
-        raise HTTPException(status_code=409, detail="Failed to create playlist")
-    finally:
-        conn.close()
+            conn.commit()
+            new_playlist_id = cursor.lastrowid
+
+            # Add songs
+            for pos, sid in enumerate(unique_ids):
+                cursor.execute(
+                    """INSERT INTO playlist_songs (playlist_id, song_id, position, added_at, start_time_ms, end_time_ms)
+                       VALUES (?, ?, ?, ?, 0, 0)""",
+                    (new_playlist_id, sid, pos, now),
+                )
+            conn.commit()
+        except sqlite3.IntegrityError:
+            raise HTTPException(status_code=409, detail="Failed to create playlist")
 
     return {
         "playlist_id": new_playlist_id,
