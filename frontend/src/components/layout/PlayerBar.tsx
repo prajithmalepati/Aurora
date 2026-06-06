@@ -7,8 +7,9 @@ import { motion, AnimatePresence } from "motion/react"
 import { AuroraPlayButton } from "@/components/player/AuroraPlayButton"
 import { SeekScrubber } from "@/components/player/SeekScrubber"
 import { QueuePanel } from "@/components/player/QueuePanel"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { formatFileSize, qualityLabel } from "@/lib/utils"
+import { api } from "@/lib/api"
 import type { Song } from "@/types"
 
 function AudioMetadataLine({ song }: { song: Song }) {
@@ -27,6 +28,16 @@ function AudioMetadataLine({ song }: { song: Song }) {
 export function PlayerBar() {
   const { seekTo } = useAudioPlayer()
   const currentSong = usePlayerStore((state) => state.currentSong)
+  const [bleedThumbUrl, setBleedThumbUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!currentSong) { setBleedThumbUrl(null); return }
+    let cancelled = false
+    api.get<{ url: string }>(`/songs/${currentSong.id}/bleed-thumb`)
+      .then((res) => { if (!cancelled) setBleedThumbUrl(res.url) })
+      .catch(() => { if (!cancelled) setBleedThumbUrl(null) })
+    return () => { cancelled = true }
+  }, [currentSong?.id])
   const isPlaying = usePlayerStore((state) => state.isPlaying)
   const volume = usePlayerStore((state) => state.volume)
   const setVolume = usePlayerStore((state) => state.setVolume)
@@ -78,15 +89,19 @@ export function PlayerBar() {
           style={{
             position: 'absolute',
             inset: '-60px',
-            backgroundImage: `url(/api/songs/${currentSong.id}/bleed-thumb)`,
-            backgroundSize: '180px 180px',
+            backgroundImage: bleedThumbUrl
+              ? `url(${bleedThumbUrl})`
+              : currentSong.dominant_color
+                ? `linear-gradient(135deg, ${currentSong.dominant_color}, transparent)`
+                : 'none',
+            backgroundSize: 'cover',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat',
-            filter: 'blur(50px) saturate(2.2) brightness(1.4)',
+            filter: 'blur(60px) saturate(2.2) brightness(1.4)',
             maskImage: 'radial-gradient(closest-side, black, transparent)',
             WebkitMaskImage: 'radial-gradient(closest-side, black, transparent)',
             mixBlendMode: 'screen',
-            opacity: 0.55,
+            opacity: 0.15,
             pointerEvents: 'none',
             transition: 'opacity 0.4s ease-out',
           }}

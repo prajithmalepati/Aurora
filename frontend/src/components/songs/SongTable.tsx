@@ -1,8 +1,20 @@
+import { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import { useSongStore } from "@/stores/songStore"
+import { usePlayerStore } from "@/stores/playerStore"
+import { usePlaylistStore } from "@/stores/playlistStore"
+import { useTagStore } from "@/stores/tagStore"
 import type { Song } from "@/types"
 import { SongRow } from "./SongRow"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Music, ChevronUp, ChevronDown, AlertTriangle, RefreshCw } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { toast } from "@/lib/toast"
+import { Music, ChevronUp, ChevronDown, AlertTriangle, RefreshCw, Play, ListPlus, Tag as TagIcon, X } from "lucide-react"
 
 interface SongTableProps {
   songs: Song[]
@@ -18,13 +30,56 @@ const HEADER_CLASS =
 
 type SortField = "title" | "artist" | "album" | "duration" | "created_at"
 
+// ── Checkbox (matches PlaylistDetail pattern) ──
+
+interface CheckboxProps {
+  checked: boolean
+  indeterminate?: boolean
+  onChange: () => void
+  ariaLabel: string
+}
+
+function Checkbox({ checked, indeterminate, onChange, ariaLabel }: CheckboxProps) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={indeterminate ? "mixed" : checked}
+      aria-label={ariaLabel}
+      onClick={(e) => { e.stopPropagation(); onChange() }}
+      className="h-4 w-4 rounded-[3px] flex items-center justify-center transition-all duration-150 aurora-focus"
+      style={{
+        background: checked || indeterminate ? "var(--aurora-accent-interactive)" : "transparent",
+        border: checked || indeterminate ? "1.5px solid var(--aurora-accent-interactive)" : "1.5px solid var(--aurora-text-tertiary)",
+      }}
+    >
+      {checked && !indeterminate && (
+        <svg width="10" height="8" viewBox="0 0 10 8" fill="none" className="text-black">
+          <path d="M1 4L3.5 6.5L9 1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      )}
+      {indeterminate && (
+        <svg width="8" height="2" viewBox="0 0 8 2" fill="none" className="text-black">
+          <path d="M0 1H8" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+        </svg>
+      )}
+    </button>
+  )
+}
+
+// ── TableHeader ──
+
 interface TableHeaderProps {
   sortField: SortField
   sortOrder: "asc" | "desc"
   onSort: (field: SortField) => void
+  showCheckbox: boolean
+  isAllSelected: boolean
+  isIndeterminate: boolean
+  onSelectAll: () => void
 }
 
-function TableHeader({ sortField, sortOrder, onSort }: TableHeaderProps) {
+function TableHeader({ sortField, sortOrder, onSort, showCheckbox, isAllSelected, isIndeterminate, onSelectAll }: TableHeaderProps) {
   const SortArrow = sortOrder === "asc" ? ChevronUp : ChevronDown
 
   function SortableTh({
@@ -53,6 +108,16 @@ function TableHeader({ sortField, sortOrder, onSort }: TableHeaderProps) {
   return (
     <thead>
       <tr>
+        {showCheckbox && (
+          <th className="px-2 py-3 w-10 text-center">
+            <Checkbox
+              checked={isAllSelected}
+              indeterminate={isIndeterminate}
+              onChange={onSelectAll}
+              ariaLabel="Select all songs"
+            />
+          </th>
+        )}
         <th className={`${HEADER_CLASS} w-12 text-center`}>#</th>
         <SortableTh field="title" label="Title" />
         <SortableTh field="duration" label="Duration" className="w-28 hidden lg:table-cell" />
@@ -64,10 +129,296 @@ function TableHeader({ sortField, sortOrder, onSort }: TableHeaderProps) {
   )
 }
 
+// ── BulkTagDialog ──
+
+interface BulkTagDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  songIds: number[]
+  onComplete: () => void
+}
+
+function BulkTagDialog({ open, onOpenChange, songIds, onComplete }: BulkTagDialogProps) {
+  const [inputValue, setInputValue] = useState("")
+  const inputRef = useRef<HTMLInputElement>(null)
+  const assignTags = useSongStore((s) => s.assignTags)
+  const allTags = useTagStore((s) => s.tags)
+  const fetchTags = useTagStore((s) => s.fetchTags)
+
+  useEffect(() => {
+    if (open) {
+      fetchTags()
+      setTimeout(() => inputRef.current?.focus(), 100)
+    }
+  }, [open, fetchTags])
+
+  const filteredTags = allTags.filter(
+    (t) => !inputValue || t.name.toLowerCase().includes(inputValue.toLowerCase())
+  )
+
+  const handleAddTag = async (name: string) => {
+    const trimmed = name.trim().toLowerCase()
+    if (!trimmed) return
+    try {
+      for (const songId of songIds) {
+        await assignTags(songId, [trimmed])
+      }
+      await fetchTags()
+      setInputValue("")
+      toast.success(`Tag "${trimmed}" added to ${songIds.length} song${songIds.length === 1 ? "" : "s"}`)
+      onComplete()
+    } catch {
+      toast.error("Failed to add tag")
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="font-display text-[22px] leading-tight">
+            Tag selected songs
+          </DialogTitle>
+          <p className="text-[12px] text-[var(--aurora-text-secondary)] font-display-italic mt-0.5">
+            {songIds.length} song{songIds.length === 1 ? "" : "s"} selected
+          </p>
+        </DialogHeader>
+
+        <div className="space-y-4 pt-2">
+          <div>
+            <p className="label-micro text-[9.5px] mb-2.5">Add tag</p>
+            <Input
+              ref={inputRef}
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === ",") {
+                  e.preventDefault()
+                  handleAddTag(inputValue)
+                }
+              }}
+              placeholder="Type and press Enter..."
+            />
+          </div>
+
+          {filteredTags.length > 0 && (
+            <div
+              className="max-h-[180px] overflow-y-auto rounded-md"
+              style={{
+                boxShadow: "inset 0 0 0 1px var(--aurora-rim)",
+                background: "var(--aurora-surface-inset)",
+              }}
+            >
+              {filteredTags.map((tag) => (
+                <button
+                  key={tag.id}
+                  type="button"
+                  onClick={() => handleAddTag(tag.name)}
+                  className="w-full px-3 py-2 text-[13px] text-[var(--aurora-text)] cursor-pointer hover:bg-white/[0.03] transition-colors duration-150 flex items-center justify-between"
+                >
+                  <span>{tag.name}</span>
+                  <span className="text-[10px] text-[var(--aurora-text-tertiary)] tabular-nums">
+                    {tag.song_count}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ── AddToPlaylistDialog ──
+
+interface AddToPlaylistDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  songIds: number[]
+  onComplete: () => void
+}
+
+function AddToPlaylistDialog({ open, onOpenChange, songIds, onComplete }: AddToPlaylistDialogProps) {
+  const [searchValue, setSearchValue] = useState("")
+  const searchRef = useRef<HTMLInputElement>(null)
+  const playlists = usePlaylistStore((s) => s.playlists)
+  const fetchPlaylists = usePlaylistStore((s) => s.fetchPlaylists)
+  const addSongToPlaylist = usePlaylistStore((s) => s.addSongToPlaylist)
+
+  useEffect(() => {
+    if (open) {
+      fetchPlaylists()
+      setTimeout(() => searchRef.current?.focus(), 100)
+    }
+  }, [open, fetchPlaylists])
+
+  const filtered = playlists.filter(
+    (p) => !searchValue || p.name.toLowerCase().includes(searchValue.toLowerCase())
+  )
+
+  const handleAdd = async (playlistId: number, playlistName: string) => {
+    try {
+      for (const songId of songIds) {
+        await addSongToPlaylist(playlistId, songId)
+      }
+      toast.success(`${songIds.length} song${songIds.length === 1 ? "" : "s"} added to "${playlistName}"`)
+      onOpenChange(false)
+      onComplete()
+    } catch {
+      toast.error("Failed to add songs to playlist")
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="font-display text-[22px] leading-tight">
+            Add to playlist
+          </DialogTitle>
+          <p className="text-[12px] text-[var(--aurora-text-secondary)] font-display-italic mt-0.5">
+            {songIds.length} song{songIds.length === 1 ? "" : "s"} selected
+          </p>
+        </DialogHeader>
+
+        <div className="space-y-4 pt-2">
+          <div>
+            <Input
+              ref={searchRef}
+              value={searchValue}
+              onChange={(e) => setSearchValue(e.target.value)}
+              placeholder="Search playlists..."
+            />
+          </div>
+
+          {filtered.length > 0 ? (
+            <div
+              className="max-h-[240px] overflow-y-auto rounded-md"
+              style={{
+                boxShadow: "inset 0 0 0 1px var(--aurora-rim)",
+                background: "var(--aurora-surface-inset)",
+              }}
+            >
+              {filtered.map((playlist) => (
+                <button
+                  key={playlist.id}
+                  type="button"
+                  onClick={() => handleAdd(playlist.id, playlist.name)}
+                  className="w-full px-3 py-2.5 text-[13px] text-[var(--aurora-text)] cursor-pointer hover:bg-white/[0.03] transition-colors duration-150 flex items-center gap-2.5"
+                >
+                  <span
+                    className="w-[6px] h-[6px] rounded-sm flex-shrink-0"
+                    style={{ backgroundColor: "var(--aurora-accent-vivid)" }}
+                  />
+                  <span className="flex-1 text-left truncate">{playlist.name}</span>
+                  <span className="text-[10px] text-[var(--aurora-text-tertiary)] tabular-nums">
+                    {playlist.song_count} song{playlist.song_count === 1 ? "" : "s"}
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="text-[12px] text-[var(--aurora-text-tertiary)] font-display-italic text-center py-4">
+              No playlists found
+            </p>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ── SongTable ──
+
 export function SongTable({ songs, loading = false, error = null, onPlay, animKey, showSort = true }: SongTableProps) {
   const sortField = useSongStore((state) => state.sortField)
   const sortOrder = useSongStore((state) => state.sortOrder)
   const sortSongs = useSongStore((state) => state.sortSongs)
+
+  const playSong = usePlayerStore((s) => s.playSong)
+  const addToQueue = usePlayerStore((s) => s.addToQueue)
+
+  // Multi-select state
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const lastSelectedIndexRef = useRef<number | null>(null)
+  const showBulkBar = selectedIds.size > 0
+
+  // Bulk dialog state
+  const [bulkTagDialogOpen, setBulkTagDialogOpen] = useState(false)
+  const [addToPlaylistDialogOpen, setAddToPlaylistDialogOpen] = useState(false)
+
+  // Clear selection when songs change (e.g. re-sort, refetch)
+  useEffect(() => {
+    setSelectedIds(new Set())
+    lastSelectedIndexRef.current = null
+  }, [songs])
+
+  const isAllSelected = songs.length > 0 && songs.every((s) => selectedIds.has(s.id))
+
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(songs.map((s) => s.id)))
+    }
+    lastSelectedIndexRef.current = null
+  }
+
+  const toggleSelectOne = useCallback((songId: number, shiftKey: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (shiftKey && lastSelectedIndexRef.current !== null) {
+        const currIndex = songs.findIndex((s) => s.id === songId)
+        const lastIndex = lastSelectedIndexRef.current
+        if (currIndex !== -1 && lastIndex !== -1) {
+          const [from, to] = lastIndex < currIndex ? [lastIndex, currIndex] : [currIndex, lastIndex]
+          for (let i = from; i <= to; i++) {
+            next.add(songs[i].id)
+          }
+        } else {
+          if (next.has(songId)) next.delete(songId)
+          else next.add(songId)
+        }
+      } else {
+        if (next.has(songId)) next.delete(songId)
+        else next.add(songId)
+      }
+      return next
+    })
+    const index = songs.findIndex((s) => s.id === songId)
+    lastSelectedIndexRef.current = index
+  }, [songs])
+
+  // Bulk actions
+  const getSelectedSongs = useCallback((): Song[] => {
+    return songs.filter((s) => selectedIds.has(s.id))
+  }, [songs, selectedIds])
+
+  const handlePlaySelected = () => {
+    const selected = getSelectedSongs()
+    const playable = selected.filter((s) => s.file_path)
+    if (playable.length === 0) {
+      toast.error("No playable files in selection")
+      return
+    }
+    playSong(playable[0], playable)
+  }
+
+  const handleAddSelectedToQueue = () => {
+    const selected = getSelectedSongs()
+    const playable = selected.filter((s) => s.file_path)
+    if (playable.length === 0) {
+      toast.error("No playable files in selection")
+      return
+    }
+    for (const s of playable) {
+      addToQueue(s)
+    }
+    toast.success(`${playable.length} song${playable.length === 1 ? "" : "s"} added to queue`)
+  }
+
+  const selectedIdsArray = useMemo(() => Array.from(selectedIds), [selectedIds])
 
   function handleColumnSort(field: SortField) {
     if (field === sortField) {
@@ -108,12 +459,76 @@ export function SongTable({ songs, loading = false, error = null, onPlay, animKe
     </div>
   ) : null
 
+  // Bulk action bar
+  const bulkBar = showBulkBar ? (
+    <div
+      className="flex items-center gap-3 px-4 py-2 mb-2 rounded-lg aurora-fade-in"
+      style={{
+        background: "var(--aurora-surface-2)",
+        border: "1px solid var(--aurora-rim)",
+      }}
+    >
+      <span className="text-[12px] font-medium text-[var(--aurora-text)] tabular-nums">
+        {selectedIds.size} selected
+      </span>
+      <div className="flex-1" />
+      <button
+        onClick={handlePlaySelected}
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-[var(--aurora-text)] hover:bg-white/[0.06] transition-colors duration-150"
+        title="Play selected"
+      >
+        <Play className="h-3.5 w-3.5" />
+        Play
+      </button>
+      <button
+        onClick={handleAddSelectedToQueue}
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-[var(--aurora-text)] hover:bg-white/[0.06] transition-colors duration-150"
+        title="Add to queue"
+      >
+        <ListPlus className="h-3.5 w-3.5" />
+        Queue
+      </button>
+      <button
+        onClick={() => setAddToPlaylistDialogOpen(true)}
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-[var(--aurora-text)] hover:bg-white/[0.06] transition-colors duration-150"
+        title="Add to playlist"
+      >
+        <ListPlus className="h-3.5 w-3.5" />
+        Playlist
+      </button>
+      <button
+        onClick={() => setBulkTagDialogOpen(true)}
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-[var(--aurora-text)] hover:bg-white/[0.06] transition-colors duration-150"
+        title="Tag selected"
+      >
+        <TagIcon className="h-3.5 w-3.5" />
+        Tag
+      </button>
+      <button
+        onClick={() => { setSelectedIds(new Set()); lastSelectedIndexRef.current = null }}
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-text)] hover:bg-white/[0.04] transition-colors duration-150"
+        title="Clear selection"
+      >
+        <X className="h-3.5 w-3.5" />
+        Clear
+      </button>
+    </div>
+  ) : null
+
   if (loading) {
     return (
       <div className="w-full overflow-auto aurora-fade-in">
         {toolbar}
         <table className="w-full border-separate border-spacing-0">
-          <TableHeader sortField={sortField} sortOrder={sortOrder} onSort={handleColumnSort} />
+          <TableHeader
+            sortField={sortField}
+            sortOrder={sortOrder}
+            onSort={handleColumnSort}
+            showCheckbox={false}
+            isAllSelected={false}
+            isIndeterminate={false}
+            onSelectAll={toggleSelectAll}
+          />
           <tbody>
             {[...Array(6)].map((_, i) => (
               <tr key={i}>
@@ -157,7 +572,15 @@ export function SongTable({ songs, loading = false, error = null, onPlay, animKe
       <div className="w-full aurora-fade-in">
         {toolbar}
         <table className="w-full border-separate border-spacing-0">
-          <TableHeader sortField={sortField} sortOrder={sortOrder} onSort={handleColumnSort} />
+          <TableHeader
+            sortField={sortField}
+            sortOrder={sortOrder}
+            onSort={handleColumnSort}
+            showCheckbox={false}
+            isAllSelected={false}
+            isIndeterminate={false}
+            onSelectAll={toggleSelectAll}
+          />
         </table>
         <div className="py-20 flex flex-col items-center justify-center gap-3">
           <AlertTriangle className="h-8 w-8 text-[var(--aurora-danger)] opacity-50" />
@@ -189,7 +612,15 @@ export function SongTable({ songs, loading = false, error = null, onPlay, animKe
       <div className="w-full aurora-fade-in">
         {toolbar}
         <table className="w-full border-separate border-spacing-0">
-          <TableHeader sortField={sortField} sortOrder={sortOrder} onSort={handleColumnSort} />
+          <TableHeader
+            sortField={sortField}
+            sortOrder={sortOrder}
+            onSort={handleColumnSort}
+            showCheckbox={false}
+            isAllSelected={false}
+            isIndeterminate={false}
+            onSelectAll={toggleSelectAll}
+          />
         </table>
         <div className="py-20 flex flex-col items-center justify-center gap-3">
           <Music className="h-8 w-8 text-[var(--aurora-text-tertiary)] opacity-40" />
@@ -205,16 +636,49 @@ export function SongTable({ songs, loading = false, error = null, onPlay, animKe
   }
 
   return (
-    <div className="w-full overflow-auto aurora-fade-in">
-      {toolbar}
-      <table className="w-full border-separate border-spacing-0">
-        <TableHeader sortField={sortField} sortOrder={sortOrder} onSort={handleColumnSort} />
-        <tbody key={animKey}>
-          {songs.map((song, index) => (
-            <SongRow key={song.id} song={song} index={index} onPlay={onPlay} animIndex={index} />
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <>
+      <div className="w-full overflow-auto aurora-fade-in">
+        {toolbar}
+        {bulkBar}
+        <table className="w-full border-separate border-spacing-0">
+          <TableHeader
+            sortField={sortField}
+            sortOrder={sortOrder}
+            onSort={handleColumnSort}
+            showCheckbox
+            isAllSelected={isAllSelected}
+            isIndeterminate={!isAllSelected && selectedIds.size > 0}
+            onSelectAll={toggleSelectAll}
+          />
+          <tbody key={animKey}>
+            {songs.map((song, index) => (
+              <SongRow
+                key={song.id}
+                song={song}
+                index={index}
+                onPlay={onPlay}
+                animIndex={index}
+                isSelected={selectedIds.has(song.id)}
+                onToggleSelect={(shiftKey) => toggleSelectOne(song.id, shiftKey)}
+              />
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <BulkTagDialog
+        open={bulkTagDialogOpen}
+        onOpenChange={setBulkTagDialogOpen}
+        songIds={selectedIdsArray}
+        onComplete={() => { setSelectedIds(new Set()); lastSelectedIndexRef.current = null }}
+      />
+
+      <AddToPlaylistDialog
+        open={addToPlaylistDialogOpen}
+        onOpenChange={setAddToPlaylistDialogOpen}
+        songIds={selectedIdsArray}
+        onComplete={() => { setSelectedIds(new Set()); lastSelectedIndexRef.current = null }}
+      />
+    </>
   )
 }
