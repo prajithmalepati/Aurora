@@ -1,6 +1,11 @@
+import { useState, useEffect, useCallback } from "react"
 import { useSettingsStore } from "@/stores/settingsStore"
 import type { CrossfadeCurve } from "@/stores/settingsStore"
 import { resetWelcome } from "@/components/welcome/WelcomeOverlay"
+import { api } from "@/lib/api"
+import { toast } from "@/lib/toast"
+import type { WatchedFolder } from "@/types"
+import type { ApiResponse } from "@/types"
 
 export function SettingsView() {
   const crossfadeEnabled = useSettingsStore((s) => s.crossfadeEnabled)
@@ -13,6 +18,46 @@ export function SettingsView() {
   const setReplaygainMode = useSettingsStore((s) => s.setReplaygainMode)
 
   const durPct = ((crossfadeDuration - 1) / 11) * 100
+
+  // ── Watched folders state ──────────────────────────────────────────
+  const [watchedFolders, setWatchedFolders] = useState<WatchedFolder[]>([])
+  const [scanningId, setScanningId] = useState<number | null>(null)
+
+  const fetchWatchedFolders = useCallback(async () => {
+    try {
+      const res = await api.get<ApiResponse<WatchedFolder[]>>("/watch")
+      setWatchedFolders(res.data)
+    } catch {
+      // Silently fail — watcher may not be available
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchWatchedFolders()
+  }, [fetchWatchedFolders])
+
+  const handleRemoveFolder = async (id: number) => {
+    try {
+      await api.delete(`/watch/${id}`)
+      setWatchedFolders((prev) => prev.filter((f) => f.id !== id))
+      toast.success("Folder removed from watch list")
+    } catch {
+      toast.error("Failed to remove folder")
+    }
+  }
+
+  const handleTriggerScan = async (id: number) => {
+    setScanningId(id)
+    try {
+      await api.post(`/watch/${id}/scan`, {})
+      toast.success("Scan triggered")
+      fetchWatchedFolders()
+    } catch {
+      toast.error("Failed to trigger scan")
+    } finally {
+      setScanningId(null)
+    }
+  }
 
   const durationPresets: { label: string; value: number }[] = [
     { label: "Short", value: 3 },
@@ -178,6 +223,85 @@ export function SettingsView() {
         <div className="px-5 py-4 border-t border-[var(--aurora-rim)] flex items-center justify-between">
           <p className="text-[13px] text-[var(--aurora-text-secondary)]">Manual skip fade</p>
           <span className="text-[13px] tabular-nums text-[var(--aurora-text-tertiary)]">1s (fixed)</span>
+        </div>
+      </div>
+
+      {/* Watched Folders section */}
+      <div
+        className="rounded-xl overflow-hidden mt-6"
+        style={{
+          background: "var(--aurora-surface)",
+          border: "1px solid var(--aurora-rim)",
+          backdropFilter: "blur(12px)",
+        }}
+      >
+        <div className="px-5 py-3 border-b border-[var(--aurora-rim)]">
+          <p className="label-micro text-[10px] tracking-[0.2em] text-[var(--aurora-text-tertiary)]">Auto-Watch</p>
+        </div>
+
+        <div className="px-5 py-4">
+          <div className="mb-3">
+            <p className="text-[14px] text-[var(--aurora-text)] font-medium">Watched Folders</p>
+            <p className="text-[12px] text-[var(--aurora-text-secondary)] mt-0.5">
+              Folders are polled every 30 seconds for new or changed music files
+            </p>
+          </div>
+
+          {watchedFolders.length === 0 ? (
+            <p className="text-[12px] text-[var(--aurora-text-tertiary)] py-2">
+              No folders watched yet. Use the Scan dialog to add one.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {watchedFolders.map((folder) => (
+                <div
+                  key={folder.id}
+                  className="flex items-center gap-3 rounded-lg px-3 py-2.5"
+                  style={{
+                    background: "var(--aurora-surface-inset)",
+                    boxShadow: "inset 0 0 0 1px var(--aurora-rim)",
+                  }}
+                >
+                  {/* Status dot */}
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                      folder.is_active ? "bg-green-400" : "bg-[var(--aurora-text-tertiary)]"
+                    }`}
+                    style={folder.is_active ? { boxShadow: "0 0 6px rgba(74,222,128,0.5)" } : undefined}
+                  />
+
+                  {/* Path + metadata */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] text-[var(--aurora-text)] truncate font-mono">
+                      {folder.folder_path}
+                    </p>
+                    {folder.last_scan_at && (
+                      <p className="text-[10px] text-[var(--aurora-text-tertiary)] mt-0.5">
+                        Last scan: {new Date(folder.last_scan_at).toLocaleString()}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <button
+                      onClick={() => handleTriggerScan(folder.id)}
+                      disabled={scanningId === folder.id}
+                      className="px-2 py-1 rounded-md text-[11px] font-medium transition-colors bg-white/[0.06] text-[var(--aurora-text-secondary)] hover:bg-white/[0.10] hover:text-[var(--aurora-text)] disabled:opacity-50"
+                    >
+                      {scanningId === folder.id ? "Scanning…" : "Scan now"}
+                    </button>
+                    <button
+                      onClick={() => handleRemoveFolder(folder.id)}
+                      className="px-2 py-1 rounded-md text-[11px] font-medium transition-colors bg-white/[0.06] text-[var(--aurora-text-tertiary)] hover:bg-[var(--aurora-danger)]/15 hover:text-[var(--aurora-danger)]"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

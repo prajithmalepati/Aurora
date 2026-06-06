@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { toast } from "@/lib/toast"
-import { Pencil, Trash2, X, Search, Scissors, Sparkles, ArrowUpDown, ArrowLeft, AlertTriangle, Play, ListPlus, Download } from "lucide-react"
+import { Pencil, Trash2, X, Search, Scissors, Sparkles, ArrowUpDown, ArrowLeft, AlertTriangle, Play, ListPlus, Download, GripVertical } from "lucide-react"
 import { AuroraPlayButton } from "@/components/player/AuroraPlayButton"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { useSettingsStore } from "@/stores/settingsStore"
@@ -825,6 +825,9 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
           <table className="w-full border-separate border-spacing-0">
             <thead>
               <tr>
+                {isDragEnabled && (
+                  <th className="px-1 py-3 w-6" />
+                )}
                 <th className="px-2 py-3 w-10 text-center">
                   <Checkbox
                     checked={isAllSelected}
@@ -1129,6 +1132,14 @@ function PlaylistSongRow({
         } : {}),
       }}
     >
+      {/* Drag handle cell */}
+      {isDragEnabled && (
+        <td
+          className="px-1 py-3 w-6 text-center cursor-grab active:cursor-grabbing"
+        >
+          <GripVertical className="h-3.5 w-3.5 text-[var(--aurora-text-tertiary)] opacity-0 group-hover:opacity-100 transition-opacity duration-150 mx-auto" />
+        </td>
+      )}
       {/* Checkbox cell */}
       <td className="relative px-2 py-3 w-10 text-center" onClick={(e) => e.stopPropagation()}>
         <span
