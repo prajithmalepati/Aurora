@@ -2,6 +2,7 @@ type View =
   | { kind: "all-songs" }
   | { kind: "filter" }
   | { kind: "playlist"; playlistId: number }
+  | { kind: "albums" }
   | { kind: "folders" }
   | { kind: "settings" }
   | { kind: "about" }
@@ -15,7 +16,7 @@ import { CreatePlaylistDialog } from "@/components/playlists/CreatePlaylistDialo
 import { ScanDialog } from "@/components/scanner/ScanDialog"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useRef, useState } from "react"
-import { Library, SlidersHorizontal, Plus, FolderSearch, Music, Settings, Upload, FolderOpen, Info } from "lucide-react"
+import { Library, SlidersHorizontal, Plus, FolderSearch, Music, Settings, Upload, FolderOpen, Info, Disc3 } from "lucide-react"
 import { AddSongDialog } from "@/components/songs/AddSongDialog"
 import { AuroraWordmark } from "@/components/aurora/AuroraWordmark"
 import { toast } from "@/lib/toast"
@@ -161,6 +162,12 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
             label="Folders"
             active={isActive({ kind: "folders" })}
             onClick={() => onViewChange({ kind: "folders" })}
+          />
+          <NavItem
+            icon={<Disc3 className="h-4 w-4" strokeWidth={1.5} />}
+            label="Albums"
+            active={isActive({ kind: "albums" })}
+            onClick={() => onViewChange({ kind: "albums" })}
           />
         </nav>
 

@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import init_db
-from app.routers import songs, tags, playlists, filter, scanner, folders
+from app.routers import songs, tags, playlists, filter, scanner, folders, watcher, albums
 
 app = FastAPI(title="Aurora", version="0.1.0")
 
@@ -23,11 +23,27 @@ app.include_router(playlists.router, prefix="/api")
 app.include_router(filter.router, prefix="/api")
 app.include_router(scanner.router, prefix="/api")
 app.include_router(folders.router, prefix="/api")
+app.include_router(watcher.router, prefix="/api")
+app.include_router(albums.router, prefix="/api")
 
 
 @app.on_event("startup")
 def startup():
     init_db()
+    # Start the background file watcher
+    from app.services.file_watcher import FileWatcher, set_watcher
+    fw = FileWatcher(interval=30)
+    set_watcher(fw)
+    app.state.watcher = fw
+    fw.start()
+
+
+@app.on_event("shutdown")
+def shutdown():
+    from app.services.file_watcher import get_watcher
+    fw = get_watcher()
+    if fw:
+        fw.stop()
 
 
 @app.get("/api/health")

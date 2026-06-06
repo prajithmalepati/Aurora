@@ -63,6 +63,14 @@ CREATE INDEX IF NOT EXISTS idx_playlist_songs_playlist ON playlist_songs(playlis
 CREATE INDEX IF NOT EXISTS idx_playlist_songs_song     ON playlist_songs(song_id);
 CREATE INDEX IF NOT EXISTS idx_song_tags_song          ON song_tags(song_id);
 CREATE INDEX IF NOT EXISTS idx_song_tags_tag           ON song_tags(tag_id);
+
+CREATE TABLE IF NOT EXISTS watched_folders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    folder_path TEXT NOT NULL UNIQUE,
+    is_active INTEGER DEFAULT 1,
+    last_scan_at TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
 """
 
 

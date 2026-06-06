@@ -127,6 +127,20 @@ export interface ScanResult {
   art_extracted: number
 }
 
+export interface AlbumInfo {
+  album_name: string
+  album_artist: string
+  song_count: number
+  total_duration: number
+  cover_art_path: string | null
+  dominant_color: string | null
+}
+
+export interface AlbumDetail {
+  album_name: string
+  songs: Song[]
+}
+
 export interface ApiResponse<T> {
   data: T
   message: string
@@ -154,4 +168,12 @@ export interface FolderSongsResponse {
   data: Song[]
   meta: { total: number; path: string; recursive: boolean }
   message: string
+}
+
+export interface WatchedFolder {
+  id: number
+  folder_path: string
+  is_active: boolean
+  last_scan_at: string | null
+  created_at: string
 }

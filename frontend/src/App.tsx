@@ -15,6 +15,7 @@ import { SongTable } from "@/components/songs/SongTable"
 import { PlaylistDetail } from "@/components/playlists/PlaylistDetail"
 import { QueryBuilder } from "@/components/filter/QueryBuilder"
 import { SettingsView } from "@/components/settings/SettingsView"
+import { AlbumsView } from "@/components/albums/AlbumsView"
 import { FoldersView } from "@/components/folders/FoldersView"
 import { AboutView } from "@/components/about/AboutView"
 import { AnimatePresence, motion } from "motion/react"
@@ -156,6 +157,8 @@ function App() {
       content = <PlaylistDetail key={view.playlistId} playlistId={view.playlistId} />
     } else if (view.kind === "folders") {
       content = <FoldersView />
+    } else if (view.kind === "albums") {
+      content = <AlbumsView />
     } else if (view.kind === "about") {
       content = <AboutView />
     } else {

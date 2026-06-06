@@ -9,6 +9,7 @@ type View =
   | { kind: "all-songs" }
   | { kind: "filter" }
   | { kind: "playlist"; playlistId: number }
+  | { kind: "albums" }
   | { kind: "folders" }
   | { kind: "settings" }
   | { kind: "about" }

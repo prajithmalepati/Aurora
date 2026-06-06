@@ -13,6 +13,7 @@ import type { ScanResult } from "@/types"
 import { useSongStore } from "@/stores/songStore"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { toast } from "@/lib/toast"
+import { api } from "@/lib/api"
 
 const BASE_URL = "http://localhost:8000/api"
 
@@ -34,6 +35,7 @@ interface ScanState {
   loading: boolean
   error: string | null
   progress: ScanProgress | null
+  watchFolder: boolean
 }
 
 const INITIAL_STATE: ScanState = {
@@ -43,6 +45,7 @@ const INITIAL_STATE: ScanState = {
   loading: false,
   error: null,
   progress: null,
+  watchFolder: false,
 }
 
 export function ScanDialog({ open, onOpenChange }: ScanDialogProps) {
@@ -141,7 +144,16 @@ export function ScanDialog({ open, onOpenChange }: ScanDialogProps) {
     abortRef.current?.abort()
   }
 
-  const handleDone = () => {
+  const handleDone = async () => {
+    // If "watch this folder" is checked, register the folder
+    if (state.watchFolder && state.folderPath.trim()) {
+      try {
+        await api.post("/watch", { path: state.folderPath.trim() })
+        toast.success("Folder added to watch list")
+      } catch {
+        toast.error("Failed to add folder to watch list")
+      }
+    }
     fetchSongs()
     fetchPlaylists()
     onOpenChange(false)
@@ -196,6 +208,20 @@ export function ScanDialog({ open, onOpenChange }: ScanDialogProps) {
               disabled={state.loading}
             />
           </div>
+
+          {/* Watch folder checkbox */}
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={state.watchFolder}
+              onChange={(e) => setState((s) => ({ ...s, watchFolder: e.target.checked }))}
+              disabled={state.loading}
+              className="w-3.5 h-3.5 rounded border-[var(--aurora-rim)] accent-[var(--aurora-accent-interactive)]"
+            />
+            <span className="text-[12px] text-[var(--aurora-text-secondary)]">
+              Auto-watch this folder for new music
+            </span>
+          </label>
 
           {/* Progress bar */}
           {state.progress && (
