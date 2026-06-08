@@ -12,6 +12,8 @@ import { formatFileSize, qualityLabel } from "@/lib/utils"
 import { api } from "@/lib/api"
 import type { Song } from "@/types"
 
+const bleedThumbCache = new Map<number, string>()
+
 function AudioMetadataLine({ song }: { song: Song }) {
   const fmt = song.file_format
   const quality = qualityLabel(song)
@@ -32,11 +34,15 @@ export function PlayerBar() {
 
   useEffect(() => {
     if (!currentSong) { setBleedThumbUrl(null); return }
-    let cancelled = false
-    api.get<{ url: string }>(`/songs/${currentSong.id}/bleed-thumb`)
-      .then((res) => { if (!cancelled) setBleedThumbUrl(res.url) })
-      .catch(() => { if (!cancelled) setBleedThumbUrl(null) })
-    return () => { cancelled = true }
+    const cached = bleedThumbCache.get(currentSong.id)
+    if (cached) { setBleedThumbUrl(cached); return }
+    const songId = currentSong.id
+    const timer = setTimeout(() => {
+      api.get<{ url: string }>(`/songs/${songId}/bleed-thumb`)
+        .then((res) => { bleedThumbCache.set(songId, res.url); setBleedThumbUrl(res.url) })
+        .catch(() => setBleedThumbUrl(null))
+    }, 300)
+    return () => clearTimeout(timer)
   }, [currentSong?.id])
   const isPlaying = usePlayerStore((state) => state.isPlaying)
   const volume = usePlayerStore((state) => state.volume)
@@ -148,10 +154,10 @@ export function PlayerBar() {
                     <span
                       className="font-display text-[15px] leading-tight text-[var(--aurora-text)] truncate"
                     >
-                      {currentSong.title}
+                      {currentSong.title || "Untitled"}
                     </span>
                     <span className="text-[10px] text-[var(--aurora-text-secondary)] truncate">
-                      {currentSong.artist}
+                      {currentSong.artist || "Unknown Artist"}
                     </span>
                     <AudioMetadataLine song={currentSong!} />
                     {/* Crossfade indicator */}
@@ -262,7 +268,7 @@ export function PlayerBar() {
             <AnimatePresence mode="wait">
             <motion.div
               key={currentSong.id}
-              className="flex items-center gap-3.5 w-[240px] min-w-[160px] flex-shrink-0"
+              className="flex items-center gap-3.5 w-[300px] min-w-[200px] flex-shrink-0"
               initial={{ opacity: 0, y: 8, scale: 0.97 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, scale: 1.04 }}
@@ -284,10 +290,10 @@ export function PlayerBar() {
                     <span
                       className="font-display text-[18px] leading-tight text-[var(--aurora-text)] truncate"
                     >
-                      {currentSong.title}
+                      {currentSong.title || "Untitled"}
                     </span>
                     <span className="text-[11px] text-[var(--aurora-text-secondary)] truncate mt-0.5 tracking-wide">
-                      {currentSong.artist}
+                      {currentSong.artist || "Unknown Artist"}
                     </span>
                     <AudioMetadataLine song={currentSong!} />
                     {/* Crossfade indicator */}
@@ -375,7 +381,7 @@ export function PlayerBar() {
             </div>
 
             {/* RIGHT: Now-playing indicator + volume */}
-            <div className="w-[200px] flex-shrink-0 flex items-center gap-3 justify-end">
+            <div className="w-[220px] flex-shrink-0 flex items-center gap-3 justify-end">
               {hasSong && isPlaying && (
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <Equalizer playing={isPlaying} />

@@ -20,6 +20,8 @@ export function useAudioPlayer() {
   const xfadeIntervalRef = useRef<number | null>(null) // equal-power crossfade interval
   const currentSongRef = useRef<string | null>(null)
   const seekingRef = useRef(false)
+  // Collects all Howls from rapid transitions that need cleanup
+  const staleHowlsRef = useRef<Howl[]>([])
 
   const currentSong = usePlayerStore((state) => state.currentSong)
   const isPlaying = usePlayerStore((state) => state.isPlaying)
@@ -32,8 +34,9 @@ export function useAudioPlayer() {
   /** Compute Howler volume with ReplayGain applied.
    *  Returns a value clamped to [0, 1]. */
   function resolveVolume(): number {
+    const vol = usePlayerStore.getState().volume
     const rgMode = useSettingsStore.getState().replaygainMode
-    if (rgMode === "off") return volume
+    if (rgMode === "off") return vol
 
     const song = usePlayerStore.getState().currentSong
     let gainDb: number | null | undefined = null
@@ -45,10 +48,10 @@ export function useAudioPlayer() {
       gainDb = song?.replaygain_album_gain ?? song?.replaygain_track_gain
     }
 
-    if (gainDb == null) return volume
+    if (gainDb == null) return vol
 
     const gain = Math.pow(10, gainDb / 20)
-    return Math.max(0, Math.min(1, volume * gain))
+    return Math.max(0, Math.min(1, vol * gain))
   }
 
   function resolveXfade(): {
@@ -90,9 +93,10 @@ export function useAudioPlayer() {
   function bindHowlHandlers(howl: Howl, songId: string) {
     howl.on('play', () => {
       usePlayerStore.getState().setIsBuffering(false)
-      if (intervalRef.current) window.clearInterval(intervalRef.current)
-      intervalRef.current = window.setInterval(() => {
-        if (!seekingRef.current && howlRef.current) {
+      if (intervalRef.current) window.clearTimeout(intervalRef.current)
+
+      const tick = () => {
+        if (!seekingRef.current && howlRef.current && howlRef.current.state() === 'loaded') {
           const seekSec = howlRef.current.seek()
           updateSeek(seekSec)
 
@@ -117,9 +121,9 @@ export function useAudioPlayer() {
             if (howlDuration > 0) {
               const triggerPoint = Math.max(0, howlDuration - xDuration)
               if (seekSec >= triggerPoint) {
-                window.clearInterval(intervalRef.current!)
-                intervalRef.current = null
+                if (intervalRef.current) { window.clearTimeout(intervalRef.current); intervalRef.current = null }
                 next()
+                return
               }
             }
           }
@@ -127,19 +131,21 @@ export function useAudioPlayer() {
           // Pre-buffer next song when within 5 seconds of end (B4 fix)
           preloadNextIfNeeded(seekSec)
         }
-      }, 250)
+        intervalRef.current = window.setTimeout(tick, 250)
+      }
+      intervalRef.current = window.setTimeout(tick, 250)
     })
 
     howl.on('pause', () => {
       if (intervalRef.current) {
-        window.clearInterval(intervalRef.current)
+        window.clearTimeout(intervalRef.current)
         intervalRef.current = null
       }
     })
 
     howl.on('end', () => {
       if (intervalRef.current) {
-        window.clearInterval(intervalRef.current)
+        window.clearTimeout(intervalRef.current)
         intervalRef.current = null
       }
       const { repeatMode } = usePlayerStore.getState()
@@ -163,6 +169,13 @@ export function useAudioPlayer() {
       const song = usePlayerStore.getState().currentSong
       const songTitle = song?.title ?? "Unknown song"
       toast.error(`Failed to load "${songTitle}" — format may be unsupported`)
+      usePlayerStore.getState().setIsBuffering(false)
+      setTimeout(() => {
+        const { currentSong } = usePlayerStore.getState()
+        if (currentSong && String(currentSong.id) === songId) {
+          usePlayerStore.getState().next()
+        }
+      }, 1500)
     })
 
     howl.on('playerror', (_, errorId) => {
@@ -170,6 +183,13 @@ export function useAudioPlayer() {
       const song = usePlayerStore.getState().currentSong
       const songTitle = song?.title ?? "Unknown song"
       toast.error(`Playback interrupted for "${songTitle}"`)
+      usePlayerStore.getState().setIsBuffering(false)
+      setTimeout(() => {
+        const { currentSong } = usePlayerStore.getState()
+        if (currentSong && String(currentSong.id) === songId) {
+          usePlayerStore.getState().next()
+        }
+      }, 1500)
     })
   }
 
@@ -241,11 +261,16 @@ export function useAudioPlayer() {
   // Unmount cleanup — stop everything that's still playing
   useEffect(() => {
     return () => {
+      // Drain all stale Howls from rapid transitions
+      for (const stale of staleHowlsRef.current) {
+        try { stale.stop(); stale.unload() } catch {}
+      }
+      staleHowlsRef.current = []
       if (xfadeIntervalRef.current) { window.clearInterval(xfadeIntervalRef.current); xfadeIntervalRef.current = null }
       if (howlRef.current) { howlRef.current.stop(); howlRef.current.unload() }
       if (prevHowlRef.current) { prevHowlRef.current.stop(); prevHowlRef.current.unload() }
       if (nextHowlRef.current) { nextHowlRef.current.howl.unload(); nextHowlRef.current = null; preloadReadyRef.current = false }
-      if (intervalRef.current) window.clearInterval(intervalRef.current)
+      if (intervalRef.current) window.clearTimeout(intervalRef.current)
     }
   }, [])
 
@@ -254,9 +279,15 @@ export function useAudioPlayer() {
   // effect's body can crossfade it instead of hard-cutting.
   useEffect(() => {
     if (intervalRef.current) {
-      window.clearInterval(intervalRef.current)
+      window.clearTimeout(intervalRef.current)
       intervalRef.current = null
     }
+
+    // Drain all stale Howls from rapid transitions — stop + unload every one
+    for (const stale of staleHowlsRef.current) {
+      try { stale.stop(); stale.unload() } catch {}
+    }
+    staleHowlsRef.current = []
 
     // The previous effect's cleanup deposited the outgoing howl here
     const prev = prevHowlRef.current
@@ -423,8 +454,10 @@ export function useAudioPlayer() {
       prevHowlRef.current = howl
       prevTitleRef.current = currentSong?.title ?? null
       if (howlRef.current === howl) howlRef.current = null
+      // Also push into stale array so rapid transitions don't lose Howls
+      staleHowlsRef.current.push(howl)
       if (intervalRef.current) {
-        window.clearInterval(intervalRef.current)
+        window.clearTimeout(intervalRef.current)
         intervalRef.current = null
       }
       if (xfadeIntervalRef.current) {
