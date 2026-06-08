@@ -68,8 +68,11 @@ export function useKeyboardShortcuts() {
         return
       }
 
-      // All remaining shortcuts only fire when NOT typing
-      if (isTyping) return
+      const isInDialog = active?.closest('[role="dialog"]') !== null || 
+                         active?.closest('[data-slot="dialog-content"]') !== null
+
+      // All remaining shortcuts only fire when NOT typing and NOT in a dialog
+      if (isTyping || isInDialog) return
 
       // Cmd/Ctrl+F — focus filter / Mix search input
       if (meta && e.key === "f" && !e.shiftKey) {

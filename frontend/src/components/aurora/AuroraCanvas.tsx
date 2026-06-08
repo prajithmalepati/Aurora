@@ -236,7 +236,7 @@ export function AuroraCanvas() {
 
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
 
-    rafRef.current = requestAnimationFrame(draw)
+    if (!document.hidden) rafRef.current = requestAnimationFrame(draw)
   }, [])
 
   useEffect(() => {
@@ -254,6 +254,15 @@ export function AuroraCanvas() {
     }
     glRef.current = result
     rafRef.current = requestAnimationFrame(draw)
+
+    const onVisibility = () => {
+      if (document.hidden) {
+        if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null }
+      } else {
+        if (!mql.matches) rafRef.current = requestAnimationFrame(draw)
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibility)
 
     const onMotionChange = (e: MediaQueryListEvent) => {
       if (e.matches) {
@@ -283,6 +292,7 @@ export function AuroraCanvas() {
     canvas.addEventListener('webglcontextrestored', onContextRestored)
 
     return () => {
+      document.removeEventListener('visibilitychange', onVisibility)
       mql.removeEventListener('change', onMotionChange)
       clearTimeout(fallbackTimer)
       if (rafRef.current) cancelAnimationFrame(rafRef.current)
