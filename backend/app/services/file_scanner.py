@@ -526,6 +526,8 @@ def scan_folder(folder_path: str) -> tuple[list[dict], list[dict]]:
     errors = []
     
     for file_path in root.rglob("*"):
+        if file_path.is_symlink():
+            continue
         if not file_path.is_file():
             continue
         if file_path.suffix.lower() not in AUDIO_EXTENSIONS:
@@ -646,7 +648,7 @@ def import_scanned_songs(
     root = Path(folder_path)
     all_audio_files = [
         f for f in root.rglob("*")
-        if f.is_file() and f.suffix.lower() in AUDIO_EXTENSIONS
+        if not f.is_symlink() and f.is_file() and f.suffix.lower() in AUDIO_EXTENSIONS
     ]
     total_files = len(all_audio_files)
 

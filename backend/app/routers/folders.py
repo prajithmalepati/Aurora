@@ -142,16 +142,17 @@ def get_folder_songs(
         normalized_path = path.rstrip("/")
 
         # Match path and any subdirectory (always needed as base filter)
-        like_pattern = normalized_path + "/%"
+        escaped_path = normalized_path.replace("%", "\\%").replace("_", "\\_")
+        like_pattern = escaped_path + "/%"
         # For non-recursive, exclude files with deeper paths
-        deeper_pattern = normalized_path + "/%/%" if not recursive else None
+        deeper_pattern = escaped_path + "/%/%" if not recursive else None
 
         query = SONG_SELECT_QUERY + " WHERE s.file_path LIKE ?"
 
         params: list = [like_pattern]
 
         if not recursive and deeper_pattern is not None:
-            query += " AND s.file_path NOT LIKE ?"
+            query += " AND s.file_path NOT LIKE ? ESCAPE '\\'"
             params.append(deeper_pattern)
 
         query += " GROUP BY s.id ORDER BY s.title COLLATE NOCASE, s.id ASC"
@@ -160,7 +161,7 @@ def get_folder_songs(
         count_query = COUNT_SONG_QUERY + " WHERE s.file_path LIKE ?"
         count_params: list = [like_pattern]
         if not recursive and deeper_pattern is not None:
-            count_query += " AND s.file_path NOT LIKE ?"
+            count_query += " AND s.file_path NOT LIKE ? ESCAPE '\\'"
             count_params.append(deeper_pattern)
 
         if limit is not None and limit > 0:

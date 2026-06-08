@@ -121,7 +121,12 @@ def filter_songs(db_connection, query_string: str) -> list[dict]:
     # Validate query is not empty
     if not query_string or not query_string.strip():
         raise ValueError("Query cannot be empty")
-    
+
+    # Complexity limit: count atoms (tag names) in the expression
+    atom_count = len(re.findall(r'[a-zA-Z_][a-zA-Z0-9_]*', query_string))
+    if atom_count > 50:
+        raise ValueError("Query too complex: maximum 50 terms allowed")
+
     # Parse
     try:
         expression, quoted_tags = parse_query(query_string)
