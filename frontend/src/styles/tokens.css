@@ -45,6 +45,6 @@
 
   /* Elevation */
   --halo-art:  0 0 60px 12px color-mix(in oklch, var(--song-color) 40%, transparent);
-  --focus-ring: 0 0 0 2px color-mix(in oklch, var(--song-color) 60%, white 20%),
+  --focus-ring: 0 0 0 2px color-mix(in oklch, var(--aurora-teal) 70%, white 10%),
                 0 0 0 4px oklch(0 0 0 / 0.6);
 }

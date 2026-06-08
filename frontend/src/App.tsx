@@ -104,7 +104,7 @@ function App() {
     let content: ReactNode
     if (view.kind === "all-songs") {
       content = (
-        <div className="p-4 sm:px-10 sm:pt-8 sm:pb-6 max-w-[1400px] mx-auto">
+        <div className="p-4 sm:px-10 sm:pt-8 sm:pb-6 max-w-[1800px] mx-auto">
           <div className="flex items-center justify-between mb-6">
             <h1 className="font-display text-[28px] leading-none tracking-tight text-[var(--aurora-text)]">
               All Songs
@@ -128,10 +128,9 @@ function App() {
             </span>
           </div>
           <div
-            className="relative flex items-center rounded-full mb-6 transition-all duration-200 focus-within:shadow-[0_0_20px_-6px_var(--aurora-glow)]"
+            className="search-shell relative flex items-center rounded-full mb-6 transition-all duration-200"
             style={{
               background: "var(--aurora-surface)",
-              boxShadow: "inset 0 0 0 1px var(--aurora-rim)",
               backdropFilter: "blur(12px)",
               WebkitBackdropFilter: "blur(12px)",
             }}
@@ -145,7 +144,7 @@ function App() {
               placeholder="Search titles, artists, albums..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-transparent border-0 outline-none pl-11 pr-5 py-2.5 text-[13px] text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-tertiary)] placeholder:font-display-italic placeholder:text-[14px]"
+              className="w-full bg-transparent border-0 outline-none pl-11 pr-5 py-2.5 text-[13px] text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-tertiary)] placeholder:font-display-italic placeholder:text-[14px] focus-visible:shadow-none"
             />
           </div>
           <SongTable songs={songs} loading={songsLoading} error={songsError} onPlay={handlePlaySong} />

@@ -724,10 +724,9 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
         {activePlaylist.songs.length > 0 && (
           <div className="flex items-center gap-2 mb-4">
             <div
-              className="relative flex-1 flex items-center rounded-full transition-all duration-200 focus-within:shadow-[0_0_20px_-6px_var(--aurora-glow)]"
+              className="search-shell relative flex-1 flex items-center rounded-full transition-all duration-200"
               style={{
                 background: "var(--aurora-surface)",
-                boxShadow: "inset 0 0 0 1px var(--aurora-surface-border)",
                 backdropFilter: "blur(12px)",
                 WebkitBackdropFilter: "blur(12px)",
               }}
@@ -741,7 +740,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
                 placeholder="Search in playlist..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-transparent border-0 outline-none pl-11 pr-5 py-2.5 text-[13px] text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-tertiary)] placeholder:font-display-italic placeholder:text-[14px]"
+                className="w-full bg-transparent border-0 outline-none pl-11 pr-5 py-2.5 text-[13px] text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-tertiary)] placeholder:font-display-italic placeholder:text-[14px] focus-visible:shadow-none"
               />
             </div>
             <Popover>

@@ -1,7 +1,6 @@
-import { useRef, useState, useCallback } from "react"
+import { useRef, useState, useCallback, useEffect } from "react"
 import { usePlayerStore } from "@/stores/playerStore"
 import { formatDuration } from "@/lib/utils"
-import { WaveformBar } from "@/components/player/WaveformBar"
 
 interface SeekScrubberProps {
   hasSong: boolean
@@ -12,7 +11,6 @@ interface SeekScrubberProps {
 export function SeekScrubber({ hasSong, seekTo, mobile = false }: SeekScrubberProps) {
   const seek = usePlayerStore((state) => state.seek)
   const duration = usePlayerStore((state) => state.duration)
-  const currentSong = usePlayerStore((state) => state.currentSong)
 
   const containerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -33,6 +31,16 @@ export function SeekScrubber({ hasSong, seekTo, mobile = false }: SeekScrubberPr
     }
   }, [])
 
+  // Update seek-bar CSS custom property for fill percentage
+  const currentVal = dragValue ?? seek
+  const pct = duration > 0 ? (currentVal / duration) * 100 : 0
+
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.style.setProperty("--seek-pct", `${pct}%`)
+    }
+  }, [pct])
+
   // --- Drag handlers for smooth scrubbing ---
   const handlePointerDown = useCallback(() => {
     isDraggingRef.current = true
@@ -44,9 +52,6 @@ export function SeekScrubber({ hasSong, seekTo, mobile = false }: SeekScrubberPr
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const val = Number(e.target.value)
       setDragValue(val)
-      // During drag, don't commit seek — wait for pointerup
-      // For pure click (no move), isDraggingRef is true from pointerdown
-      // but we still defer to pointerup for visual consistency
       if (!isDraggingRef.current) {
         seekTo(val)
       }
@@ -100,9 +105,6 @@ export function SeekScrubber({ hasSong, seekTo, mobile = false }: SeekScrubberPr
     ? (hoverX / containerWidth) * duration
     : null
 
-  // Waveform peaks from current song
-  const waveformPeaks = currentSong?.waveform_peaks ?? null
-
   return (
     <div className={`flex items-center gap-3${mobile ? "" : " w-full"}`}>
       <span
@@ -112,25 +114,16 @@ export function SeekScrubber({ hasSong, seekTo, mobile = false }: SeekScrubberPr
       </span>
       <div
         ref={containerRef}
-        className="relative flex-1 group"
-        style={{ height: "32px" }}
+        className="relative flex-1 group flex items-center"
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
         onWheel={handleWheel}
       >
-        {hasSong && (
-          <WaveformBar
-            duration={duration}
-            seek={seek}
-            dragSeek={dragValue}
-            waveformPeaks={waveformPeaks}
-          />
-        )}
         <input
           ref={inputRef}
           type="range"
           aria-label="Seek"
-          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+          className="seek-bar"
           min={0}
           max={duration || 100}
           step={1}
