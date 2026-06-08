@@ -1,4 +1,5 @@
 import { useId, useRef, useEffect, useCallback, useMemo } from 'react'
+import { usePlayerStore } from "@/stores/playerStore"
 
 interface WaveformBarProps {
   duration: number
@@ -64,6 +65,21 @@ export function WaveformBar({ duration, seek, dragSeek, waveformPeaks }: Wavefor
   durationRef.current = duration
   dragSeekRef.current = dragSeek
 
+  // Interpolation: track when seek last changed (new data point from backend)
+  const lastSeekRef = useRef(seek)
+  const lastSeekTimeRef = useRef(performance.now())
+  const wasPlayingRef = useRef(false)
+  if (seek !== lastSeekRef.current) {
+    lastSeekRef.current = seek
+    lastSeekTimeRef.current = performance.now()
+  }
+  // Detect pause transition — freeze interpolation at current position
+  const playingNow = usePlayerStore.getState().isPlaying
+  if (wasPlayingRef.current && !playingNow) {
+    lastSeekTimeRef.current = performance.now() // elapsed=0 → playhead freezes
+  }
+  wasPlayingRef.current = playingNow
+
   // Active playhead position: use dragSeek if dragging, otherwise seek
   const playheadX = useMemo(() => {
     const s = dragSeek != null ? dragSeek : seek
@@ -98,14 +114,21 @@ export function WaveformBar({ duration, seek, dragSeek, waveformPeaks }: Wavefor
     wave2LitRef.current?.setAttribute('d', d2)
 
     if (durationRef.current) {
-      const s = dragSeekRef.current != null ? dragSeekRef.current : seekRef.current
+      let s: number
+      if (dragSeekRef.current != null) {
+        s = dragSeekRef.current
+      } else {
+        // Only interpolate when playing — don't advance while paused
+        const isPlaying = usePlayerStore.getState().isPlaying
+        const elapsed = isPlaying ? (performance.now() - lastSeekTimeRef.current) / 1000 : 0
+        s = Math.min(seekRef.current + elapsed, durationRef.current)
+      }
       const x = (s / durationRef.current) * VIEW_W
       clipRectRef.current?.setAttribute('width', String(x))
       playlineRef.current?.setAttribute('x1', String(x))
       playlineRef.current?.setAttribute('x2', String(x))
     }
 
-    rafRef.current = requestAnimationFrame(tick)
   }, [])
 
   useEffect(() => {

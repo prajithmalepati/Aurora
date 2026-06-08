@@ -84,7 +84,7 @@ function Kbd({ children }: { children: React.ReactNode }) {
 
 export function AboutView() {
   return (
-    <div className="aurora-view-enter p-10 max-w-[680px] mx-auto">
+    <div className="aurora-view-enter p-4 sm:p-10 max-w-[680px] mx-auto">
       {/* Header: Logo + version */}
       <div className="flex items-end gap-4 mb-2">
         <AuroraWordmark className="h-7" />

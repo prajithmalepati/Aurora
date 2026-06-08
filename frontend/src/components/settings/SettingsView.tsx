@@ -67,8 +67,8 @@ export function SettingsView() {
   ]
 
   return (
-    <div className="aurora-view-enter p-10 max-w-[600px]">
-      <h1 className="font-display text-[36px] leading-none tracking-tight text-[var(--aurora-text)] mb-8">
+    <div className="aurora-view-enter p-4 sm:p-10 max-w-[600px]">
+      <h1 className="font-display text-[28px] leading-none tracking-tight text-[var(--aurora-text)] mb-8">
         Settings
       </h1>
 
