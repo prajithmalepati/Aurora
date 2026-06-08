@@ -1,6 +1,7 @@
 import { create } from "zustand"
 import { api } from "@/lib/api"
 import type { Playlist, PlaylistDetail, ApiResponse } from "@/types"
+import { usePlayerStore } from "@/stores/playerStore"
 import { toast } from "@/lib/toast"
 
 interface PlaylistState {
@@ -94,6 +95,10 @@ export const usePlaylistStore = create<PlaylistState>((set, get) => ({
       // Clear active if we deleted the one being viewed
       if (get().activePlaylist?.id === id) {
         set({ activePlaylist: null })
+      }
+      const playerState = usePlayerStore.getState()
+      if (playerState.queuePlaylistId === id) {
+        usePlayerStore.setState({ queuePlaylistId: null })
       }
       await get().fetchPlaylists()
       toast.success("Playlist deleted")

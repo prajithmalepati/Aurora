@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { toast } from "@/lib/toast"
+import { api } from "@/lib/api"
 import { Music, ChevronUp, ChevronDown, AlertTriangle, RefreshCw, Play, ListPlus, Tag as TagIcon, X } from "lucide-react"
 
 interface SongTableProps {
@@ -141,7 +142,6 @@ interface BulkTagDialogProps {
 function BulkTagDialog({ open, onOpenChange, songIds, onComplete }: BulkTagDialogProps) {
   const [inputValue, setInputValue] = useState("")
   const inputRef = useRef<HTMLInputElement>(null)
-  const assignTags = useSongStore((s) => s.assignTags)
   const allTags = useTagStore((s) => s.tags)
   const fetchTags = useTagStore((s) => s.fetchTags)
 
@@ -160,10 +160,9 @@ function BulkTagDialog({ open, onOpenChange, songIds, onComplete }: BulkTagDialo
     const trimmed = name.trim().toLowerCase()
     if (!trimmed) return
     try {
-      for (const songId of songIds) {
-        await assignTags(songId, [trimmed])
-      }
+      await Promise.all(songIds.map(id => api.post(`/songs/${id}/tags`, { tag_names: [trimmed] })))
       await fetchTags()
+      await useSongStore.getState().fetchSongs()
       setInputValue("")
       toast.success(`Tag "${trimmed}" added to ${songIds.length} song${songIds.length === 1 ? "" : "s"}`)
       onComplete()
