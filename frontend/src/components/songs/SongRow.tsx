@@ -1,5 +1,4 @@
 import type { Song } from "@/types"
-import { motion } from "motion/react"
 import { formatDuration, formatFileSize, qualityLabel } from "@/lib/utils"
 import { AlbumArt } from "@/components/songs/AlbumArt"
 import { Equalizer } from "@/components/ui/Equalizer"
@@ -54,19 +53,22 @@ function FormatBadge({ format }: { format: string | null | undefined }) {
 export const SongRow = memo(function SongRow({ song, index, animIndex, onPlay, isSelected, onToggleSelect }: SongRowProps) {
   const deleteSong = useSongStore((state) => state.deleteSong)
   const playSong = usePlayerStore((state) => state.playSong)
-  const currentSong = usePlayerStore((state) => state.currentSong)
-  const isPlaying = usePlayerStore((state) => state.isPlaying)
+  const isCurrentSong = usePlayerStore(
+    (state) => state.currentSong?.id === song.id
+  )
+  const isCurrentlyPlaying = usePlayerStore(
+    (state) => state.isPlaying && state.currentSong?.id === song.id
+  )
+  const inQueue = usePlayerStore(
+    (state) => state.queue.some((q) => q.id === song.id)
+  )
   const playNext = usePlayerStore((state) => state.playNext)
   const addToQueue = usePlayerStore((state) => state.addToQueue)
-  const queue = usePlayerStore((state) => state.queue)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [tagEditorOpen, setTagEditorOpen] = useState(false)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
   const rowRef = useRef<HTMLTableRowElement>(null)
-
-  // Check if song is already in queue
-  const inQueue = queue.some((s) => s.id === song.id)
 
   const handleDelete = async () => {
     setDeleteDialogOpen(false)
@@ -82,7 +84,9 @@ export const SongRow = memo(function SongRow({ song, index, animIndex, onPlay, i
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    setContextMenu({ x: e.clientX, y: e.clientY })
+    const x = Math.min(e.clientX, window.innerWidth - 188)
+    const y = Math.min(e.clientY, window.innerHeight - 128)
+    setContextMenu({ x, y })
   }, [])
 
   const closeContextMenu = useCallback(() => {
@@ -105,7 +109,8 @@ export const SongRow = memo(function SongRow({ song, index, animIndex, onPlay, i
 
   const handlePlayNow = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
-    playSong(song)
+    const songs = useSongStore.getState().songs
+    playSong(song, songs.length > 0 ? songs : undefined)
     closeContextMenu()
   }, [song, playSong, closeContextMenu])
 
@@ -118,23 +123,20 @@ export const SongRow = memo(function SongRow({ song, index, animIndex, onPlay, i
     }
   }
 
-  const isCurrentSong = currentSong?.id === song.id
   const hasFile = song.file_path !== null
 
-  const staggerDelay = animIndex !== undefined && animIndex < 16 ? animIndex * 0.02 : 0
+  const shouldStagger = animIndex !== undefined && animIndex < 16
 
   return (
     <>
-      <motion.tr
+      <tr
         ref={rowRef}
         onClick={handlePlay}
         onContextMenu={handleContextMenu}
         className={`group relative transition-colors duration-150 ${
           hasFile ? "cursor-pointer" : "cursor-not-allowed opacity-40"
-        } ${isSelected ? "bg-white/[0.04]" : ""}`}
-        initial={{ opacity: 0, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: staggerDelay, type: "spring", stiffness: 300, damping: 28 }}
+        } ${isSelected ? "bg-white/[0.04]" : ""} ${shouldStagger ? "song-row-enter" : ""}`}
+        style={shouldStagger ? { animationDelay: `${animIndex! * 0.02}s` } : undefined}
       >
         {/* Checkbox column (when multi-select is active) */}
         {onToggleSelect && (
@@ -210,7 +212,7 @@ export const SongRow = memo(function SongRow({ song, index, animIndex, onPlay, i
           {/* Static content (row number / equalizer) */}
           <span className="relative z-10 flex items-center justify-center">
             {isCurrentSong ? (
-              <Equalizer playing={isPlaying} />
+              <Equalizer playing={isCurrentlyPlaying} />
             ) : (
               <span className="text-xs tabular-nums transition-opacity duration-150 group-hover:opacity-0 select-none">
                 {index + 1}
@@ -249,10 +251,10 @@ export const SongRow = memo(function SongRow({ song, index, animIndex, onPlay, i
                     : "text-[var(--aurora-text)]"
                 }`}
               >
-                {song.title}
+                {song.title || "Untitled"}
               </span>
               <span className="truncate text-[12px] text-[var(--aurora-text-secondary)] mt-0.5">
-                {song.artist}
+                {song.artist || "Unknown Artist"}
                 {song.featured_artists && song.featured_artists.length > 0 && (
                   <span className="text-[var(--aurora-text-tertiary)]">
                     {" "}feat. {song.featured_artists.join(", ")}
@@ -393,7 +395,7 @@ export const SongRow = memo(function SongRow({ song, index, animIndex, onPlay, i
             </IconBtn>
           </div>
         </td>
-      </motion.tr>
+      </tr>
 
       {/* Context Menu */}
       {contextMenu && (

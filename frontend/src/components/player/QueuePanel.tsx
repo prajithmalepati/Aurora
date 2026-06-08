@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom"
 import { usePlayerStore } from "@/stores/playerStore"
 import type { Song } from "@/types"
 import { formatDuration } from "@/lib/utils"
@@ -70,9 +71,7 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
     playSong(song, queue)
   }
 
-  if (!open) return null
-
-  return (
+  return createPortal(
     <AnimatePresence>
       {open && (
         <>
@@ -343,6 +342,7 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
           </motion.div>
         </>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   )
 }

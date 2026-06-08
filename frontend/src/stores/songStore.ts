@@ -3,6 +3,7 @@ import { api } from "@/lib/api"
 import type { Song, ApiResponse, Tag } from "@/types"
 import { useTagStore } from "@/stores/tagStore"
 import { useFilterStore } from "@/stores/filterStore"
+import { usePlayerStore } from "@/stores/playerStore"
 import { toast } from "@/lib/toast"
 
 type View =
@@ -40,11 +41,13 @@ interface SongState {
     duration?: number
   }) => Promise<void>
   deleteSong: (id: number) => Promise<void>
-  assignTags: (songId: number, tagNames: string[]) => Promise<void>
+  assignTags: (songId: number, tagNames: string[], options?: { skipRefetch?: boolean }) => Promise<void>
   removeTag: (songId: number, tagId: number) => Promise<void>
   removeTagByName: (songId: number, tagName: string) => Promise<void>
   setView: (view: View) => void
 }
+
+let fetchId = 0
 
 export const useSongStore = create<SongState>((set, get) => ({
   songs: [],
@@ -55,6 +58,7 @@ export const useSongStore = create<SongState>((set, get) => ({
   sortOrder: "asc",
 
   fetchSongs: async (search) => {
+    const myId = ++fetchId
     set({ loading: true, error: null })
     try {
       const { sortField, sortOrder } = get()
@@ -63,8 +67,10 @@ export const useSongStore = create<SongState>((set, get) => ({
       params.set("sort", sortField)
       params.set("order", sortOrder)
       const res = await api.get<ApiResponse<Song[]>>(`/songs?${params.toString()}`)
+      if (myId !== fetchId) return // stale response, discard
       set({ songs: res.data, loading: false })
     } catch (e: any) {
+      if (myId !== fetchId) return
       set({ error: e.message, loading: false })
     }
   },
@@ -101,6 +107,15 @@ export const useSongStore = create<SongState>((set, get) => ({
   deleteSong: async (id) => {
     try {
       await api.delete(`/songs/${id}`)
+      const playerState = usePlayerStore.getState()
+      if (playerState.currentSong?.id === id) {
+        const queueIdx = playerState.queue.findIndex(s => s.id === id)
+        if (queueIdx !== -1) {
+          playerState.removeFromQueue(queueIdx)
+        } else {
+          playerState.stop()
+        }
+      }
       await get().fetchSongs()
       toast.success("Song deleted")
     } catch (e: any) {
@@ -110,12 +125,14 @@ export const useSongStore = create<SongState>((set, get) => ({
     }
   },
 
-  assignTags: async (songId, tagNames) => {
+  assignTags: async (songId, tagNames, options?: { skipRefetch?: boolean }) => {
     try {
       await api.post(`/songs/${songId}/tags`, { tag_names: tagNames })
-      await get().fetchSongs()
-      const filterState = useFilterStore.getState()
-      if (filterState.query.trim()) await filterState.executeFilter()
+      if (!options?.skipRefetch) {
+        await get().fetchSongs()
+        const filterState = useFilterStore.getState()
+        if (filterState.query.trim()) await filterState.executeFilter()
+      }
     } catch (e: any) {
       set({ error: e.message })
       toast.error(e.message ?? "Failed to update tags")
