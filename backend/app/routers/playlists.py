@@ -9,6 +9,7 @@ from fastapi.responses import Response
 from datetime import datetime, timezone
 
 from app.database import get_db_ctx, PLAYLIST_SONG_SELECT_QUERY
+from app.routers.songs import _safe_json_loads
 from app.models import PlaylistCreate, PlaylistUpdate, PlaylistResponse, SongResponse, PlaylistSongAdd, PlaylistReorder, PlaylistSongTiming
 
 # Playlist cover images are saved into the Vite public folder so they're
@@ -252,8 +253,8 @@ def reorder_playlist_songs(playlist_id: int, reorder: PlaylistReorder):
                 title=song_row["title"],
                 artist=song_row["artist"],
                 album=song_row["album"],
-                artists=json.loads(song_row["artists"]) if song_row["artists"] else None,
-                featured_artists=json.loads(song_row["featured_artists"]) if song_row["featured_artists"] else None,
+                artists=_safe_json_loads(song_row["artists"]),
+                featured_artists=_safe_json_loads(song_row["featured_artists"]),
                 duration=song_row["duration"],
                 file_path=song_row["file_path"],
                 file_format=song_row["file_format"] if "file_format" in song_row.keys() else None,
@@ -266,7 +267,7 @@ def reorder_playlist_songs(playlist_id: int, reorder: PlaylistReorder):
                 start_time_ms=song_row["start_time_ms"],
                 end_time_ms=song_row["end_time_ms"],
                 position=song_row["position"],
-                waveform_peaks=json.loads(raw_peaks) if raw_peaks else None,
+                waveform_peaks=_safe_json_loads(raw_peaks),
                 dominant_color=song_row["dominant_color"] if "dominant_color" in song_row.keys() else None,
                 dominant_color_2=song_row["dominant_color_2"] if "dominant_color_2" in song_row.keys() else None,
                 replaygain_track_gain=song_row["replaygain_track_gain"] if "replaygain_track_gain" in song_row.keys() else None,
@@ -354,7 +355,6 @@ def delete_song_from_playlist(playlist_id: int, song_id: int):
             "DELETE FROM playlist_songs WHERE playlist_id = ? AND song_id = ?",
             (playlist_id, song_id),
         )
-        conn.commit()
         
         # Recompack positions: decrement position for all songs after the deleted one
         cursor.execute(
@@ -389,8 +389,8 @@ def delete_song_from_playlist(playlist_id: int, song_id: int):
                 title=song_row["title"],
                 artist=song_row["artist"],
                 album=song_row["album"],
-                artists=json.loads(song_row["artists"]) if song_row["artists"] else None,
-                featured_artists=json.loads(song_row["featured_artists"]) if song_row["featured_artists"] else None,
+                artists=_safe_json_loads(song_row["artists"]),
+                featured_artists=_safe_json_loads(song_row["featured_artists"]),
                 duration=song_row["duration"],
                 file_path=song_row["file_path"],
                 file_format=song_row["file_format"] if "file_format" in song_row.keys() else None,
@@ -403,7 +403,7 @@ def delete_song_from_playlist(playlist_id: int, song_id: int):
                 start_time_ms=song_row["start_time_ms"],
                 end_time_ms=song_row["end_time_ms"],
                 position=song_row["position"],
-                waveform_peaks=json.loads(raw_peaks) if raw_peaks else None,
+                waveform_peaks=_safe_json_loads(raw_peaks),
                 dominant_color=song_row["dominant_color"] if "dominant_color" in song_row.keys() else None,
                 dominant_color_2=song_row["dominant_color_2"] if "dominant_color_2" in song_row.keys() else None,
                 replaygain_track_gain=song_row["replaygain_track_gain"] if "replaygain_track_gain" in song_row.keys() else None,
@@ -489,8 +489,8 @@ def get_playlist(playlist_id: int):
                 title=song_row["title"],
                 artist=song_row["artist"],
                 album=song_row["album"],
-                artists=json.loads(song_row["artists"]) if song_row["artists"] else None,
-                featured_artists=json.loads(song_row["featured_artists"]) if song_row["featured_artists"] else None,
+                artists=_safe_json_loads(song_row["artists"]),
+                featured_artists=_safe_json_loads(song_row["featured_artists"]),
                 duration=song_row["duration"],
                 file_path=song_row["file_path"],
                 file_format=song_row["file_format"] if "file_format" in song_row.keys() else None,
@@ -503,7 +503,7 @@ def get_playlist(playlist_id: int):
                 start_time_ms=song_row["start_time_ms"],
                 end_time_ms=song_row["end_time_ms"],
                 position=song_row["position"],
-                waveform_peaks=json.loads(raw_peaks) if raw_peaks else None,
+                waveform_peaks=_safe_json_loads(raw_peaks),
                 dominant_color=song_row["dominant_color"] if "dominant_color" in song_row.keys() else None,
                 dominant_color_2=song_row["dominant_color_2"] if "dominant_color_2" in song_row.keys() else None,
                 replaygain_track_gain=song_row["replaygain_track_gain"] if "replaygain_track_gain" in song_row.keys() else None,
@@ -742,8 +742,8 @@ def add_song_to_playlist(playlist_id: int, song_add: PlaylistSongAdd):
                 title=song_row["title"],
                 artist=song_row["artist"],
                 album=song_row["album"],
-                artists=json.loads(song_row["artists"]) if song_row["artists"] else None,
-                featured_artists=json.loads(song_row["featured_artists"]) if song_row["featured_artists"] else None,
+                artists=_safe_json_loads(song_row["artists"]),
+                featured_artists=_safe_json_loads(song_row["featured_artists"]),
                 duration=song_row["duration"],
                 file_path=song_row["file_path"],
                 file_format=song_row["file_format"] if "file_format" in song_row.keys() else None,
@@ -756,7 +756,7 @@ def add_song_to_playlist(playlist_id: int, song_add: PlaylistSongAdd):
                 start_time_ms=song_row["start_time_ms"],
                 end_time_ms=song_row["end_time_ms"],
                 position=song_row["position"],
-                waveform_peaks=json.loads(raw_peaks) if raw_peaks else None,
+                waveform_peaks=_safe_json_loads(raw_peaks),
                 dominant_color=song_row["dominant_color"] if "dominant_color" in song_row.keys() else None,
                 dominant_color_2=song_row["dominant_color_2"] if "dominant_color_2" in song_row.keys() else None,
                 replaygain_track_gain=song_row["replaygain_track_gain"] if "replaygain_track_gain" in song_row.keys() else None,
@@ -867,8 +867,8 @@ def _get_playlist_songs_for_export(playlist_id: int):
             title=sr["title"],
             artist=sr["artist"],
             album=sr["album"],
-            artists=json.loads(sr["artists"]) if sr["artists"] else None,
-            featured_artists=json.loads(sr["featured_artists"]) if sr["featured_artists"] else None,
+            artists=_safe_json_loads(sr["artists"]),
+            featured_artists=_safe_json_loads(sr["featured_artists"]),
             duration=sr["duration"],
             file_path=sr["file_path"],
             file_format=sr["file_format"] if "file_format" in sr.keys() else None,
@@ -881,7 +881,7 @@ def _get_playlist_songs_for_export(playlist_id: int):
             start_time_ms=sr["start_time_ms"],
             end_time_ms=sr["end_time_ms"],
             position=sr["position"],
-            waveform_peaks=json.loads(raw_peaks) if raw_peaks else None,
+            waveform_peaks=_safe_json_loads(raw_peaks),
             dominant_color=sr["dominant_color"] if "dominant_color" in sr.keys() else None,
             dominant_color_2=sr["dominant_color_2"] if "dominant_color_2" in sr.keys() else None,
             replaygain_track_gain=sr["replaygain_track_gain"] if "replaygain_track_gain" in sr.keys() else None,

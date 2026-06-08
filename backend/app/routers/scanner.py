@@ -9,6 +9,7 @@ from pathlib import Path
 
 from app.models import ScanRequest
 from app.services.file_scanner import import_scanned_songs
+from app.cache import song_cache, tag_cache, folder_cache
 
 
 router = APIRouter(tags=["scanner"])
@@ -32,6 +33,9 @@ def scan_folder(request: ScanRequest):
     from app.database import get_db_ctx
     with get_db_ctx() as conn:
         result = import_scanned_songs(conn, request.folder_path, request.playlist_name)
+        song_cache.invalidate_prefix("songs:")
+        tag_cache.invalidate("tags:list")
+        folder_cache.invalidate("folders:tree")
         
         # Build message
         parts = []
@@ -75,6 +79,9 @@ async def scan_folder_stream(request: ScanRequest, req: Request):
                     cancel_event=cancel_event,
                     progress_cb=lambda evt: event_queue.put(evt),
                 )
+                song_cache.invalidate_prefix("songs:")
+                tag_cache.invalidate("tags:list")
+                folder_cache.invalidate("folders:tree")
             except Exception as exc:
                 event_queue.put({"type": "error", "message": str(exc)})
             finally:

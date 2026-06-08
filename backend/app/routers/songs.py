@@ -47,7 +47,10 @@ def song_row_to_dict(row: sqlite3.Row) -> dict:
         for item in playlists_str.split(","):
             if ":" in item:
                 id_part, name_part = item.split(":", 1)
-                pid = int(id_part)
+                try:
+                    pid = int(id_part)
+                except ValueError:
+                    continue
                 if pid not in seen_playlist_ids:
                     seen_playlist_ids.add(pid)
                     playlists.append({"id": pid, "name": name_part.strip()})
