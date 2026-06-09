@@ -176,7 +176,7 @@ interface AlbumCardProps {
 function AlbumCard({ album, onClick, onPlay, onShuffle }: AlbumCardProps) {
   const [hovered, setHovered] = useState(false)
   const coverUrl = album.cover_art_path
-    ? `/api/album-art/${album.cover_art_path}`
+    ? `http://localhost:8000/api/album-art/${album.cover_art_path}`
     : null
 
   return (
