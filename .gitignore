@@ -99,3 +99,11 @@ docs/design/
 docs/audits/
 docs/qa/
 docs/deferred-ideas.md
+# Process artifacts (audits, plans — local only)
+DEEP_AUDIT*.md
+EXECUTION_PLAN.md
+FIX_PLAN*.md
+PERFORMANCE_AUDIT.md
+V1_EXECUTION_PLAN.md
+V1_PLAN.md
+VISUAL_AUDIT.md
