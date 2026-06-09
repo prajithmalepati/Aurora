@@ -1,11 +1,31 @@
 """FastAPI application factory."""
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import init_db
 from app.routers import songs, tags, playlists, filter, scanner, folders, watcher, albums
 
-app = FastAPI(title="Aurora", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Startup and shutdown lifecycle."""
+    init_db()
+    # Start the background file watcher
+    from app.services.file_watcher import FileWatcher, set_watcher
+    fw = FileWatcher(interval=30)
+    set_watcher(fw)
+    app.state.watcher = fw
+    fw.start()
+    yield
+    # Shutdown
+    from app.services.file_watcher import get_watcher
+    fw = get_watcher()
+    if fw:
+        fw.stop()
+
+
+app = FastAPI(title="Aurora", version="0.1.0", lifespan=lifespan)
 
 # CORS — allow React dev server
 app.add_middleware(
@@ -26,24 +46,6 @@ app.include_router(folders.router, prefix="/api")
 app.include_router(watcher.router, prefix="/api")
 app.include_router(albums.router, prefix="/api")
 
-
-@app.on_event("startup")
-def startup():
-    init_db()
-    # Start the background file watcher
-    from app.services.file_watcher import FileWatcher, set_watcher
-    fw = FileWatcher(interval=30)
-    set_watcher(fw)
-    app.state.watcher = fw
-    fw.start()
-
-
-@app.on_event("shutdown")
-def shutdown():
-    from app.services.file_watcher import get_watcher
-    fw = get_watcher()
-    if fw:
-        fw.stop()
 
 
 @app.get("/api/health")
