@@ -2,7 +2,7 @@
 
 A personal music library with smart tagging, boolean filtering, and a built-in audio player.
 
-![All Songs view](screenshots/all-songs.png)
+![All Songs view](screenshots/01-all-songs.png)
 
 ## Features
 
@@ -18,7 +18,17 @@ A personal music library with smart tagging, boolean filtering, and a built-in a
 - **Auto-Watch** — register folders to automatically detect and import new music files
 - **Playlist Export/Import** — export playlists as `.m3u` / `.m3u8`, import from file
 - **Folder Browser** — tree-view navigation of your music directory structure
-- **Dark Mode UI** — single dark theme with bleed-glow player bar
+- **Queue Management** — play next, add to queue, drag-to-reorder, history
+- **Keyboard Shortcuts** — 16+ shortcuts for power users (press `?` to see all)
+- **Dark Mode UI** — single dark theme with per-song color bleed and glass surfaces
+
+## Screenshots
+
+| | |
+|---|---|
+| ![All Songs](screenshots/01-all-songs.png) | ![Mix Filter](screenshots/02-mix-filter.png) |
+| ![Folders](screenshots/03-folders.png) | ![Playlist Detail](screenshots/04-playlist-detail.png) |
+| ![Queue Panel](screenshots/05-queue-panel.png) | ![Settings](screenshots/06-settings.png) |
 
 ## Tech Stack
 
@@ -113,8 +123,8 @@ npm run lint
 | Key | Action |
 |-----|--------|
 | `Space` | Play / Pause |
-| `→` (ArrowRight) | Next track |
-| `←` (ArrowLeft) | Previous track |
+| `→` | Next track |
+| `←` | Previous track |
 | `N` | Next track |
 | `P` | Previous track |
 | `M` | Mute / Unmute |
@@ -129,7 +139,6 @@ npm run lint
 | `Esc` | Close dialog / command palette, blur input |
 | `Ctrl+F` / `⌘F` | Focus filter search input |
 | `Ctrl+K` / `⌘K` | Open command palette |
-| `Ctrl+Shift+F` / `⌘⇧F` | Toggle fullscreen |
 
 All shortcuts are disabled while typing in an input field (except `Esc`).
 
