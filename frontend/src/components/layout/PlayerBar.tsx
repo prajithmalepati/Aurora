@@ -56,7 +56,6 @@ export function PlayerBar() {
   const isShuffled = usePlayerStore((state) => state.isShuffled)
   const toggleShuffle = usePlayerStore((state) => state.toggleShuffle)
   const isBuffering = usePlayerStore((state) => state.isBuffering)
-  const queue = usePlayerStore((state) => state.queue)
   const isCrossfading = usePlayerStore((state) => state.isCrossfading)
   const crossfadeFromTitle = usePlayerStore((state) => state.crossfadeFromTitle)
 
@@ -235,11 +234,6 @@ export function PlayerBar() {
                 aria-label="Open queue"
               >
                 <ListMusic className="h-3.5 w-3.5" strokeWidth={1.5} />
-                {queue.length > 1 && (
-                  <span className="absolute -top-0.5 -right-1.5 text-[8px] tabular-nums text-[var(--aurora-text-tertiary)] leading-none">
-                    {queue.length}
-                  </span>
-                )}
               </button>
             </div>
           </div>
@@ -369,11 +363,6 @@ export function PlayerBar() {
                   aria-label="Open queue"
                 >
                   <ListMusic className="h-[15px] w-[15px]" strokeWidth={1.5} />
-                  {queue.length > 1 && (
-                    <span className="absolute -top-0.5 -right-1.5 text-[9px] tabular-nums text-[var(--aurora-text-tertiary)] leading-none">
-                      {queue.length}
-                    </span>
-                  )}
                 </button>
               </div>
 
