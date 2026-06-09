@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react"
+import { useEffect, useState, lazy, Suspense, type ReactNode } from "react"
 import { useSongStore } from "@/stores/songStore"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { useTagStore } from "@/stores/tagStore"
@@ -11,18 +11,20 @@ import { PlayerBar } from "@/components/layout/PlayerBar"
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary"
 import { Toaster } from "sonner"
 import { ToastClickDismiss } from "@/components/ui/ToastClickDismiss"
-import { SongTable } from "@/components/songs/SongTable"
-import { PlaylistDetail } from "@/components/playlists/PlaylistDetail"
-import { QueryBuilder } from "@/components/filter/QueryBuilder"
-import { SettingsView } from "@/components/settings/SettingsView"
-import { AlbumsView } from "@/components/albums/AlbumsView"
-import { FoldersView } from "@/components/folders/FoldersView"
-import { AboutView } from "@/components/about/AboutView"
 import { AnimatePresence, motion } from "motion/react"
-import { AuroraColorBridge } from '@/components/aurora/AuroraColorBridge'
+import { AuroraColorBridge } from "@/components/aurora/AuroraColorBridge"
 import { WelcomeOverlay, dismissWelcome, isWelcomeDismissed } from "@/components/welcome/WelcomeOverlay"
 import { Search, Shuffle } from "lucide-react"
 import type { Song } from "@/types"
+
+// Lazy-loaded views — only one renders at a time
+const SongTable = lazy(() => import("@/components/songs/SongTable").then(m => ({ default: m.SongTable })))
+const PlaylistDetail = lazy(() => import("@/components/playlists/PlaylistDetail").then(m => ({ default: m.PlaylistDetail })))
+const QueryBuilder = lazy(() => import("@/components/filter/QueryBuilder").then(m => ({ default: m.QueryBuilder })))
+const SettingsView = lazy(() => import("@/components/settings/SettingsView").then(m => ({ default: m.SettingsView })))
+const AlbumsView = lazy(() => import("@/components/albums/AlbumsView").then(m => ({ default: m.AlbumsView })))
+const FoldersView = lazy(() => import("@/components/folders/FoldersView").then(m => ({ default: m.FoldersView })))
+const AboutView = lazy(() => import("@/components/about/AboutView").then(m => ({ default: m.AboutView })))
 
 function App() {
   const [searchQuery, setSearchQuery] = useState("")
@@ -166,15 +168,21 @@ function App() {
 
     return (
       <AnimatePresence mode="wait">
-        <motion.div
-          key={view.kind === "playlist" ? `playlist-${view.playlistId}` : view.kind}
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -6 }}
-          transition={{ type: "spring", stiffness: 280, damping: 30 }}
-        >
-          {content}
-        </motion.div>
+        <Suspense fallback={
+          <div className="flex items-center justify-center h-64">
+            <div className="w-6 h-6 border-2 border-[var(--aurora-accent)] border-t-transparent rounded-full animate-spin" />
+          </div>
+        }>
+          <motion.div
+            key={view.kind === "playlist" ? `playlist-${view.playlistId}` : view.kind}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ type: "spring", stiffness: 280, damping: 30 }}
+          >
+            {content}
+          </motion.div>
+        </Suspense>
       </AnimatePresence>
     )
   }
