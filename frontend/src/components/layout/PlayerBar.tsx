@@ -72,7 +72,7 @@ export function PlayerBar() {
   const repeatActive = repeatMode !== "none"
   const repeatLabel = repeatMode === "none" ? "Repeat off" : repeatMode === "all" ? "Repeat all" : "Repeat one"
   const transportBtnClass = (active: boolean) =>
-    `transition-colors duration-150 disabled:opacity-25 disabled:pointer-events-none ${
+    `transition-colors duration-150 disabled:opacity-40 disabled:pointer-events-none ${
       active
         ? "text-[var(--aurora-accent-interactive)]"
         : "text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)]"

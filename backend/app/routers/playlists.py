@@ -318,38 +318,42 @@ def delete_song_from_playlist(playlist_id: int, song_id: int):
         # Start explicit transaction so DELETE + position recompaction
         # are atomic. Python 3.11's default autocommit mode would
         # otherwise persist the DELETE immediately.
-        conn.execute("BEGIN IMMEDIATE")
+        try:
+            conn.execute("BEGIN IMMEDIATE")
 
-        # Verify song is in the playlist (inside the transaction to
-        # prevent a TOCTOU race on position reads) and get its position
-        cursor.execute(
-            "SELECT id, position FROM playlist_songs WHERE playlist_id = ? AND song_id = ?",
-            (playlist_id, song_id),
-        )
-        existing = cursor.fetchone()
-        
-        if not existing:
-            raise HTTPException(status_code=404, detail="Song not in playlist")
-        
-        # Get the position of the song being deleted
-        deleted_position = existing["position"]
-        
-        # Delete the playlist_songs row
-        cursor.execute(
-            "DELETE FROM playlist_songs WHERE playlist_id = ? AND song_id = ?",
-            (playlist_id, song_id),
-        )
-        
-        # Recompack positions: decrement position for all songs after the deleted one
-        cursor.execute(
-            """
-            UPDATE playlist_songs
-            SET position = position - 1
-            WHERE playlist_id = ? AND position > ?
-            """,
-            (playlist_id, deleted_position),
-        )
-        conn.commit()
+            # Verify song is in the playlist (inside the transaction to
+            # prevent a TOCTOU race on position reads) and get its position
+            cursor.execute(
+                "SELECT id, position FROM playlist_songs WHERE playlist_id = ? AND song_id = ?",
+                (playlist_id, song_id),
+            )
+            existing = cursor.fetchone()
+            
+            if not existing:
+                raise HTTPException(status_code=404, detail="Song not in playlist")
+            
+            # Get the position of the song being deleted
+            deleted_position = existing["position"]
+            
+            # Delete the playlist_songs row
+            cursor.execute(
+                "DELETE FROM playlist_songs WHERE playlist_id = ? AND song_id = ?",
+                (playlist_id, song_id),
+            )
+            
+            # Recompack positions: decrement position for all songs after the deleted one
+            cursor.execute(
+                """
+                UPDATE playlist_songs
+                SET position = position - 1
+                WHERE playlist_id = ? AND position > ?
+                """,
+                (playlist_id, deleted_position),
+            )
+            conn.commit()
+        except:
+            conn.rollback()
+            raise
 
     # Fetch and return the full playlist with songs
     with get_db_ctx() as conn:

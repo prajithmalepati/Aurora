@@ -187,7 +187,7 @@ function AlbumCard({ album, onClick, onPlay, onShuffle }: AlbumCardProps) {
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick() }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className="group relative flex flex-col rounded-xl overflow-hidden text-left transition-all duration-200 aurora-focus cursor-pointer"
+      className="group relative flex flex-col rounded-xl overflow-hidden text-left transition-[box-shadow] duration-200 aurora-focus cursor-pointer"
       style={{
         background: "var(--aurora-surface)",
         boxShadow: "inset 0 0 0 1px var(--aurora-rim)",

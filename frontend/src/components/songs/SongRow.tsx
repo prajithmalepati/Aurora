@@ -168,7 +168,7 @@ export const SongRow = memo(function SongRow({ song, index, animIndex, onPlay, i
                   e.stopPropagation()
                   onToggleSelect(e.nativeEvent.shiftKey)
                 }}
-                className="h-4 w-4 rounded-[3px] flex items-center justify-center transition-all duration-150 aurora-focus"
+                className="h-4 w-4 rounded-[3px] flex items-center justify-center transition-[color,background-color,border-color,box-shadow] duration-150 aurora-focus"
                 style={{
                   background: isSelected ? "var(--aurora-accent-interactive)" : "transparent",
                   border: isSelected

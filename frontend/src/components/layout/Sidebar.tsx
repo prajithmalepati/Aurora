@@ -342,7 +342,7 @@ function NavItem({ icon, label, active, onClick }: NavItemProps) {
   return (
     <button
       onClick={onClick}
-      className={`group relative w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors duration-200 aurora-focus ${
+      className={`group relative w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors duration-200 aurora-focus active:bg-white/[0.03] ${
         active
           ? "text-[var(--aurora-text)] bg-white/[0.05]"
           : "text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)]"
@@ -407,7 +407,7 @@ function TagSidebarItem({ name, count, onClick }: TagSidebarItemProps) {
   return (
     <button
       onClick={onClick}
-      className="group relative w-full flex items-center gap-2 px-3 py-[6px] rounded-md text-left text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] transition-colors duration-150"
+      className="group relative w-full flex items-center gap-2 px-3 py-[6px] rounded-md text-left text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] transition-colors duration-150 active:bg-white/[0.03]"
     >
       <span
         className="absolute inset-0 rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none"

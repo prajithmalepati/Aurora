@@ -237,7 +237,7 @@ export function ScanDialog({ open, onOpenChange }: ScanDialogProps) {
                 style={{ background: "var(--aurora-surface)" }}
               >
                 <div
-                  className="h-full rounded-full transition-all duration-150"
+                  className="h-full rounded-full transition-[width] duration-150"
                   style={{
                     width: `${progressPct}%`,
                     background: "linear-gradient(to right, var(--aurora-accent-interactive), var(--aurora-secondary))",
