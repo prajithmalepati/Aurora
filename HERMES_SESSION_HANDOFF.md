@@ -1,6 +1,13 @@
 # HERMES_SESSION_HANDOFF.md
 
-**Sessions 8 + 9 + 10 complete (2026-06-10, Fable 5). Next: Gate 0 review (Fable 5 only).**
+**Sessions 8 + 9 + 10 + Gate 0 complete (2026-06-10, Fable 5). Phase 0 APPROVED — see `GATE0_REVIEW.md`.**
+
+## Gate 0 outcome
+- All checklist items pass (details in `GATE0_REVIEW.md`). One review-found bug fixed in-session: watcher deletions never invalidated caches (`d076a3d`).
+- All 10 `hermes/phase0-s*` branches pushed to origin.
+- **PR not yet created** — `gh` unauthenticated on this machine. Human: `gh auth login`, then PR `hermes/phase0-s10 → main` (body drafted in Gate 0 session log / GATE0_REVIEW.md §merge plan).
+- **Merge blocked on one human item:** listening pass (crossfade ×3 curves, gapless, ReplayGain, trim).
+- Punch list for Phase 1/2 in `GATE0_REVIEW.md` (5 deferred items) + `DESIGN_QA.md` Tier-3 (11 items).
 
 ## What Session 10 delivered (task 0.12)
 
