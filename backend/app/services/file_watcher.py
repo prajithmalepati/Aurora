@@ -69,6 +69,30 @@ class FileWatcher:
 
     # ── internal loop ────────────────────────────────────────────────
 
+    @staticmethod
+    def _tree_mtime(folder_path: str) -> float | None:
+        """Latest mtime of the folder and every directory beneath it.
+
+        import_scanned_songs scans recursively, so the guard must notice
+        adds/removes/renames in nested subdirectories — those bump only
+        their parent directory's mtime, never the watched root's.
+        Stats directories only (not files), so it stays far cheaper than
+        the full import it short-circuits.
+        """
+        try:
+            latest = os.stat(folder_path).st_mtime
+        except OSError:
+            return None
+        for dirpath, dirnames, _files in os.walk(folder_path):
+            for d in dirnames:
+                try:
+                    m = os.stat(os.path.join(dirpath, d)).st_mtime
+                except OSError:
+                    continue
+                if m > latest:
+                    latest = m
+        return latest
+
     def _run(self) -> None:
         while not self._stop_event.is_set():
             try:
@@ -106,18 +130,16 @@ class FileWatcher:
                     continue
 
                 # Cheap interim guard: skip the expensive import_scanned_songs
-                # when the directory's mtime hasn't changed since last poll.
-                # Adding, removing, or renaming files always bumps dir mtime on
-                # Linux filesystems (ext4/xfs/btrfs), making this a reliable
-                # signal for "nothing happened." Only applied for background
-                # polls — manual scans always run.
+                # when no directory in the tree changed since last poll.
+                # Adding, removing, or renaming files bumps the containing
+                # directory's mtime on Linux filesystems (ext4/xfs/btrfs);
+                # _tree_mtime takes the max across the whole tree so nested
+                # changes are seen too. In-place content edits don't bump dir
+                # mtimes — those are caught by manual scans, which always run.
                 current_mtime: float | None = None
                 dir_unchanged = False
                 if folder_id is None:
-                    try:
-                        current_mtime = os.stat(folder_path).st_mtime
-                    except OSError:
-                        current_mtime = None
+                    current_mtime = self._tree_mtime(folder_path)
                     if current_mtime is not None and current_mtime == self._last_dir_mtimes.get(folder_path):
                         dir_unchanged = True
 
