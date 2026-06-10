@@ -537,7 +537,7 @@ export function SongTable({ songs, loading = false, error = null, onPlay, animKe
     getScrollElement: () => tableContainerRef.current,
     estimateSize: () => ROW_HEIGHT,
     overscan: OVERSCAN,
-    getItemKey: (index) => songs[index]?.id ?? index,
+    getItemKey: (index) => songs[index]?.id ?? `idx-${index}`,
   })
 
   // Infinite scroll: fetch more when scrolled near the bottom
