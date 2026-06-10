@@ -1375,7 +1375,7 @@ function IconBtn({ children, label, danger, active, disabled, onClick }: IconBtn
       disabled={disabled}
       title={label}
       aria-label={label}
-      className={`aurora-focus h-7 w-7 rounded-md flex items-center justify-center transition-all duration-150 disabled:opacity-25 disabled:pointer-events-none ${
+      className={`aurora-focus h-7 w-7 rounded-md flex items-center justify-center transition-all duration-150 disabled:opacity-40 disabled:pointer-events-none ${
         danger
           ? "text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-danger)] hover:bg-[var(--aurora-danger)]/10"
           : active
