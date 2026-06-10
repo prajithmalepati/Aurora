@@ -741,7 +741,7 @@ export function SongTable({ songs, loading = false, error = null, onPlay, animKe
               <tr>
                 <td colSpan={TABLE_COLSPAN} className="text-center py-4">
                   <span className="inline-flex items-center gap-2 text-[12px] text-[var(--aurora-text-tertiary)]">
-                    <div className="w-3.5 h-3.5 border-2 border-[var(--aurora-accent)] border-t-transparent rounded-full animate-spin" />
+                    <span aria-hidden="true" className="inline-block w-3.5 h-3.5 border-2 border-[var(--aurora-accent)] border-t-transparent rounded-full animate-spin" />
                     Loading more songs...
                   </span>
                 </td>
