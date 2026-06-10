@@ -9,8 +9,8 @@ from fastapi.responses import Response, FileResponse
 from datetime import datetime, timezone
 
 from app.database import get_db_ctx, PLAYLIST_SONG_SELECT_QUERY
-from app.routers.songs import _safe_json_loads
-from app.models import PlaylistCreate, PlaylistUpdate, PlaylistResponse, SongResponse, PlaylistSongAdd, PlaylistReorder, PlaylistSongTiming
+from app.models import PlaylistCreate, PlaylistUpdate, PlaylistResponse, PlaylistSongAdd, PlaylistReorder, PlaylistSongTiming
+from app.serializers import song_row_to_dict
 
 from app.paths import PLAYLIST_IMAGES_DIR
 
@@ -252,42 +252,8 @@ def reorder_playlist_songs(playlist_id: int, reorder: PlaylistReorder):
         cursor.execute(query, (playlist_id,))
         song_rows = cursor.fetchall()
 
-    # Build songs list with tags parsed from GROUP_CONCAT
-    songs = []
-    for song_row in song_rows:
-        tags_str = song_row["tags"]
-        tags = tags_str.split(",") if tags_str else []
-        raw_peaks = song_row["waveform_peaks"] if "waveform_peaks" in song_row.keys() else None
-
-        songs.append(
-            SongResponse(
-                id=song_row["id"],
-                title=song_row["title"],
-                artist=song_row["artist"],
-                album=song_row["album"],
-                artists=_safe_json_loads(song_row["artists"]),
-                featured_artists=_safe_json_loads(song_row["featured_artists"]),
-                duration=song_row["duration"],
-                file_path=song_row["file_path"],
-                file_format=song_row["file_format"] if "file_format" in song_row.keys() else None,
-                album_art_path=(song_row["album_art_path"] or None) if "album_art_path" in song_row.keys() else None,
-                source=song_row["source"],
-                tags=tags,
-                playlists=[],
-                created_at="",
-                updated_at="",
-                start_time_ms=song_row["start_time_ms"],
-                end_time_ms=song_row["end_time_ms"],
-                position=song_row["position"],
-                waveform_peaks=_safe_json_loads(raw_peaks),
-                dominant_color=song_row["dominant_color"] if "dominant_color" in song_row.keys() else None,
-                dominant_color_2=song_row["dominant_color_2"] if "dominant_color_2" in song_row.keys() else None,
-                replaygain_track_gain=song_row["replaygain_track_gain"] if "replaygain_track_gain" in song_row.keys() else None,
-                replaygain_track_peak=song_row["replaygain_track_peak"] if "replaygain_track_peak" in song_row.keys() else None,
-                replaygain_album_gain=song_row["replaygain_album_gain"] if "replaygain_album_gain" in song_row.keys() else None,
-                replaygain_album_peak=song_row["replaygain_album_peak"] if "replaygain_album_peak" in song_row.keys() else None,
-            )
-        )
+    # Build songs list
+    songs = [song_row_to_dict(r, include_peaks=False) for r in song_rows]
 
     # Fetch playlist metadata
     with get_db_ctx() as conn:
@@ -388,42 +354,8 @@ def delete_song_from_playlist(playlist_id: int, song_id: int):
         cursor.execute(query, (playlist_id,))
         song_rows = cursor.fetchall()
 
-    # Build songs list with tags parsed from GROUP_CONCAT
-    songs = []
-    for song_row in song_rows:
-        tags_str = song_row["tags"]
-        tags = tags_str.split(",") if tags_str else []
-        raw_peaks = song_row["waveform_peaks"] if "waveform_peaks" in song_row.keys() else None
-
-        songs.append(
-            SongResponse(
-                id=song_row["id"],
-                title=song_row["title"],
-                artist=song_row["artist"],
-                album=song_row["album"],
-                artists=_safe_json_loads(song_row["artists"]),
-                featured_artists=_safe_json_loads(song_row["featured_artists"]),
-                duration=song_row["duration"],
-                file_path=song_row["file_path"],
-                file_format=song_row["file_format"] if "file_format" in song_row.keys() else None,
-                album_art_path=(song_row["album_art_path"] or None) if "album_art_path" in song_row.keys() else None,
-                source=song_row["source"],
-                tags=tags,
-                playlists=[],
-                created_at="",
-                updated_at="",
-                start_time_ms=song_row["start_time_ms"],
-                end_time_ms=song_row["end_time_ms"],
-                position=song_row["position"],
-                waveform_peaks=_safe_json_loads(raw_peaks),
-                dominant_color=song_row["dominant_color"] if "dominant_color" in song_row.keys() else None,
-                dominant_color_2=song_row["dominant_color_2"] if "dominant_color_2" in song_row.keys() else None,
-                replaygain_track_gain=song_row["replaygain_track_gain"] if "replaygain_track_gain" in song_row.keys() else None,
-                replaygain_track_peak=song_row["replaygain_track_peak"] if "replaygain_track_peak" in song_row.keys() else None,
-                replaygain_album_gain=song_row["replaygain_album_gain"] if "replaygain_album_gain" in song_row.keys() else None,
-                replaygain_album_peak=song_row["replaygain_album_peak"] if "replaygain_album_peak" in song_row.keys() else None,
-            )
-        )
+    # Build songs list
+    songs = [song_row_to_dict(r, include_peaks=False) for r in song_rows]
 
     # Fetch playlist metadata
     with get_db_ctx() as conn:
@@ -488,42 +420,8 @@ def get_playlist(playlist_id: int):
         cursor.execute(query, (playlist_id,))
         song_rows = cursor.fetchall()
 
-    # Build songs list with tags parsed from GROUP_CONCAT
-    songs = []
-    for song_row in song_rows:
-        tags_str = song_row["tags"]
-        tags = tags_str.split(",") if tags_str else []
-        raw_peaks = song_row["waveform_peaks"] if "waveform_peaks" in song_row.keys() else None
-
-        songs.append(
-            SongResponse(
-                id=song_row["id"],
-                title=song_row["title"],
-                artist=song_row["artist"],
-                album=song_row["album"],
-                artists=_safe_json_loads(song_row["artists"]),
-                featured_artists=_safe_json_loads(song_row["featured_artists"]),
-                duration=song_row["duration"],
-                file_path=song_row["file_path"],
-                file_format=song_row["file_format"] if "file_format" in song_row.keys() else None,
-                album_art_path=(song_row["album_art_path"] or None) if "album_art_path" in song_row.keys() else None,
-                source=song_row["source"],
-                tags=tags,
-                playlists=[],
-                created_at="",
-                updated_at="",
-                start_time_ms=song_row["start_time_ms"],
-                end_time_ms=song_row["end_time_ms"],
-                position=song_row["position"],
-                waveform_peaks=_safe_json_loads(raw_peaks),
-                dominant_color=song_row["dominant_color"] if "dominant_color" in song_row.keys() else None,
-                dominant_color_2=song_row["dominant_color_2"] if "dominant_color_2" in song_row.keys() else None,
-                replaygain_track_gain=song_row["replaygain_track_gain"] if "replaygain_track_gain" in song_row.keys() else None,
-                replaygain_track_peak=song_row["replaygain_track_peak"] if "replaygain_track_peak" in song_row.keys() else None,
-                replaygain_album_gain=song_row["replaygain_album_gain"] if "replaygain_album_gain" in song_row.keys() else None,
-                replaygain_album_peak=song_row["replaygain_album_peak"] if "replaygain_album_peak" in song_row.keys() else None,
-            )
-        )
+    # Build songs list
+    songs = [song_row_to_dict(r, include_peaks=False) for r in song_rows]
 
     # Calculate song_count
     song_count = len(songs)
@@ -741,42 +639,8 @@ def add_song_to_playlist(playlist_id: int, song_add: PlaylistSongAdd):
         cursor.execute(query, (playlist_id,))
         song_rows = cursor.fetchall()
 
-    # Build songs list with tags parsed from GROUP_CONCAT
-    songs = []
-    for song_row in song_rows:
-        tags_str = song_row["tags"]
-        tags = tags_str.split(",") if tags_str else []
-        raw_peaks = song_row["waveform_peaks"] if "waveform_peaks" in song_row.keys() else None
-
-        songs.append(
-            SongResponse(
-                id=song_row["id"],
-                title=song_row["title"],
-                artist=song_row["artist"],
-                album=song_row["album"],
-                artists=_safe_json_loads(song_row["artists"]),
-                featured_artists=_safe_json_loads(song_row["featured_artists"]),
-                duration=song_row["duration"],
-                file_path=song_row["file_path"],
-                file_format=song_row["file_format"] if "file_format" in song_row.keys() else None,
-                album_art_path=(song_row["album_art_path"] or None) if "album_art_path" in song_row.keys() else None,
-                source=song_row["source"],
-                tags=tags,
-                playlists=[],
-                created_at="",
-                updated_at="",
-                start_time_ms=song_row["start_time_ms"],
-                end_time_ms=song_row["end_time_ms"],
-                position=song_row["position"],
-                waveform_peaks=_safe_json_loads(raw_peaks),
-                dominant_color=song_row["dominant_color"] if "dominant_color" in song_row.keys() else None,
-                dominant_color_2=song_row["dominant_color_2"] if "dominant_color_2" in song_row.keys() else None,
-                replaygain_track_gain=song_row["replaygain_track_gain"] if "replaygain_track_gain" in song_row.keys() else None,
-                replaygain_track_peak=song_row["replaygain_track_peak"] if "replaygain_track_peak" in song_row.keys() else None,
-                replaygain_album_gain=song_row["replaygain_album_gain"] if "replaygain_album_gain" in song_row.keys() else None,
-                replaygain_album_peak=song_row["replaygain_album_peak"] if "replaygain_album_peak" in song_row.keys() else None,
-            )
-        )
+    # Build songs list
+    songs = [song_row_to_dict(r, include_peaks=False) for r in song_rows]
 
     # Fetch playlist metadata
     with get_db_ctx() as conn:
@@ -869,38 +733,7 @@ def _get_playlist_songs_for_export(playlist_id: int):
         cursor.execute(query, (playlist_id,))
         song_rows = cursor.fetchall()
 
-    songs = []
-    for sr in song_rows:
-        tags_str = sr["tags"]
-        tags = tags_str.split(",") if tags_str else []
-        raw_peaks = sr["waveform_peaks"] if "waveform_peaks" in sr.keys() else None
-        songs.append(SongResponse(
-            id=sr["id"],
-            title=sr["title"],
-            artist=sr["artist"],
-            album=sr["album"],
-            artists=_safe_json_loads(sr["artists"]),
-            featured_artists=_safe_json_loads(sr["featured_artists"]),
-            duration=sr["duration"],
-            file_path=sr["file_path"],
-            file_format=sr["file_format"] if "file_format" in sr.keys() else None,
-            album_art_path=(sr["album_art_path"] or None) if "album_art_path" in sr.keys() else None,
-            source=sr["source"],
-            tags=tags,
-            playlists=[],
-            created_at="",
-            updated_at="",
-            start_time_ms=sr["start_time_ms"],
-            end_time_ms=sr["end_time_ms"],
-            position=sr["position"],
-            waveform_peaks=_safe_json_loads(raw_peaks),
-            dominant_color=sr["dominant_color"] if "dominant_color" in sr.keys() else None,
-            dominant_color_2=sr["dominant_color_2"] if "dominant_color_2" in sr.keys() else None,
-            replaygain_track_gain=sr["replaygain_track_gain"] if "replaygain_track_gain" in sr.keys() else None,
-            replaygain_track_peak=sr["replaygain_track_peak"] if "replaygain_track_peak" in sr.keys() else None,
-            replaygain_album_gain=sr["replaygain_album_gain"] if "replaygain_album_gain" in sr.keys() else None,
-            replaygain_album_peak=sr["replaygain_album_peak"] if "replaygain_album_peak" in sr.keys() else None,
-        ))
+    songs = [song_row_to_dict(r, include_peaks=False) for r in song_rows]
 
     return row, songs
 
@@ -927,15 +760,15 @@ def export_playlist(playlist_id: int, format: str = Query("m3u8", regex="^(m3u|m
             },
             "songs": [
                 {
-                    "title": s.title,
-                    "artist": s.artist,
-                    "album": s.album,
-                    "duration": s.duration,
-                    "file_path": s.file_path,
-                    "file_format": s.file_format,
-                    "tags": s.tags,
-                    "start_time_ms": s.start_time_ms,
-                    "end_time_ms": s.end_time_ms,
+                    "title": s["title"],
+                    "artist": s["artist"],
+                    "album": s["album"],
+                    "duration": s["duration"],
+                    "file_path": s["file_path"],
+                    "file_format": s["file_format"],
+                    "tags": s["tags"],
+                    "start_time_ms": s["start_time_ms"],
+                    "end_time_ms": s["end_time_ms"],
                 }
                 for s in songs
             ],
@@ -956,11 +789,11 @@ def export_playlist(playlist_id: int, format: str = Query("m3u8", regex="^(m3u|m
         # M3U8 explicitly declares UTF-8 (though we always emit UTF-8)
         lines[0] = "#EXTM3U"
     for s in songs:
-        duration_sec = s.duration if s.duration else -1
-        artist_title = f"{s.artist} - {s.title}" if s.artist else s.title
+        duration_sec = s["duration"] if s["duration"] else -1
+        artist_title = f"{s['artist']} - {s['title']}" if s["artist"] else s["title"]
         lines.append(f"#EXTINF:{duration_sec},{artist_title}")
         # Use forward slashes for cross-platform compatibility
-        file_path = (s.file_path or "").replace("\\", "/")
+        file_path = (s["file_path"] or "").replace("\\", "/")
         lines.append(file_path)
 
     content = "\n".join(lines) + "\n"

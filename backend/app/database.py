@@ -93,6 +93,7 @@ CREATE INDEX IF NOT EXISTS idx_playlist_songs_playlist ON playlist_songs(playlis
 CREATE INDEX IF NOT EXISTS idx_playlist_songs_song     ON playlist_songs(song_id);
 CREATE INDEX IF NOT EXISTS idx_song_tags_song          ON song_tags(song_id);
 CREATE INDEX IF NOT EXISTS idx_song_tags_tag           ON song_tags(tag_id);
+CREATE INDEX IF NOT EXISTS idx_songs_title_artist      ON songs(title, artist);
 
 CREATE TABLE IF NOT EXISTS watched_folders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -168,6 +169,10 @@ MIGRATIONS = [
         "ALTER TABLE songs ADD COLUMN featured_artists TEXT",
     ]),
     # (future migrations go here as (2, [...]), (3, [...]), etc.)
+    # Version 2: composite index for title+artist lookups
+    (2, [
+        "CREATE INDEX IF NOT EXISTS idx_songs_title_artist ON songs(title, artist)",
+    ]),
 ]
 
 CURRENT_VERSION = len(MIGRATIONS)
@@ -290,6 +295,7 @@ COUNT_SONG_QUERY = "SELECT COUNT(*) as total FROM songs s"
 PLAYLIST_SONG_SELECT_COLUMNS = """
     s.id, s.title, s.artist, s.album, s.duration,
     s.file_path, s.file_format, s.album_art_path, s.source,
+    s.bitrate, s.sample_rate, s.bit_depth, s.file_size,
     s.waveform_peaks, s.dominant_color, s.dominant_color_2,
     s.replaygain_track_gain, s.replaygain_track_peak,
     s.replaygain_album_gain, s.replaygain_album_peak,

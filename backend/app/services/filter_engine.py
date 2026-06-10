@@ -1,20 +1,10 @@
 """Filter engine for boolean tag queries."""
-import json
 import re
 import boolean
 
+from app.serializers import song_row_to_dict
 
 algebra = boolean.BooleanAlgebra()
-
-
-def _safe_json_loads(raw):
-    """Safely parse JSON, returning None on any failure."""
-    if not raw:
-        return None
-    try:
-        return json.loads(raw)
-    except (json.JSONDecodeError, TypeError):
-        return None
 
 
 def parse_query(query_string: str):
@@ -144,8 +134,8 @@ def filter_songs(db_connection, query_string: str) -> list[dict]:
             s.artists, s.featured_artists,
             s.bitrate, s.sample_rate, s.bit_depth, s.file_size,
             s.created_at, s.updated_at,
-            GROUP_CONCAT(DISTINCT t.name) AS tag_names,
-            GROUP_CONCAT(DISTINCT p.id || ':' || p.name) AS playlist_ids_names
+            GROUP_CONCAT(DISTINCT t.name) AS tags,
+            GROUP_CONCAT(DISTINCT p.id || ':' || p.name) AS playlists
         FROM songs s
         LEFT JOIN song_tags st ON s.id = st.song_id
         LEFT JOIN tags t ON st.tag_id = t.id
@@ -156,53 +146,14 @@ def filter_songs(db_connection, query_string: str) -> list[dict]:
     
     results = []
     for row in cursor.fetchall():
-        tag_set = build_tag_set(row["tag_names"], row["playlist_ids_names"])
+        tag_set = build_tag_set(row["tags"], row["playlists"])
         
         if evaluate_song(expression, quoted_tags, tag_set):
-            # Parse playlists as objects with id and name
-            playlists = []
-            if row["playlist_ids_names"]:
-                for item in row["playlist_ids_names"].split(","):
-                    if ":" in item:
-                        id_part, name_part = item.split(":", 1)
-                        playlists.append({"id": int(id_part), "name": name_part.strip()})
-            
-            # Parse waveform_peaks JSON
-            raw_peaks = row["waveform_peaks"] if "waveform_peaks" in row.keys() else None
-            waveform_peaks = _safe_json_loads(raw_peaks)
-            raw_artists = row["artists"] if "artists" in row.keys() else None
-            raw_featured = row["featured_artists"] if "featured_artists" in row.keys() else None
-            artists_list = _safe_json_loads(raw_artists)
-            featured_list = _safe_json_loads(raw_featured)
-
-            results.append({
-                "id": row["id"],
-                "title": row["title"],
-                "artist": row["artist"],
-                "album": row["album"],
-                "artists": artists_list,
-                "featured_artists": featured_list,
-                "duration": row["duration"],
-                "file_path": row["file_path"],
-                "file_format": row["file_format"] if "file_format" in row.keys() else None,
-                "album_art_path": (row["album_art_path"] or None) if "album_art_path" in row.keys() else None,
-                "source": row["source"],
-                "tags": sorted(tag_set),
-                "playlists": playlists,
-                "created_at": row["created_at"],
-                "updated_at": row["updated_at"],
-                "waveform_peaks": waveform_peaks,
-                "dominant_color": row["dominant_color"] if "dominant_color" in row.keys() else None,
-                "dominant_color_2": row["dominant_color_2"] if "dominant_color_2" in row.keys() else None,
-                "replaygain_track_gain": row["replaygain_track_gain"] if "replaygain_track_gain" in row.keys() else None,
-                "replaygain_track_peak": row["replaygain_track_peak"] if "replaygain_track_peak" in row.keys() else None,
-                "replaygain_album_gain": row["replaygain_album_gain"] if "replaygain_album_gain" in row.keys() else None,
-                "replaygain_album_peak": row["replaygain_album_peak"] if "replaygain_album_peak" in row.keys() else None,
-                "bitrate": row["bitrate"] if "bitrate" in row.keys() else None,
-                "sample_rate": row["sample_rate"] if "sample_rate" in row.keys() else None,
-                "bit_depth": row["bit_depth"] if "bit_depth" in row.keys() else None,
-                "file_size": row["file_size"] if "file_size" in row.keys() else None,
-            })
+            song_dict = song_row_to_dict(row, include_peaks=False)
+            # Filter engine returns tags as sorted set (for boolean evaluation),
+            # not the deduplicated list from the serializer
+            song_dict["tags"] = sorted(tag_set)
+            results.append(song_dict)
     
     # Sort by title
     results.sort(key=lambda s: s["title"].lower())
