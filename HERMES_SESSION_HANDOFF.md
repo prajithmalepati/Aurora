@@ -1,6 +1,23 @@
 # HERMES_SESSION_HANDOFF.md
 
-**Sessions 8 + 9 + 10 + Gate 0 complete (2026-06-10, Fable 5). Phase 0 APPROVED — see `GATE0_REVIEW.md`.**
+**Sessions 8 + 9 + 10 + Gate 0 complete (2026-06-10, Fable 5). Phase 0 APPROVED — see `GATE0_REVIEW.md`. PR #2 open. Post-gate listening pass found real bugs; status below.**
+
+## Post-Gate listening-pass bugs (2026-06-10 evening, Fable 5)
+
+**Fixed + measured (commits `a395939`, `defa340`, `1bfffd8` on `hermes/phase0-s10`):**
+1. Double-advance after natural-end crossfade — outgoing engine's `end` handler stayed bound; its true end always lands mid-fade → spurious `next()` ~fade-duration into every following song. Fix: detach all outgoing-engine handlers at handoff. Verified by sampling real `<audio>` elements (Audio-constructor intercept — Howler html5 nodes are DOM-detached).
+2. Repeat-one dead with crossfade on — early trigger called `next()` unconditionally. Fix: trigger skipped on repeat-one; end handler loops (respects trim start). Verified.
+3. "Awkward fade" — measured equal-power AND linear shapes are mathematically clean; perceived weirdness was bug 1's chained double-fade.
+
+**OPEN — silent playback after natural end (unreproduced).** User heard silence; debug logs showed transition `to:5` with `prevPlaying:false` (= early trigger never fired; song reached absolute end or prior playback was already dead), then a manual-next with `prevPlaying:true` (silent engine WAS "playing"). NOT reproduced in 6 headless configs (equalpower/linear, 3s/5s, trigger path, end path, real autoplay policy, 2 consecutive ends — all clean). Diagnostics now in place, gated by `localStorage.setItem("aurora-debug-audio","1")`: per-transition state + 5s heartbeat (pos/vol/playing). Next occurrence → console screenshot gives the verdict: pos advancing + vol 0.7 + silent ⇒ output-path issue; pos frozen ⇒ blocked play; vol 0 ⇒ fade-state bug.
+
+**Hermes N1 (overnight polish) DONE:** `hermes/phase1-polish`, 6 commits (`98dca53`…`6402429`) — virtualizer key, disabled opacity, press states, transition-all sweep (21 sites), playlist-delete rollback, border tokens. N1.1 (queue badge 8px) reported stale — needs Fable verification. Branch pushed, NOT reviewed yet, NOT in any PR.
+
+## Next session (Fable 5) — agenda
+1. Audio silence: read user's debug-console output (heartbeat + transition lines), identify which of the 3 verdicts, fix at root. Repro tooling ready: `/tmp/aurora-{xfade,double-end,linear,endpath,repeat,manualnext}-repro.mjs` (Audio-intercept + volume sampling pattern).
+2. Review `hermes/phase1-polish` diff (MiMo already passed it, Fable gate needed): verify N1.1 staleness, check the 21-site transition property lists against actual hover/active classes, then merge into `hermes/phase0-s10` so PR #2 stays the single Phase-0 PR.
+3. Finish listening pass: overlap curve, gapless (crossfade off), ReplayGain (NOTE: library currently has ZERO RG metadata — scanner may not extract it; check `file_scanner.py` before blaming playback), repeat-all wrap, pause mid-fade, trimmed song.
+4. PR #2 merge once listening pass clean → then Phase 1 per STRATEGIC_PLAN.
 
 ## Gate 0 outcome
 - All checklist items pass (details in `GATE0_REVIEW.md`). One review-found bug fixed in-session: watcher deletions never invalidated caches (`d076a3d`).
