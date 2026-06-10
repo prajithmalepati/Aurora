@@ -411,15 +411,20 @@ export function useAudioPlayer() {
       if (crossfadeIn) {
         // crossfadeIn guarantees prev is non-null (derived from prev?.isPlaying())
         const outgoing = prev!
-        engine.setVolume(0)
-        engine.play()
-
         const fadeDurationMs = duration * 1000
         const targetVol = resolveVolume()
+
+        // Howler trap: on an already-loaded engine (promoted preload), play()
+        // holds _playLock until the html5 play() promise resolves. volume()/
+        // fade() calls made during the lock are pushed onto Howler's action
+        // queue with no event that ever releases them — the song plays at
+        // volume 0 forever. So: set volume BEFORE play(), and start fades on
+        // the engine's play event (emitted after the lock clears).
 
         if (curve === 'overlap') {
           // Overlap: play both at full volume, then cut old one after duration
           engine.setVolume(targetVol)
+          engine.play()
           usePlayerStore.getState().setCrossfading(true, prevTitleRef.current ?? undefined)
           setTimeout(() => {
             outgoing.stop()
@@ -427,6 +432,8 @@ export function useAudioPlayer() {
             usePlayerStore.getState().setCrossfading(false)
           }, fadeDurationMs)
         } else if (curve === 'equalpower') {
+          engine.setVolume(0)
+          engine.play()
           // Equal Power: cosine curve for constant-power transition
           const prevVol = outgoing.getVolume()
           const startTime = performance.now()
@@ -450,9 +457,16 @@ export function useAudioPlayer() {
           }, 33) // ~30fps
           xfadeIntervalRef.current = equalPowerInterval as unknown as number
         } else {
-          // Linear: engine-native fade
+          // Linear: engine-native fade, deferred to the play event (see Howler
+          // trap note above — fade() during _playLock is silently dropped)
+          engine.setVolume(0)
+          const startFade = () => {
+            engine.off("play", startFade)
+            engine.fade(0, targetVol, fadeDurationMs)
+          }
+          engine.on("play", startFade)
+          engine.play()
           usePlayerStore.getState().setCrossfading(true, prevTitleRef.current ?? undefined)
-          engine.fade(0, targetVol, fadeDurationMs)
         }
       } else {
         engine.setVolume(resolveVolume())
