@@ -315,7 +315,13 @@ def delete_song_from_playlist(playlist_id: int, song_id: int):
         if not song_row:
             raise HTTPException(status_code=404, detail="Song not found")
         
-        # Verify song is in the playlist
+        # Start explicit transaction so DELETE + position recompaction
+        # are atomic. Python 3.11's default autocommit mode would
+        # otherwise persist the DELETE immediately.
+        conn.execute("BEGIN IMMEDIATE")
+
+        # Verify song is in the playlist (inside the transaction to
+        # prevent a TOCTOU race on position reads) and get its position
         cursor.execute(
             "SELECT id, position FROM playlist_songs WHERE playlist_id = ? AND song_id = ?",
             (playlist_id, song_id),
