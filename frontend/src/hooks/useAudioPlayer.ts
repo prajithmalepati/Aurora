@@ -134,9 +134,10 @@ export function useAudioPlayer() {
             return
           }
 
-          // Crossfade early trigger — fires at crossfadeDuration seconds before end
+          // Crossfade early trigger — fires at crossfadeDuration seconds before end.
+          // Skipped on repeat-one: the song must loop via the end handler, not advance.
           const { enabled: xEnabled, duration: xDuration } = resolveXfade()
-          if (xEnabled) {
+          if (xEnabled && usePlayerStore.getState().repeatMode !== "one") {
             const engineDuration = engineRef.current.duration()
             if (engineDuration > 0) {
               const triggerPoint = Math.max(0, engineDuration - xDuration)
@@ -168,11 +169,12 @@ export function useAudioPlayer() {
         window.clearTimeout(intervalRef.current)
         intervalRef.current = null
       }
-      const { repeatMode } = usePlayerStore.getState()
+      const { repeatMode, currentSong: song } = usePlayerStore.getState()
       if (repeatMode === "one") {
-        engine.seek(0)
+        const startSec = (song?.start_time_ms ?? 0) / 1000
+        engine.seek(startSec)
         engine.play()
-        updateSeek(0)
+        updateSeek(startSec)
       } else {
         next()
       }
@@ -297,6 +299,17 @@ export function useAudioPlayer() {
     // The previous effect's cleanup deposited the outgoing engine here
     const prev = prevEngineRef.current
     prevEngineRef.current = null
+
+    // Neutralize the outgoing engine's handlers. Its natural `end` arrives
+    // DURING the crossfade (trigger fires at duration - fade, so real end lands
+    // ~fade-duration later, before fade-complete stop()) — if the handler stays
+    // bound it calls next() a second time and yanks the incoming song away
+    // mid-fade. Same for stale buffering/error handlers.
+    if (prev) {
+      for (const ev of ["buffering", "play", "pause", "end", "load", "loaderror", "playerror"] as const) {
+        prev.off(ev)
+      }
+    }
 
     // Drain stale engines from rapid transitions — but never the deposited prev:
     // stopping it here would make prev.isPlaying() read false below and kill every
