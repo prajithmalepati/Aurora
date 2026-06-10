@@ -5,6 +5,7 @@ import { useSettingsStore } from "@/stores/settingsStore"
 import type { CrossfadeCurve } from "@/stores/settingsStore"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { toast } from "@/lib/toast"
+import { getBaseUrl } from "@/lib/api"
 
 export function useAudioPlayer() {
   const howlRef = useRef<Howl | null>(null)
@@ -238,7 +239,7 @@ export function useAudioPlayer() {
     const preExt = nextSong.file_path.split('.').pop()?.toLowerCase()
     nextHowlRef.current = {
       howl: new Howl({
-        src: `http://localhost:8000/api/songs/${preId}/stream`,
+        src: `${getBaseUrl()}/api/songs/${preId}/stream`,
         format: preExt ? [preExt] : undefined,
         html5: true,
         preload: true,
@@ -341,7 +342,7 @@ export function useAudioPlayer() {
 
       const ext = currentSong.file_path?.split('.').pop()?.toLowerCase()
       howl = new Howl({
-        src: `http://localhost:8000/api/songs/${songId}/stream`,
+        src: `${getBaseUrl()}/api/songs/${songId}/stream`,
         format: ext ? [ext] : undefined,
         html5: true,
         preload: true,
