@@ -1,80 +1,68 @@
 # HERMES_SESSION_HANDOFF.md
 
-**Session 6 complete (2026-06-09). Next: Session 7.**
+**Session 8 complete (2026-06-09, Fable 5). Next: Session 9 (Fable 5 — Aurora seek bar).**
 
 ## Git state
-Branch: `hermes/phase0-s6` (1 commit ahead of `hermes/phase0-s5`)
+Branch: `hermes/phase0-s8` (4 commits ahead of `hermes/phase0-s7`)
 
 ```
-5accc81 perf(frontend): virtualize SongTable with @tanstack/react-virtual, enable infinite scroll
+c381637 refactor(frontend): extract PlaybackEngine interface, useAudioPlayer talks to HowlerEngine
+e7b0088 fix(backend): correct legacy data-dir migration paths off by one level
+d6e35e1 fix(audio): stale-howl drain no longer kills the crossfade prev handoff
+bc1fe4a refactor(frontend): extract Howler private-API access to howlerCompat.ts   <- S7 (a)
 ```
 
-S5 commit (base of this branch):
-```
-3946bac test(backend): add golden parity pytest+httpx suite with 85 fixtures
+Note: S7 ended without a handoff commit. S7 verified complete during S8 startup: (a) `howlerCompat.ts` committed, (b) single-transaction playlist delete at `playlists.py:318`, (c) watcher dir-mtime guard in `file_watcher.py` — all present on `hermes/phase0-s7`.
+
+## What Session 8 delivered
+
+### 1. The PlaybackEngine keystone (task 0.8)
+- **`frontend/src/types/playback.ts`** (new) — the contract: `load(PlaybackSource) / play / pause / stop / unload / seek / position / duration / setVolume / getVolume / fade / isPlaying / isLoaded / resetToStart / on / off`. Event model: `play, pause, end, load(duration), loaderror, playerror, buffering(boolean)` — buffering included per spec for Phase-2 addon streams. One engine instance = one voice; crossfade/gapless = orchestrator holding multiple instances.
+- **`frontend/src/lib/engines/howlerEngine.ts`** (new) — `HowlerEngine` implements the interface over one Howl (`html5: true` preserved). Exports `createPlaybackEngine()` (the single swap point) and `unlockAudioOutput()`. Buffering semantics: coarse (`true` at load start, `false` at first play or terminal error) — HTML5 audio has no mid-track stall signal; documented in file header.
+- **`frontend/src/hooks/useAudioPlayer.ts`** — pure orchestration now: zero Howler imports, all engine calls through the interface. All logic preserved 1:1 — gapless preload+promotion, 3 crossfade curves, ReplayGain, trim enforcement, repeat/shuffle, error auto-advance, 250ms tick.
+- Howler containment verified: `grep` shows Howler referenced only in `howlerCompat.ts`, `howlerEngine.ts`, and an AboutView credits string.
+
+### 2. Crossfade regression fix (pre-existing, found during S8 read-through)
+`188415f` (June 6) introduced a stale-Howl drain at the TOP of the song-change effect, but effect cleanup deposits the outgoing Howl into both `prevHowlRef` AND `staleHowlsRef`. The drain stopped+unloaded the outgoing Howl before `prev.playing()` was read → `crossfadeIn` always false → **crossfade dead and gapless overlap reduced to a hard cut since June 6**. Fix (`d6e35e1`): read `prev` first, drain skips it, prev stays tracked as `[prev]` for the next drain (rapid-transition leak protection intact). S7's "crossfade matrix passes" claim was not a real verification — audio matrices need human ears.
+
+### 3. Data-dir migration fix (S2 defect, found during S8 smoke test)
+`main.py` `_migrate_to_data_dir()` had `old_root = Path(__file__).parent.parent.parent` → resolves to repo root, not `backend/`. All three legacy paths (DB, album-art, playlist-images) missed; migration silently no-op'd; first boot created a FRESH EMPTY DB in `~/.local/share/Aurora/`. Fixed (`e7b0088`): two parents, not three. S2's "existing DB/images migrated" verification was never actually run (S6 handoff even noted "backend hasn't been started since paths.py was added").
+
+## ⚠️ ACTION REQUIRED (human, this machine)
+`~/.local/share/Aurora/aurora.db` is an **empty** DB created 2026-06-09 22:09 by the broken migration boot. It BLOCKS the (now fixed) migration via the `not DB_PATH.exists()` guard. The real 352-song DB is still safe at `backend/aurora.db`.
+
+```bash
+rm ~/.local/share/Aurora/aurora.db   # it has 0 songs — verified
+# then start the backend once; it will migrate backend/aurora.db + album-art + playlist images
 ```
 
-All verifications passed:
-- `npm run build` clean (291ms, 327KB) ✓
+(Fable was permission-blocked from removing it — correctly so.)
+Same check applies to the MAIN LAPTOP before/after pulling these commits: if it ever booted the broken code, the same empty-DB trap exists there.
+
+## Verification run
+- `npm run build` clean ✓ (after each commit)
 - `pytest` 120/120 passed ✓
-- API pagination tested: 1052 songs, all reachable via limit/offset ✓
-- MiMo diff review: PASS WITH CHANGES — 2 CRITICAL fixed (fetchSongs offset reset, fetchMore fetchId guard), 4 MINOR documented ✓
+- Headless-browser smoke test (Playwright + real 352-song DB copy via `AURORA_DATA_DIR` scratch dir): play via dblclick → position advances; Next → new song plays (exercises prev-engine handoff); pause → frozen; resume → advances; Previous → restart. **5/5 PASS, zero console errors** ✓
+- Migration path resolution verified against real files (old_db/old_art found) ✓
+- NOT verified (needs ears, next time the human is at this machine): 3 crossfade curves + gapless audio quality. The crossfade fix makes this matrix meaningful again — before it, crossfade literally never triggered.
 
-## What Session 6 delivered
+## Quirks found during S8
+- Default headless viewport hides the desktop PlayerBar variant — there are two `aria-label="Next"` buttons (mobile + desktop); Playwright needs `visible=true` filters.
+- App default view is Mix, not All Songs — smoke scripts must navigate first.
+- Backend `/api/songs/` (trailing slash) → 307 redirect; use `/api/songs?...`.
+- Hermes DB has 0 tags (user's tags presumably live on the main laptop DB) — Mix view filter testing needs tags created first.
 
-### SongTable virtualization + infinite scroll
-
-- **`frontend/src/stores/songStore.ts`** — Pagination support:
-  - `PAGE_SIZE = 100`, `totalCount`, `hasMore`, `offset` state
-  - `fetchSongs(search?)` — always resets offset to 0, uses `limit=100&offset=0`
-  - `fetchMore()` — appends next page, stale-response guard via `fetchId` pattern
-  - `sortSongs/createSong/updateSong/deleteSong/assignTags/removeTag` — all reset pagination before refetch
-  - Removed hardcoded `limit: "500"`
-
-- **`frontend/src/components/songs/SongTable.tsx`** — Virtualized table:
-  - `useVirtualizer` from `@tanstack/react-virtual` v3.14.2
-  - **Spacer-based approach** — top/bottom spacers maintain total scroll height, visible `<tr>` rows render in between. Keeps full table semantics, zero changes to SongRow.
-  - Container: `h-[calc(100vh-15rem)] overflow-auto`
-  - `ROW_HEIGHT = 64`, `OVERSCAN = 10`
-  - **Infinite scroll**: `onScroll` handler triggers `fetchMore()` when within 300px of bottom
-  - **Selection preservation**: only clears when first song ID changes (replacement), not on append
-  - **Footer**: sticky "Showing N of M" with "Load more" button
-  - **Loading**: full skeleton only when `songs.length===0`; spinner row when appending
-  - `animIndex` capped at 16 for stagger animation performance
-  - All existing features preserved: selection (shift-range), context menu, sort, bulk actions (play/queue/playlist/tag), search
-
-- **`frontend/package.json`** — Added `@tanstack/react-virtual` dependency
-
-### Architecture decisions
-- **Spacer-based virtualization** — renders actual `<tr>` elements inside `<tbody>` with top/bottom spacer rows for scroll height. Chosen over absolute positioning (incompatible with table-row display) and div-based rewrite (would require touching SongRow).
-- **Fixed container height** (`100vh - 15rem`) — accounts for AppShell chrome, search bar, player bar, and padding. Simpler than restructuring the flex layout chain.
-- **fetchId pattern** — applied to both `fetchSongs` and `fetchMore` to prevent late-arriving responses from corrupting state after a mutation.
-
-### MiMo review findings
-
-| Severity | Issue | Status |
-|----------|-------|--------|
-| CRITICAL | `fetchSongs` used stale `offset` — search/external callers would fetch wrong page | Fixed: always resets offset to 0 |
-| CRITICAL | `fetchMore` lacked `fetchId` guard — race with mutation-triggered `fetchSongs` | Fixed: added fetchId pattern |
-| MINOR | `BulkTagDialog` bypasses store's `assignTags` | Documented, low-impact |
-| MINOR | `hasMore` fallback uses pre-append count | Fixed: fallback now uses `state.songs.length + res.data.length` |
-| MINOR | Sticky footer may overlap last row | Documented, layout-only |
-| MINOR | `offset` state inconsistency after `fetchMore` | Harmless after CRITICAL fix #1 |
-
-## Quirks found during S6
-- **LSP diagnostics can be stale** — after rapid sequential patches, LSP shows errors from pre-patch state. Always trust `npm run build` over LSP diagnostics.
-- **DB at old location** — `aurora.db` still at `backend/aurora.db` (not migrated to `platformdirs`). Migration code exists but backend hasn't been started since `paths.py` was added.
-- **Virtualizer scroll height flickers** — during rapid scroll, the bottom spacer height recalculation can cause a slight repaint. Acceptable; Rust port replaces this in Phase 2.
+## Known latent issue (not fixed, document for Gate 0)
+During a crossfade, the outgoing engine's `end` handler is still bound; if the fade timer and natural song end race, `next()` could fire twice (double-skip). Pre-existing behavior, preserved by the zero-behavior-change mandate. Worth a guard when the engine work continues (Phase 2/4).
 
 ## For the next session
-- Start on branch `hermes/phase0-s6` (or merge to main first)
-- Read CLAUDE.md, then HERMES_KICKOFF.md, then this handoff
-- Execute Session 7 (S7) exactly as written: Containment + backend residue
-- Do NOT start Session 8 in the same context — start fresh for each session
+- Start on `hermes/phase0-s8`
+- Read CLAUDE.md, HERMES_KICKOFF.md §S9, then this handoff
+- S9 = Aurora seek bar redesign (`SeekScrubber.tsx`, `index.css`) — full spec in kickoff §S9. **Fable 5 only.**
+- Then S10 (live design audit), then Gate 0 review (cumulative diff of s1→s8 + DESIGN_QA punch list), then PR → human merge.
 
 ## Sessions reserved for Fable 5 only
-- S8 (PlaybackEngine contract)
-- S9 (seek bar design)
+- S9 (seek bar design) — NEXT
 - S10 (design audit)
 - Gate 0 review
 
