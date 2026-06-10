@@ -15,7 +15,8 @@ logger = logging.getLogger(__name__)
 
 def _migrate_to_data_dir() -> None:
     """One-time migration: move DB, album art, and playlist images into DATA_DIR."""
-    old_root = Path(__file__).parent.parent.parent  # backend/
+    # __file__ is backend/app/main.py → two parents up is backend/
+    old_root = Path(__file__).parent.parent  # backend/
 
     # Ensure data directory tree exists
     DATA_DIR.mkdir(parents=True, exist_ok=True)
