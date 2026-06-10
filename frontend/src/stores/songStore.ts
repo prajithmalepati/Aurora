@@ -17,6 +17,8 @@ type View =
 
 type SortField = "title" | "artist" | "album" | "duration" | "created_at"
 
+const PAGE_SIZE = 100
+
 interface SongState {
   songs: Song[]
   loading: boolean
@@ -24,8 +26,12 @@ interface SongState {
   view: View
   sortField: SortField
   sortOrder: "asc" | "desc"
+  totalCount: number
+  hasMore: boolean
+  offset: number
 
   fetchSongs: (search?: string) => Promise<void>
+  fetchMore: () => Promise<void>
   sortSongs: (field: SortField, order: "asc" | "desc") => Promise<void>
   createSong: (data: {
     title: string
@@ -56,19 +62,58 @@ export const useSongStore = create<SongState>((set, get) => ({
   view: { kind: "filter" },
   sortField: "title",
   sortOrder: "asc",
+  totalCount: 0,
+  hasMore: false,
+  offset: 0,
 
   fetchSongs: async (search) => {
     const myId = ++fetchId
-    set({ loading: true, error: null })
+    set({ loading: true, error: null, offset: 0 })
     try {
       const { sortField, sortOrder } = get()
-      const params = new URLSearchParams({ limit: "500" })
+      const params = new URLSearchParams({
+        limit: String(PAGE_SIZE),
+        offset: "0",
+      })
       if (search) params.set("search", search)
       params.set("sort", sortField)
       params.set("order", sortOrder)
       const res = await api.get<ApiResponse<Song[]>>(`/songs?${params.toString()}`)
       if (myId !== fetchId) return // stale response, discard
-      set({ songs: res.data, loading: false })
+      set({
+        songs: res.data,
+        loading: false,
+        totalCount: res.meta?.total ?? res.data.length,
+        hasMore: PAGE_SIZE < (res.meta?.total ?? res.data.length),
+        offset: 0,
+      })
+    } catch (e: any) {
+      if (myId !== fetchId) return
+      set({ error: e.message, loading: false })
+    }
+  },
+
+  fetchMore: async () => {
+    const { sortField, sortOrder, songs, totalCount, loading } = get()
+    if (loading || songs.length >= totalCount) return
+    const myId = ++fetchId
+    const newOffset = songs.length
+    set({ offset: newOffset, loading: true })
+    try {
+      const params = new URLSearchParams({
+        limit: String(PAGE_SIZE),
+        offset: String(newOffset),
+      })
+      params.set("sort", sortField)
+      params.set("order", sortOrder)
+      const res = await api.get<ApiResponse<Song[]>>(`/songs?${params.toString()}`)
+      if (myId !== fetchId) return
+      set((state) => ({
+        songs: [...state.songs, ...res.data],
+        loading: false,
+        totalCount: res.meta?.total ?? state.songs.length + res.data.length,
+        hasMore: (newOffset + PAGE_SIZE) < (res.meta?.total ?? state.songs.length + res.data.length),
+      }))
     } catch (e: any) {
       if (myId !== fetchId) return
       set({ error: e.message, loading: false })
@@ -76,13 +121,15 @@ export const useSongStore = create<SongState>((set, get) => ({
   },
 
   sortSongs: async (field, order) => {
-    set({ sortField: field, sortOrder: order })
+    set({ sortField: field, sortOrder: order, offset: 0, songs: [], totalCount: 0, hasMore: false })
     await get().fetchSongs()
   },
 
   createSong: async (data) => {
     try {
       await api.post("/songs", data)
+      // Reset and refetch — new song could be anywhere
+      set({ offset: 0, songs: [], totalCount: 0, hasMore: false })
       await get().fetchSongs()
       toast.success("Song added")
     } catch (e: any) {
@@ -95,6 +142,8 @@ export const useSongStore = create<SongState>((set, get) => ({
   updateSong: async (id, data) => {
     try {
       await api.put(`/songs/${id}`, data)
+      // Reset and refetch — updated song could move in sort order
+      set({ offset: 0, songs: [], totalCount: 0, hasMore: false })
       await get().fetchSongs()
       toast.success("Song updated")
     } catch (e: any) {
@@ -116,6 +165,8 @@ export const useSongStore = create<SongState>((set, get) => ({
           playerState.stop()
         }
       }
+      // Reset and refetch — total count changed
+      set({ offset: 0, songs: [], totalCount: 0, hasMore: false })
       await get().fetchSongs()
       toast.success("Song deleted")
     } catch (e: any) {
@@ -129,6 +180,8 @@ export const useSongStore = create<SongState>((set, get) => ({
     try {
       await api.post(`/songs/${songId}/tags`, { tag_names: tagNames })
       if (!options?.skipRefetch) {
+        // Reset and refetch — tags affect sort/filter visibility
+        set({ offset: 0, songs: [], totalCount: 0, hasMore: false })
         await get().fetchSongs()
         const filterState = useFilterStore.getState()
         if (filterState.query.trim()) await filterState.executeFilter()
@@ -143,6 +196,7 @@ export const useSongStore = create<SongState>((set, get) => ({
   removeTag: async (songId, tagId) => {
     try {
       await api.delete(`/songs/${songId}/tags/${tagId}`)
+      set({ offset: 0, songs: [], totalCount: 0, hasMore: false })
       await get().fetchSongs()
       const filterState = useFilterStore.getState()
       if (filterState.query.trim()) await filterState.executeFilter()
@@ -172,6 +226,7 @@ export const useSongStore = create<SongState>((set, get) => ({
     }
     try {
       await api.delete(`/songs/${songId}/tags/${matchingTag.id}`)
+      set({ offset: 0, songs: [], totalCount: 0, hasMore: false })
       await get().fetchSongs()
       const filterState = useFilterStore.getState()
       if (filterState.query.trim()) await filterState.executeFilter()
