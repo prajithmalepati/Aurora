@@ -1,0 +1,32 @@
+{
+  "data": [
+    {
+      "album_artist": "Deep Purple",
+      "album_name": "Machine Head",
+      "cover_art_path": "abc123def456.jpg",
+      "dominant_color": "#E63946",
+      "song_count": 1,
+      "total_duration": 367
+    },
+    {
+      "album_artist": "TK from Ling Tosite Sigure",
+      "album_name": "Tokyo Ghoul OST",
+      "cover_art_path": null,
+      "dominant_color": "#2A9D8F",
+      "song_count": 1,
+      "total_duration": 240
+    },
+    {
+      "album_artist": "LoFi Girl",
+      "album_name": "Unknown Album",
+      "cover_art_path": null,
+      "dominant_color": null,
+      "song_count": 1,
+      "total_duration": 180
+    }
+  ],
+  "message": "ok",
+  "meta": {
+    "total": 3
+  }
+}

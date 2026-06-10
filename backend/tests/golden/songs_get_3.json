@@ -1,0 +1,55 @@
+{
+  "data": {
+    "album": "Tokyo Ghoul OST",
+    "album_art_path": null,
+    "artist": "TK from Ling Tosite Sigure",
+    "artists": [
+      "TK from Ling Tosite Sigure"
+    ],
+    "bit_depth": 16,
+    "bitrate": 256000,
+    "created_at": "2025-06-01T12:00:00Z",
+    "dominant_color": "#2A9D8F",
+    "dominant_color_2": "#E9C46A",
+    "duration": 240,
+    "end_time_ms": 0,
+    "featured_artists": [],
+    "file_format": "mp3",
+    "file_path": "/music/anime/TK - Unravel.mp3",
+    "file_size": 4801234,
+    "id": 3,
+    "playlists": [
+      {
+        "id": 3,
+        "name": "Anime"
+      }
+    ],
+    "position": null,
+    "replaygain_album_gain": -5.5,
+    "replaygain_album_peak": 0.92,
+    "replaygain_track_gain": -6.0,
+    "replaygain_track_peak": 0.88,
+    "sample_rate": 44100,
+    "source": "local_scan",
+    "start_time_ms": 0,
+    "tags": [
+      "anime",
+      "opening"
+    ],
+    "title": "Unravel",
+    "updated_at": "2025-06-01T12:00:00Z",
+    "waveform_peaks": [
+      0.05,
+      0.15,
+      0.35,
+      0.55,
+      0.8,
+      0.95,
+      0.7,
+      0.4,
+      0.2,
+      0.08
+    ]
+  },
+  "message": "ok"
+}
