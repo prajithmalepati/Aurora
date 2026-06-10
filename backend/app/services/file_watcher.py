@@ -37,6 +37,7 @@ class FileWatcher:
         self._stop_event = threading.Event()
         self._thread: threading.Thread | None = None
         self._scan_lock = threading.Lock()
+        self._last_dir_mtimes: dict[str, float] = {}
 
     # ── lifecycle ────────────────────────────────────────────────────
 
@@ -104,18 +105,41 @@ class FileWatcher:
                     logger.warning("Watched folder missing: %s", folder_path)
                     continue
 
+                # Cheap interim guard: skip the expensive import_scanned_songs
+                # when the directory's mtime hasn't changed since last poll.
+                # Adding, removing, or renaming files always bumps dir mtime on
+                # Linux filesystems (ext4/xfs/btrfs), making this a reliable
+                # signal for "nothing happened." Only applied for background
+                # polls — manual scans always run.
+                current_mtime: float | None = None
+                dir_unchanged = False
+                if folder_id is None:
+                    try:
+                        current_mtime = os.stat(folder_path).st_mtime
+                    except OSError:
+                        current_mtime = None
+                    if current_mtime is not None and current_mtime == self._last_dir_mtimes.get(folder_path):
+                        dir_unchanged = True
+
                 # Use import_scanned_songs for new/changed files
                 try:
-                    result = import_scanned_songs(conn, folder_path)
-                    total_imported += result.get("imported", 0)
-                    total_replaced += result.get("replaced", 0)
-                    total_skipped += result.get("skipped", 0)
-                    total_errors += len(result.get("errors", []))
-                    # Invalidate caches so new songs appear without waiting for TTL
-                    if result.get("imported", 0) > 0 or result.get("replaced", 0) > 0:
-                        song_cache.invalidate_prefix("songs:")
-                        tag_cache.invalidate("tags:list")
-                        folder_cache.invalidate("folders:tree")
+                    if not dir_unchanged:
+                        result = import_scanned_songs(conn, folder_path)
+                        total_imported += result.get("imported", 0)
+                        total_replaced += result.get("replaced", 0)
+                        total_skipped += result.get("skipped", 0)
+                        total_errors += len(result.get("errors", []))
+                        # Invalidate caches so new songs appear without waiting for TTL
+                        if result.get("imported", 0) > 0 or result.get("replaced", 0) > 0:
+                            song_cache.invalidate_prefix("songs:")
+                            tag_cache.invalidate("tags:list")
+                            folder_cache.invalidate("folders:tree")
+                        # Record successful scan mtime
+                        if current_mtime is not None:
+                            self._last_dir_mtimes[folder_path] = current_mtime
+                    else:
+                        result = None
+                        logger.debug("FileWatcher: skipping %s — dir mtime unchanged", folder_path)
                 except Exception:
                     logger.exception("Error scanning watched folder %s", folder_path)
                     total_errors += 1

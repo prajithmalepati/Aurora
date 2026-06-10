@@ -6,6 +6,7 @@ import type { CrossfadeCurve } from "@/stores/settingsStore"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { toast } from "@/lib/toast"
 import { getBaseUrl } from "@/lib/api"
+import { resumeAudioContext, resetAudioNodeTime } from "@/lib/howlerCompat"
 
 export function useAudioPlayer() {
   const howlRef = useRef<Howl | null>(null)
@@ -356,18 +357,12 @@ export function useAudioPlayer() {
     // This eliminates the silence gap by starting the new audio source
     // while the old one is still finishing its final samples.
     if (usePlayerStore.getState().isPlaying) {
-      const ctx: AudioContext | undefined = (window as any).Howler?.ctx
-      if (ctx?.state === 'suspended') ctx.resume().catch(() => {})
+      resumeAudioContext()
 
       // For non-crossfade gapless: reset the Audio element to start
       // so the transition is sample-precise.
       if (!crossfadeIn) {
-        try {
-          const audioNode = (howl as any)._sounds?.[0]?._node as HTMLAudioElement | undefined
-          if (audioNode) {
-            audioNode.currentTime = 0
-          }
-        } catch { /* private API access — safe to ignore */ }
+        resetAudioNodeTime(howl)
       }
 
       if (crossfadeIn) {
@@ -477,8 +472,7 @@ export function useAudioPlayer() {
     if (isPlaying) {
       // Resume AudioContext before play — must happen in the leaf effect closest to user gesture.
       // useAudioAnalyser runs later (App.tsx root) and may miss the browser's activation window.
-      const ctx: AudioContext | undefined = (window as any).Howler?.ctx
-      if (ctx?.state === 'suspended') ctx.resume().catch(() => {})
+      resumeAudioContext()
       howlRef.current.play()
       if (prevHowlRef.current && prevHowlRef.current.volume() > 0.05) {
         prevHowlRef.current.play()
