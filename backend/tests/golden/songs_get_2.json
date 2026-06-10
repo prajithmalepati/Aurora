@@ -1,0 +1,42 @@
+{
+  "data": {
+    "album": null,
+    "album_art_path": null,
+    "artist": "LoFi Girl",
+    "artists": null,
+    "bit_depth": null,
+    "bitrate": null,
+    "created_at": "2025-06-01T12:01:00Z",
+    "dominant_color": null,
+    "dominant_color_2": null,
+    "duration": 180,
+    "end_time_ms": 0,
+    "featured_artists": null,
+    "file_format": null,
+    "file_path": null,
+    "file_size": null,
+    "id": 2,
+    "playlists": [
+      {
+        "id": 2,
+        "name": "Lo-Fi Study"
+      }
+    ],
+    "position": null,
+    "replaygain_album_gain": null,
+    "replaygain_album_peak": null,
+    "replaygain_track_gain": null,
+    "replaygain_track_peak": null,
+    "sample_rate": null,
+    "source": "manual",
+    "start_time_ms": 0,
+    "tags": [
+      "slow",
+      "chill"
+    ],
+    "title": "Chill Vibes",
+    "updated_at": "2025-06-01T12:01:00Z",
+    "waveform_peaks": null
+  },
+  "message": "ok"
+}

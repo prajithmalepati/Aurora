@@ -1,0 +1,44 @@
+{
+  "data": [
+    {
+      "created_at": "2025-06-01T12:00:00Z",
+      "id": 5,
+      "name": "anime",
+      "song_count": 1
+    },
+    {
+      "created_at": "2025-06-01T12:01:00Z",
+      "id": 4,
+      "name": "chill",
+      "song_count": 1
+    },
+    {
+      "created_at": "2025-06-01T12:00:00Z",
+      "id": 2,
+      "name": "fast",
+      "song_count": 1
+    },
+    {
+      "created_at": "2025-06-01T12:00:00Z",
+      "id": 6,
+      "name": "opening",
+      "song_count": 1
+    },
+    {
+      "created_at": "2025-06-01T12:00:00Z",
+      "id": 1,
+      "name": "rock",
+      "song_count": 1
+    },
+    {
+      "created_at": "2025-06-01T12:01:00Z",
+      "id": 3,
+      "name": "slow",
+      "song_count": 1
+    }
+  ],
+  "message": "ok",
+  "meta": {
+    "total": 6
+  }
+}
