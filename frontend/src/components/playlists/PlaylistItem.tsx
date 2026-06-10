@@ -1,5 +1,6 @@
 import type { Playlist } from "@/types"
 import { playlistThumbnail } from "@/lib/playlistImage"
+import { getBaseUrl } from "@/lib/api"
 
 interface PlaylistItemProps {
   playlist: Playlist
@@ -8,7 +9,7 @@ interface PlaylistItemProps {
 }
 
 export function PlaylistItem({ playlist, isActive, onSelect }: PlaylistItemProps) {
-  const storedImage = playlist.image_url ?? null
+  const storedImage = playlist.image_url ? `${getBaseUrl()}${playlist.image_url}` : null
   const gradient = playlistThumbnail(playlist.name)
 
   return (
