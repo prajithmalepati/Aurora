@@ -29,6 +29,9 @@ export function useAudioPlayer() {
   const prevEngineRef = useRef<PlaybackEngine | null>(null)
   // Title of the outgoing song (for crossfade indicator)
   const prevTitleRef = useRef<string | null>(null)
+  // Outgoing engine while a crossfade is in flight — the pause/resume effect
+  // must reach it (prevEngineRef is already nulled by then)
+  const fadingOutRef = useRef<PlaybackEngine | null>(null)
   // Preloaded next song's engine — created ~5s before song end to eliminate silence gap
   const nextEngineRef = useRef<{ engine: PlaybackEngine; songId: string } | null>(null)
   // Tracks whether the preloaded engine has finished loading (fully decoded, ready to play)
@@ -334,6 +337,9 @@ export function useAudioPlayer() {
       try { stale.stop(); stale.unload() } catch {}
     }
     staleEnginesRef.current = prev ? [prev] : []
+    // Any earlier fade's outgoing engine was just drained (or finished on its
+    // own timer) — this transition sets it again if it starts a new fade.
+    fadingOutRef.current = null
 
     const { enabled, duration, curve } = resolveXfade()
     const crossfadeIn = enabled && (prev?.isPlaying() ?? false)
@@ -413,6 +419,10 @@ export function useAudioPlayer() {
         const outgoing = prev!
         const fadeDurationMs = duration * 1000
         const targetVol = resolveVolume()
+        fadingOutRef.current = outgoing
+        const fadeDone = () => {
+          if (fadingOutRef.current === outgoing) fadingOutRef.current = null
+        }
 
         // Howler trap: on an already-loaded engine (promoted preload), play()
         // holds _playLock until the html5 play() promise resolves. volume()/
@@ -422,14 +432,19 @@ export function useAudioPlayer() {
         // the engine's play event (emitted after the lock clears).
 
         if (curve === 'overlap') {
-          // Overlap: play both at full volume, then cut old one after duration
+          // Overlap: play both at full volume for the duration, then taper the
+          // old one out over 250ms — a true hard cut sounds like a glitch
           engine.setVolume(targetVol)
           engine.play()
           usePlayerStore.getState().setCrossfading(true, prevTitleRef.current ?? undefined)
           setTimeout(() => {
-            outgoing.stop()
-            outgoing.unload()
-            usePlayerStore.getState().setCrossfading(false)
+            outgoing.fade(outgoing.getVolume(), 0, 250)
+            setTimeout(() => {
+              outgoing.stop()
+              outgoing.unload()
+              fadeDone()
+              usePlayerStore.getState().setCrossfading(false)
+            }, 250)
           }, fadeDurationMs)
         } else if (curve === 'equalpower') {
           engine.setVolume(0)
@@ -452,6 +467,7 @@ export function useAudioPlayer() {
               xfadeIntervalRef.current = null
               outgoing.stop()
               outgoing.unload()
+              fadeDone()
               usePlayerStore.getState().setCrossfading(false)
             }
           }, 33) // ~30fps
@@ -493,6 +509,7 @@ export function useAudioPlayer() {
           setTimeout(() => {
             prev.stop()
             prev.unload()
+            if (fadingOutRef.current === prev) fadingOutRef.current = null
             usePlayerStore.getState().setCrossfading(false)
           }, fadeDurationMs)
         }
@@ -532,12 +549,15 @@ export function useAudioPlayer() {
       // miss the browser's activation window.
       unlockAudioOutput()
       engineRef.current.play()
-      if (prevEngineRef.current && prevEngineRef.current.getVolume() > 0.05) {
-        prevEngineRef.current.play()
+      // Resume a mid-crossfade outgoing engine only if it's still audible —
+      // pausing snaps Howler fades to their end value, so a faded-out engine
+      // reads 0 here and stays stopped
+      if (fadingOutRef.current && fadingOutRef.current.getVolume() > 0.05) {
+        fadingOutRef.current.play()
       }
     } else {
       engineRef.current.pause()
-      prevEngineRef.current?.pause()
+      fadingOutRef.current?.pause()
     }
   }, [isPlaying])
 
