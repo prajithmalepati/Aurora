@@ -35,7 +35,7 @@ export function TagList({ tags, maxVisible = 3, onRemoveTag, onTagClick }: TagLi
             e.stopPropagation()
             setExpanded(true)
           }}
-          className="aurora-chip inline-flex items-center text-[11px] font-medium tracking-wide text-[var(--aurora-text-tertiary)] px-2.5 py-[2px] rounded-full transition-[color] duration-150 hover:text-[var(--aurora-text)] cursor-pointer"
+          className="aurora-chip inline-flex items-center text-[11px] font-medium tracking-wide text-[var(--aurora-text-tertiary)] px-2.5 py-[2px] rounded-full transition-[color,background-color,border-color] duration-150 hover:text-[var(--aurora-text)] cursor-pointer"
         >
           +{remaining} more
         </button>
