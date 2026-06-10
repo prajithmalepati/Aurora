@@ -1,4 +1,14 @@
-const BASE_URL = "http://localhost:8000/api"
+export function getBaseUrl(): string {
+  if (typeof window !== "undefined" && (window as any).__AURORA_BASE_URL__) {
+    return (window as any).__AURORA_BASE_URL__ as string
+  }
+  if (import.meta.env.VITE_API_BASE_URL) {
+    return import.meta.env.VITE_API_BASE_URL as string
+  }
+  return "http://localhost:8000"
+}
+
+const BASE_URL = `${getBaseUrl()}/api`
 
 export { BASE_URL }
 

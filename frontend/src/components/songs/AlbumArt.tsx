@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react"
 import { albumGradient } from "@/lib/albumGradient"
+import { getBaseUrl } from "@/lib/api"
 
-const ALBUM_ART_BASE = "http://localhost:8000/api/album-art"
+const ALBUM_ART_BASE = `${getBaseUrl()}/api/album-art`
 
 const SIZE_CLASSES: Record<string, string> = {
   sm: "w-10 h-10",
