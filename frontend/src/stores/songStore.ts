@@ -29,6 +29,8 @@ interface SongState {
   totalCount: number
   hasMore: boolean
   offset: number
+  // Search term of the last fetchSongs call — fetchMore must page within it
+  lastSearch: string | undefined
 
   fetchSongs: (search?: string) => Promise<void>
   fetchMore: () => Promise<void>
@@ -65,10 +67,11 @@ export const useSongStore = create<SongState>((set, get) => ({
   totalCount: 0,
   hasMore: false,
   offset: 0,
+  lastSearch: undefined,
 
   fetchSongs: async (search) => {
     const myId = ++fetchId
-    set({ loading: true, error: null, offset: 0 })
+    set({ loading: true, error: null, offset: 0, lastSearch: search })
     try {
       const { sortField, sortOrder } = get()
       const params = new URLSearchParams({
@@ -94,7 +97,7 @@ export const useSongStore = create<SongState>((set, get) => ({
   },
 
   fetchMore: async () => {
-    const { sortField, sortOrder, songs, totalCount, loading } = get()
+    const { sortField, sortOrder, songs, totalCount, loading, lastSearch } = get()
     if (loading || songs.length >= totalCount) return
     const myId = ++fetchId
     const newOffset = songs.length
@@ -104,6 +107,7 @@ export const useSongStore = create<SongState>((set, get) => ({
         limit: String(PAGE_SIZE),
         offset: String(newOffset),
       })
+      if (lastSearch) params.set("search", lastSearch)
       params.set("sort", sortField)
       params.set("order", sortOrder)
       const res = await api.get<ApiResponse<Song[]>>(`/songs?${params.toString()}`)
