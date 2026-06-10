@@ -4,7 +4,7 @@ import re
 import sqlite3
 from pathlib import Path
 from fastapi import APIRouter, HTTPException, UploadFile, File, Query, Form
-from fastapi.responses import Response
+from fastapi.responses import Response, FileResponse
 
 from datetime import datetime, timezone
 
@@ -12,10 +12,7 @@ from app.database import get_db_ctx, PLAYLIST_SONG_SELECT_QUERY
 from app.routers.songs import _safe_json_loads
 from app.models import PlaylistCreate, PlaylistUpdate, PlaylistResponse, SongResponse, PlaylistSongAdd, PlaylistReorder, PlaylistSongTiming
 
-# Playlist cover images are saved into the Vite public folder so they're
-# served at /playlist-images/<id>.<ext> by the dev server (no CORS issues).
-_PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
-IMAGES_DIR = _PROJECT_ROOT / "frontend" / "public" / "playlist-images"
+from app.paths import PLAYLIST_IMAGES_DIR
 
 router = APIRouter(tags=["playlists"])
 
@@ -43,18 +40,18 @@ async def upload_playlist_image(playlist_id: int, file: UploadFile = File(...)):
             mime = file.content_type or "image/jpeg"
             ext = {"image/png": "png", "image/gif": "gif", "image/webp": "webp"}.get(mime, "jpg")
 
-            IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+            PLAYLIST_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 
             # Remove any existing image files for this playlist
-            for old in IMAGES_DIR.glob(f"{playlist_id}.*"):
+            for old in PLAYLIST_IMAGES_DIR.glob(f"{playlist_id}.*"):
                 old.unlink()
 
             filename = f"{playlist_id}.{ext}"
-            filepath = IMAGES_DIR / filename
+            filepath = PLAYLIST_IMAGES_DIR / filename
             with open(filepath, "wb") as f:
                 f.write(await file.read())
 
-            image_url = f"/playlist-images/{filename}"
+            image_url = f"/api/playlist-images/{filename}"
 
             conn.execute(
                 "UPDATE playlists SET image_url = ?, updated_at = ? WHERE id = ?",
@@ -85,7 +82,7 @@ def delete_playlist_image(playlist_id: int):
 
     if row["image_url"]:
         filename = row["image_url"].split("/")[-1]
-        file_path = IMAGES_DIR / filename
+        file_path = PLAYLIST_IMAGES_DIR / filename
         if file_path.exists():
             file_path.unlink()
 
@@ -97,6 +94,21 @@ def delete_playlist_image(playlist_id: int):
         conn.commit()
 
     return {"data": None, "message": "Image removed"}
+
+
+@router.get("/playlist-images/{filename}")
+def serve_playlist_image(filename: str):
+    """Serve a playlist cover image by filename."""
+    safe_name = Path(filename).name
+    file_path = PLAYLIST_IMAGES_DIR / safe_name
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Image not found")
+    mime = "image/png" if safe_name.endswith(".png") else "image/jpeg"
+    if safe_name.endswith(".webp"):
+        mime = "image/webp"
+    elif safe_name.endswith(".gif"):
+        mime = "image/gif"
+    return FileResponse(str(file_path), media_type=mime)
 
 
 @router.post("/playlists", status_code=201)
