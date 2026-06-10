@@ -149,6 +149,11 @@ class FileWatcher:
                 try:
                     deleted = self._mark_missing(conn, folder_path)
                     total_deleted += deleted
+                    # Invalidate caches so removed songs disappear without waiting for TTL
+                    if deleted > 0:
+                        song_cache.invalidate_prefix("songs:")
+                        tag_cache.invalidate("tags:list")
+                        folder_cache.invalidate("folders:tree")
                 except Exception:
                     logger.exception("Error checking missing files in %s", folder_path)
 
