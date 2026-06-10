@@ -35,7 +35,7 @@ export function WelcomeOverlay() {
         >
           <motion.div
             className="absolute -top-1/2 left-1/2 -translate-x-1/2 w-[800px] h-[800px] rounded-full blur-[120px]"
-            style={{ background: "radial-gradient(circle, rgba(99, 102, 241, 0.12), transparent 70%)" }}
+            style={{ background: "radial-gradient(circle, rgba(45, 212, 191, 0.12), transparent 70%)" }}
             animate={{
               scale: [1, 1.08, 1],
               opacity: [0.5, 0.65, 0.5],
@@ -62,7 +62,7 @@ export function WelcomeOverlay() {
           />
           <motion.div
             className="absolute top-1/4 -left-1/4 w-[500px] h-[500px] rounded-full blur-[90px]"
-            style={{ background: "radial-gradient(circle, rgba(59, 130, 246, 0.06), transparent 70%)" }}
+            style={{ background: "radial-gradient(circle, rgba(45, 212, 191, 0.06), transparent 70%)" }}
             animate={{
               scale: [1, 1.1, 1],
               opacity: [0.3, 0.5, 0.3],

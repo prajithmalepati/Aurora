@@ -100,7 +100,7 @@ export function QueryBuilder() {
               style={{ color: "var(--aurora-accent-interactive)" }}
               strokeWidth={2}
             />
-            <span className="font-display text-[26px] leading-none tracking-tight text-[var(--aurora-text)] truncate">
+            <span className="font-display text-[28px] leading-none tracking-tight text-[var(--aurora-text)] truncate">
               {displayTagName}
             </span>
             {!loading && results.length > 0 && (
