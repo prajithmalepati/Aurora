@@ -226,7 +226,7 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
                                 <button
                                   onClick={(e) => { e.stopPropagation(); handleMoveUp(actualIndex) }}
                                   disabled={actualIndex === 0}
-                                  className="h-4 w-5 flex items-center justify-center text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-text)] disabled:opacity-25"
+                                  className="h-4 w-5 flex items-center justify-center text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-text)] disabled:opacity-40"
                                   aria-label="Move up"
                                 >
                                   <ChevronUp className="h-3 w-3" />
@@ -234,7 +234,7 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
                                 <button
                                   onClick={(e) => { e.stopPropagation(); handleMoveDown(actualIndex) }}
                                   disabled={actualIndex === queue.length - 1}
-                                  className="h-4 w-5 flex items-center justify-center text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-text)] disabled:opacity-25"
+                                  className="h-4 w-5 flex items-center justify-center text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-text)] disabled:opacity-40"
                                   aria-label="Move down"
                                 >
                                   <ChevronDown className="h-3 w-3" />
