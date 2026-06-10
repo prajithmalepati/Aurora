@@ -42,14 +42,17 @@ Not machine-verifiable: 10-min CPU flatness, 60fps drag *feel*, trim-notch visua
 1. **Crossfade dead since June 6** (`188415f`): stale-Howl drain stopped the outgoing Howl before `prev.playing()` was read → crossfade never triggered, gapless was a hard cut. Fixed `d6e35e1`.
 2. **S2 data-dir migration never ran**: `old_root` had one `.parent` too many (pointed at repo root). Fixed `e7b0088`.
 
-## ⚠️ ACTION REQUIRED (human, this machine)
-`~/.local/share/Aurora/aurora.db` is an **empty** DB created by the broken-migration boot; it blocks the fixed migration (`not DB_PATH.exists()` guard). Real 352-song DB safe at `backend/aurora.db`.
-```bash
-rm ~/.local/share/Aurora/aurora.db   # verified 0 songs
-# next backend start migrates DB + album-art + playlist images automatically
-```
-Same check on the MAIN LAPTOP if it ever booted S2 code.
-Also: crossfade curves + gapless need a human listening pass — they were silently broken until tonight.
+## ✅ Migration completed & verified on this machine (2026-06-09 ~22:40)
+Human removed the blocking empty DB; verification boot ran the real migration:
+- `~/.local/share/Aurora/aurora.db` — 352 songs ✓ (moved from `backend/`)
+- `~/.local/share/Aurora/album-art/` — 312 files, served 200 at `/api/album-art/{file}` ✓
+- playlist-images: none ever existed (7 playlists, 0 covers in DB) — nothing to migrate
+- `backend/aurora.db` + `backend/album-art/` gone from the source tree ✓
+
+Incident during verification, resolved: the S9 dev boot used `AURORA_DATA_DIR=/tmp/aurora-s8-data` with the fixed migration code — DB move was skipped (scratch DB present) but **album art got moved into /tmp**. Recovered by copy before reboot could wipe it. Lesson: a scratch-data-dir boot still migrates art/images out of the REAL legacy locations; future scratch dirs should pre-create empty `album-art/` + `playlist-images/`… or better, only ever migrate-test on copies.
+
+**MAIN LAPTOP notes:** (1) first boot of any phase0 branch migrates its DB/art to the platformdirs location — expected; (2) booting `main` (pre-S2 code) AFTER that migration will create a fresh empty `backend/aurora.db` — don't panic, the real DB is in the data dir; merge Phase 0 soon to close this gap.
+Also: crossfade curves + gapless still need a human listening pass — broken June 6 → tonight.
 
 ## Dev/test conveniences from these sessions
 - Boot backend against a scratch copy: `AURORA_DATA_DIR=/tmp/aurora-s8-data python run.py` (dir holds a copy of the real DB).
