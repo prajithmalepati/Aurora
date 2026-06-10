@@ -120,7 +120,7 @@ export function QueryBuilder() {
             className="h-8 px-4 rounded-full text-[12px] font-semibold inline-flex items-center gap-1.5 flex-shrink-0 transition-colors duration-150 aurora-btn-press hover:text-[var(--aurora-text)]"
             style={{
               background: "var(--aurora-surface)",
-              boxShadow: "inset 0 0 0 1px var(--aurora-surface-border)",
+              boxShadow: "inset 0 0 0 1px var(--aurora-rim)",
               color: "var(--aurora-text-secondary)",
             }}
           >
@@ -172,7 +172,7 @@ export function QueryBuilder() {
             className="h-8 w-8 rounded-full flex items-center justify-center text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] transition-colors duration-150 aurora-btn-press disabled:opacity-40"
             style={{
               background: "var(--aurora-surface)",
-              boxShadow: "inset 0 0 0 1px var(--aurora-surface-border)",
+              boxShadow: "inset 0 0 0 1px var(--aurora-rim)",
             }}
           >
             <Shuffle className="h-3.5 w-3.5" />
