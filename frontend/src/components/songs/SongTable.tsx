@@ -49,7 +49,7 @@ function Checkbox({ checked, indeterminate, onChange, ariaLabel }: CheckboxProps
       aria-checked={indeterminate ? "mixed" : checked}
       aria-label={ariaLabel}
       onClick={(e) => { e.stopPropagation(); onChange() }}
-      className="h-4 w-4 rounded-[3px] flex items-center justify-center transition-all duration-150 aurora-focus"
+      className="h-4 w-4 rounded-[3px] flex items-center justify-center transition-[color,background-color,border-color,box-shadow] duration-150 aurora-focus"
       style={{
         background: checked || indeterminate ? "var(--aurora-accent-interactive)" : "transparent",
         border: checked || indeterminate ? "1.5px solid var(--aurora-accent-interactive)" : "1.5px solid var(--aurora-text-tertiary)",
@@ -537,7 +537,7 @@ export function SongTable({ songs, loading = false, error = null, onPlay, animKe
     getScrollElement: () => tableContainerRef.current,
     estimateSize: () => ROW_HEIGHT,
     overscan: OVERSCAN,
-    getItemKey: (index) => songs[index]?.id ?? index,
+    getItemKey: (index) => songs[index]?.id ?? `idx-${index}`,
   })
 
   // Infinite scroll: fetch more when scrolled near the bottom

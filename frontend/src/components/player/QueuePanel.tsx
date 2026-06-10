@@ -180,7 +180,7 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
                           return (
                             <div
                               key={`${song.id}-${actualIndex}`}
-                              className={`group flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors cursor-pointer ${
+                              className={`group flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors cursor-pointer active:bg-white/[0.03] ${
                                 isDragging ? "opacity-50" : ""
                               }`}
                               style={{
@@ -226,7 +226,7 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
                                 <button
                                   onClick={(e) => { e.stopPropagation(); handleMoveUp(actualIndex) }}
                                   disabled={actualIndex === 0}
-                                  className="h-4 w-5 flex items-center justify-center text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-text)] disabled:opacity-25"
+                                  className="h-4 w-5 flex items-center justify-center text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-text)] disabled:opacity-40"
                                   aria-label="Move up"
                                 >
                                   <ChevronUp className="h-3 w-3" />
@@ -234,7 +234,7 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
                                 <button
                                   onClick={(e) => { e.stopPropagation(); handleMoveDown(actualIndex) }}
                                   disabled={actualIndex === queue.length - 1}
-                                  className="h-4 w-5 flex items-center justify-center text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-text)] disabled:opacity-25"
+                                  className="h-4 w-5 flex items-center justify-center text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-text)] disabled:opacity-40"
                                   aria-label="Move down"
                                 >
                                   <ChevronDown className="h-3 w-3" />
@@ -283,7 +283,7 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
                             {recentHistory.map((song, i) => (
                               <div
                                 key={`history-${song.id}-${i}`}
-                                className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-[var(--aurora-surface-hover)] transition-colors cursor-pointer opacity-60 hover:opacity-100"
+                                className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-[var(--aurora-surface-hover)] transition-colors cursor-pointer opacity-60 hover:opacity-100 active:bg-white/[0.03]"
                                 onClick={() => playSong(song, queue)}
                               >
                                 <span className="text-[10px] text-[var(--aurora-text-tertiary)] tabular-nums w-5 text-right flex-shrink-0">

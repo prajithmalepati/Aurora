@@ -676,7 +676,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
               <PopoverTrigger
                 title="Export playlist"
                 aria-label="Export playlist"
-                className="h-9 w-9 rounded-md flex items-center justify-center text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] hover:bg-white/[0.04] transition-all duration-150"
+                className="h-9 w-9 rounded-md flex items-center justify-center text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] hover:bg-white/[0.04] transition-[color,background-color] duration-150"
               >
                 <Download className="h-4 w-4" />
               </PopoverTrigger>
@@ -700,7 +700,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
               onClick={handleEdit}
               title="Edit playlist"
               aria-label="Edit playlist"
-              className="h-9 w-9 rounded-md flex items-center justify-center text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] hover:bg-white/[0.04] transition-all duration-150"
+              className="h-9 w-9 rounded-md flex items-center justify-center text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] hover:bg-white/[0.04] transition-[color,background-color] duration-150"
             >
               <Pencil className="h-4 w-4" />
             </button>
@@ -708,7 +708,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
               onClick={() => setDeleteDialogOpen(true)}
               title="Delete playlist"
               aria-label="Delete playlist"
-              className="h-9 w-9 rounded-md flex items-center justify-center text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-danger)] hover:bg-[var(--aurora-danger)]/10 transition-all duration-150"
+              className="h-9 w-9 rounded-md flex items-center justify-center text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-danger)] hover:bg-[var(--aurora-danger)]/10 transition-[color,background-color] duration-150"
             >
               <Trash2 className="h-4 w-4" />
             </button>
@@ -724,7 +724,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
         {activePlaylist.songs.length > 0 && (
           <div className="flex items-center gap-2 mb-4">
             <div
-              className="search-shell relative flex-1 flex items-center rounded-full transition-all duration-200"
+              className="search-shell relative flex-1 flex items-center rounded-full transition-[box-shadow] duration-200"
               style={{
                 background: "var(--aurora-surface)",
                 backdropFilter: "blur(12px)",
@@ -1114,7 +1114,7 @@ function Checkbox({ checked, indeterminate, onChange, ariaLabel }: CheckboxProps
       aria-checked={indeterminate ? "mixed" : checked}
       aria-label={ariaLabel}
       onClick={(e) => { e.stopPropagation(); onChange() }}
-      className="h-4 w-4 rounded-[3px] flex items-center justify-center transition-all duration-150 aurora-focus"
+      className="h-4 w-4 rounded-[3px] flex items-center justify-center transition-[color,background-color,border-color,box-shadow] duration-150 aurora-focus"
       style={{
         background: checked || indeterminate ? "var(--aurora-accent-interactive)" : "transparent",
         border: checked || indeterminate ? "1.5px solid var(--aurora-accent-interactive)" : "1.5px solid var(--aurora-text-tertiary)",
@@ -1187,7 +1187,7 @@ function PlaylistSongRow({
       onDragLeave={onDragLeave}
       onDrop={(e) => onDrop(e, song.id)}
       onDragEnd={onDragEnd}
-      className={`group relative transition-all duration-200 ${
+      className={`group relative transition-[opacity,border-color] duration-200 ${
         hasFile ? "cursor-pointer" : "cursor-not-allowed opacity-40"
       } ${isDragging ? "opacity-40" : ""}`}
       style={{
@@ -1375,7 +1375,7 @@ function IconBtn({ children, label, danger, active, disabled, onClick }: IconBtn
       disabled={disabled}
       title={label}
       aria-label={label}
-      className={`aurora-focus h-7 w-7 rounded-md flex items-center justify-center transition-all duration-150 disabled:opacity-25 disabled:pointer-events-none ${
+      className={`aurora-focus h-7 w-7 rounded-md flex items-center justify-center transition-[color,background-color,box-shadow,opacity] duration-150 disabled:opacity-40 disabled:pointer-events-none ${
         danger
           ? "text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-danger)] hover:bg-[var(--aurora-danger)]/10"
           : active
@@ -1438,7 +1438,7 @@ function CrossfadeChip({ playlist }: CrossfadeChipProps) {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
-        className="flex items-center gap-1.5 h-9 px-3 rounded-md text-[12px] text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] hover:bg-white/[0.04] transition-all duration-150"
+        className="flex items-center gap-1.5 h-9 px-3 rounded-md text-[12px] text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] hover:bg-white/[0.04] transition-[color,background-color] duration-150"
         title="Crossfade settings"
       >
         <Sparkles className="h-3.5 w-3.5" />

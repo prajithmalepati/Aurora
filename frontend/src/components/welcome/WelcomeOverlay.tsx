@@ -123,7 +123,7 @@ export function WelcomeOverlay() {
             {/* Card 1: Scan Folder */}
             <button
               onClick={() => setScanOpen(true)}
-              className="flex flex-col items-center gap-3 p-5 rounded-xl text-left transition-all duration-200 group"
+              className="flex flex-col items-center gap-3 p-5 rounded-xl text-left transition-[color,background-color,border-color,box-shadow] duration-200 group"
               style={{
                 background: "rgba(255, 255, 255, 0.04)",
                 backdropFilter: "blur(12px)",
@@ -156,7 +156,7 @@ export function WelcomeOverlay() {
             {/* Card 2: Add Song */}
             <button
               onClick={() => setAddSongOpen(true)}
-              className="flex flex-col items-center gap-3 p-5 rounded-xl text-left transition-all duration-200 group"
+              className="flex flex-col items-center gap-3 p-5 rounded-xl text-left transition-[color,background-color,border-color,box-shadow] duration-200 group"
               style={{
                 background: "rgba(255, 255, 255, 0.04)",
                 backdropFilter: "blur(12px)",
@@ -189,7 +189,7 @@ export function WelcomeOverlay() {
             {/* Card 3: View Shortcuts */}
             <button
               onClick={() => setShortcutsOpen(true)}
-              className="flex flex-col items-center gap-3 p-5 rounded-xl text-left transition-all duration-200 group"
+              className="flex flex-col items-center gap-3 p-5 rounded-xl text-left transition-[color,background-color,border-color,box-shadow] duration-200 group"
               style={{
                 background: "rgba(255, 255, 255, 0.04)",
                 backdropFilter: "blur(12px)",
