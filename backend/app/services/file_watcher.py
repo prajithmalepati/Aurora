@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from app.database import get_db_ctx
+from app.cache import song_cache, tag_cache, folder_cache
 from app.services.file_scanner import AUDIO_EXTENSIONS, extract_metadata, import_scanned_songs
 
 logger = logging.getLogger("aurora.file_watcher")
@@ -110,6 +111,11 @@ class FileWatcher:
                     total_replaced += result.get("replaced", 0)
                     total_skipped += result.get("skipped", 0)
                     total_errors += len(result.get("errors", []))
+                    # Invalidate caches so new songs appear without waiting for TTL
+                    if result.get("imported", 0) > 0 or result.get("replaced", 0) > 0:
+                        song_cache.invalidate_prefix("songs:")
+                        tag_cache.invalidate("tags:list")
+                        folder_cache.invalidate("folders:tree")
                 except Exception:
                     logger.exception("Error scanning watched folder %s", folder_path)
                     total_errors += 1
