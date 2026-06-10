@@ -130,7 +130,7 @@ function App() {
             </span>
           </div>
           <div
-            className="search-shell relative flex items-center rounded-full mb-6 transition-all duration-200"
+            className="search-shell relative flex items-center rounded-full mb-6 transition-[box-shadow] duration-200"
             style={{
               background: "var(--aurora-surface)",
               backdropFilter: "blur(12px)",
