@@ -170,6 +170,9 @@ export function useAudioPlayer() {
         intervalRef.current = null
       }
       const { repeatMode, currentSong: song } = usePlayerStore.getState()
+      if (localStorage.getItem("aurora-debug-audio")) {
+        console.log("[audio] natural end", { song: song?.id, repeat: repeatMode })
+      }
       if (repeatMode === "one") {
         const startSec = (song?.start_time_ms ?? 0) / 1000
         engine.seek(startSec)
@@ -323,6 +326,15 @@ export function useAudioPlayer() {
 
     const { enabled, duration, curve } = resolveXfade()
     const crossfadeIn = enabled && (prev?.isPlaying() ?? false)
+
+    // Listening-pass diagnostics — enable with localStorage.setItem("aurora-debug-audio", "1")
+    if (localStorage.getItem("aurora-debug-audio")) {
+      console.log("[audio] transition", {
+        to: currentSong?.id, title: currentSong?.title, crossfadeIn, curve, fadeS: duration,
+        prevPlaying: prev?.isPlaying() ?? false, targetVol: resolveVolume(),
+        repeat: usePlayerStore.getState().repeatMode, isPlaying: usePlayerStore.getState().isPlaying,
+      })
+    }
 
     if (!currentSong?.file_path) {
       currentSongRef.current = null
