@@ -129,7 +129,7 @@ export function SettingsView() {
               <button
                 key={preset.value}
                 onClick={() => setCrossfadeDuration(preset.value)}
-                className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors duration-150 ${
+                className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors duration-150 active:bg-white/[0.03] ${
                   crossfadeDuration === preset.value
                     ? "bg-[var(--aurora-accent-interactive)]/15 text-[var(--aurora-accent-interactive)]"
                     : "bg-white/[0.06] text-[var(--aurora-text-secondary)] hover:bg-white/[0.10] hover:text-[var(--aurora-text)]"
@@ -180,7 +180,7 @@ export function SettingsView() {
               <button
                 key={value}
                 onClick={() => setCrossfadeCurve(value)}
-                className={`px-3 py-1.5 rounded-lg text-[13px] font-medium transition-colors ${
+                className={`px-3 py-1.5 rounded-lg text-[13px] font-medium transition-colors active:bg-white/[0.03] ${
                   crossfadeCurve === value
                     ? "bg-[var(--aurora-accent-interactive)] text-white"
                     : "bg-white/[0.08] text-[var(--aurora-text-secondary)] hover:bg-white/[0.12]"
@@ -207,7 +207,7 @@ export function SettingsView() {
               <button
                 key={mode}
                 onClick={() => setReplaygainMode(mode)}
-                className={`px-3 py-1.5 rounded-lg text-[13px] font-medium transition-colors ${
+                className={`px-3 py-1.5 rounded-lg text-[13px] font-medium transition-colors active:bg-white/[0.03] ${
                   replaygainMode === mode
                     ? "bg-[var(--aurora-accent-interactive)] text-white"
                     : "bg-white/[0.08] text-[var(--aurora-text-secondary)] hover:bg-white/[0.12]"
