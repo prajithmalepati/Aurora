@@ -617,7 +617,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
   return (
     <div className="aurora-view-enter">
       {/* ── HERO HEADER ── */}
-      <div className="relative px-10 pt-10 pb-8 overflow-hidden">
+      <div className="relative px-4 pt-6 pb-6 sm:px-10 sm:pt-10 sm:pb-8 overflow-hidden">
         {/* Background halo derived from playlist art */}
         <div
           className="absolute inset-0 opacity-60 pointer-events-none"
@@ -626,10 +626,10 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
           }}
           aria-hidden="true"
         />
-        <div className="relative flex items-end gap-7">
+        <div className="relative flex flex-wrap items-end gap-4 sm:gap-7">
           {/* Hero art tile */}
           <div
-            className="w-[168px] h-[168px] rounded-xl flex-shrink-0 aurora-rim overflow-hidden flex items-center justify-center text-5xl"
+            className="w-[96px] h-[96px] sm:w-[168px] sm:h-[168px] rounded-xl flex-shrink-0 aurora-rim overflow-hidden flex items-center justify-center text-3xl sm:text-5xl"
             style={{
               background: heroImage || showArtGrid ? undefined : heroTileGradient,
               boxShadow: `0 20px 60px -20px ${heroArt.glow}, inset 0 0 0 1px var(--aurora-rim)`,
@@ -649,9 +649,9 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
           </div>
 
           {/* Metadata */}
-          <div className="flex-1 min-w-0 pb-2">
+          <div className="flex-1 min-w-[180px] pb-2">
             <p className="label-micro mb-3 tracking-[0.2em]">Playlist</p>
-            <h1 className="font-display text-[64px] leading-[0.95] tracking-tight text-[var(--aurora-text)] truncate">
+            <h1 className="font-display text-[28px] sm:text-[44px] lg:text-[64px] leading-[0.95] tracking-tight text-[var(--aurora-text)] truncate">
               {activePlaylist.name}
             </h1>
             <div className="flex items-center gap-2 mt-4 text-[12px] text-[var(--aurora-text-secondary)]">
@@ -717,7 +717,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
       </div>
 
       {/* Fade divider before song list */}
-      <div className="aurora-divider-h mx-10" />
+      <div className="aurora-divider-h mx-4 sm:mx-10" />
 
       {/* ── SONG LIST ── */}
       <div className="px-6 py-4">

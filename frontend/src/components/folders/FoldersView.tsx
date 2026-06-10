@@ -191,9 +191,9 @@ export function FoldersView({ }: FoldersViewProps) {
   }
 
   return (
-    <div className="h-full flex">
+    <div className="h-full flex flex-col md:flex-row">
       {/* Folder tree sidebar */}
-      <div className="w-64 flex-shrink-0 border-r border-[var(--aurora-muted)]/40 flex flex-col h-full">
+      <div className="w-full md:w-64 flex-shrink-0 max-h-[35vh] md:max-h-none border-b md:border-b-0 md:border-r border-[var(--aurora-muted)]/40 flex flex-col md:h-full">
         <div className="px-4 pt-6 pb-3">
           <h2 className="font-display text-[18px] leading-none tracking-tight text-[var(--aurora-text)]">
             Folders
@@ -228,7 +228,7 @@ export function FoldersView({ }: FoldersViewProps) {
       </div>
 
       {/* Main content area */}
-      <div className="flex-1 min-w-0 overflow-y-auto">
+      <div className="flex-1 min-w-0 min-h-0 overflow-y-auto">
         <div className="p-4 sm:px-10 sm:pt-8 sm:pb-6 max-w-[1400px] mx-auto">
           {currentPath ? (
             <>
