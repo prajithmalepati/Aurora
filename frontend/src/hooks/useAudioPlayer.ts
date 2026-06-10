@@ -285,15 +285,19 @@ export function useAudioPlayer() {
       intervalRef.current = null
     }
 
-    // Drain all stale Howls from rapid transitions — stop + unload every one
-    for (const stale of staleHowlsRef.current) {
-      try { stale.stop(); stale.unload() } catch {}
-    }
-    staleHowlsRef.current = []
-
     // The previous effect's cleanup deposited the outgoing howl here
     const prev = prevHowlRef.current
     prevHowlRef.current = null
+
+    // Drain stale Howls from rapid transitions — but never the deposited prev:
+    // stopping it here would make prev.playing() read false below and kill every
+    // crossfade/gapless handoff. prev stays tracked for the NEXT drain, which
+    // catches it if an interrupted fade leaks it mid-transition.
+    for (const stale of staleHowlsRef.current) {
+      if (stale === prev) continue
+      try { stale.stop(); stale.unload() } catch {}
+    }
+    staleHowlsRef.current = prev ? [prev] : []
 
     const { enabled, duration, curve } = resolveXfade()
     const crossfadeIn = enabled && (prev?.playing() ?? false)
