@@ -1,15 +1,21 @@
 # HERMES_SESSION_HANDOFF.md
 
-**Session 3 complete (2026-06-09). Next: Session 4.**
+**Session 4 complete (2026-06-09). Next: Session 5.**
 
 ## Git state
-Branch: `hermes/phase0-s3` (1 commit ahead of `hermes/phase0-s2`)
+Branch: `hermes/phase0-s4` (1 commit ahead of `hermes/phase0-s3`)
 
 ```
+b2f5717 refactor(backend): unify song serialization and standardize response envelopes
+```
+
+S3 commits (on `hermes/phase0-s3`, base of this branch):
+```
+2a668f7 docs: S3 handoff — versioned migration ladder complete
 d1eac9b refactor(backend): replace try/except init_db with PRAGMA user_version migration ladder
 ```
 
-S2 commits (on `hermes/phase0-s2`, base of this branch):
+S2 commits (on `hermes/phase0-s2`):
 ```
 c4f9fc5 feat(backend): centralize data directory with platformdirs migration
 ```
@@ -22,30 +28,45 @@ eefcb51 chore(frontend): delete unmounted WaveformBar dead code
 ```
 
 All verifications passed:
-- `pytest` 23/23 passed
-- Real aurora.db copy upgrades to `user_version=1` ✓
-- Fresh DB creates at `user_version=1` with all 31 songs columns ✓
-- Unknown version (99) raises `RuntimeError` with clear message ✓
-- Idempotent (running init_db twice on same DB) ✓
+- `pytest` 23/23 passed ✓
+- `npm run build` clean (304ms) ✓
+- MiMo diff review: PASS WITH CHANGES (all issues fixed before commit) ✓
 
-## What Session 3 delivered
-1. **`INIT_SQL`** now defines the complete current schema — all 31 songs columns, 9 playlists columns (including crossfade), 7 playlist_songs columns (including trim). Fresh databases create at the latest version with zero ALTER TABLE calls.
-2. **`MIGRATIONS` list** — version 1 contains all 26 ALTER TABLE statements from the original try/except blocks. The ladder is append-only: future migrations go as `(2, [...])`, `(3, [...])`, etc.
-3. **`_run_migrations()`** — handles three paths:
-   - `user_version == 0`: runs all migrations with targeted "duplicate column" error handling, stamps version 1
-   - `user_version > CURRENT_VERSION`: raises `RuntimeError` (fail loudly)
-   - `user_version < latest`: applies forward migrations only (no try/except)
-4. **Backfills** (file_format, album_art) remain outside the version ladder — they're idempotent and only touch NULL rows.
-5. **MiMo review** caught overly-broad `except OperationalError` → fixed to only catch "duplicate column" errors.
+## What Session 4 delivered
 
-## Quirks found during S3
-- None. Clean rewrite, no surprises.
+### (a) Unified serializer
+- **`backend/app/serializers.py`** (new): single source of truth for song dict construction
+  - `parse_tags()` — deduplicated tag parsing (was inconsistent: songs.py had dedupe, playlists.py didn't)
+  - `parse_playlist_refs()` — playlist id:name parsing with dedup
+  - `song_row_to_dict(row, *, include_peaks=True)` — works with both SONG_SELECT_QUERY and PLAYLIST_SONG_SELECT_QUERY
+  - `strip_peaks()` — remove waveform_peaks from a dict
+- **`songs.py`**: re-exports `song_row_to_dict` so tags.py, folders.py, albums.py continue working
+- **`playlists.py`**: all 5 copy-pasted `SongResponse(...)` blocks (35+ lines each) replaced with one-liner `[song_row_to_dict(r, include_peaks=False) for r in song_rows]`
+- **`filter_engine.py`**: 30-line dict literal replaced with `song_row_to_dict(row, include_peaks=False)` + tag override
+
+### (b) Quality columns + peaks removal
+- `PLAYLIST_SONG_SELECT_COLUMNS` now includes `s.bitrate, s.sample_rate, s.bit_depth, s.file_size` (was missing)
+- `waveform_peaks` removed from: `GET /songs` list, all playlist song lists, `POST /filter`
+- `waveform_peaks` preserved on: `GET /songs/{id}`, `POST /songs`, `PUT /songs/{id}` (per-song endpoints — WaveformTrimEditor needs these)
+
+### (c) Envelope standardization
+- `create_song` now fetches full song from DB instead of returning a partial manual dict (was missing: artists, featured_artists, quality columns, waveform_peaks, dominant_color, replaygain)
+- `delete_tag`: removed incorrect `response_model=dict[str, str]`
+- All JSON endpoints already used `{data, meta?, message}` — no other changes needed
+
+### (d) Composite index migration
+- `MIGRATIONS` version 2: `CREATE INDEX IF NOT EXISTS idx_songs_title_artist ON songs(title, artist)`
+- Added to `INIT_SQL` for fresh databases
+- `CURRENT_VERSION` = 2
+
+## Quirks found during S4
+- None. Clean refactor, no surprises.
 
 ## For the next session
-- Start on branch `hermes/phase0-s3` (or merge to main first — your call)
+- Start on branch `hermes/phase0-s4` (or merge to main first — your call)
 - Read CLAUDE.md, then HERMES_KICKOFF.md, then this handoff
-- Execute Session 4 (S4) exactly as written
-- Do NOT start Session 5 in the same context — start fresh for each session
+- Execute Session 5 (S5) exactly as written
+- Do NOT start Session 6 in the same context — start fresh for each session
 
 ## Sessions reserved for Fable 5 only
 - S8 (PlaybackEngine contract)
