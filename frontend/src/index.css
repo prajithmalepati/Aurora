@@ -776,69 +776,233 @@ input[type="text"]:focus-visible {
 }
 
 /* ============================================================
-   SEEK BAR — clean progress bar for the player.
-   Song-color fill, muted track, subtle thumb on hover.
+   AURORA SEEK BAR (S9) — split hitbox / layered visuals.
+   24px hit area via an invisible native range input on top;
+   4px visual track behind it. Fill is a song-color gradient
+   with a comet-head glow at the playhead. Hover growth is
+   transform-only (scaleY), continuous motion is a linear
+   width transition smoothing the 4Hz store ticks.
    ============================================================ */
 
-.seek-bar {
+.scrub {
   --seek-pct: 0%;
-  appearance: none;
-  -webkit-appearance: none;
+  position: relative;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  contain: layout style;
+}
+
+/* Invisible native range input on top — keeps a11y, keyboard arrows,
+   click/drag, and the CLAUDE.md plain-<input type=range> rule. */
+.scrub-input {
+  position: absolute;
+  inset: 0;
   width: 100%;
-  height: 4px;
-  border-radius: 999px;
-  background:
-    linear-gradient(to right,
-      var(--aurora-accent-muted) 0%,
-      var(--aurora-accent-interactive) 100%
-    ) left top / var(--seek-pct) 100% no-repeat,
-    rgba(255, 255, 255, 0.08);
-  outline: none;
-  cursor: pointer;
-  transition: height 150ms ease;
-}
-.seek-bar:hover,
-.seek-bar:focus-visible {
-  height: 6px;
-}
-.seek-bar::-webkit-slider-thumb {
-  -webkit-appearance: none;
+  height: 100%;
+  margin: 0;
   appearance: none;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--aurora-accent-interactive);
-  border: 2px solid rgba(255, 255, 255, 0.9);
-  box-shadow: 0 0 6px 1px color-mix(in oklch, var(--aurora-accent-interactive) 50%, transparent);
-  cursor: pointer;
+  -webkit-appearance: none;
+  background: transparent;
   opacity: 0;
-  transition: opacity 150ms ease, transform 100ms ease;
-}
-.seek-bar:hover::-webkit-slider-thumb,
-.seek-bar:focus-visible::-webkit-slider-thumb {
-  opacity: 1;
-}
-.seek-bar::-webkit-slider-thumb:active {
-  transform: scale(1.2);
-}
-.seek-bar::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--aurora-accent-interactive);
-  border: 2px solid rgba(255, 255, 255, 0.9);
-  box-shadow: 0 0 6px 1px color-mix(in oklch, var(--aurora-accent-interactive) 50%, transparent);
   cursor: pointer;
-  opacity: 0;
-  transition: opacity 150ms ease;
+  z-index: 2;
 }
-.seek-bar:hover::-moz-range-thumb,
-.seek-bar:focus-visible::-moz-range-thumb {
-  opacity: 1;
+.scrub[data-dragging] .scrub-input {
+  cursor: grabbing;
 }
-.seek-bar:disabled {
-  opacity: 0.3;
+.scrub[data-disabled] .scrub-input {
   cursor: default;
+}
+
+/* Visual stack — pointer-events-none, grows on hover via transform */
+.scrub-visual {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 4px;
+  transform: translateY(-50%);
+  pointer-events: none;
+  transition: transform 150ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.scrub[data-disabled] .scrub-visual {
+  opacity: 0.35;
+}
+
+.scrub-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Fill — width driven by --seek-pct; the 250ms linear transition turns
+   4Hz store ticks into continuous motion (linear: constant-rate motion). */
+.scrub-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: var(--seek-pct);
+  border-radius: 999px;
+  background: linear-gradient(to right, var(--song-color), var(--song-color-2));
+  transition: width 250ms linear;
+}
+/* 1:1 response while dragging and on discrete keyboard/wheel seeks */
+.scrub[data-dragging] .scrub-fill,
+.scrub[data-instant] .scrub-fill {
+  transition: none;
+}
+
+/* Comet head — soft glow riding the fill's leading edge. Color-only
+   identity: no idle animation. */
+.scrub-comet {
+  position: absolute;
+  right: -8px;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  transform: translateY(-50%);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    color-mix(in oklch, var(--song-color-2) 35%, transparent) 0%,
+    transparent 70%
+  );
+  filter: blur(2px);
+}
+.scrub[data-disabled] .scrub-comet {
+  opacity: 0;
+}
+
+/* Thumb — sibling of the visual stack so hover scaleY can't distort it */
+.scrub-thumb {
+  position: absolute;
+  left: var(--seek-pct);
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--song-color-2) 70%, transparent);
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease-out, transform 150ms ease-out, left 250ms linear;
+}
+.scrub[data-dragging] .scrub-thumb,
+.scrub[data-instant] .scrub-thumb {
+  transition: opacity 150ms ease-out, transform 150ms ease-out;
+}
+.scrub[data-dragging] .scrub-thumb {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1.15);
+}
+.scrub[data-disabled] .scrub-thumb {
+  opacity: 0;
+}
+
+/* Trim-point notches (start/end_time_ms) */
+.scrub-notch {
+  position: absolute;
+  top: 50%;
+  width: 2px;
+  height: 8px;
+  border-radius: 1px;
+  background: rgba(255, 255, 255, 0.25);
+  transform: translate(-50%, -50%);
+}
+
+/* Buffering shimmer — sweeps the unplayed region while the engine
+   reports buffering (PlaybackEngine `buffering` event → store). */
+.scrub-shimmer {
+  position: absolute;
+  left: var(--seek-pct);
+  right: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 999px;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+.scrub-shimmer::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.12),
+    transparent
+  );
+  transform: translateX(-100%);
+}
+.scrub[data-buffering] .scrub-shimmer {
+  opacity: 1;
+}
+.scrub[data-buffering] .scrub-shimmer::before {
+  animation: scrub-shimmer-sweep 1.2s linear infinite;
+}
+@keyframes scrub-shimmer-sweep {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* Hover — gated to real pointers; growth is GPU scaleY, never height */
+@media (hover: hover) and (pointer: fine) {
+  .scrub:hover .scrub-visual,
+  .scrub:has(.scrub-input:focus-visible) .scrub-visual {
+    transform: translateY(-50%) scaleY(1.5);
+  }
+  .scrub:hover .scrub-thumb,
+  .scrub:has(.scrub-input:focus-visible) .scrub-thumb {
+    opacity: 1;
+  }
+  .scrub-row .scrub-time {
+    transition: color 150ms ease;
+  }
+  .scrub-row:hover .scrub-time:first-child {
+    color: var(--aurora-text);
+  }
+  .scrub-row:hover .scrub-time:last-child {
+    color: var(--aurora-text-secondary);
+  }
+}
+
+/* Touch — thumb always visible, slightly smaller */
+@media (hover: none), (pointer: coarse) {
+  .scrub-thumb {
+    width: 10px;
+    height: 10px;
+    opacity: 1;
+  }
+  .scrub[data-disabled] .scrub-thumb {
+    opacity: 0;
+  }
+}
+
+/* Reduced motion — keep opacity/color transitions; drop growth and the
+   width catch-up (fill steps discretely). */
+@media (prefers-reduced-motion: reduce) {
+  .scrub-visual {
+    transition: none;
+  }
+  .scrub:hover .scrub-visual,
+  .scrub:has(.scrub-input:focus-visible) .scrub-visual {
+    transform: translateY(-50%);
+  }
+  .scrub-fill {
+    transition: none;
+  }
+  .scrub-thumb {
+    transition: opacity 150ms ease-out;
+  }
+  .scrub[data-buffering] .scrub-shimmer::before {
+    animation: none;
+  }
 }
 
 /* ============================================================
