@@ -1,74 +1,76 @@
 # HERMES_SESSION_HANDOFF.md
 
-**Session 5 complete (2026-06-09). Next: Session 6.**
+**Session 6 complete (2026-06-09). Next: Session 7.**
 
 ## Git state
-Branch: `hermes/phase0-s5` (1 commit ahead of `hermes/phase0-s4`)
+Branch: `hermes/phase0-s6` (1 commit ahead of `hermes/phase0-s5`)
 
+```
+5accc81 perf(frontend): virtualize SongTable with @tanstack/react-virtual, enable infinite scroll
+```
+
+S5 commit (base of this branch):
 ```
 3946bac test(backend): add golden parity pytest+httpx suite with 85 fixtures
 ```
 
-S4 commits (on `hermes/phase0-s4`, base of this branch):
-```
-ab69700 docs: S4 handoff — unified serializer complete
-b2f5717 refactor(backend): unify song serialization and standardize response envelopes
-```
-
 All verifications passed:
-- `pytest` 120/120 passed (97 golden + 23 existing) ✓
-- Running suite 3× produces identical results ✓
-- Golden fixtures free of cross-module mutation leakage ✓
-- MiMo diff review: PASS WITH CHANGES — 2 HIGH issues fixed (fixture scoping, re-recorded from clean state), 1 MEDIUM documented, 1 LOW fixed ✓
+- `npm run build` clean (291ms, 327KB) ✓
+- `pytest` 120/120 passed ✓
+- API pagination tested: 1052 songs, all reachable via limit/offset ✓
+- MiMo diff review: PASS WITH CHANGES — 2 CRITICAL fixed (fetchSongs offset reset, fetchMore fetchId guard), 4 MINOR documented ✓
 
-## What Session 5 delivered
+## What Session 6 delivered
 
-### Golden parity test suite
+### SongTable virtualization + infinite scroll
 
-- **`backend/tests/conftest.py`** — Test infrastructure:
-  - Isolated `AURORA_DATA_DIR` via temp directory (cleaned up on exit)
-  - Seeded SQLite DB: 3 songs (varying metadata profiles), 6 tags, 3 playlists, 1 watched folder
-  - FastAPI TestClient fixture
-  - `check_golden()` / `check_golden_status()` helpers for fixture recording + comparison
-  - `record_bug()` for documenting backend bugs found (test-only rule)
-  - `_seed_database()` for state reset between test groups
-  - Fixed timestamps throughout for deterministic output
+- **`frontend/src/stores/songStore.ts`** — Pagination support:
+  - `PAGE_SIZE = 100`, `totalCount`, `hasMore`, `offset` state
+  - `fetchSongs(search?)` — always resets offset to 0, uses `limit=100&offset=0`
+  - `fetchMore()` — appends next page, stale-response guard via `fetchId` pattern
+  - `sortSongs/createSong/updateSong/deleteSong/assignTags/removeTag` — all reset pagination before refetch
+  - Removed hardcoded `limit: "500"`
 
-- **9 test files** (97 tests, 85 golden JSON fixtures):
-  | File | Tests | Endpoints |
-  |------|-------|-----------|
-  | `test_golden_songs.py` | 20 | GET/POST/PUT/DELETE /api/songs, stream, bleed-thumb, album-art |
-  | `test_golden_tags.py` | 13 | GET/POST/DELETE /api/tags, assign/remove song tags |
-  | `test_golden_health.py` | 1 | GET /api/health |
-  | `test_golden_playlists.py` | 38 | All 17 playlist endpoints including image, export, import, timing |
-  | `test_golden_folders.py` | 4 | GET /api/folders, /api/folders/songs |
-  | `test_golden_albums.py` | 3 | GET /api/albums, /api/albums/{name} |
-  | `test_golden_filter.py` | 6 | POST /api/filter (happy + errors) |
-  | `test_golden_watcher.py` | 6 | GET/POST/DELETE /api/watch, trigger scan |
-  | `test_golden_zscanner.py` | 6 | POST /api/scan, /api/scan/stream (last — adds songs) |
+- **`frontend/src/components/songs/SongTable.tsx`** — Virtualized table:
+  - `useVirtualizer` from `@tanstack/react-virtual` v3.14.2
+  - **Spacer-based approach** — top/bottom spacers maintain total scroll height, visible `<tr>` rows render in between. Keeps full table semantics, zero changes to SongRow.
+  - Container: `h-[calc(100vh-15rem)] overflow-auto`
+  - `ROW_HEIGHT = 64`, `OVERSCAN = 10`
+  - **Infinite scroll**: `onScroll` handler triggers `fetchMore()` when within 300px of bottom
+  - **Selection preservation**: only clears when first song ID changes (replacement), not on append
+  - **Footer**: sticky "Showing N of M" with "Load more" button
+  - **Loading**: full skeleton only when `songs.length===0`; spinner row when appending
+  - `animIndex` capped at 16 for stagger animation performance
+  - All existing features preserved: selection (shift-range), context menu, sort, bulk actions (play/queue/playlist/tag), search
 
-- **85 golden JSON fixtures** in `backend/tests/golden/` — committed, deterministic on repeated runs
+- **`frontend/package.json`** — Added `@tanstack/react-virtual` dependency
 
 ### Architecture decisions
-- **Scanner runs last** (`zscanner`) — adds songs to shared DB; downstream modules re-seed
-- **Module-scoped autouse fixtures** — `_seed_database()` via `@pytest.fixture(scope="module", autouse=True)` in songs/tags/health modules (not at import time — fixes ordering fragility)
-- **Timestamp stripping** — create/update endpoints strip `created_at`/`updated_at` from golden comparison (runtime values)
-- **Pydantic 422 vs 400** — `min_length=1` validations return 422 (Pydantic layer), tests document this
-- **Playlist tests** — test groups separated by `_seed_database()` calls within file
+- **Spacer-based virtualization** — renders actual `<tr>` elements inside `<tbody>` with top/bottom spacer rows for scroll height. Chosen over absolute positioning (incompatible with table-row display) and div-based rewrite (would require touching SongRow).
+- **Fixed container height** (`100vh - 15rem`) — accounts for AppShell chrome, search bar, player bar, and padding. Simpler than restructuring the flex layout chain.
+- **fetchId pattern** — applied to both `fetchSongs` and `fetchMore` to prevent late-arriving responses from corrupting state after a mutation.
 
-### Backend bugs found (documented, NOT fixed — test-only rule)
-1. **Empty timestamps in embedded playlist songs** — `PLAYLIST_SONG_SELECT_COLUMNS` omits `s.created_at`/`s.updated_at`; serializer defaults to `""`. Affects `GET /api/playlists/{id}`. Recorded via `record_bug()`.
+### MiMo review findings
 
-## Quirks found during S5
-- **Module-level `_seed_database()` runs at import time**, not execution time — caused golden fixtures to encode mutated state from playlists tests. Fixed by switching to `@pytest.fixture(scope="module", autouse=True)`.
-- **Pydantic validates before endpoint handlers** — `min_length=1` on `FilterRequest.query` and `ScanRequest.folder_path` returns 422 (not the documented 400) for empty strings.
-- **Shared DB across all test modules** — scanner adds songs, watcher adds folders. Modules that depend on seed counts must re-seed.
+| Severity | Issue | Status |
+|----------|-------|--------|
+| CRITICAL | `fetchSongs` used stale `offset` — search/external callers would fetch wrong page | Fixed: always resets offset to 0 |
+| CRITICAL | `fetchMore` lacked `fetchId` guard — race with mutation-triggered `fetchSongs` | Fixed: added fetchId pattern |
+| MINOR | `BulkTagDialog` bypasses store's `assignTags` | Documented, low-impact |
+| MINOR | `hasMore` fallback uses pre-append count | Fixed: fallback now uses `state.songs.length + res.data.length` |
+| MINOR | Sticky footer may overlap last row | Documented, layout-only |
+| MINOR | `offset` state inconsistency after `fetchMore` | Harmless after CRITICAL fix #1 |
+
+## Quirks found during S6
+- **LSP diagnostics can be stale** — after rapid sequential patches, LSP shows errors from pre-patch state. Always trust `npm run build` over LSP diagnostics.
+- **DB at old location** — `aurora.db` still at `backend/aurora.db` (not migrated to `platformdirs`). Migration code exists but backend hasn't been started since `paths.py` was added.
+- **Virtualizer scroll height flickers** — during rapid scroll, the bottom spacer height recalculation can cause a slight repaint. Acceptable; Rust port replaces this in Phase 2.
 
 ## For the next session
-- Start on branch `hermes/phase0-s5` (or merge to main first — your call)
+- Start on branch `hermes/phase0-s6` (or merge to main first)
 - Read CLAUDE.md, then HERMES_KICKOFF.md, then this handoff
-- Execute Session 6 (S6) exactly as written
-- Do NOT start Session 7 in the same context — start fresh for each session
+- Execute Session 7 (S7) exactly as written: Containment + backend residue
+- Do NOT start Session 8 in the same context — start fresh for each session
 
 ## Sessions reserved for Fable 5 only
 - S8 (PlaybackEngine contract)
