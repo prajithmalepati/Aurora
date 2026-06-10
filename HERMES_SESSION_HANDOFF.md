@@ -1,9 +1,25 @@
 # HERMES_SESSION_HANDOFF.md
 
-**Sessions 8 + 9 complete (2026-06-09, Fable 5). Next: Session 10 (Fable 5 — live design audit).**
+**Sessions 8 + 9 + 10 complete (2026-06-10, Fable 5). Next: Gate 0 review (Fable 5 only).**
+
+## What Session 10 delivered (task 0.12)
+
+Live design audit on `hermes/phase0-s10`: 42 before + 42 after Playwright screenshots (every view × 1440/768/390, `/tmp/aurora-s10-shots/{before,after}/`), zero console errors. Output: `DESIGN_QA.md` (committed) — tiered punch list with stale-VISUAL_AUDIT items marked.
+
+Tier-1 fixed in-session (commit `b77965a`):
+1. **Mobile hamburger overlapped every page title** (<768px) — `AppShell.tsx` main container now `pt-14 md:pt-0`.
+2. **Playlist hero collapsed ≤768** (title truncated to one letter at 768, gone at 390) — responsive padding/art/type (`28/44/64px`), `flex-wrap` actions, `min-w-[180px]` metadata.
+3. **FoldersView unusable at 390** (fixed 256px tree) — stacks `flex-col md:flex-row`, tree `max-h-[35vh]` on mobile.
+
+Tier-2 also fixed: quick-tag header 26→28px, dead `.playerbar-*` CSS deleted (44/80 vs 52/96 mismatch), WelcomeOverlay off-palette indigo/blue → aurora teal, 3× `transition: all` in index.css → explicit property lists.
+
+Tier-3 punch list (11 items) feeds Gate 0 — see `DESIGN_QA.md`. Verified already-fixed since VISUAL_AUDIT: responsive Settings/About padding, 28px title scale, context-menu clamping, global focus ring.
+
+`npm run build` clean. After-screenshots verified at all 3 widths, desktop unchanged.
 
 ## Git state
-Branch: `hermes/phase0-s9` (1 commit ahead of `hermes/phase0-s8`)
+Branch: `hermes/phase0-s10` (2 commits ahead of `hermes/phase0-s9`: `b77965a` fixes, `41c4224` DESIGN_QA.md)
+Previous: `hermes/phase0-s9` (1 commit ahead of `hermes/phase0-s8`)
 
 ```
 14d9bfa feat(player): Aurora seek bar — split hitbox, song-color gradient fill, comet glow   <- S9
@@ -61,11 +77,9 @@ Also: crossfade curves + gapless still need a human listening pass — broken Ju
 ## Known latent issue (document for Gate 0)
 Outgoing engine's `end` handler stays bound during crossfade; fade-timer vs natural-end race could double-`next()`. Pre-existing, preserved under zero-behavior-change. Guard candidate for Phase 2/4.
 
-## For the next session
-- Start on `hermes/phase0-s9`
-- S10 = live design audit (kickoff §S10): Playwright screenshots of every view at 1440/768/390, review vs emil-design-eng checklist + VISUAL_AUDIT.md, produce `DESIGN_QA.md`, fix top tier. **Fable 5 only.**
-- Then Gate 0 review (cumulative s1→s9 diff + checklist) → push branches → PR → human merge. Nothing is on main yet.
-
-## Sessions reserved for Fable 5 only
-- S10 (design audit) — NEXT
-- Gate 0 review
+## For the next session — Gate 0 (Fable 5 only)
+- Start on `hermes/phase0-s10`
+- Checklist (kickoff §Gate 0): golden suite green · playback matrix passes · no `localhost:8000` outside `getBaseUrl` · DB/images in data dir · migrations versioned · >500-song library reachable at 60fps · watcher invalidation verified · seek bar perf gate · DESIGN_QA.md top tier fixed ✓ (this session)
+- Read cumulative diff `main...hermes/phase0-s10`, approve Phase 1 or bounce sessions → push branches → PR → human merge. Nothing is on main yet.
+- Human items still pending: crossfade curves + gapless listening pass (broken June 6–9, fixed in S8); 10-min CPU flatness + trim-notch visuals from S9; mobile drawer nav close-on-select feel (S10 observation: drawer stays open after picking a view — works, but evaluate).
+- Dev servers: backend `AURORA_DATA_DIR=/tmp/aurora-s8-data venv/bin/python run.py` (scratch dir intact with album-art/ + playlist-images/ so migration can't steal real art); sweep scripts `/tmp/aurora-s10-sweep.mjs` + `/tmp/aurora-s10-sweep-390fix.mjs` (main sweep times out on 390 dialogs — known, fix-script covers the 4 missing shots).
