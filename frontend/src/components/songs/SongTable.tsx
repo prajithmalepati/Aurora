@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react"
+import { useVirtualizer } from "@tanstack/react-virtual"
 import { useSongStore } from "@/stores/songStore"
 import { usePlayerStore } from "@/stores/playerStore"
 import { usePlaylistStore } from "@/stores/playlistStore"
@@ -330,10 +331,17 @@ function AddToPlaylistDialog({ open, onOpenChange, songIds, onComplete }: AddToP
 
 // ── SongTable ──
 
+const ROW_HEIGHT = 64
+const OVERSCAN = 10
+const TABLE_COLSPAN = 7
+
 export function SongTable({ songs, loading = false, error = null, onPlay, animKey, showSort = true }: SongTableProps) {
   const sortField = useSongStore((state) => state.sortField)
   const sortOrder = useSongStore((state) => state.sortOrder)
   const sortSongs = useSongStore((state) => state.sortSongs)
+  const totalCount = useSongStore((state) => state.totalCount)
+  const hasMore = useSongStore((state) => state.hasMore)
+  const fetchMore = useSongStore((state) => state.fetchMore)
 
   const playSong = usePlayerStore((s) => s.playSong)
   const addToQueue = usePlayerStore((s) => s.addToQueue)
@@ -347,10 +355,15 @@ export function SongTable({ songs, loading = false, error = null, onPlay, animKe
   const [bulkTagDialogOpen, setBulkTagDialogOpen] = useState(false)
   const [addToPlaylistDialogOpen, setAddToPlaylistDialogOpen] = useState(false)
 
-  // Clear selection when songs change (e.g. re-sort, refetch)
+  // Only clear selection when songs are replaced (first ID changes), not when appended
+  const firstIdRef = useRef<number | null>(songs[0]?.id ?? null)
   useEffect(() => {
-    setSelectedIds(new Set())
-    lastSelectedIndexRef.current = null
+    const newFirstId = songs[0]?.id ?? null
+    if (newFirstId !== firstIdRef.current) {
+      setSelectedIds(new Set())
+      lastSelectedIndexRef.current = null
+    }
+    firstIdRef.current = newFirstId
   }, [songs])
 
   const isAllSelected = songs.length > 0 && songs.every((s) => selectedIds.has(s.id))
@@ -435,7 +448,7 @@ export function SongTable({ songs, loading = false, error = null, onPlay, animKe
   const sortDropdownValue = `${sortField}-${sortOrder}`
 
   const toolbar = showSort ? (
-    <div className="flex items-center justify-end px-4 pb-2">
+    <div className="flex items-center justify-end px-4 pb-2 shrink-0">
       <div className="flex items-center gap-2">
         <span className="text-[10px] text-[var(--aurora-text-tertiary)] uppercase tracking-wide">Sort</span>
         <select
@@ -461,7 +474,7 @@ export function SongTable({ songs, loading = false, error = null, onPlay, animKe
   // Bulk action bar
   const bulkBar = showBulkBar ? (
     <div
-      className="flex items-center gap-3 px-4 py-2 mb-2 rounded-lg aurora-fade-in"
+      className="flex items-center gap-3 px-4 py-2 mb-2 rounded-lg aurora-fade-in shrink-0"
       style={{
         background: "var(--aurora-surface-2)",
         border: "1px solid var(--aurora-rim)",
@@ -514,7 +527,37 @@ export function SongTable({ songs, loading = false, error = null, onPlay, animKe
     </div>
   ) : null
 
-  if (loading) {
+  // ── Virtualizer ──
+  const tableContainerRef = useRef<HTMLDivElement>(null)
+
+  const virtualCount = songs.length
+
+  const rowVirtualizer = useVirtualizer({
+    count: virtualCount,
+    getScrollElement: () => tableContainerRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: OVERSCAN,
+    getItemKey: (index) => songs[index]?.id ?? index,
+  })
+
+  // Infinite scroll: fetch more when scrolled near the bottom
+  const handleScroll = useCallback(() => {
+    const el = tableContainerRef.current
+    if (!el || !hasMore || useSongStore.getState().loading) return
+    const { scrollTop, scrollHeight, clientHeight } = el
+    if (scrollHeight - scrollTop - clientHeight < 300) {
+      fetchMore()
+    }
+  }, [hasMore, fetchMore])
+
+  const virtualItems = rowVirtualizer.getVirtualItems()
+  const topSpacerHeight = virtualItems.length > 0 ? virtualItems[0].start : 0
+  const bottomSpacerHeight = virtualItems.length > 0
+    ? rowVirtualizer.getTotalSize() - virtualItems[virtualItems.length - 1].end
+    : 0
+
+  // ── Loading state ──
+  if (loading && songs.length === 0) {
     return (
       <div className="w-full overflow-auto aurora-fade-in">
         {toolbar}
@@ -566,6 +609,7 @@ export function SongTable({ songs, loading = false, error = null, onPlay, animKe
     )
   }
 
+  // ── Error state ──
   if (error) {
     return (
       <div className="w-full aurora-fade-in">
@@ -606,6 +650,7 @@ export function SongTable({ songs, loading = false, error = null, onPlay, animKe
     )
   }
 
+  // ── Empty state ──
   if (songs.length === 0) {
     return (
       <div className="w-full aurora-fade-in">
@@ -634,9 +679,16 @@ export function SongTable({ songs, loading = false, error = null, onPlay, animKe
     )
   }
 
+  // ── Virtualized render ──
+  const isLoadingMore = loading && songs.length > 0
+
   return (
     <>
-      <div className="w-full overflow-auto aurora-fade-in">
+      <div
+        ref={tableContainerRef}
+        className="w-full h-[calc(100vh-15rem)] overflow-auto aurora-fade-in"
+        onScroll={handleScroll}
+      >
         {toolbar}
         {bulkBar}
         <table className="w-full border-separate border-spacing-0">
@@ -650,19 +702,66 @@ export function SongTable({ songs, loading = false, error = null, onPlay, animKe
             onSelectAll={toggleSelectAll}
           />
           <tbody key={animKey}>
-            {songs.map((song, index) => (
-              <SongRow
-                key={song.id}
-                song={song}
-                index={index}
-                onPlay={onPlay}
-                animIndex={index}
-                isSelected={selectedIds.has(song.id)}
-                onToggleSelect={(shiftKey) => toggleSelectOne(song.id, shiftKey)}
-              />
-            ))}
+            {/* Top spacer */}
+            {topSpacerHeight > 0 && (
+              <tr aria-hidden="true">
+                <td
+                  colSpan={TABLE_COLSPAN}
+                  style={{ height: topSpacerHeight, padding: 0, border: 0, lineHeight: 0 }}
+                />
+              </tr>
+            )}
+            {/* Visible rows */}
+            {virtualItems.map((virtualRow) => {
+              const song = songs[virtualRow.index]
+              if (!song) return null
+              return (
+                <SongRow
+                  key={song.id}
+                  song={song}
+                  index={virtualRow.index}
+                  onPlay={onPlay}
+                  animIndex={virtualRow.index < 16 ? virtualRow.index : undefined}
+                  isSelected={selectedIds.has(song.id)}
+                  onToggleSelect={(shiftKey) => toggleSelectOne(song.id, shiftKey)}
+                />
+              )
+            })}
+            {/* Bottom spacer */}
+            {bottomSpacerHeight > 0 && (
+              <tr aria-hidden="true">
+                <td
+                  colSpan={TABLE_COLSPAN}
+                  style={{ height: bottomSpacerHeight, padding: 0, border: 0, lineHeight: 0 }}
+                />
+              </tr>
+            )}
+            {/* Load-more row */}
+            {isLoadingMore && (
+              <tr>
+                <td colSpan={TABLE_COLSPAN} className="text-center py-4">
+                  <span className="inline-flex items-center gap-2 text-[12px] text-[var(--aurora-text-tertiary)]">
+                    <div className="w-3.5 h-3.5 border-2 border-[var(--aurora-accent)] border-t-transparent rounded-full animate-spin" />
+                    Loading more songs...
+                  </span>
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
+
+        {/* Song count footer */}
+        <div className="sticky bottom-0 text-center py-2.5 text-[11px] text-[var(--aurora-text-tertiary)] bg-[var(--aurora-obsidian)]/90 backdrop-blur-sm border-t border-[var(--aurora-rim)]">
+          Showing {songs.length} of {totalCount.toLocaleString()}
+          {hasMore && !isLoadingMore && (
+            <button
+              onClick={fetchMore}
+              className="ml-2 text-[var(--aurora-accent)] hover:underline cursor-pointer"
+            >
+              Load more
+            </button>
+          )}
+        </div>
       </div>
 
       <BulkTagDialog
