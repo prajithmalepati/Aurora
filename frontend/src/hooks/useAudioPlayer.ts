@@ -115,10 +115,21 @@ export function useAudioPlayer() {
     engine.on("play", () => {
       if (intervalRef.current) window.clearTimeout(intervalRef.current)
 
+      let debugTickCount = 0
       const tick = () => {
         if (!seekingRef.current && engineRef.current && engineRef.current.isLoaded()) {
           const seekSec = engineRef.current.position()
           updateSeek(seekSec)
+
+          // Listening-pass heartbeat (~5s) — position/volume/playing of the live engine
+          if (localStorage.getItem("aurora-debug-audio") && ++debugTickCount % 20 === 0) {
+            console.log("[audio] heartbeat", {
+              song: usePlayerStore.getState().currentSong?.id,
+              pos: +seekSec.toFixed(1), dur: +engineRef.current.duration().toFixed(1),
+              vol: +engineRef.current.getVolume().toFixed(2),
+              playing: engineRef.current.isPlaying(),
+            })
+          }
 
           // End-time enforcement (playlist trim)
           const song = usePlayerStore.getState().currentSong
