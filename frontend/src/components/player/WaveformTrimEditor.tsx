@@ -15,9 +15,10 @@ import { usePlayerStore } from "@/stores/playerStore"
 
 interface WaveformTrimEditorProps {
   song: PlaylistSong
+  playlistId: number
   open: boolean
   onClose: () => void
-  onSaved: () => void
+  onSaved: (startMs: number, endMs: number) => void
 }
 
 function formatMs(ms: number): string {
@@ -39,7 +40,7 @@ const BAR_GAP = 1
 
 type DragHandle = "start" | "end" | null
 
-export function WaveformTrimEditor({ song, open, onClose, onSaved }: WaveformTrimEditorProps) {
+export function WaveformTrimEditor({ song, playlistId, open, onClose, onSaved }: WaveformTrimEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const animFrameRef = useRef<number>(0)
@@ -343,12 +344,14 @@ export function WaveformTrimEditor({ song, open, onClose, onSaved }: WaveformTri
     if (isInvalid) return
     setSaving(true)
     try {
-      await api.put(`/songs/${song.id}`, {
-        start_time_ms: startMs,
-        end_time_ms: endMs,
-      })
+      // Trim is per-playlist (playlist_songs row), not a song attribute —
+      // the songs PUT silently ignores these fields.
+      const res = await api.patch<{ data: { start_time_ms: number; end_time_ms: number } }>(
+        `/playlists/${playlistId}/songs/${song.id}/timing`,
+        { start_time_ms: startMs, end_time_ms: endMs },
+      )
       toast.success("Trim saved")
-      onSaved()
+      onSaved(res.data.start_time_ms, res.data.end_time_ms)
       onClose()
     } catch {
       toast.error("Failed to save trim")

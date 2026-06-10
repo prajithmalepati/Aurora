@@ -1087,9 +1087,12 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
         return (
           <WaveformTrimEditor
             song={trimSong}
+            playlistId={playlistId}
             open={true}
             onClose={() => setOpenTrimId(null)}
-            onSaved={() => fetchPlaylistDetail(playlistId)}
+            onSaved={(startMs, endMs) =>
+              usePlaylistStore.getState().updateSongTiming(trimSong.id, startMs, endMs)
+            }
           />
         )
       })()}
