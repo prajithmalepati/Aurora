@@ -106,7 +106,8 @@ export function useAudioPlayer() {
   function initEngineAfterLoad(engine: PlaybackEngine) {
     setDuration(engine.duration())
     const song = usePlayerStore.getState().currentSong
-    if (song?.start_time_ms && song.start_time_ms > 0) {
+    const { respectTrims } = useSettingsStore.getState()
+    if (respectTrims && song?.start_time_ms && song.start_time_ms > 0) {
       engine.seek(song.start_time_ms / 1000)
     }
   }
@@ -137,12 +138,20 @@ export function useAudioPlayer() {
             })
           }
 
-          // End-time enforcement (playlist trim)
+          // Trim-out as effective end (Apple Music "Stop Time" convention),
+          // only when the user wants trims respected
           const song = usePlayerStore.getState().currentSong
-          if (song?.end_time_ms && song.end_time_ms > 0 && seekSec * 1000 >= song.end_time_ms) {
+          const { respectTrims } = useSettingsStore.getState()
+          const trimEndSec =
+            respectTrims && song?.end_time_ms && song.end_time_ms > 0
+              ? song.end_time_ms / 1000
+              : null
+
+          // End-time enforcement (playlist trim) — backstop hard advance
+          if (trimEndSec !== null && seekSec >= trimEndSec) {
             const { repeatMode } = usePlayerStore.getState()
             if (repeatMode === "one") {
-              const startSec = (song.start_time_ms ?? 0) / 1000
+              const startSec = (song?.start_time_ms ?? 0) / 1000
               engineRef.current?.seek(startSec)
               updateSeek(startSec)
             } else {
@@ -151,13 +160,15 @@ export function useAudioPlayer() {
             return
           }
 
-          // Crossfade early trigger — fires at crossfadeDuration seconds before end.
-          // Skipped on repeat-one: the song must loop via the end handler, not advance.
+          // Crossfade early trigger — fires at crossfadeDuration seconds
+          // before the EFFECTIVE end (trim-out if set, else file end).
+          // Skipped on repeat-one: the song must loop via the end handler.
           const { enabled: xEnabled, duration: xDuration } = resolveXfade()
           if (xEnabled && usePlayerStore.getState().repeatMode !== "one") {
             const engineDuration = engineRef.current.duration()
-            if (engineDuration > 0) {
-              const triggerPoint = Math.max(0, engineDuration - xDuration)
+            const effectiveEnd = trimEndSec ?? (engineDuration > 0 ? engineDuration : 0)
+            if (effectiveEnd > 0) {
+              const triggerPoint = Math.max(0, effectiveEnd - xDuration)
               if (seekSec >= triggerPoint) {
                 if (intervalRef.current) { window.clearTimeout(intervalRef.current); intervalRef.current = null }
                 next()
@@ -191,7 +202,8 @@ export function useAudioPlayer() {
         console.log("[audio] natural end", { song: song?.id, repeat: repeatMode })
       }
       if (repeatMode === "one") {
-        const startSec = (song?.start_time_ms ?? 0) / 1000
+        const { respectTrims } = useSettingsStore.getState()
+        const startSec = respectTrims ? (song?.start_time_ms ?? 0) / 1000 : 0
         engine.seek(startSec)
         engine.play()
         updateSeek(startSec)
@@ -239,8 +251,14 @@ export function useAudioPlayer() {
   function preloadNextIfNeeded(currentSeekSec: number) {
     const curDuration = engineRef.current?.duration()
     if (!curDuration || curDuration <= 0) return
-    // For songs > 5s: preload in last 5 seconds. For short songs: preload immediately.
-    if (curDuration > 5 && currentSeekSec < curDuration - 5) return
+    const curSong = usePlayerStore.getState().currentSong
+    const { respectTrims } = useSettingsStore.getState()
+    const effectiveEnd =
+      respectTrims && curSong?.end_time_ms && curSong.end_time_ms > 0
+        ? curSong.end_time_ms / 1000
+        : curDuration
+    // For songs > 5s: preload in the last 5 seconds before the effective end.
+    if (effectiveEnd > 5 && currentSeekSec < effectiveEnd - 5) return
 
     const state = usePlayerStore.getState()
     const { queue, queueIndex, repeatMode, currentSong } = state
