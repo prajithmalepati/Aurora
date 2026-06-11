@@ -107,3 +107,42 @@ Outgoing engine's `end` handler stays bound during crossfade; fade-timer vs natu
 - Read cumulative diff `main...hermes/phase0-s10`, approve Phase 1 or bounce sessions → push branches → PR → human merge. Nothing is on main yet.
 - Human items still pending: crossfade curves + gapless listening pass (broken June 6–9, fixed in S8); 10-min CPU flatness + trim-notch visuals from S9; mobile drawer nav close-on-select feel (S10 observation: drawer stays open after picking a view — works, but evaluate).
 - Dev servers: backend `AURORA_DATA_DIR=/tmp/aurora-s8-data venv/bin/python run.py` (scratch dir intact with album-art/ + playlist-images/ so migration can't steal real art); sweep scripts `/tmp/aurora-s10-sweep.mjs` + `/tmp/aurora-s10-sweep-390fix.mjs` (main sweep times out on 390 dialogs — known, fix-script covers the 4 missing shots).
+
+## N2 — Lagged Crossfade Curve + Respect-Trims Toggle
+
+**Branch:** `hermes/phase1-xfade` (off `hermes/phase0-s10`) — 3 commits:
+- `863bcbb` — `feat(settings): lagged crossfade curve option`
+- `5a8f2f9` — `feat(audio): lagged crossfade curve — fade out over N, incoming enters at N/2`
+- `f388cc0` — `feat(audio): respect-trims toggle — trim-out is the effective end for playback, crossfade, and preload`
+
+**What was implemented:**
+
+| Feature | Detail |
+|---|---|
+| Lagged crossfade curve | 4th curve option: outgoing fades over full N, incoming starts at N/2 and fades up over remaining N/2. Uses `laggedStartTimerRef` for delayed start, respects pause during delay window, cleans up on skip/unmount. |
+| Respect song trims toggle | Global setting (default ON). When enabled: start-trim seek on load, crossfade triggers at trim-out point (not file end), end handler loops to trim start, preload keys off effective end. Apple Music "Stop Time" convention. |
+
+**Files modified:**
+- `frontend/src/stores/settingsStore.ts` — added `"lagged"` to CrossfadeCurve type, added `respectTrims` + `setRespectTrims`
+- `frontend/src/components/settings/SettingsView.tsx` — "Lagged" curve button, "Respect song trims" toggle row
+- `frontend/src/hooks/useAudioPlayer.ts` — laggedStartTimerRef, lagged branch in crossfadeIn, trim-gated tick/end/preload
+
+**Verifications (all green):**
+- `npm run build` clean ✓
+- `pytest` 120/120 passed ✓
+- 5 repro scripts all PASS:
+  - `/tmp/aurora-fadelock-repro.mjs` (linear) ✓
+  - `/tmp/aurora-fadelock-overlap.mjs` (overlap) ✓
+  - `/tmp/aurora-fadelock-ep.mjs` (equalpower) ✓
+  - `/tmp/aurora-lagged-repro.mjs` (lagged) ✓
+  - `/tmp/aurora-pausefade-repro.mjs` (pause mid-fade) ✓
+  - `/tmp/aurora-trimfade-repro.mjs` (trim-crossfade) ✓ — overlap at t=56s before 60s trim
+- Toggle-off sanity: FAIL as expected (trims ignored, crossfade at full duration)
+
+**Repro scripts written this session:**
+- `/tmp/aurora-lagged-repro.mjs` — asserts incoming silent during first 40% of fade, playing by 70%
+- `/tmp/aurora-trimfade-repro.mjs` — asserts crossfade triggers before trim-out point
+
+**Out of scope (per brief):** No per-playlist trim toggle, no skip-crossfade-for-same-album, no trim editor changes, no backend changes, no refactors beyond specified lines.
+
+**For Fable 5 review:** Diff is `main...hermes/phase1-xfade`. Human listening pass needed for lagged curve audibility + trim-crossfade timing feel.
