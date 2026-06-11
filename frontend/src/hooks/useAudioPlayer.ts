@@ -510,6 +510,10 @@ export function useAudioPlayer() {
             laggedStartTimerRef.current = null
             // A newer transition replaced this engine — do nothing
             if (engineRef.current !== engine) return
+            // Resume during the delay already started this engine via the
+            // isPlaying effect — a second play() would spawn a second Howler
+            // sound instance of the same file (double audio)
+            if (engine.isPlaying()) return
             if (!usePlayerStore.getState().isPlaying) {
               // User paused during the delay: don't start. Park the engine at
               // target volume so resume (isPlaying effect) comes in audible.
