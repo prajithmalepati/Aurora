@@ -32,6 +32,9 @@ export function useAudioPlayer() {
   // Outgoing engine while a crossfade is in flight — the pause/resume effect
   // must reach it (prevEngineRef is already nulled by then)
   const fadingOutRef = useRef<PlaybackEngine | null>(null)
+  // Pending delayed start of the incoming engine (lagged curve) — cleared on
+  // transition cleanup so a skip during the delay can't start a ghost engine
+  const laggedStartTimerRef = useRef<number | null>(null)
   // Preloaded next song's engine — created ~5s before song end to eliminate silence gap
   const nextEngineRef = useRef<{ engine: PlaybackEngine; songId: string } | null>(null)
   // Tracks whether the preloaded engine has finished loading (fully decoded, ready to play)
@@ -301,6 +304,7 @@ export function useAudioPlayer() {
       if (prevEngineRef.current) { prevEngineRef.current.stop(); prevEngineRef.current.unload() }
       if (nextEngineRef.current) { nextEngineRef.current.engine.unload(); nextEngineRef.current = null; preloadReadyRef.current = false }
       if (intervalRef.current) window.clearTimeout(intervalRef.current)
+      if (laggedStartTimerRef.current) window.clearTimeout(laggedStartTimerRef.current)
     }
   }, [])
 
@@ -472,6 +476,32 @@ export function useAudioPlayer() {
             }
           }, 33) // ~30fps
           xfadeIntervalRef.current = equalPowerInterval as unknown as number
+        } else if (curve === 'lagged') {
+          // Lagged: outgoing fades to 0 over the full N (handled in the
+          // `if (prev)` block below — it shares the linear fade-out path);
+          // incoming stays parked for N/2, then plays and fades up over
+          // the remaining N/2. See PLAYLOCK TRAP note: volume set before
+          // play, fade started from the play event.
+          engine.setVolume(0)
+          const startFade = () => {
+            engine.off("play", startFade)
+            engine.fade(0, targetVol, fadeDurationMs / 2)
+          }
+          engine.on("play", startFade)
+          laggedStartTimerRef.current = window.setTimeout(() => {
+            laggedStartTimerRef.current = null
+            // A newer transition replaced this engine — do nothing
+            if (engineRef.current !== engine) return
+            if (!usePlayerStore.getState().isPlaying) {
+              // User paused during the delay: don't start. Park the engine at
+              // target volume so resume (isPlaying effect) comes in audible.
+              engine.off("play", startFade)
+              engine.setVolume(targetVol)
+              return
+            }
+            engine.play()
+          }, fadeDurationMs / 2)
+          usePlayerStore.getState().setCrossfading(true, prevTitleRef.current ?? undefined)
         } else {
           // Linear: engine-native fade, deferred to the play event (see Howler
           // trap note above — fade() during _playLock is silently dropped)
@@ -504,7 +534,7 @@ export function useAudioPlayer() {
           // Already handled above via setInterval
           // prev volume is being manually ramped down
         } else {
-          // Linear: engine-native fade out
+          // Linear AND lagged: engine-native fade out over the full duration
           prev.fade(prev.getVolume(), 0, fadeDurationMs)
           setTimeout(() => {
             prev.stop()
@@ -535,6 +565,10 @@ export function useAudioPlayer() {
         xfadeIntervalRef.current = null
         // If crossfade was interrupted, ensure state is cleaned up
         usePlayerStore.getState().setCrossfading(false)
+      }
+      if (laggedStartTimerRef.current) {
+        window.clearTimeout(laggedStartTimerRef.current)
+        laggedStartTimerRef.current = null
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
