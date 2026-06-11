@@ -146,3 +146,65 @@ Outgoing engine's `end` handler stays bound during crossfade; fade-timer vs natu
 **Out of scope (per brief):** No per-playlist trim toggle, no skip-crossfade-for-same-album, no trim editor changes, no backend changes, no refactors beyond specified lines.
 
 **For Fable 5 review:** Diff is `main...hermes/phase1-xfade`. Human listening pass needed for lagged curve audibility + trim-crossfade timing feel.
+
+## N3 — Lagged Double-Play Fix + Phase 1 Desktop Start (Tauri + Sidecar)
+
+**Session:** 2026-06-10, Hermes. Branch: `hermes/phase1-xfade` (1 new commit).
+
+### Task 1: lagged double-play guard ✅
+
+**Bug:** During lagged crossfade, pause→resume within the N/2 delay window causes double-play. The isPlaying resume effect calls `engine.play()` on the parked incoming engine, but the pending `laggedStartTimerRef` timeout fires 1.5s later and calls `engine.play()` again on an already-playing engine, spawning a second Howler sound instance.
+
+**Fix:** Added `if (engine.isPlaying()) return` guard in the lagged timer callback (line 516 of `useAudioPlayer.ts`), after the `engineRef.current !== engine` check. No other changes.
+
+**Commit:** `52c093e fix(audio): guard lagged delayed start against double play after pause-resume` (already on branch from previous push).
+
+**Verification:**
+- `/tmp/aurora-lagged-pauseresume-repro.mjs` → PASS (1 incoming instance, not 2)
+- `/tmp/aurora-lagged-repro.mjs` → PASS (no regression)
+- `/tmp/aurora-pausefade-repro.mjs` → PASS (no regression)
+- `npm run build` → clean
+
+### Task 2: open PR for `hermes/phase1-xfade` ❌ BLOCKED
+
+`gh auth` token invalid. Cannot create PR. Human needs to run `gh auth login` or provide a valid token. PR command ready:
+```
+gh pr create --base hermes/phase0-s10 --head hermes/phase1-xfade --title "feat(audio): lagged crossfade curve + respect-trims toggle"
+```
+Branch has 5 commits (4 N2 + 1 N3 fix), all pushed.
+
+### Task 3: Tauri 2 scaffold ❌ BLOCKED
+
+Rust installed (1.96.0 via rustup, user-level). `webkit2gtk-4.1` and `libayatana-appindicator` not installed — `sudo pacman` requires password. Cannot proceed unattended.
+
+**Next session:** `sudo pacman -S --needed webkit2gtk-4.1 libayatana-appindicator` then `npx tauri init`.
+
+### Task 4: PyInstaller freeze of backend ✅
+
+**Changes:**
+- `backend/run.py` — added `import sys`, `is_frozen = getattr(sys, "frozen", False)`, `reload=not is_frozen`. PyInstaller frozen binaries have no source files to watch.
+- `backend/aurora-backend.spec` — onedir mode. Explicit `app/` package in datas (uvicorn string-imports aren't traced). Hidden imports: boolean, uvicorn submodules, mutagen submodules, miniaudio, all app.routers and app.services.
+
+**Commit:** `03edbe3 feat(backend): PyInstaller freeze spec — onedir mode, conditional reload`
+
+**Verification:**
+- `pyinstaller aurora-backend.spec` → build complete
+- Frozen binary on port 8123 (empty data dir) → health 200, songs 0
+- Frozen binary on port 8124 (real data dir) → health 200, songs 352, stream 200 (11MB), album art 200 (264KB)
+- `pytest -q` → 120/120 passed
+
+### Tasks 5–6: sidecar lifecycle + folder picker ❌ BLOCKED
+
+Both require Tauri scaffold (Task 3). Deferred to next session.
+
+### Deviation from brief
+
+- `frontend/src-tauri/` not created (Task 3 blocked). Brief default layout path preserved for next session.
+- PR not opened (Task 2 blocked). All 5 commits pushed, PR command documented above.
+
+### Next session agenda
+
+1. `sudo pacman -S --needed webkit2gtk-4.1 libayatana-appindicator` → Tauri scaffold (Task 3)
+2. Sidecar lifecycle (Task 5) + folder picker (Task 6)
+3. `gh auth login` → open PR (Task 2)
+4. Push `hermes/phase1-desktop` branch
