@@ -208,3 +208,111 @@ Both require Tauri scaffold (Task 3). Deferred to next session.
 2. Sidecar lifecycle (Task 5) + folder picker (Task 6)
 3. `gh auth login` → open PR (Task 2)
 4. Push `hermes/phase1-desktop` branch
+
+## N4 — Tauri Scaffold + Sidecar + CI Builds
+
+**Session:** 2026-06-10, Hermes (MiMo Pro). Branches: `hermes/phase1-xfade` (1 new commit), `hermes/phase1-desktop` (1 new commit).
+
+### PRE-FLIGHT results
+- SUDO-BLOCKED (needs password)
+- GH-OK ✓
+- webkit2gtk-4.1: NOT installed
+- libayatana-appindicator: NOT installed
+
+**Reordering applied:** Tasks 1 → 5 → 6 → 7 (Tasks 2-4 skipped — need webkit2gtk + sudo).
+
+### Task 1: N3-review nits ✅
+
+**Two fixes from Fable's N3 review:**
+
+1. **CWD-independent PyInstaller spec** (`backend/aurora-backend.spec`):
+   - `pathex`: `os.path.dirname(os.path.abspath('__file__'))` → `SPECPATH`
+   - `datas`: `('app', 'app')` → `(os.path.join(SPECPATH, 'app'), 'app')`
+
+2. **Loopback-default host binding** (`backend/run.py`):
+   - `host="0.0.0.0"` → `host = os.environ.get("AURORA_HOST", "127.0.0.1")`
+   - Added trailing newline
+
+**Commit:** `7a1ce12 fix(backend): CWD-independent pyinstaller spec; loopback-default host binding`
+
+**Verification (all green):**
+- PyInstaller build from repo root (not backend/) → clean ✓
+- Frozen binary on port 8126 → health 200 ✓
+- `ss -tln | grep 8126` → `127.0.0.1:8126` (NOT 0.0.0.0) ✓
+- `pytest` → 120/120 passed ✓
+
+### Task 5: Open PR for `hermes/phase1-xfade` ✅
+
+PR #3 already existed: https://github.com/prajithmalepati/Aurora/pull/3
+- Title: `feat(audio): lagged crossfade curve + respect-trims toggle`
+- Base: `hermes/phase0-s10`, Head: `hermes/phase1-xfade`
+- State: OPEN
+
+PR body update blocked by GitHub Projects (classic) deprecation GraphQL error — non-blocking.
+
+### Task 6: CI builds ⚠️ WRITTEN, PUSH BLOCKED
+
+**Workflow:** `.github/workflows/desktop-build.yml`
+- Two jobs: `build-linux` (ubuntu-22.04) + `build-windows` (windows-latest)
+- Triggers: `workflow_dispatch` + `push: tags: ['v*']` + temporary `push: branches: ['hermes/phase1-desktop']`
+- Linux: apt deps → Python 3.12 + pyinstaller → freeze backend → Node 22 + npm ci → Rust → `npx tauri build` → upload AppImage + .deb
+- Windows: same skeleton, no system deps → NSIS installer
+
+**Push blocked:** GitHub PAT lacks `workflow` scope (required for `.github/workflows/` files). No SSH key configured.
+
+**To unblock:**
+```
+gh auth refresh -s workflow
+# or
+gh auth login --git-protocol ssh
+```
+
+**Also:** workflow references `src-tauri/` which doesn't exist yet (Tasks 2-4 blocked). CI will fail until Tauri scaffold is done.
+
+### Tasks 2-4: Tauri scaffold + sidecar + folder picker ❌ SKIPPED
+
+**Reason:** web2gtk-4.1 and libayatana-appindicator not installed, sudo needs password.
+
+**To unblock:** `sudo pacman -S webkit2gtk-4.1 libayatana-appindicator` then re-run Tasks 2-4 from the brief.
+
+### Task 7: handoff + push ✅
+
+**Branches pushed:**
+- `hermes/phase1-xfade` → `7a1ce12` (origin) ✓
+- `hermes/phase1-desktop` → `9d52d9d` (local only — workflow push blocked)
+
+**Branch state:**
+```
+hermes/phase1-xfade (8 commits ahead of phase0-s10):
+  7a1ce12 fix(backend): CWD-independent pyinstaller spec; loopback-default host binding
+  149d53a docs: N3 handoff
+  03edbe3 feat(backend): PyInstaller freeze spec
+  52c093e fix(audio): guard lagged delayed start against double play
+  e33320c docs: N2 handoff
+  f388cc0 feat(audio): respect-trims toggle
+  5a8f2f9 feat(audio): lagged crossfade curve
+  863bcbb feat(settings): lagged crossfade curve option
+
+hermes/phase1-desktop (1 commit ahead of phase1-xfade):
+  9d52d9d ci(desktop): tagged release builds — AppImage/.deb (linux), NSIS (windows)
+```
+
+### Done means status
+
+| Criterion | Status |
+|---|---|
+| Task 1 frozen rebuild from repo root + loopback binding verified + pytest 120/120 | ✅ |
+| `tauri dev` runs Aurora with self-managed sidecar | ❌ Skipped (needs webkit2gtk) |
+| Folder picker works under Tauri with web fallback | ❌ Skipped (needs Tauri) |
+| xfade PR open | ✅ PR #3 |
+| CI Linux job green with installable artifacts | ⚠️ Written, can't push (no workflow scope) |
+| Handoff appended | ✅ |
+| Everything pushed | ⚠️ phase1-desktop local only |
+
+### Next session agenda
+
+1. `sudo pacman -S webkit2gtk-4.1 libayatana-appindicator` → Tasks 2-4 (Tauri scaffold, sidecar, folder picker)
+2. `gh auth refresh -s workflow` → push `.github/workflows/desktop-build.yml`
+3. Watch CI, iterate until Linux green
+4. Remove temporary branch trigger
+
