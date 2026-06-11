@@ -176,6 +176,7 @@ export function SettingsView() {
               { value: "linear" as CrossfadeCurve, label: "Linear" },
               { value: "equalpower" as CrossfadeCurve, label: "Equal Power" },
               { value: "overlap" as CrossfadeCurve, label: "Overlap" },
+              { value: "lagged" as CrossfadeCurve, label: "Lagged" },
             ]).map(({ value, label }) => (
               <button
                 key={value}

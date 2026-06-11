@@ -1,6 +1,6 @@
 import { create } from "zustand"
 
-export type CrossfadeCurve = "linear" | "equalpower" | "overlap"
+export type CrossfadeCurve = "linear" | "equalpower" | "overlap" | "lagged"
 
 interface SettingsState {
   crossfadeEnabled: boolean
