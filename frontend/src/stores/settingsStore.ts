@@ -7,11 +7,13 @@ interface SettingsState {
   crossfadeDuration: number
   crossfadeCurve: CrossfadeCurve
   replaygainMode: "off" | "track" | "album"
+  respectTrims: boolean
 
   setCrossfadeEnabled: (enabled: boolean) => void
   setCrossfadeDuration: (seconds: number) => void
   setCrossfadeCurve: (curve: CrossfadeCurve) => void
   setReplaygainMode: (mode: "off" | "track" | "album") => void
+  setRespectTrims: (respect: boolean) => void
 }
 
 function load<T>(key: string, fallback: T): T {
@@ -29,6 +31,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   crossfadeDuration: load("aurora-xfade-duration", 5),
   crossfadeCurve: load<CrossfadeCurve>("aurora-xfade-curve", "equalpower"),
   replaygainMode: load<"off" | "track" | "album">("aurora-rg-mode", "track"),
+  respectTrims: load("aurora-respect-trims", true),
 
   setCrossfadeEnabled: (enabled) => {
     localStorage.setItem("aurora-xfade-enabled", JSON.stringify(enabled))
@@ -49,5 +52,10 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   setReplaygainMode: (mode) => {
     localStorage.setItem("aurora-rg-mode", JSON.stringify(mode))
     set({ replaygainMode: mode })
+  },
+
+  setRespectTrims: (respect) => {
+    localStorage.setItem("aurora-respect-trims", JSON.stringify(respect))
+    set({ respectTrims: respect })
   },
 }))

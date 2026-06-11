@@ -16,6 +16,8 @@ export function SettingsView() {
   const setCrossfadeDuration = useSettingsStore((s) => s.setCrossfadeDuration)
   const setCrossfadeCurve = useSettingsStore((s) => s.setCrossfadeCurve)
   const setReplaygainMode = useSettingsStore((s) => s.setReplaygainMode)
+  const respectTrims = useSettingsStore((s) => s.respectTrims)
+  const setRespectTrims = useSettingsStore((s) => s.setRespectTrims)
 
   const durPct = ((crossfadeDuration - 1) / 11) * 100
 
@@ -218,6 +220,32 @@ export function SettingsView() {
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Respect song trims */}
+        <div className="px-5 py-4 border-t border-[var(--aurora-rim)] flex items-center justify-between">
+          <div>
+            <p className="text-[14px] text-[var(--aurora-text)] font-medium">Respect song trims</p>
+            <p className="text-[12px] text-[var(--aurora-text-secondary)] mt-0.5">
+              Play playlist songs between their trim points and crossfade at the trim-out
+            </p>
+          </div>
+          <button
+            onClick={() => setRespectTrims(!respectTrims)}
+            role="switch"
+            aria-checked={respectTrims}
+            className={`relative rounded-full transition-colors duration-200 flex-shrink-0 ${
+              respectTrims
+                ? "bg-[var(--aurora-accent-interactive)]"
+                : "bg-white/[0.12]"
+            }`}
+            style={{ height: "22px", width: "40px" }}
+          >
+            <span
+              className="absolute top-0.5 left-0.5 w-[18px] h-[18px] rounded-full bg-white shadow-sm transition-transform duration-200"
+              style={{ transform: respectTrims ? "translateX(18px)" : "translateX(0)" }}
+            />
+          </button>
         </div>
 
         {/* Manual skip info */}
