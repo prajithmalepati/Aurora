@@ -5,14 +5,14 @@ import os
 
 a = Analysis(
     ['run.py'],
-    pathex=[os.path.dirname(os.path.abspath('__file__'))],
+    pathex=[SPECPATH],
     binaries=[],
     datas=[
         # mutagen metadata
         *collect_data_files('mutagen'),
         # app package — uvicorn uses string-based import ("app.main:app")
         # which PyInstaller can't trace; include explicitly
-        ('app', 'app'),
+        (os.path.join(SPECPATH, 'app'), 'app'),
     ],
     hiddenimports=[
         'boolean',
