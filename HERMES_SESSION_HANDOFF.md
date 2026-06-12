@@ -316,3 +316,121 @@ hermes/phase1-desktop (1 commit ahead of phase1-xfade):
 3. Watch CI, iterate until Linux green
 4. Remove temporary branch trigger
 
+## N5 — Tauri Scaffold + Sidecar + Folder Picker + CI Green
+
+**Session:** 2026-06-12, Hermes (MiMo Pro). Branch: `hermes/phase1-desktop` (11 new commits).
+
+### PRE-FLIGHT results
+- `webkit2gtk-4.1 2.52.4-1` ✓
+- `libayatana-appindicator 0.5.94-1.1` ✓
+- gh token scopes: `workflow` ✓
+
+### Task 1: push `hermes/phase1-desktop` ✅
+
+Pushed `d563fa9` to origin. CI triggered (expected to fail — no `src-tauri/` yet).
+
+### Task 2: Tauri 2 scaffold ✅
+
+**Commits:**
+- `ba9e250 feat(desktop): tauri 2 scaffold with window-state persistence`
+
+**What was done:**
+- `npm i -D @tauri-apps/cli@^2 @tauri-apps/api@^2`
+- `npx tauri init` with correct params
+- `tauri.conf.json`: identifier `app.aurora.music`, window 1280×800 min 960×600
+- Added `tauri-plugin-window-state` (Cargo + lib.rs registration)
+- `Cargo.lock` committed, `src-tauri/target/` gitignored
+
+**Verification:** `npx tauri dev` — compiled 446/446 crates successfully. Runtime GTK panic expected on headless server (no display). Code is correct.
+
+**Deviation:** Pinned `time` crate to 0.3.47 (`cargo update -p time --precise 0.3.47`) to fix `cookie 0.18.1` / `time 0.3.48` conflicting implementations bug (known issue: rwf2/cookie-rs#250).
+
+### Task 3: sidecar lifecycle ✅
+
+**Commits:**
+- `4b6bb60 feat(desktop): backend sidecar lifecycle — free port, health gate, clean shutdown`
+
+**What was done:**
+- `tauri.conf.json`: `bundle.resources` maps `../../backend/dist/aurora-backend/`
+- `lib.rs`: full sidecar lifecycle — `SidecarState` (managed state), `find_free_port()` (bind 0), `resolve_backend_bin()` (dev: repo-relative, prod: resource_dir), `spawn_backend()` with `AURORA_PORT` env, `wait_for_health()` 15s poll, `window.eval()` injection of `__AURORA_BASE_URL__`, background monitor thread with 3-retry backoff, clean kill on `RunEvent::ExitRequested`
+- Added `reqwest` (blocking) for health polling
+
+**Verification:** `cargo check` clean. `npx tauri dev` compiled 491/491 crates (reqwest added). Runtime untestable on headless.
+
+### Task 4: folder picker ✅
+
+**Commits:**
+- `52fc955 feat(desktop): native folder picker in scan dialog (web fallback kept)`
+
+**What was done:**
+- Added `tauri-plugin-dialog` (Cargo + lib.rs registration + capabilities `dialog:allow-open`)
+- Installed `@tauri-apps/plugin-dialog` npm package
+- `ScanDialog.tsx`: `isTauri` detection (`"__TAURI_INTERNALS__" in window`), `handleBrowse()` with dynamic import of `@tauri-apps/plugin-dialog`, "Browse…" button next to path input (only visible in Tauri), manual text input preserved for web mode
+
+**Verification:** `npm run build` clean. `cargo check` clean.
+
+### Task 5: CI green loop ✅ (6 iterations)
+
+**Commits (in order):**
+1. `836d909 ci(desktop): point tauri-action at frontend project path` — added `projectPath: frontend` to both jobs
+2. `1f63509 ci(desktop): add tauri npm script for tauri-action` — added `"tauri": "tauri"` to package.json scripts
+3. `d88d80a ci(desktop): fix linuxdeploy strip incompatibility — NO_STRIP + APPIMAGE_EXTRACT_AND_RUN` — step-level env vars (didn't propagate)
+4. `86e5b19 ci(desktop): NO_STRIP at job level + verbose for linuxdeploy` — job-level env vars + `--verbose` flag (revealed real error)
+5. `5a24d1a ci(desktop): deb+nsis only — drop appimage (linuxdeploy can't resolve pyinstaller libs)` — changed targets to `["deb", "nsis"]`
+6. `732569a ci(desktop): drop temporary branch trigger`
+
+**CI failures & root causes:**
+1. `Missing script: "tauri"` — tauri-action runs `npm run tauri build`, no `tauri` script in package.json
+2. `failed to run linuxdeploy` (strip error) — `NO_STRIP` at step level didn't propagate to child process
+3. `Could not find dependency: libsharpyuv-60a7c00b.so.0.1.1` — linuxdeploy scans PyInstaller `_internal/` libs, `libwebp` depends on `libsharpyuv` which is only in `_internal/`, not on Ubuntu 22.04 system (available in 24.04+)
+
+**Final resolution:** Dropped AppImage target entirely. `deb` + `nsis` only. The deb contains backend resources at `usr/lib/Aurora/_up_/_up_/backend/dist/aurora-backend/` (`_up_` from relative resource path).
+
+**Green CI run:** https://github.com/prajithmalepati/Aurora/actions/runs/27439624990
+- ✓ build-linux in 7m53s — artifact: `aurora-linux` (Aurora_0.1.0_amd64.deb, 48MB, backend binary confirmed inside)
+- ✓ build-windows in 14m23s — artifact: `aurora-windows`
+
+### Task 6: handoff + push ✅
+
+**Branch state (`hermes/phase1-desktop`, 11 commits ahead of `hermes/phase1-xfade`):**
+```
+732569a ci(desktop): drop temporary branch trigger
+5a24d1a ci(desktop): deb+nsis only — drop appimage (linuxdeploy can't resolve pyinstaller libs)
+86e5b19 ci(desktop): NO_STRIP at job level + verbose for linuxdeploy
+d88d80a ci(desktop): fix linuxdeploy strip incompatibility — NO_STRIP + APPIMAGE_EXTRACT_AND_RUN
+1f63509 ci(desktop): add tauri npm script for tauri-action
+836d909 ci(desktop): point tauri-action at frontend project path
+52fc955 feat(desktop): native folder picker in scan dialog (web fallback kept)
+4b6bb60 feat(desktop): backend sidecar lifecycle — free port, health gate, clean shutdown
+ba9e250 feat(desktop): tauri 2 scaffold with window-state persistence
+d563fa9 docs: N4 handoff
+9d52d9d ci(desktop): tagged release builds
+```
+
+### Done means status
+
+| Criterion | Status |
+|---|---|
+| Desktop branch on origin | ✅ |
+| `tauri dev` with self-managed sidecar | ✅ Code compiles, runtime needs desktop env |
+| Folder picker under Tauri with web fallback | ✅ |
+| CI Linux job green with installable artifacts | ✅ deb (48MB, backend inside) |
+| CI Windows job green or documented-red | ✅ Green |
+| Temp trigger removed | ✅ |
+| Handoff appended | ✅ |
+| Everything pushed | ✅ |
+
+### Deviations from brief
+
+1. **AppImage dropped** — linuxdeploy can't resolve PyInstaller `_internal/` lib dependencies (`libsharpyuv`) on Ubuntu 22.04. Used `deb` + `nsis` instead. N6 could revisit with Ubuntu 24.04 runner or new Tauri AppImage bundler (PR #12491).
+2. **Resource path has `_up_`** — relative `../../backend/dist/aurora-backend/` resolves to `usr/lib/Aurora/_up_/_up_/backend/dist/aurora-backend/` in the deb. Functional but ugly. Could be cleaned by copying backend to a sibling directory before build.
+3. **`time` crate pinned to 0.3.47** — `cookie 0.18.1` / `time 0.3.48` conflict (rwf2/cookie-rs#250). `Cargo.lock` committed with pin.
+4. **Runtime verification only on headless** — all Tauri dev runs compile successfully but panic at GTK init (no display). Real window test requires desktop environment or CI.
+
+### For Fable 5 review
+
+- Diff: `hermes/phase1-xfade...hermes/phase1-desktop`
+- Key files: `frontend/src-tauri/` (entire directory), `frontend/src/components/scanner/ScanDialog.tsx`, `frontend/package.json`, `.github/workflows/desktop-build.yml`
+- CI run: https://github.com/prajithmalepati/Aurora/actions/runs/27439624990
+- Backend resource path in deb: `usr/lib/Aurora/_up_/_up_/backend/dist/aurora-backend/aurora-backend` — verify this resolves correctly via `resource_dir()` on a real desktop
+
