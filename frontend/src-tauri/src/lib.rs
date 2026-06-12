@@ -54,6 +54,7 @@ fn wait_for_health(port: u16, timeout: Duration) -> bool {
 pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_window_state::Builder::default().build())
+        .plugin(tauri_plugin_dialog::init())
         .manage(SidecarState {
             child: Mutex::new(None),
             port: Mutex::new(0),

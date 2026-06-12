@@ -15,6 +15,8 @@ import { usePlaylistStore } from "@/stores/playlistStore"
 import { toast } from "@/lib/toast"
 import { api, getBaseUrl } from "@/lib/api"
 
+const isTauri = "__TAURI_INTERNALS__" in window
+
 interface ScanDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -168,6 +170,14 @@ export function ScanDialog({ open, onOpenChange }: ScanDialogProps) {
     }
   }
 
+  const handleBrowse = async () => {
+    const { open } = await import("@tauri-apps/plugin-dialog")
+    const selected = await open({ directory: true })
+    if (selected) {
+      setState((s) => ({ ...s, folderPath: selected as string, error: null }))
+    }
+  }
+
   const progressPct = state.progress && state.progress.total > 0
     ? Math.round((state.progress.done / state.progress.total) * 100)
     : 0
@@ -187,13 +197,27 @@ export function ScanDialog({ open, onOpenChange }: ScanDialogProps) {
             <label className="label-micro text-[9.5px]">
               Folder path <span className="text-[var(--aurora-danger)]">*</span>
             </label>
-            <Input
-              type="text"
-              placeholder="C:\Users\rockz\Music\Rock"
-              value={state.folderPath}
-              onChange={(e) => setState((s) => ({ ...s, folderPath: e.target.value, error: null }))}
-              disabled={state.loading}
-            />
+            <div className="flex gap-2">
+              <Input
+                type="text"
+                placeholder="C:\Users\rockz\Music\Rock"
+                value={state.folderPath}
+                onChange={(e) => setState((s) => ({ ...s, folderPath: e.target.value, error: null }))}
+                disabled={state.loading}
+                className="flex-1"
+              />
+              {isTauri && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={handleBrowse}
+                  disabled={state.loading}
+                  className="shrink-0"
+                >
+                  Browse…
+                </Button>
+              )}
+            </div>
           </div>
 
           <div className="space-y-2">
