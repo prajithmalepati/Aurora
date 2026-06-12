@@ -118,6 +118,42 @@ cd frontend
 npm run lint
 ```
 
+## Desktop App (Tauri)
+
+Aurora ships as a native desktop app via Tauri 2. The backend is frozen with PyInstaller and bundled as a sidecar — no Python installation required for end users.
+
+### Dev Loop
+
+```bash
+# 1. Freeze the backend (one-time, or after backend changes)
+cd backend
+source venv/bin/activate
+pyinstaller aurora-backend.spec --distpath dist --workpath build -y
+
+# 2. Launch Tauri dev (starts Vite + Rust compile + sidecar)
+cd frontend
+npx tauri dev
+```
+
+The Tauri app spawns the frozen backend on a free port, waits for health, then injects `window.__AURORA_BASE_URL__` via `initialization_script` before creating the window. No manual backend start needed.
+
+### CI Artifacts
+
+Pushing a `v*` tag triggers signed release builds (`.deb` + `.exe` + updater artifacts). `workflow_dispatch` builds unsigned artifacts for testing:
+
+```bash
+gh workflow run "Desktop Build" --ref hermes/phase1-desktop
+```
+
+### Install (Linux)
+
+```bash
+sudo dpkg -i Aurora_0.1.0_amd64.deb
+# Then run: Aurora
+```
+
+The backend binds to `127.0.0.1` by default. For LAN/mobile access: `AURORA_HOST=0.0.0.0 Aurora`.
+
 ## Keyboard Shortcuts
 
 | Key | Action |
