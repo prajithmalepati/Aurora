@@ -35,10 +35,15 @@ fn resolve_backend_bin(app: &tauri::AppHandle) -> std::path::PathBuf {
 }
 
 fn spawn_backend(bin: &std::path::Path, port: u16) -> std::io::Result<Child> {
+    let (stdout, stderr) = if cfg!(debug_assertions) {
+        (std::process::Stdio::inherit(), std::process::Stdio::inherit())
+    } else {
+        (std::process::Stdio::null(), std::process::Stdio::null())
+    };
     Command::new(bin)
         .env("AURORA_PORT", port.to_string())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
+        .stdout(stdout)
+        .stderr(stderr)
         .spawn()
 }
 
@@ -83,7 +88,6 @@ pub fn run() {
                 Err(e) => {
                     log::error!("sidecar: failed to spawn backend: {}", e);
                     let msg = format!("Failed to start backend:\n{}\n\nPath: {}", e, bin.display());
-                    // Show native error dialog (blocking), then propagate error
                     use tauri_plugin_dialog::DialogExt;
                     app.dialog()
                         .message(&msg)
@@ -107,14 +111,18 @@ pub fn run() {
                 // Don't block forever — show window anyway, user will see error
             }
 
-            // Inject base URL before frontend loads
-            let base_url = format!("http://127.0.0.1:{}", port);
-            let init_script = format!("window.__AURORA_BASE_URL__ = \"{}\";", base_url);
+            // Inject base URL via initialization_script (runs before page JS on every nav)
+            let init = format!("window.__AURORA_BASE_URL__ = \"http://127.0.0.1:{}\";", port);
 
-            let window = app.get_webview_window("main").expect("main window");
-            window.eval(&init_script).expect("eval init script");
+            // Create window AFTER health gate — user never sees a white/frozen screen
+            tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::default())
+                .title("Aurora")
+                .inner_size(1280.0, 800.0)
+                .min_inner_size(960.0, 600.0)
+                .initialization_script(&init)
+                .build()?;
 
-            log::info!("sidecar: ready on {}", base_url);
+            log::info!("sidecar: ready on port {}", port);
 
             // Background monitor thread — restart with backoff if sidecar dies
             let handle = app.handle().clone();
