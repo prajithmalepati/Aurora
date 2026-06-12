@@ -28,8 +28,17 @@
     "resources": {
       "../../backend/dist/aurora-backend/": "backend/"
     },
+    "createUpdaterArtifacts": true,
     "android": {
       "debugApplicationIdSuffix": ".debug"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDdFRDdGQTVGMjczRjA1QgpSV1JiOEhQeXBYL3RCKzU1VVNzb3hwUUluUCt4UExEQmNJczYxbWY1VmN4QmVFMWZyV1EyS3RRdAo=",
+      "endpoints": [
+        "https://github.com/prajithmalepati/Aurora/releases/latest/download/latest.json"
+      ]
     }
   }
 }
