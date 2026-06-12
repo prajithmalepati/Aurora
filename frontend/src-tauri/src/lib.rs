@@ -104,8 +104,8 @@ pub fn run() {
             // Store port + child in managed state
             {
                 let state = app.state::<SidecarState>();
-                *state.port.lock().unwrap() = port;
-                *state.child.lock().unwrap() = Some(child);
+                *state.port.lock().unwrap_or_else(|e| e.into_inner()) = port;
+                *state.child.lock().unwrap_or_else(|e| e.into_inner()) = Some(child);
             }
 
             // Health gate — block until backend is ready (up to 15s)
@@ -138,7 +138,7 @@ pub fn run() {
                     if state.shutting_down.load(Ordering::Acquire) {
                         return;
                     }
-                    let mut guard = state.child.lock().unwrap();
+                    let mut guard = state.child.lock().unwrap_or_else(|e| e.into_inner());
                     if let Some(ref mut child) = *guard {
                         match child.try_wait() {
                             Ok(Some(status)) => {
@@ -148,7 +148,7 @@ pub fn run() {
                                 if state.shutting_down.load(Ordering::Acquire) {
                                     return;
                                 }
-                                let port = *state.port.lock().unwrap();
+                                let port = *state.port.lock().unwrap_or_else(|e| e.into_inner());
                                 let bin = resolve_backend_bin(&handle);
                                 // 3 attempts with backoff
                                 let mut restarted = false;
@@ -164,7 +164,7 @@ pub fn run() {
                                     if state.shutting_down.load(Ordering::Acquire) {
                                         return;
                                     }
-                                    guard = state.child.lock().unwrap();
+                                    guard = state.child.lock().unwrap_or_else(|e| e.into_inner());
                                     match spawn_backend(&bin, port) {
                                         Ok(new_child) => {
                                             *guard = Some(new_child);
@@ -200,7 +200,7 @@ pub fn run() {
             let state = app_handle.state::<SidecarState>();
             // Signal monitor thread to stop BEFORE killing the child
             state.shutting_down.store(true, Ordering::Release);
-            let mut guard = state.child.lock().unwrap();
+            let mut guard = state.child.lock().unwrap_or_else(|e| e.into_inner());
             if let Some(ref mut child) = *guard {
                 log::info!("sidecar: killing backend on exit");
                 let _ = child.kill();
