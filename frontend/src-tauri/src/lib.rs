@@ -16,15 +16,21 @@ fn find_free_port() -> u16 {
     port
 }
 
+const BIN: &str = if cfg!(target_os = "windows") {
+    "aurora-backend.exe"
+} else {
+    "aurora-backend"
+};
+
 fn resolve_backend_bin(app: &tauri::AppHandle) -> std::path::PathBuf {
     if cfg!(debug_assertions) {
         // Dev: repo-relative path from src-tauri/
         let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        manifest_dir.join("../../backend/dist/aurora-backend/aurora-backend")
+        manifest_dir.join("../../backend/dist/aurora-backend").join(BIN)
     } else {
-        // Bundled: inside resource dir
+        // Bundled: resources map puts aurora-backend/ at resource_dir/backend/
         let resource_dir = app.path().resource_dir().expect("resource_dir");
-        resource_dir.join("backend/dist/aurora-backend/aurora-backend")
+        resource_dir.join("backend").join(BIN)
     }
 }
 
@@ -72,8 +78,20 @@ pub fn run() {
             let port = find_free_port();
             log::info!("sidecar: spawning {} on port {}", bin.display(), port);
 
-            let child = spawn_backend(&bin, port)
-                .expect("failed to spawn aurora-backend sidecar");
+            let child = match spawn_backend(&bin, port) {
+                Ok(c) => c,
+                Err(e) => {
+                    log::error!("sidecar: failed to spawn backend: {}", e);
+                    let msg = format!("Failed to start backend:\n{}\n\nPath: {}", e, bin.display());
+                    // Show native error dialog (blocking), then propagate error
+                    use tauri_plugin_dialog::DialogExt;
+                    app.dialog()
+                        .message(&msg)
+                        .title("Aurora — Backend Error")
+                        .blocking_show();
+                    return Err(Box::new(e));
+                }
+            };
 
             // Store port + child in managed state
             {
