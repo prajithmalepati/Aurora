@@ -35,9 +35,9 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": [
-      "../../backend/dist/aurora-backend/"
-    ],
+    "resources": {
+      "../../backend/dist/aurora-backend/": "backend/"
+    },
     "android": {
       "debugApplicationIdSuffix": ".debug"
     }
