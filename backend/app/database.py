@@ -1,8 +1,11 @@
 """SQLite database connection and initialization."""
+import logging
 import sqlite3
 from pathlib import Path
 
 from app.paths import DB_PATH
+
+logger = logging.getLogger(__name__)
 
 # ── Current schema (version 1) ──────────────────────────────────────────
 # All columns that exist today are defined here. Fresh databases create
@@ -257,8 +260,8 @@ def _backfill_album_art(conn) -> None:
             )
             if filename:
                 updated += 1
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Album art backfill failed for %s: %s", row["file_path"], e)
     if rows:
         conn.commit()
 
