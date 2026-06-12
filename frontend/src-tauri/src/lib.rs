@@ -1,4 +1,5 @@
 use std::process::{Child, Command};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::net::TcpListener;
 use std::time::{Duration, Instant};
@@ -7,6 +8,7 @@ use tauri::{Manager, RunEvent};
 struct SidecarState {
     child: Mutex<Option<Child>>,
     port: Mutex<u16>,
+    shutting_down: AtomicBool,
 }
 
 fn find_free_port() -> u16 {
@@ -69,6 +71,7 @@ pub fn run() {
         .manage(SidecarState {
             child: Mutex::new(None),
             port: Mutex::new(0),
+            shutting_down: AtomicBool::new(false),
         })
         .setup(|app| {
             if cfg!(debug_assertions) {
@@ -130,14 +133,24 @@ pub fn run() {
                 let state = handle.state::<SidecarState>();
                 loop {
                     std::thread::sleep(Duration::from_secs(2));
+                    // Exit if app is shutting down
+                    if state.shutting_down.load(Ordering::Acquire) {
+                        return;
+                    }
                     let mut guard = state.child.lock().unwrap();
                     if let Some(ref mut child) = *guard {
                         match child.try_wait() {
                             Ok(Some(status)) => {
                                 log::warn!("sidecar: backend exited ({}), restarting...", status);
+                                // Clear cached exit status so try_wait can't re-trigger
+                                *guard = None;
+                                if state.shutting_down.load(Ordering::Acquire) {
+                                    return;
+                                }
                                 let port = *state.port.lock().unwrap();
                                 let bin = resolve_backend_bin(&handle);
-                                // Backoff: 3 retries with increasing delay
+                                // 3 attempts with backoff
+                                let mut restarted = false;
                                 for attempt in 1..=3u32 {
                                     let delay = Duration::from_secs(attempt as u64);
                                     log::info!(
@@ -147,22 +160,24 @@ pub fn run() {
                                     );
                                     drop(guard); // release lock during sleep
                                     std::thread::sleep(delay);
+                                    if state.shutting_down.load(Ordering::Acquire) {
+                                        return;
+                                    }
                                     guard = state.child.lock().unwrap();
                                     match spawn_backend(&bin, port) {
                                         Ok(new_child) => {
                                             *guard = Some(new_child);
                                             log::info!("sidecar: restarted successfully");
+                                            restarted = true;
                                             break;
                                         }
                                         Err(e) => {
                                             log::error!("sidecar: restart failed: {}", e);
-                                            if attempt == 3 {
-                                                log::error!(
-                                                    "sidecar: all restart attempts exhausted"
-                                                );
-                                            }
                                         }
                                     }
+                                }
+                                if !restarted {
+                                    log::error!("sidecar: giving up after 3 failed restarts");
                                 }
                             }
                             Ok(None) => { /* still running */ }
@@ -182,6 +197,8 @@ pub fn run() {
     app.run(|app_handle, event| {
         if let RunEvent::ExitRequested { .. } = event {
             let state = app_handle.state::<SidecarState>();
+            // Signal monitor thread to stop BEFORE killing the child
+            state.shutting_down.store(true, Ordering::Release);
             let mut guard = state.child.lock().unwrap();
             if let Some(ref mut child) = *guard {
                 log::info!("sidecar: killing backend on exit");
