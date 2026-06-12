@@ -89,7 +89,7 @@ export function useAudioPlayer() {
       if (playlist && playlist.crossfade_enabled !== null && playlist.crossfade_enabled !== undefined) {
         return {
           enabled: playlist.crossfade_enabled === 1,
-          duration: playlist.crossfade_duration_s ?? settings.crossfadeDuration,
+          duration: Math.max(1, Math.min(12, playlist.crossfade_duration_s ?? settings.crossfadeDuration)),
           curve: settings.crossfadeCurve,
         }
       }
@@ -257,8 +257,9 @@ export function useAudioPlayer() {
       respectTrims && curSong?.end_time_ms && curSong.end_time_ms > 0
         ? Math.min(curSong.end_time_ms / 1000, curDuration)
         : curDuration
-    // For songs > 5s: preload in the last 5 seconds before the effective end.
-    if (effectiveEnd > 5 && currentSeekSec < effectiveEnd - 5) return
+    // Preload in last 5 seconds (or last 80% for songs ≤ 5s) before effective end.
+    const preloadWindow = Math.min(5, effectiveEnd * 0.8)
+    if (currentSeekSec < effectiveEnd - preloadWindow) return
 
     const state = usePlayerStore.getState()
     const { queue, queueIndex, repeatMode, currentSong } = state
@@ -608,7 +609,7 @@ export function useAudioPlayer() {
       // Resume a mid-crossfade outgoing engine only if it's still audible —
       // pausing snaps Howler fades to their end value, so a faded-out engine
       // reads 0 here and stays stopped
-      if (fadingOutRef.current && fadingOutRef.current.getVolume() > 0.05) {
+      if (fadingOutRef.current && fadingOutRef.current.isLoaded() && fadingOutRef.current.getVolume() > 0.05) {
         fadingOutRef.current.play()
       }
     } else {
