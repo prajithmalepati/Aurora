@@ -13,6 +13,9 @@ permissions:
 jobs:
   build-linux:
     runs-on: ubuntu-22.04
+    env:
+      NO_STRIP: true
+      APPIMAGE_EXTRACT_AND_RUN: 1
     steps:
       - uses: actions/checkout@v4
 
@@ -48,6 +51,7 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         with:
           projectPath: frontend
+          args: --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NO_STRIP: true
