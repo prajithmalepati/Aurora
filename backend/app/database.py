@@ -300,7 +300,7 @@ PLAYLIST_SONG_SELECT_COLUMNS = """
     s.replaygain_track_gain, s.replaygain_track_peak,
     s.replaygain_album_gain, s.replaygain_album_peak,
     s.artists, s.featured_artists,
-    GROUP_CONCAT(t.name) as tags,
+    GROUP_CONCAT(DISTINCT t.name) as tags,
     ps.start_time_ms, ps.end_time_ms, ps.position"""
 
 PLAYLIST_SONG_SELECT_FROM = """
