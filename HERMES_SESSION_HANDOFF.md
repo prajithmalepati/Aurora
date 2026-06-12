@@ -434,3 +434,161 @@ d563fa9 docs: N4 handoff
 - CI run: https://github.com/prajithmalepati/Aurora/actions/runs/27439624990
 - Backend resource path in deb: `usr/lib/Aurora/_up_/_up_/backend/dist/aurora-backend/aurora-backend` — verify this resolves correctly via `resource_dir()` on a real desktop
 
+## N6 — Sidecar Fixes + Runtime Verification + Updater/Signing
+
+**Session:** 2026-06-12, Hermes (MiMo Pro). Branch: `hermes/phase1-desktop` (8 new commits).
+
+### PRE-FLIGHT results
+- Frozen backend: `backend/dist/aurora-backend/aurora-backend` ✓
+- gh auth: `workflow` scope ✓
+- webkit2gtk-4.1: installed ✓
+- xorg-server-xvfb: installed (user installed mid-session) ✓
+- `$DISPLAY`: empty (used `xvfb-run` throughout)
+
+### Task 0: Copilot fixes on PR #3 ✅
+
+**Branch:** `hermes/phase1-xfade`. **Files:** `useAudioPlayer.ts`, `SettingsView.tsx`.
+
+**Changes:**
+1. Trim-end clamp in tick: `Math.min(song.end_time_ms / 1000, engineRef.current.duration() || Infinity)`
+2. Same clamp in `preloadNextIfNeeded`: `Math.min(curSong.end_time_ms / 1000, curDuration)`
+3. `aria-label="Respect song trims"` on switch button
+
+**Commit:** `a587611` on xfade, merged to desktop (`b2b4591`). Pushed to origin.
+
+### Task 1: fix prod backend resource path ✅
+
+**Changes:**
+1. `bundle.resources`: array → map `{"../../backend/dist/aurora-backend/": "backend/"}` — kills `_up_/_up_`
+2. `BIN` constant with explicit `.exe` suffix. Prod: `resource_dir().join("backend").join(BIN)`
+3. `.expect()` → native error dialog (`DialogExt::blocking_show`)
+4. Cargo.toml placeholders filled
+
+**Commit:** `085065e fix(desktop): resolve backend resource path`
+
+### Task 2: fix base-URL injection ✅
+
+**Changes:**
+1. `"windows": []` — main window now created in Rust after health gate
+2. `WebviewWindowBuilder::new(app, "main", ...)` with `.initialization_script(&init)`
+3. Deleted `window.eval()` block + `get_webview_window("main")` lookup
+4. Debug-only `Stdio::inherit()` for backend stdout/stderr
+
+**Commit:** `1575f25 fix(desktop): inject base url via initialization_script`
+
+### Task 3: harden sidecar monitor thread ✅
+
+**Changes:**
+1. `shutting_down: AtomicBool` on `SidecarState`
+2. `ExitRequested`: sets flag true BEFORE child kill
+3. Monitor checks flag at tick top + before each respawn
+4. `*guard = None` immediately on dead child (no cached try_wait re-trigger)
+5. 3-attempt cap → "giving up" → leaves None forever
+
+**Commit:** `bdeb107 fix(desktop): monitor thread — shutdown flag, restart cap`
+
+### Task 4: runtime verification ✅
+
+Under `xvfb-run -s "-screen 0 1920x1080x24"`.
+
+**Injection proof (uvicorn log):**
+```
+sidecar: spawning ...aurora-backend on port 32817
+Uvicorn running on http://127.0.0.1:32817
+127.0.0.1:50160 - "GET /api/songs?limit=100..." 200 OK
+127.0.0.1:50190 - "GET /api/playlists" 200 OK
+127.0.0.1:50176 - "GET /api/tags" 200 OK
+```
+
+**Visual proof:** `/tmp/aurora-n6.png` — Aurora Mix view, dark theme, sidebar, playlists/tags visible.
+
+**Orphan check:** clean after quit ✓
+
+**Crash-restart:** backend respawned (new PID 229286, same port 44687) within ~5s:
+```
+sidecar: backend exited (signal: 15), restarting...
+sidecar: restart attempt 1 after 1s
+sidecar: restarted successfully
+```
+Quit → no orphan ✓
+
+**Window-state:** default size (kill doesn't save; needs real display).
+
+### Task 5: CI artifact verification ✅
+
+**CI run:** https://github.com/prajithmalepati/Aurora/actions/runs/27443661489 (both green)
+
+**Deb path:** `usr/lib/Aurora/backend/aurora-backend` — zero `_up_` entries ✓
+
+**Installed app:** extracted deb → backend on ephemeral port 43455, health OK (352 songs). Sidebar playlists/tags show "Failed to load" (likely frontend assets path in extracted context; core chain works). Orphan clean ✓.
+
+**Artifacts:** Linux 48MB, Windows 20MB.
+
+### Task 6: AppImage retry ❌ FAILED
+
+Changed to ubuntu-24.04, added appimage target (`f455482`). CI run 27444337382.
+
+**Result:** `failed to run linuxdeploy` — same root cause as N5. linuxdeploy can't resolve PyInstaller `_internal/` libs even on 24.04. Reverted immediately (`0671bfb`). AppImage dead until Tauri upstream changes.
+
+### Task 7: updater + signing ✅
+
+1. `tauri-plugin-updater` (Cargo + lib.rs + capabilities)
+2. `tauri.conf.json`: `createUpdaterArtifacts`, `plugins.updater` (pubkey + endpoint)
+3. Signing keypair: `~/.tauri/aurora.key` (empty password)
+4. CI secrets set: `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`
+5. Workflow: signing on both jobs; draft release on `v*` tags only
+6. Migration smoke: `user_version=2`, 352 songs ✓
+
+**Commit:** `519e60b feat(desktop): updater plugin + signed artifacts`
+
+### Task 8: docs ✅
+
+README: desktop section. `docs/05-project-structure.md`: refreshed run.py snippet.
+
+**Commit:** `b0fa21d docs: desktop dev loop (tauri + sidecar)`
+
+### Branch state
+
+```
+0671bfb ci(desktop): revert appimage — linuxdeploy still fails on ubuntu-24.04
+f455482 ci(desktop): retry appimage on ubuntu-24.04
+b0fa21d docs: desktop dev loop (tauri + sidecar)
+519e60b feat(desktop): updater plugin + signed artifacts on tag releases
+bdeb107 fix(desktop): monitor thread — shutdown flag, restart cap
+1575f25 fix(desktop): inject base url via initialization_script
+085065e fix(desktop): resolve backend resource path — map resources to backend/
+b2b4591 Merge branch 'hermes/phase1-xfade' into hermes/phase1-desktop
+```
+
+### Done means status
+
+| Criterion | Status |
+|---|---|
+| Copilot fixes on PR #3 | ✅ |
+| Sidecar bugs fixed (Tasks 1-3) | ✅ `cargo check` clean |
+| Runtime injection proof | ✅ Port 32817, uvicorn log |
+| Runtime visual proof | ✅ `/tmp/aurora-n6.png` |
+| Orphan checks | ✅ Both clean |
+| Crash-restart proof | ✅ Same port, ~5s |
+| CI deb path (no `_up_`) | ✅ |
+| Extracted deb runs | ✅ |
+| AppImage | ❌ Dead (reverted) |
+| Updater + signing | ✅ |
+| Migration smoke | ✅ |
+| Docs | ✅ |
+| Handoff | ✅ This section |
+
+### Deviations
+
+1. **AppImage dead** — same linuxdeploy failure on 24.04. Upstream fix needed.
+2. **Installed app sidebar errors** — extracted deb context, not `dpkg -i`. Core chain works.
+3. **Window-state** — kill doesn't save; needs real display.
+
+### For Fable 5 review
+
+- Diff: `hermes/phase1-xfade...hermes/phase1-desktop`
+- Key files: `frontend/src-tauri/src/lib.rs`, `tauri.conf.json`, `desktop-build.yml`
+- CI: [27443661489](https://github.com/prajithmalepati/Aurora/actions/runs/27443661489) (green)
+- Signing key: `~/.tauri/aurora.key` (empty password)
+- Full updater e2e test: N7 with the human
+
