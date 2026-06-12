@@ -4,18 +4,15 @@ import re
 import sqlite3
 from pathlib import Path
 from fastapi import APIRouter, HTTPException, UploadFile, File, Query, Form
-from fastapi.responses import Response
+from fastapi.responses import Response, FileResponse
 
 from datetime import datetime, timezone
 
 from app.database import get_db_ctx, PLAYLIST_SONG_SELECT_QUERY
-from app.routers.songs import _safe_json_loads
-from app.models import PlaylistCreate, PlaylistUpdate, PlaylistResponse, SongResponse, PlaylistSongAdd, PlaylistReorder, PlaylistSongTiming
+from app.models import PlaylistCreate, PlaylistUpdate, PlaylistResponse, PlaylistSongAdd, PlaylistReorder, PlaylistSongTiming
+from app.serializers import song_row_to_dict
 
-# Playlist cover images are saved into the Vite public folder so they're
-# served at /playlist-images/<id>.<ext> by the dev server (no CORS issues).
-_PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
-IMAGES_DIR = _PROJECT_ROOT / "frontend" / "public" / "playlist-images"
+from app.paths import PLAYLIST_IMAGES_DIR
 
 router = APIRouter(tags=["playlists"])
 
@@ -43,18 +40,18 @@ async def upload_playlist_image(playlist_id: int, file: UploadFile = File(...)):
             mime = file.content_type or "image/jpeg"
             ext = {"image/png": "png", "image/gif": "gif", "image/webp": "webp"}.get(mime, "jpg")
 
-            IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+            PLAYLIST_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 
             # Remove any existing image files for this playlist
-            for old in IMAGES_DIR.glob(f"{playlist_id}.*"):
+            for old in PLAYLIST_IMAGES_DIR.glob(f"{playlist_id}.*"):
                 old.unlink()
 
             filename = f"{playlist_id}.{ext}"
-            filepath = IMAGES_DIR / filename
+            filepath = PLAYLIST_IMAGES_DIR / filename
             with open(filepath, "wb") as f:
                 f.write(await file.read())
 
-            image_url = f"/playlist-images/{filename}"
+            image_url = f"/api/playlist-images/{filename}"
 
             conn.execute(
                 "UPDATE playlists SET image_url = ?, updated_at = ? WHERE id = ?",
@@ -85,7 +82,7 @@ def delete_playlist_image(playlist_id: int):
 
     if row["image_url"]:
         filename = row["image_url"].split("/")[-1]
-        file_path = IMAGES_DIR / filename
+        file_path = PLAYLIST_IMAGES_DIR / filename
         if file_path.exists():
             file_path.unlink()
 
@@ -97,6 +94,21 @@ def delete_playlist_image(playlist_id: int):
         conn.commit()
 
     return {"data": None, "message": "Image removed"}
+
+
+@router.get("/playlist-images/{filename}")
+def serve_playlist_image(filename: str):
+    """Serve a playlist cover image by filename."""
+    safe_name = Path(filename).name
+    file_path = PLAYLIST_IMAGES_DIR / safe_name
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Image not found")
+    mime = "image/png" if safe_name.endswith(".png") else "image/jpeg"
+    if safe_name.endswith(".webp"):
+        mime = "image/webp"
+    elif safe_name.endswith(".gif"):
+        mime = "image/gif"
+    return FileResponse(str(file_path), media_type=mime)
 
 
 @router.post("/playlists", status_code=201)
@@ -240,42 +252,8 @@ def reorder_playlist_songs(playlist_id: int, reorder: PlaylistReorder):
         cursor.execute(query, (playlist_id,))
         song_rows = cursor.fetchall()
 
-    # Build songs list with tags parsed from GROUP_CONCAT
-    songs = []
-    for song_row in song_rows:
-        tags_str = song_row["tags"]
-        tags = tags_str.split(",") if tags_str else []
-        raw_peaks = song_row["waveform_peaks"] if "waveform_peaks" in song_row.keys() else None
-
-        songs.append(
-            SongResponse(
-                id=song_row["id"],
-                title=song_row["title"],
-                artist=song_row["artist"],
-                album=song_row["album"],
-                artists=_safe_json_loads(song_row["artists"]),
-                featured_artists=_safe_json_loads(song_row["featured_artists"]),
-                duration=song_row["duration"],
-                file_path=song_row["file_path"],
-                file_format=song_row["file_format"] if "file_format" in song_row.keys() else None,
-                album_art_path=(song_row["album_art_path"] or None) if "album_art_path" in song_row.keys() else None,
-                source=song_row["source"],
-                tags=tags,
-                playlists=[],
-                created_at="",
-                updated_at="",
-                start_time_ms=song_row["start_time_ms"],
-                end_time_ms=song_row["end_time_ms"],
-                position=song_row["position"],
-                waveform_peaks=_safe_json_loads(raw_peaks),
-                dominant_color=song_row["dominant_color"] if "dominant_color" in song_row.keys() else None,
-                dominant_color_2=song_row["dominant_color_2"] if "dominant_color_2" in song_row.keys() else None,
-                replaygain_track_gain=song_row["replaygain_track_gain"] if "replaygain_track_gain" in song_row.keys() else None,
-                replaygain_track_peak=song_row["replaygain_track_peak"] if "replaygain_track_peak" in song_row.keys() else None,
-                replaygain_album_gain=song_row["replaygain_album_gain"] if "replaygain_album_gain" in song_row.keys() else None,
-                replaygain_album_peak=song_row["replaygain_album_peak"] if "replaygain_album_peak" in song_row.keys() else None,
-            )
-        )
+    # Build songs list
+    songs = [song_row_to_dict(r, include_peaks=False) for r in song_rows]
 
     # Fetch playlist metadata
     with get_db_ctx() as conn:
@@ -337,35 +315,45 @@ def delete_song_from_playlist(playlist_id: int, song_id: int):
         if not song_row:
             raise HTTPException(status_code=404, detail="Song not found")
         
-        # Verify song is in the playlist
-        cursor.execute(
-            "SELECT id, position FROM playlist_songs WHERE playlist_id = ? AND song_id = ?",
-            (playlist_id, song_id),
-        )
-        existing = cursor.fetchone()
-        
-        if not existing:
-            raise HTTPException(status_code=404, detail="Song not in playlist")
-        
-        # Get the position of the song being deleted
-        deleted_position = existing["position"]
-        
-        # Delete the playlist_songs row
-        cursor.execute(
-            "DELETE FROM playlist_songs WHERE playlist_id = ? AND song_id = ?",
-            (playlist_id, song_id),
-        )
-        
-        # Recompack positions: decrement position for all songs after the deleted one
-        cursor.execute(
-            """
-            UPDATE playlist_songs
-            SET position = position - 1
-            WHERE playlist_id = ? AND position > ?
-            """,
-            (playlist_id, deleted_position),
-        )
-        conn.commit()
+        # Start explicit transaction so DELETE + position recompaction
+        # are atomic. Python 3.11's default autocommit mode would
+        # otherwise persist the DELETE immediately.
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+
+            # Verify song is in the playlist (inside the transaction to
+            # prevent a TOCTOU race on position reads) and get its position
+            cursor.execute(
+                "SELECT id, position FROM playlist_songs WHERE playlist_id = ? AND song_id = ?",
+                (playlist_id, song_id),
+            )
+            existing = cursor.fetchone()
+            
+            if not existing:
+                raise HTTPException(status_code=404, detail="Song not in playlist")
+            
+            # Get the position of the song being deleted
+            deleted_position = existing["position"]
+            
+            # Delete the playlist_songs row
+            cursor.execute(
+                "DELETE FROM playlist_songs WHERE playlist_id = ? AND song_id = ?",
+                (playlist_id, song_id),
+            )
+            
+            # Recompack positions: decrement position for all songs after the deleted one
+            cursor.execute(
+                """
+                UPDATE playlist_songs
+                SET position = position - 1
+                WHERE playlist_id = ? AND position > ?
+                """,
+                (playlist_id, deleted_position),
+            )
+            conn.commit()
+        except:
+            conn.rollback()
+            raise
 
     # Fetch and return the full playlist with songs
     with get_db_ctx() as conn:
@@ -376,42 +364,8 @@ def delete_song_from_playlist(playlist_id: int, song_id: int):
         cursor.execute(query, (playlist_id,))
         song_rows = cursor.fetchall()
 
-    # Build songs list with tags parsed from GROUP_CONCAT
-    songs = []
-    for song_row in song_rows:
-        tags_str = song_row["tags"]
-        tags = tags_str.split(",") if tags_str else []
-        raw_peaks = song_row["waveform_peaks"] if "waveform_peaks" in song_row.keys() else None
-
-        songs.append(
-            SongResponse(
-                id=song_row["id"],
-                title=song_row["title"],
-                artist=song_row["artist"],
-                album=song_row["album"],
-                artists=_safe_json_loads(song_row["artists"]),
-                featured_artists=_safe_json_loads(song_row["featured_artists"]),
-                duration=song_row["duration"],
-                file_path=song_row["file_path"],
-                file_format=song_row["file_format"] if "file_format" in song_row.keys() else None,
-                album_art_path=(song_row["album_art_path"] or None) if "album_art_path" in song_row.keys() else None,
-                source=song_row["source"],
-                tags=tags,
-                playlists=[],
-                created_at="",
-                updated_at="",
-                start_time_ms=song_row["start_time_ms"],
-                end_time_ms=song_row["end_time_ms"],
-                position=song_row["position"],
-                waveform_peaks=_safe_json_loads(raw_peaks),
-                dominant_color=song_row["dominant_color"] if "dominant_color" in song_row.keys() else None,
-                dominant_color_2=song_row["dominant_color_2"] if "dominant_color_2" in song_row.keys() else None,
-                replaygain_track_gain=song_row["replaygain_track_gain"] if "replaygain_track_gain" in song_row.keys() else None,
-                replaygain_track_peak=song_row["replaygain_track_peak"] if "replaygain_track_peak" in song_row.keys() else None,
-                replaygain_album_gain=song_row["replaygain_album_gain"] if "replaygain_album_gain" in song_row.keys() else None,
-                replaygain_album_peak=song_row["replaygain_album_peak"] if "replaygain_album_peak" in song_row.keys() else None,
-            )
-        )
+    # Build songs list
+    songs = [song_row_to_dict(r, include_peaks=False) for r in song_rows]
 
     # Fetch playlist metadata
     with get_db_ctx() as conn:
@@ -476,42 +430,8 @@ def get_playlist(playlist_id: int):
         cursor.execute(query, (playlist_id,))
         song_rows = cursor.fetchall()
 
-    # Build songs list with tags parsed from GROUP_CONCAT
-    songs = []
-    for song_row in song_rows:
-        tags_str = song_row["tags"]
-        tags = tags_str.split(",") if tags_str else []
-        raw_peaks = song_row["waveform_peaks"] if "waveform_peaks" in song_row.keys() else None
-
-        songs.append(
-            SongResponse(
-                id=song_row["id"],
-                title=song_row["title"],
-                artist=song_row["artist"],
-                album=song_row["album"],
-                artists=_safe_json_loads(song_row["artists"]),
-                featured_artists=_safe_json_loads(song_row["featured_artists"]),
-                duration=song_row["duration"],
-                file_path=song_row["file_path"],
-                file_format=song_row["file_format"] if "file_format" in song_row.keys() else None,
-                album_art_path=(song_row["album_art_path"] or None) if "album_art_path" in song_row.keys() else None,
-                source=song_row["source"],
-                tags=tags,
-                playlists=[],
-                created_at="",
-                updated_at="",
-                start_time_ms=song_row["start_time_ms"],
-                end_time_ms=song_row["end_time_ms"],
-                position=song_row["position"],
-                waveform_peaks=_safe_json_loads(raw_peaks),
-                dominant_color=song_row["dominant_color"] if "dominant_color" in song_row.keys() else None,
-                dominant_color_2=song_row["dominant_color_2"] if "dominant_color_2" in song_row.keys() else None,
-                replaygain_track_gain=song_row["replaygain_track_gain"] if "replaygain_track_gain" in song_row.keys() else None,
-                replaygain_track_peak=song_row["replaygain_track_peak"] if "replaygain_track_peak" in song_row.keys() else None,
-                replaygain_album_gain=song_row["replaygain_album_gain"] if "replaygain_album_gain" in song_row.keys() else None,
-                replaygain_album_peak=song_row["replaygain_album_peak"] if "replaygain_album_peak" in song_row.keys() else None,
-            )
-        )
+    # Build songs list
+    songs = [song_row_to_dict(r, include_peaks=False) for r in song_rows]
 
     # Calculate song_count
     song_count = len(songs)
@@ -729,42 +649,8 @@ def add_song_to_playlist(playlist_id: int, song_add: PlaylistSongAdd):
         cursor.execute(query, (playlist_id,))
         song_rows = cursor.fetchall()
 
-    # Build songs list with tags parsed from GROUP_CONCAT
-    songs = []
-    for song_row in song_rows:
-        tags_str = song_row["tags"]
-        tags = tags_str.split(",") if tags_str else []
-        raw_peaks = song_row["waveform_peaks"] if "waveform_peaks" in song_row.keys() else None
-
-        songs.append(
-            SongResponse(
-                id=song_row["id"],
-                title=song_row["title"],
-                artist=song_row["artist"],
-                album=song_row["album"],
-                artists=_safe_json_loads(song_row["artists"]),
-                featured_artists=_safe_json_loads(song_row["featured_artists"]),
-                duration=song_row["duration"],
-                file_path=song_row["file_path"],
-                file_format=song_row["file_format"] if "file_format" in song_row.keys() else None,
-                album_art_path=(song_row["album_art_path"] or None) if "album_art_path" in song_row.keys() else None,
-                source=song_row["source"],
-                tags=tags,
-                playlists=[],
-                created_at="",
-                updated_at="",
-                start_time_ms=song_row["start_time_ms"],
-                end_time_ms=song_row["end_time_ms"],
-                position=song_row["position"],
-                waveform_peaks=_safe_json_loads(raw_peaks),
-                dominant_color=song_row["dominant_color"] if "dominant_color" in song_row.keys() else None,
-                dominant_color_2=song_row["dominant_color_2"] if "dominant_color_2" in song_row.keys() else None,
-                replaygain_track_gain=song_row["replaygain_track_gain"] if "replaygain_track_gain" in song_row.keys() else None,
-                replaygain_track_peak=song_row["replaygain_track_peak"] if "replaygain_track_peak" in song_row.keys() else None,
-                replaygain_album_gain=song_row["replaygain_album_gain"] if "replaygain_album_gain" in song_row.keys() else None,
-                replaygain_album_peak=song_row["replaygain_album_peak"] if "replaygain_album_peak" in song_row.keys() else None,
-            )
-        )
+    # Build songs list
+    songs = [song_row_to_dict(r, include_peaks=False) for r in song_rows]
 
     # Fetch playlist metadata
     with get_db_ctx() as conn:
@@ -857,38 +743,7 @@ def _get_playlist_songs_for_export(playlist_id: int):
         cursor.execute(query, (playlist_id,))
         song_rows = cursor.fetchall()
 
-    songs = []
-    for sr in song_rows:
-        tags_str = sr["tags"]
-        tags = tags_str.split(",") if tags_str else []
-        raw_peaks = sr["waveform_peaks"] if "waveform_peaks" in sr.keys() else None
-        songs.append(SongResponse(
-            id=sr["id"],
-            title=sr["title"],
-            artist=sr["artist"],
-            album=sr["album"],
-            artists=_safe_json_loads(sr["artists"]),
-            featured_artists=_safe_json_loads(sr["featured_artists"]),
-            duration=sr["duration"],
-            file_path=sr["file_path"],
-            file_format=sr["file_format"] if "file_format" in sr.keys() else None,
-            album_art_path=(sr["album_art_path"] or None) if "album_art_path" in sr.keys() else None,
-            source=sr["source"],
-            tags=tags,
-            playlists=[],
-            created_at="",
-            updated_at="",
-            start_time_ms=sr["start_time_ms"],
-            end_time_ms=sr["end_time_ms"],
-            position=sr["position"],
-            waveform_peaks=_safe_json_loads(raw_peaks),
-            dominant_color=sr["dominant_color"] if "dominant_color" in sr.keys() else None,
-            dominant_color_2=sr["dominant_color_2"] if "dominant_color_2" in sr.keys() else None,
-            replaygain_track_gain=sr["replaygain_track_gain"] if "replaygain_track_gain" in sr.keys() else None,
-            replaygain_track_peak=sr["replaygain_track_peak"] if "replaygain_track_peak" in sr.keys() else None,
-            replaygain_album_gain=sr["replaygain_album_gain"] if "replaygain_album_gain" in sr.keys() else None,
-            replaygain_album_peak=sr["replaygain_album_peak"] if "replaygain_album_peak" in sr.keys() else None,
-        ))
+    songs = [song_row_to_dict(r, include_peaks=False) for r in song_rows]
 
     return row, songs
 
@@ -915,15 +770,15 @@ def export_playlist(playlist_id: int, format: str = Query("m3u8", regex="^(m3u|m
             },
             "songs": [
                 {
-                    "title": s.title,
-                    "artist": s.artist,
-                    "album": s.album,
-                    "duration": s.duration,
-                    "file_path": s.file_path,
-                    "file_format": s.file_format,
-                    "tags": s.tags,
-                    "start_time_ms": s.start_time_ms,
-                    "end_time_ms": s.end_time_ms,
+                    "title": s["title"],
+                    "artist": s["artist"],
+                    "album": s["album"],
+                    "duration": s["duration"],
+                    "file_path": s["file_path"],
+                    "file_format": s["file_format"],
+                    "tags": s["tags"],
+                    "start_time_ms": s["start_time_ms"],
+                    "end_time_ms": s["end_time_ms"],
                 }
                 for s in songs
             ],
@@ -944,11 +799,11 @@ def export_playlist(playlist_id: int, format: str = Query("m3u8", regex="^(m3u|m
         # M3U8 explicitly declares UTF-8 (though we always emit UTF-8)
         lines[0] = "#EXTM3U"
     for s in songs:
-        duration_sec = s.duration if s.duration else -1
-        artist_title = f"{s.artist} - {s.title}" if s.artist else s.title
+        duration_sec = s["duration"] if s["duration"] else -1
+        artist_title = f"{s['artist']} - {s['title']}" if s["artist"] else s["title"]
         lines.append(f"#EXTINF:{duration_sec},{artist_title}")
         # Use forward slashes for cross-platform compatibility
-        file_path = (s.file_path or "").replace("\\", "/")
+        file_path = (s["file_path"] or "").replace("\\", "/")
         lines.append(file_path)
 
     content = "\n".join(lines) + "\n"

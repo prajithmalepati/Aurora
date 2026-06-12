@@ -13,9 +13,7 @@ import type { ScanResult } from "@/types"
 import { useSongStore } from "@/stores/songStore"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { toast } from "@/lib/toast"
-import { api } from "@/lib/api"
-
-const BASE_URL = "http://localhost:8000/api"
+import { api, getBaseUrl } from "@/lib/api"
 
 interface ScanDialogProps {
   open: boolean
@@ -67,7 +65,7 @@ export function ScanDialog({ open, onOpenChange }: ScanDialogProps) {
     abortRef.current = controller
 
     try {
-      const res = await fetch(`${BASE_URL}/scan/stream`, {
+      const res = await fetch(`${getBaseUrl()}/api/scan/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -239,7 +237,7 @@ export function ScanDialog({ open, onOpenChange }: ScanDialogProps) {
                 style={{ background: "var(--aurora-surface)" }}
               >
                 <div
-                  className="h-full rounded-full transition-all duration-150"
+                  className="h-full rounded-full transition-[width] duration-150"
                   style={{
                     width: `${progressPct}%`,
                     background: "linear-gradient(to right, var(--aurora-accent-interactive), var(--aurora-secondary))",

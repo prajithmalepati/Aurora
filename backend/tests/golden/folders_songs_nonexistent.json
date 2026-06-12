@@ -1,0 +1,9 @@
+{
+  "data": [],
+  "message": "ok",
+  "meta": {
+    "path": "/nonexistent",
+    "recursive": false,
+    "total": 0
+  }
+}

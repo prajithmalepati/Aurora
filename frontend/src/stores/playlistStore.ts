@@ -29,6 +29,7 @@ interface PlaylistState {
   addSongToPlaylist: (playlistId: number, songId: number) => Promise<void>
   removeSongFromPlaylist: (playlistId: number, songId: number) => Promise<void>
   reorderSongs: (playlistId: number, songIds: number[]) => Promise<void>
+  updateSongTiming: (songId: number, startMs: number, endMs: number) => void
   clearActivePlaylist: () => void
 }
 
@@ -149,6 +150,21 @@ export const usePlaylistStore = create<PlaylistState>((set, get) => ({
       set({ error: e.message })
       throw e
     }
+  },
+
+  // Local-only update after the timing PATCH succeeds — avoids a full detail
+  // refetch, which remounts the song list and throws away scroll position.
+  updateSongTiming: (songId, startMs, endMs) => {
+    const ap = get().activePlaylist
+    if (!ap) return
+    set({
+      activePlaylist: {
+        ...ap,
+        songs: ap.songs.map((s) =>
+          s.id === songId ? { ...s, start_time_ms: startMs, end_time_ms: endMs } : s
+        ),
+      },
+    })
   },
 
   clearActivePlaylist: () => set({ activePlaylist: null }),

@@ -98,7 +98,7 @@ def list_tags():
     return result
 
 
-@router.delete("/tags/{tag_id}", response_model=dict[str, str])
+@router.delete("/tags/{tag_id}")
 def delete_tag(tag_id: int):
     """Delete a tag by ID. Returns 404 if tag doesn't exist."""
     with get_db_ctx() as conn:

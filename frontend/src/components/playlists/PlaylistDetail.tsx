@@ -36,7 +36,7 @@ import { Equalizer } from "@/components/ui/Equalizer"
 import { AlbumArt } from "@/components/songs/AlbumArt"
 import { PlaylistImagePicker } from "@/components/playlists/PlaylistImagePicker"
 import { WaveformTrimEditor } from "@/components/player/WaveformTrimEditor"
-import { api, BASE_URL } from "@/lib/api"
+import { api, BASE_URL, getBaseUrl } from "@/lib/api"
 
 interface PlaylistDetailProps {
   playlistId: number
@@ -135,7 +135,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
   )
 
   // Server-stored image URL (comes back from the API on every fetchPlaylistDetail)
-  const heroImage = activePlaylist?.image_url ?? null
+  const heroImage = activePlaylist?.image_url ? `${getBaseUrl()}${activePlaylist.image_url}` : null
 
   // Neutral dark gradient for the hero tile — no teal/violet bias.
   // If the playlist has a custom accent colour we let a whisper of it through.
@@ -192,7 +192,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
       setEditColor(activePlaylist.color || "")
       setEditEmoji(activePlaylist.emoji || "")
       // Seed picker with the current server URL (displays as <img src>)
-      setEditImageDataUrl(activePlaylist.image_url || null)
+      setEditImageDataUrl(activePlaylist.image_url ? `${getBaseUrl()}${activePlaylist.image_url}` : null)
       // Seed crossfade settings
       setEditCrossfadeEnabled(
         activePlaylist.crossfade_enabled !== null && activePlaylist.crossfade_enabled !== undefined
@@ -617,7 +617,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
   return (
     <div className="aurora-view-enter">
       {/* ── HERO HEADER ── */}
-      <div className="relative px-10 pt-10 pb-8 overflow-hidden">
+      <div className="relative px-4 pt-6 pb-6 sm:px-10 sm:pt-10 sm:pb-8 overflow-hidden">
         {/* Background halo derived from playlist art */}
         <div
           className="absolute inset-0 opacity-60 pointer-events-none"
@@ -626,10 +626,10 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
           }}
           aria-hidden="true"
         />
-        <div className="relative flex items-end gap-7">
+        <div className="relative flex flex-wrap items-end gap-4 sm:gap-7">
           {/* Hero art tile */}
           <div
-            className="w-[168px] h-[168px] rounded-xl flex-shrink-0 aurora-rim overflow-hidden flex items-center justify-center text-5xl"
+            className="w-[96px] h-[96px] sm:w-[168px] sm:h-[168px] rounded-xl flex-shrink-0 aurora-rim overflow-hidden flex items-center justify-center text-3xl sm:text-5xl"
             style={{
               background: heroImage || showArtGrid ? undefined : heroTileGradient,
               boxShadow: `0 20px 60px -20px ${heroArt.glow}, inset 0 0 0 1px var(--aurora-rim)`,
@@ -649,9 +649,9 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
           </div>
 
           {/* Metadata */}
-          <div className="flex-1 min-w-0 pb-2">
+          <div className="flex-1 min-w-[180px] pb-2">
             <p className="label-micro mb-3 tracking-[0.2em]">Playlist</p>
-            <h1 className="font-display text-[64px] leading-[0.95] tracking-tight text-[var(--aurora-text)] truncate">
+            <h1 className="font-display text-[28px] sm:text-[44px] lg:text-[64px] leading-[0.95] tracking-tight text-[var(--aurora-text)] truncate">
               {activePlaylist.name}
             </h1>
             <div className="flex items-center gap-2 mt-4 text-[12px] text-[var(--aurora-text-secondary)]">
@@ -676,7 +676,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
               <PopoverTrigger
                 title="Export playlist"
                 aria-label="Export playlist"
-                className="h-9 w-9 rounded-md flex items-center justify-center text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] hover:bg-white/[0.04] transition-all duration-150"
+                className="h-9 w-9 rounded-md flex items-center justify-center text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] hover:bg-white/[0.04] transition-[color,background-color] duration-150"
               >
                 <Download className="h-4 w-4" />
               </PopoverTrigger>
@@ -700,7 +700,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
               onClick={handleEdit}
               title="Edit playlist"
               aria-label="Edit playlist"
-              className="h-9 w-9 rounded-md flex items-center justify-center text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] hover:bg-white/[0.04] transition-all duration-150"
+              className="h-9 w-9 rounded-md flex items-center justify-center text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] hover:bg-white/[0.04] transition-[color,background-color] duration-150"
             >
               <Pencil className="h-4 w-4" />
             </button>
@@ -708,7 +708,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
               onClick={() => setDeleteDialogOpen(true)}
               title="Delete playlist"
               aria-label="Delete playlist"
-              className="h-9 w-9 rounded-md flex items-center justify-center text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-danger)] hover:bg-[var(--aurora-danger)]/10 transition-all duration-150"
+              className="h-9 w-9 rounded-md flex items-center justify-center text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-danger)] hover:bg-[var(--aurora-danger)]/10 transition-[color,background-color] duration-150"
             >
               <Trash2 className="h-4 w-4" />
             </button>
@@ -717,14 +717,14 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
       </div>
 
       {/* Fade divider before song list */}
-      <div className="aurora-divider-h mx-10" />
+      <div className="aurora-divider-h mx-4 sm:mx-10" />
 
       {/* ── SONG LIST ── */}
       <div className="px-6 py-4">
         {activePlaylist.songs.length > 0 && (
           <div className="flex items-center gap-2 mb-4">
             <div
-              className="search-shell relative flex-1 flex items-center rounded-full transition-all duration-200"
+              className="search-shell relative flex-1 flex items-center rounded-full transition-[box-shadow] duration-200"
               style={{
                 background: "var(--aurora-surface)",
                 backdropFilter: "blur(12px)",
@@ -1087,9 +1087,12 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
         return (
           <WaveformTrimEditor
             song={trimSong}
+            playlistId={playlistId}
             open={true}
             onClose={() => setOpenTrimId(null)}
-            onSaved={() => fetchPlaylistDetail(playlistId)}
+            onSaved={(startMs, endMs) =>
+              usePlaylistStore.getState().updateSongTiming(trimSong.id, startMs, endMs)
+            }
           />
         )
       })()}
@@ -1114,7 +1117,7 @@ function Checkbox({ checked, indeterminate, onChange, ariaLabel }: CheckboxProps
       aria-checked={indeterminate ? "mixed" : checked}
       aria-label={ariaLabel}
       onClick={(e) => { e.stopPropagation(); onChange() }}
-      className="h-4 w-4 rounded-[3px] flex items-center justify-center transition-all duration-150 aurora-focus"
+      className="h-4 w-4 rounded-[3px] flex items-center justify-center transition-[color,background-color,border-color,box-shadow] duration-150 aurora-focus"
       style={{
         background: checked || indeterminate ? "var(--aurora-accent-interactive)" : "transparent",
         border: checked || indeterminate ? "1.5px solid var(--aurora-accent-interactive)" : "1.5px solid var(--aurora-text-tertiary)",
@@ -1187,7 +1190,7 @@ function PlaylistSongRow({
       onDragLeave={onDragLeave}
       onDrop={(e) => onDrop(e, song.id)}
       onDragEnd={onDragEnd}
-      className={`group relative transition-all duration-200 ${
+      className={`group relative transition-[opacity,border-color] duration-200 ${
         hasFile ? "cursor-pointer" : "cursor-not-allowed opacity-40"
       } ${isDragging ? "opacity-40" : ""}`}
       style={{
@@ -1375,7 +1378,7 @@ function IconBtn({ children, label, danger, active, disabled, onClick }: IconBtn
       disabled={disabled}
       title={label}
       aria-label={label}
-      className={`aurora-focus h-7 w-7 rounded-md flex items-center justify-center transition-all duration-150 disabled:opacity-25 disabled:pointer-events-none ${
+      className={`aurora-focus h-7 w-7 rounded-md flex items-center justify-center transition-[color,background-color,box-shadow,opacity] duration-150 disabled:opacity-40 disabled:pointer-events-none ${
         danger
           ? "text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-danger)] hover:bg-[var(--aurora-danger)]/10"
           : active
@@ -1438,7 +1441,7 @@ function CrossfadeChip({ playlist }: CrossfadeChipProps) {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
-        className="flex items-center gap-1.5 h-9 px-3 rounded-md text-[12px] text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] hover:bg-white/[0.04] transition-all duration-150"
+        className="flex items-center gap-1.5 h-9 px-3 rounded-md text-[12px] text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] hover:bg-white/[0.04] transition-[color,background-color] duration-150"
         title="Crossfade settings"
       >
         <Sparkles className="h-3.5 w-3.5" />

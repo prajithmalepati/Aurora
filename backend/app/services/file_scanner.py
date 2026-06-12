@@ -11,8 +11,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 from typing import Any, Callable
 
-# Extracted art is stored here; deduplicated by SHA-1 hash.
-ALBUM_ART_DIR = Path(__file__).parent.parent.parent / "album-art"
+from app.paths import ALBUM_ART_DIR
 
 
 AUDIO_EXTENSIONS = {

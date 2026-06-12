@@ -1,0 +1,32 @@
+{
+  "data": {
+    "album": "Test Album",
+    "album_art_path": null,
+    "artist": "Test Artist",
+    "artists": null,
+    "bit_depth": null,
+    "bitrate": null,
+    "dominant_color": null,
+    "dominant_color_2": null,
+    "duration": 200,
+    "end_time_ms": 0,
+    "featured_artists": null,
+    "file_format": "mp3",
+    "file_path": "/tmp/golden_test.mp3",
+    "file_size": null,
+    "id": 4,
+    "playlists": [],
+    "position": null,
+    "replaygain_album_gain": null,
+    "replaygain_album_peak": null,
+    "replaygain_track_gain": null,
+    "replaygain_track_peak": null,
+    "sample_rate": null,
+    "source": "manual",
+    "start_time_ms": 0,
+    "tags": [],
+    "title": "Updated Golden Song",
+    "waveform_peaks": null
+  },
+  "message": "ok"
+}

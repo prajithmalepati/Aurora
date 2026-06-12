@@ -1,0 +1,15 @@
+{
+  "data": {
+    "color": "#111111",
+    "created_at": "2025-06-01T12:00:00Z",
+    "crossfade_duration_s": null,
+    "crossfade_enabled": null,
+    "emoji": "🎵",
+    "id": 1,
+    "image_url": null,
+    "name": "Rock Classics Updated",
+    "song_count": 1,
+    "updated_at": "2025-06-01T13:00:00Z"
+  },
+  "message": "ok"
+}

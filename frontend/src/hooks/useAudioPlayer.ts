@@ -1,27 +1,47 @@
 import { useEffect, useRef, useCallback } from "react"
-import { Howl } from "howler"
 import { usePlayerStore } from "@/stores/playerStore"
 import { useSettingsStore } from "@/stores/settingsStore"
 import type { CrossfadeCurve } from "@/stores/settingsStore"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { toast } from "@/lib/toast"
+import { getBaseUrl } from "@/lib/api"
+import { createPlaybackEngine, unlockAudioOutput } from "@/lib/engines/howlerEngine"
+import type { PlaybackEngine, PlaybackSource } from "@/types/playback"
+
+/** Build the PlaybackSource for a library song. URL resolution lives here —
+ *  engines receive a fully resolved URL and never construct API paths. */
+function streamSource(
+  songId: string,
+  filePath: string | null | undefined,
+  gapless = false,
+): PlaybackSource {
+  const ext = filePath?.split(".").pop()?.toLowerCase()
+  return {
+    url: `${getBaseUrl()}/api/songs/${songId}/stream`,
+    format: ext,
+    gapless,
+  }
+}
 
 export function useAudioPlayer() {
-  const howlRef = useRef<Howl | null>(null)
-  // Holds the outgoing howl being faded out — cleanup passes it here instead of stopping
-  const prevHowlRef = useRef<Howl | null>(null)
+  const engineRef = useRef<PlaybackEngine | null>(null)
+  // Holds the outgoing engine being faded out — cleanup passes it here instead of stopping
+  const prevEngineRef = useRef<PlaybackEngine | null>(null)
   // Title of the outgoing song (for crossfade indicator)
   const prevTitleRef = useRef<string | null>(null)
-  // Preloaded next song's Howl — created ~5s before song end to eliminate silence gap
-  const nextHowlRef = useRef<{ howl: Howl; songId: string } | null>(null)
-  // Tracks whether the preloaded Howl's onload has fired (fully decoded, ready to play)
+  // Outgoing engine while a crossfade is in flight — the pause/resume effect
+  // must reach it (prevEngineRef is already nulled by then)
+  const fadingOutRef = useRef<PlaybackEngine | null>(null)
+  // Preloaded next song's engine — created ~5s before song end to eliminate silence gap
+  const nextEngineRef = useRef<{ engine: PlaybackEngine; songId: string } | null>(null)
+  // Tracks whether the preloaded engine has finished loading (fully decoded, ready to play)
   const preloadReadyRef = useRef<boolean>(false)
   const intervalRef = useRef<number | null>(null)
   const xfadeIntervalRef = useRef<number | null>(null) // equal-power crossfade interval
   const currentSongRef = useRef<string | null>(null)
   const seekingRef = useRef(false)
-  // Collects all Howls from rapid transitions that need cleanup
-  const staleHowlsRef = useRef<Howl[]>([])
+  // Collects all engines from rapid transitions that need cleanup
+  const staleEnginesRef = useRef<PlaybackEngine[]>([])
 
   const currentSong = usePlayerStore((state) => state.currentSong)
   const isPlaying = usePlayerStore((state) => state.isPlaying)
@@ -31,7 +51,7 @@ export function useAudioPlayer() {
   const setDuration = usePlayerStore((state) => state.setDuration)
   const next = usePlayerStore((state) => state.next)
 
-  /** Compute Howler volume with ReplayGain applied.
+  /** Compute output volume with ReplayGain applied.
    *  Returns a value clamped to [0, 1]. */
   function resolveVolume(): number {
     const vol = usePlayerStore.getState().volume
@@ -79,26 +99,40 @@ export function useAudioPlayer() {
   }
 
   /** Run post-load initialization (set duration, seek to start_time_ms).
-   *  Called from both onload event and after promoting a preloaded Howl. */
-  function initHowlAfterLoad(howl: Howl) {
-    setDuration(howl.duration())
+   *  Called from both the load event and after promoting a preloaded engine. */
+  function initEngineAfterLoad(engine: PlaybackEngine) {
+    setDuration(engine.duration())
     const song = usePlayerStore.getState().currentSong
     if (song?.start_time_ms && song.start_time_ms > 0) {
-      howl.seek(song.start_time_ms / 1000)
+      engine.seek(song.start_time_ms / 1000)
     }
   }
 
-  /** Attach all event handlers (play, pause, end, load, errors) to a Howl instance.
-   *  Used for both newly created and promoted preloaded Howls. */
-  function bindHowlHandlers(howl: Howl, songId: string) {
-    howl.on('play', () => {
-      usePlayerStore.getState().setIsBuffering(false)
+  /** Attach all event handlers (play, pause, end, load, errors, buffering) to an
+   *  engine. Used for both newly created and promoted preloaded engines. */
+  function bindEngineHandlers(engine: PlaybackEngine, songId: string) {
+    engine.on("buffering", (buffering) => {
+      usePlayerStore.getState().setIsBuffering(buffering)
+    })
+
+    engine.on("play", () => {
       if (intervalRef.current) window.clearTimeout(intervalRef.current)
 
+      let debugTickCount = 0
       const tick = () => {
-        if (!seekingRef.current && howlRef.current && howlRef.current.state() === 'loaded') {
-          const seekSec = howlRef.current.seek()
+        if (!seekingRef.current && engineRef.current && engineRef.current.isLoaded()) {
+          const seekSec = engineRef.current.position()
           updateSeek(seekSec)
+
+          // Listening-pass heartbeat (~5s) — position/volume/playing of the live engine
+          if (localStorage.getItem("aurora-debug-audio") && ++debugTickCount % 20 === 0) {
+            console.log("[audio] heartbeat", {
+              song: usePlayerStore.getState().currentSong?.id,
+              pos: +seekSec.toFixed(1), dur: +engineRef.current.duration().toFixed(1),
+              vol: +engineRef.current.getVolume().toFixed(2),
+              playing: engineRef.current.isPlaying(),
+            })
+          }
 
           // End-time enforcement (playlist trim)
           const song = usePlayerStore.getState().currentSong
@@ -106,7 +140,7 @@ export function useAudioPlayer() {
             const { repeatMode } = usePlayerStore.getState()
             if (repeatMode === "one") {
               const startSec = (song.start_time_ms ?? 0) / 1000
-              howlRef.current?.seek(startSec)
+              engineRef.current?.seek(startSec)
               updateSeek(startSec)
             } else {
               next()
@@ -114,12 +148,13 @@ export function useAudioPlayer() {
             return
           }
 
-          // Crossfade early trigger — fires at crossfadeDuration seconds before end
+          // Crossfade early trigger — fires at crossfadeDuration seconds before end.
+          // Skipped on repeat-one: the song must loop via the end handler, not advance.
           const { enabled: xEnabled, duration: xDuration } = resolveXfade()
-          if (xEnabled) {
-            const howlDuration = howlRef.current.duration()
-            if (howlDuration > 0) {
-              const triggerPoint = Math.max(0, howlDuration - xDuration)
+          if (xEnabled && usePlayerStore.getState().repeatMode !== "one") {
+            const engineDuration = engineRef.current.duration()
+            if (engineDuration > 0) {
+              const triggerPoint = Math.max(0, engineDuration - xDuration)
               if (seekSec >= triggerPoint) {
                 if (intervalRef.current) { window.clearTimeout(intervalRef.current); intervalRef.current = null }
                 next()
@@ -136,40 +171,43 @@ export function useAudioPlayer() {
       intervalRef.current = window.setTimeout(tick, 250)
     })
 
-    howl.on('pause', () => {
+    engine.on("pause", () => {
       if (intervalRef.current) {
         window.clearTimeout(intervalRef.current)
         intervalRef.current = null
       }
     })
 
-    howl.on('end', () => {
+    engine.on("end", () => {
       if (intervalRef.current) {
         window.clearTimeout(intervalRef.current)
         intervalRef.current = null
       }
-      const { repeatMode } = usePlayerStore.getState()
+      const { repeatMode, currentSong: song } = usePlayerStore.getState()
+      if (localStorage.getItem("aurora-debug-audio")) {
+        console.log("[audio] natural end", { song: song?.id, repeat: repeatMode })
+      }
       if (repeatMode === "one") {
-        howl.seek(0)
-        howl.play()
-        updateSeek(0)
+        const startSec = (song?.start_time_ms ?? 0) / 1000
+        engine.seek(startSec)
+        engine.play()
+        updateSeek(startSec)
       } else {
         next()
       }
     })
 
-    howl.on('load', () => {
-      if (howlRef.current === howl) {
-        initHowlAfterLoad(howl)
+    engine.on("load", () => {
+      if (engineRef.current === engine) {
+        initEngineAfterLoad(engine)
       }
     })
 
-    howl.on('loaderror', (_, errorId) => {
-      console.error(`Howl load error song ${songId}:`, errorId)
+    engine.on("loaderror", (error) => {
+      console.error(`Playback load error song ${songId}:`, error)
       const song = usePlayerStore.getState().currentSong
       const songTitle = song?.title ?? "Unknown song"
       toast.error(`Failed to load "${songTitle}" — format may be unsupported`)
-      usePlayerStore.getState().setIsBuffering(false)
       setTimeout(() => {
         const { currentSong } = usePlayerStore.getState()
         if (currentSong && String(currentSong.id) === songId) {
@@ -178,12 +216,11 @@ export function useAudioPlayer() {
       }, 1500)
     })
 
-    howl.on('playerror', (_, errorId) => {
-      console.error(`Howl play error song ${songId}:`, errorId)
+    engine.on("playerror", (error) => {
+      console.error(`Playback error song ${songId}:`, error)
       const song = usePlayerStore.getState().currentSong
       const songTitle = song?.title ?? "Unknown song"
       toast.error(`Playback interrupted for "${songTitle}"`)
-      usePlayerStore.getState().setIsBuffering(false)
       setTimeout(() => {
         const { currentSong } = usePlayerStore.getState()
         if (currentSong && String(currentSong.id) === songId) {
@@ -193,14 +230,14 @@ export function useAudioPlayer() {
     })
   }
 
-  /** Create a new Howl for the next song and store in nextHowlRef.
+  /** Create a preload engine for the next song and store in nextEngineRef.
    *  Replaces stale preloads when queue order changes (shuffle, etc.).
-   *  Attaches onload/loaderror so preloadReadyRef stays accurate. */
+   *  Attaches load/loaderror so preloadReadyRef stays accurate. */
   function preloadNextIfNeeded(currentSeekSec: number) {
-    const hDuration = howlRef.current?.duration()
-    if (!hDuration || hDuration <= 0) return
+    const curDuration = engineRef.current?.duration()
+    if (!curDuration || curDuration <= 0) return
     // For songs > 5s: preload in last 5 seconds. For short songs: preload immediately.
-    if (hDuration > 5 && currentSeekSec < hDuration - 5) return
+    if (curDuration > 5 && currentSeekSec < curDuration - 5) return
 
     const state = usePlayerStore.getState()
     const { queue, queueIndex, repeatMode, currentSong } = state
@@ -213,9 +250,9 @@ export function useAudioPlayer() {
 
     if (!nextSong?.file_path) {
       // No next song — destroy any existing preload
-      if (nextHowlRef.current) {
-        nextHowlRef.current.howl.unload()
-        nextHowlRef.current = null
+      if (nextEngineRef.current) {
+        nextEngineRef.current.engine.unload()
+        nextEngineRef.current = null
         preloadReadyRef.current = false
       }
       return
@@ -226,85 +263,105 @@ export function useAudioPlayer() {
     if (preId === curId) return
 
     // Already preloaded the correct song
-    if (nextHowlRef.current?.songId === preId) return
+    if (nextEngineRef.current?.songId === preId) return
 
     // Destroy stale preload (wrong song due to shuffle / queue change)
-    if (nextHowlRef.current) {
-      nextHowlRef.current.howl.unload()
-      nextHowlRef.current = null
+    if (nextEngineRef.current) {
+      nextEngineRef.current.engine.unload()
+      nextEngineRef.current = null
       preloadReadyRef.current = false
     }
 
-    const preExt = nextSong.file_path.split('.').pop()?.toLowerCase()
-    nextHowlRef.current = {
-      howl: new Howl({
-        src: `http://localhost:8000/api/songs/${preId}/stream`,
-        format: preExt ? [preExt] : undefined,
-        html5: true,
-        preload: true,
-        onload: () => {
-          preloadReadyRef.current = true
-        },
-        onloaderror: () => {
-          console.error(`Gapless preload failed for song ${preId} — falling back to normal load`)
-          if (nextHowlRef.current?.songId === preId) {
-            nextHowlRef.current.howl.unload()
-            nextHowlRef.current = null
-            preloadReadyRef.current = false
-          }
-        },
-      }),
-      songId: preId,
-    }
+    const preEngine = createPlaybackEngine()
+    preEngine.on("load", () => {
+      preloadReadyRef.current = true
+    })
+    preEngine.on("loaderror", () => {
+      console.error(`Gapless preload failed for song ${preId} — falling back to normal load`)
+      if (nextEngineRef.current?.songId === preId) {
+        nextEngineRef.current.engine.unload()
+        nextEngineRef.current = null
+        preloadReadyRef.current = false
+      }
+    })
+    preEngine.load(streamSource(preId, nextSong.file_path, true))
+    nextEngineRef.current = { engine: preEngine, songId: preId }
   }
 
   // Unmount cleanup — stop everything that's still playing
   useEffect(() => {
     return () => {
-      // Drain all stale Howls from rapid transitions
-      for (const stale of staleHowlsRef.current) {
+      // Drain all stale engines from rapid transitions
+      for (const stale of staleEnginesRef.current) {
         try { stale.stop(); stale.unload() } catch {}
       }
-      staleHowlsRef.current = []
+      staleEnginesRef.current = []
       if (xfadeIntervalRef.current) { window.clearInterval(xfadeIntervalRef.current); xfadeIntervalRef.current = null }
-      if (howlRef.current) { howlRef.current.stop(); howlRef.current.unload() }
-      if (prevHowlRef.current) { prevHowlRef.current.stop(); prevHowlRef.current.unload() }
-      if (nextHowlRef.current) { nextHowlRef.current.howl.unload(); nextHowlRef.current = null; preloadReadyRef.current = false }
+      if (engineRef.current) { engineRef.current.stop(); engineRef.current.unload() }
+      if (prevEngineRef.current) { prevEngineRef.current.stop(); prevEngineRef.current.unload() }
+      if (nextEngineRef.current) { nextEngineRef.current.engine.unload(); nextEngineRef.current = null; preloadReadyRef.current = false }
       if (intervalRef.current) window.clearTimeout(intervalRef.current)
     }
   }, [])
 
   // Song-change effect — fires only when currentSong.id changes.
-  // Cleanup does NOT stop the outgoing howl; it hands it to prevHowlRef so this
-  // effect's body can crossfade it instead of hard-cutting.
+  // Cleanup does NOT stop the outgoing engine; it hands it to prevEngineRef so
+  // this effect's body can crossfade it instead of hard-cutting.
   useEffect(() => {
     if (intervalRef.current) {
       window.clearTimeout(intervalRef.current)
       intervalRef.current = null
     }
 
-    // Drain all stale Howls from rapid transitions — stop + unload every one
-    for (const stale of staleHowlsRef.current) {
+    // The previous effect's cleanup deposited the outgoing engine here
+    const prev = prevEngineRef.current
+    prevEngineRef.current = null
+
+    // Neutralize the outgoing engine's handlers. Its natural `end` arrives
+    // DURING the crossfade (trigger fires at duration - fade, so real end lands
+    // ~fade-duration later, before fade-complete stop()) — if the handler stays
+    // bound it calls next() a second time and yanks the incoming song away
+    // mid-fade. Same for stale buffering/error handlers.
+    if (prev) {
+      for (const ev of ["buffering", "play", "pause", "end", "load", "loaderror", "playerror"] as const) {
+        prev.off(ev)
+      }
+    }
+
+    // Drain stale engines from rapid transitions — but never the deposited prev:
+    // stopping it here would make prev.isPlaying() read false below and kill every
+    // crossfade/gapless handoff. prev stays tracked for the NEXT drain, which
+    // catches it if an interrupted fade leaks it mid-transition.
+    for (const stale of staleEnginesRef.current) {
+      if (stale === prev) continue
       try { stale.stop(); stale.unload() } catch {}
     }
-    staleHowlsRef.current = []
-
-    // The previous effect's cleanup deposited the outgoing howl here
-    const prev = prevHowlRef.current
-    prevHowlRef.current = null
+    staleEnginesRef.current = prev ? [prev] : []
+    // Any earlier fade's outgoing engine was just drained (or finished on its
+    // own timer) — this transition sets it again if it starts a new fade.
+    fadingOutRef.current = null
 
     const { enabled, duration, curve } = resolveXfade()
-    const crossfadeIn = enabled && (prev?.playing() ?? false)
+    const crossfadeIn = enabled && (prev?.isPlaying() ?? false)
+
+    // Listening-pass diagnostics — enable with localStorage.setItem("aurora-debug-audio", "1")
+    if (localStorage.getItem("aurora-debug-audio")) {
+      console.log("[audio] transition", {
+        to: currentSong?.id, title: currentSong?.title, crossfadeIn, curve, fadeS: duration,
+        prevPlaying: prev?.isPlaying() ?? false, targetVol: resolveVolume(),
+        repeat: usePlayerStore.getState().repeatMode, isPlaying: usePlayerStore.getState().isPlaying,
+      })
+    }
 
     if (!currentSong?.file_path) {
       currentSongRef.current = null
-      // Clear stale preloaded Howl when queue ends
-      if (nextHowlRef.current) {
-        nextHowlRef.current.howl.unload()
-        nextHowlRef.current = null
+      // Clear stale preloaded engine when queue ends
+      if (nextEngineRef.current) {
+        nextEngineRef.current.engine.unload()
+        nextEngineRef.current = null
         preloadReadyRef.current = false
       }
-      // Clean up the outgoing Howl (no new song to transition to)
+      // Clean up the outgoing engine (no new song to transition to)
       if (prev) {
         prev.stop()
         prev.unload()
@@ -315,81 +372,85 @@ export function useAudioPlayer() {
     const songId = String(currentSong.id)
     currentSongRef.current = songId
 
-    // --- Check for preloaded Howl (gapless: only promote when fully decoded) ---
-    const preloaded = nextHowlRef.current
+    // --- Check for preloaded engine (gapless: only promote when fully decoded) ---
+    const preloaded = nextEngineRef.current
     const preloadIsReady = preloadReadyRef.current
-    let howl: Howl
+    let engine: PlaybackEngine
 
     if (preloaded && preloaded.songId === songId && preloadIsReady) {
-      // Promote preloaded Howl — fully decoded and ready for gapless transition
-      howl = preloaded.howl
-      nextHowlRef.current = null
+      // Promote preloaded engine — fully decoded and ready for gapless transition
+      engine = preloaded.engine
+      nextEngineRef.current = null
       preloadReadyRef.current = false
-      bindHowlHandlers(howl, songId)
-      // Run post-load init now (onload already fired during preload)
-      initHowlAfterLoad(howl)
+      bindEngineHandlers(engine, songId)
+      // Run post-load init now (load already completed during preload)
+      initEngineAfterLoad(engine)
       usePlayerStore.getState().setIsBuffering(false)
     } else {
       // Destroy stale or unready preload (wrong song, user skipped, load error, or not yet loaded)
       if (preloaded) {
-        preloaded.howl.unload()
-        nextHowlRef.current = null
+        preloaded.engine.unload()
+        nextEngineRef.current = null
         preloadReadyRef.current = false
       }
 
-      usePlayerStore.getState().setIsBuffering(true)
-
-      const ext = currentSong.file_path?.split('.').pop()?.toLowerCase()
-      howl = new Howl({
-        src: `http://localhost:8000/api/songs/${songId}/stream`,
-        format: ext ? [ext] : undefined,
-        html5: true,
-        preload: true,
-      })
-      bindHowlHandlers(howl, songId)
+      engine = createPlaybackEngine()
+      bindEngineHandlers(engine, songId)
+      // load() emits buffering:true, which the bound handler mirrors to the store
+      engine.load(streamSource(songId, currentSong.file_path))
     }
 
-    howlRef.current = howl
+    engineRef.current = engine
 
-    // --- Gapless transition: play new Howl BEFORE stopping the old one ---
+    // --- Gapless transition: play new engine BEFORE stopping the old one ---
     // This eliminates the silence gap by starting the new audio source
     // while the old one is still finishing its final samples.
     if (usePlayerStore.getState().isPlaying) {
-      const ctx: AudioContext | undefined = (window as any).Howler?.ctx
-      if (ctx?.state === 'suspended') ctx.resume().catch(() => {})
+      unlockAudioOutput()
 
-      // For non-crossfade gapless: reset the Audio element to start
+      // For non-crossfade gapless: reset the audio position to start
       // so the transition is sample-precise.
       if (!crossfadeIn) {
-        try {
-          const audioNode = (howl as any)._sounds?.[0]?._node as HTMLAudioElement | undefined
-          if (audioNode) {
-            audioNode.currentTime = 0
-          }
-        } catch { /* private API access — safe to ignore */ }
+        engine.resetToStart()
       }
 
       if (crossfadeIn) {
-        // crossfadeIn guarantees prev is non-null (derived from prev?.playing())
+        // crossfadeIn guarantees prev is non-null (derived from prev?.isPlaying())
         const outgoing = prev!
-        howl.volume(0)
-        howl.play()
-
         const fadeDurationMs = duration * 1000
         const targetVol = resolveVolume()
+        fadingOutRef.current = outgoing
+        const fadeDone = () => {
+          if (fadingOutRef.current === outgoing) fadingOutRef.current = null
+        }
+
+        // Howler trap: on an already-loaded engine (promoted preload), play()
+        // holds _playLock until the html5 play() promise resolves. volume()/
+        // fade() calls made during the lock are pushed onto Howler's action
+        // queue with no event that ever releases them — the song plays at
+        // volume 0 forever. So: set volume BEFORE play(), and start fades on
+        // the engine's play event (emitted after the lock clears).
 
         if (curve === 'overlap') {
-          // Overlap: play both at full volume, then cut old one after duration
-          howl.volume(targetVol)
+          // Overlap: play both at full volume for the duration, then taper the
+          // old one out over 250ms — a true hard cut sounds like a glitch
+          engine.setVolume(targetVol)
+          engine.play()
           usePlayerStore.getState().setCrossfading(true, prevTitleRef.current ?? undefined)
           setTimeout(() => {
-            outgoing.stop()
-            outgoing.unload()
-            usePlayerStore.getState().setCrossfading(false)
+            outgoing.fade(outgoing.getVolume(), 0, 250)
+            setTimeout(() => {
+              outgoing.stop()
+              outgoing.unload()
+              fadeDone()
+              usePlayerStore.getState().setCrossfading(false)
+            }, 250)
           }, fadeDurationMs)
         } else if (curve === 'equalpower') {
+          engine.setVolume(0)
+          engine.play()
           // Equal Power: cosine curve for constant-power transition
-          const prevVol = outgoing.volume()
+          const prevVol = outgoing.getVolume()
           const startTime = performance.now()
           usePlayerStore.getState().setCrossfading(true, prevTitleRef.current ?? undefined)
 
@@ -399,31 +460,39 @@ export function useAudioPlayer() {
             // Cosine curves: sin² + cos² = 1 → constant power
             const fadeInVol = Math.sin(t * Math.PI / 2) * targetVol
             const fadeOutVol = Math.cos(t * Math.PI / 2) * prevVol
-            howl.volume(fadeInVol)
-            if (outgoing.playing()) outgoing.volume(fadeOutVol)
+            engine.setVolume(fadeInVol)
+            if (outgoing.isPlaying()) outgoing.setVolume(fadeOutVol)
             if (t >= 1) {
               clearInterval(equalPowerInterval)
               xfadeIntervalRef.current = null
               outgoing.stop()
               outgoing.unload()
+              fadeDone()
               usePlayerStore.getState().setCrossfading(false)
             }
           }, 33) // ~30fps
           xfadeIntervalRef.current = equalPowerInterval as unknown as number
         } else {
-          // Linear: default Howler fade behavior
+          // Linear: engine-native fade, deferred to the play event (see Howler
+          // trap note above — fade() during _playLock is silently dropped)
+          engine.setVolume(0)
+          const startFade = () => {
+            engine.off("play", startFade)
+            engine.fade(0, targetVol, fadeDurationMs)
+          }
+          engine.on("play", startFade)
+          engine.play()
           usePlayerStore.getState().setCrossfading(true, prevTitleRef.current ?? undefined)
-          howl.fade(0, targetVol, fadeDurationMs)
         }
       } else {
-        howl.volume(resolveVolume())
-        howl.play()
+        engine.setVolume(resolveVolume())
+        engine.play()
       }
     } else {
-      howl.volume(resolveVolume())
+      engine.setVolume(resolveVolume())
     }
 
-    // NOW handle the outgoing Howl — after the new one is already playing.
+    // NOW handle the outgoing engine — after the new one is already playing.
     // The momentary overlap of two audio sources produces the gapless transition.
     if (prev) {
       if (crossfadeIn) {
@@ -435,11 +504,12 @@ export function useAudioPlayer() {
           // Already handled above via setInterval
           // prev volume is being manually ramped down
         } else {
-          // Linear: use Howler's built-in fade
-          prev.fade(prev.volume(), 0, fadeDurationMs)
+          // Linear: engine-native fade out
+          prev.fade(prev.getVolume(), 0, fadeDurationMs)
           setTimeout(() => {
             prev.stop()
             prev.unload()
+            if (fadingOutRef.current === prev) fadingOutRef.current = null
             usePlayerStore.getState().setCrossfading(false)
           }, fadeDurationMs)
         }
@@ -450,12 +520,12 @@ export function useAudioPlayer() {
     }
 
     return () => {
-      // Hand off to prevHowlRef — DO NOT stop here, let the next body crossfade
-      prevHowlRef.current = howl
+      // Hand off to prevEngineRef — DO NOT stop here, let the next body crossfade
+      prevEngineRef.current = engine
       prevTitleRef.current = currentSong?.title ?? null
-      if (howlRef.current === howl) howlRef.current = null
-      // Also push into stale array so rapid transitions don't lose Howls
-      staleHowlsRef.current.push(howl)
+      if (engineRef.current === engine) engineRef.current = null
+      // Also push into stale array so rapid transitions don't lose engines
+      staleEnginesRef.current.push(engine)
       if (intervalRef.current) {
         window.clearTimeout(intervalRef.current)
         intervalRef.current = null
@@ -472,34 +542,37 @@ export function useAudioPlayer() {
 
   // Pause / resume
   useEffect(() => {
-    if (!howlRef.current) return
+    if (!engineRef.current) return
     if (isPlaying) {
-      // Resume AudioContext before play — must happen in the leaf effect closest to user gesture.
-      // useAudioAnalyser runs later (App.tsx root) and may miss the browser's activation window.
-      const ctx: AudioContext | undefined = (window as any).Howler?.ctx
-      if (ctx?.state === 'suspended') ctx.resume().catch(() => {})
-      howlRef.current.play()
-      if (prevHowlRef.current && prevHowlRef.current.volume() > 0.05) {
-        prevHowlRef.current.play()
+      // Unlock audio output before play — must happen in the leaf effect closest
+      // to the user gesture. useAudioAnalyser runs later (App.tsx root) and may
+      // miss the browser's activation window.
+      unlockAudioOutput()
+      engineRef.current.play()
+      // Resume a mid-crossfade outgoing engine only if it's still audible —
+      // pausing snaps Howler fades to their end value, so a faded-out engine
+      // reads 0 here and stays stopped
+      if (fadingOutRef.current && fadingOutRef.current.getVolume() > 0.05) {
+        fadingOutRef.current.play()
       }
     } else {
-      howlRef.current.pause()
-      prevHowlRef.current?.pause()
+      engineRef.current.pause()
+      fadingOutRef.current?.pause()
     }
   }, [isPlaying])
 
   // Volume sync (includes ReplayGain)
   useEffect(() => {
-    if (!howlRef.current) return
-    howlRef.current.volume(resolveVolume())
-    // Don't touch prevHowlRef — it's mid-fade
+    if (!engineRef.current) return
+    engineRef.current.setVolume(resolveVolume())
+    // Don't touch prevEngineRef — it's mid-fade
   }, [volume, replaygainMode])
 
   const seekTo = useCallback((seconds: number) => {
     seekingRef.current = true
     usePlayerStore.getState().setSeek(seconds)
-    if (howlRef.current) {
-      howlRef.current.seek(seconds)
+    if (engineRef.current) {
+      engineRef.current.seek(seconds)
     }
     setTimeout(() => {
       seekingRef.current = false

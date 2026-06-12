@@ -30,7 +30,7 @@ export function PlaylistImagePicker({ name, imageDataUrl, onImageChange }: Playl
       <button
         type="button"
         onClick={() => inputRef.current?.click()}
-        className="relative w-16 h-16 rounded-md overflow-hidden group transition-all duration-150 hover:ring-1 hover:ring-[var(--aurora-rim-bright)]"
+        className="relative w-16 h-16 rounded-md overflow-hidden group transition-[box-shadow] duration-150 hover:ring-1 hover:ring-[var(--aurora-rim-bright)]"
         style={!imageDataUrl ? { background: gradient } : undefined}
       >
         {imageDataUrl && (

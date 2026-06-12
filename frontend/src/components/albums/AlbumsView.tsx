@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react"
 import type { AlbumInfo, AlbumDetail, ApiResponse, Song } from "@/types"
 import { usePlayerStore } from "@/stores/playerStore"
-import { api } from "@/lib/api"
+import { api, getBaseUrl } from "@/lib/api"
 import { SongTable } from "@/components/songs/SongTable"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Disc3, Play, Shuffle, ChevronLeft, Music } from "lucide-react"
@@ -176,7 +176,7 @@ interface AlbumCardProps {
 function AlbumCard({ album, onClick, onPlay, onShuffle }: AlbumCardProps) {
   const [hovered, setHovered] = useState(false)
   const coverUrl = album.cover_art_path
-    ? `http://localhost:8000/api/album-art/${album.cover_art_path}`
+    ? `${getBaseUrl()}/api/album-art/${album.cover_art_path}`
     : null
 
   return (
@@ -187,7 +187,7 @@ function AlbumCard({ album, onClick, onPlay, onShuffle }: AlbumCardProps) {
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick() }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className="group relative flex flex-col rounded-xl overflow-hidden text-left transition-all duration-200 aurora-focus cursor-pointer"
+      className="group relative flex flex-col rounded-xl overflow-hidden text-left transition-[box-shadow] duration-200 aurora-focus cursor-pointer"
       style={{
         background: "var(--aurora-surface)",
         boxShadow: "inset 0 0 0 1px var(--aurora-rim)",
