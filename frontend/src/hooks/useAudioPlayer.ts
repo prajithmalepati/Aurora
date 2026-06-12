@@ -144,7 +144,7 @@ export function useAudioPlayer() {
           const { respectTrims } = useSettingsStore.getState()
           const trimEndSec =
             respectTrims && song?.end_time_ms && song.end_time_ms > 0
-              ? song.end_time_ms / 1000
+              ? Math.min(song.end_time_ms / 1000, engineRef.current.duration() || Infinity)
               : null
 
           // End-time enforcement (playlist trim) — backstop hard advance
@@ -255,7 +255,7 @@ export function useAudioPlayer() {
     const { respectTrims } = useSettingsStore.getState()
     const effectiveEnd =
       respectTrims && curSong?.end_time_ms && curSong.end_time_ms > 0
-        ? curSong.end_time_ms / 1000
+        ? Math.min(curSong.end_time_ms / 1000, curDuration)
         : curDuration
     // For songs > 5s: preload in the last 5 seconds before the effective end.
     if (effectiveEnd > 5 && currentSeekSec < effectiveEnd - 5) return
