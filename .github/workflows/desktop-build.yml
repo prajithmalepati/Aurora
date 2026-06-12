@@ -4,8 +4,6 @@ on:
   workflow_dispatch:
   push:
     tags: ['v*']
-    # TEMPORARY: remove after first green run
-    branches: ['hermes/phase1-desktop']
 
 permissions:
   contents: write
