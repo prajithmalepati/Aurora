@@ -187,6 +187,12 @@ class FileWatcher:
 
             conn.commit()
 
+        # Prune stale mtime entries for folders no longer watched
+        active_paths = {wf["folder_path"] for wf in rows}
+        stale = [p for p in self._last_dir_mtimes if p not in active_paths]
+        for p in stale:
+            del self._last_dir_mtimes[p]
+
         summary = {
             "folders_scanned": len(rows),
             "imported": total_imported,
@@ -206,12 +212,13 @@ class FileWatcher:
         Returns the count of newly-missing songs (those that still had
         file_path set — i.e. were not already marked).
         """
-        normalized = Path(folder_path).resolve()
-        like_pattern = str(normalized) + "%"
+        normalized = str(Path(folder_path).resolve())
+        # GLOB: * is wildcard, _ and % are literal — no LIKE-escaping needed
+        glob_pattern = normalized + "/*"
 
         rows = conn.execute(
-            "SELECT id, file_path FROM songs WHERE file_path LIKE ?",
-            (like_pattern,),
+            "SELECT id, file_path FROM songs WHERE file_path GLOB ?",
+            (glob_pattern,),
         ).fetchall()
 
         deleted = 0
