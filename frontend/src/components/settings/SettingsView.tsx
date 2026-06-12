@@ -233,6 +233,7 @@ export function SettingsView() {
           <button
             onClick={() => setRespectTrims(!respectTrims)}
             role="switch"
+            aria-label="Respect song trims"
             aria-checked={respectTrims}
             className={`relative rounded-full transition-colors duration-200 flex-shrink-0 ${
               respectTrims
