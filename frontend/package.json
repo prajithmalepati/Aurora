@@ -35,6 +35,8 @@
   "devDependencies": {
     "@eslint/js": "^9.39.4",
     "@tailwindcss/vite": "^4.2.2",
+    "@tauri-apps/api": "^2.11.0",
+    "@tauri-apps/cli": "^2.11.2",
     "@types/culori": "^4.0.1",
     "@types/howler": "^2.2.12",
     "@types/node": "^24.12.2",
