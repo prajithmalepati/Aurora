@@ -88,6 +88,8 @@ verify-*.jpg
 # Research / process docs (never commit — local only)
 docs/research/
 docs/*.docx
+docs/CHALLENGES.md
+docs/DEVIATIONS.md
 
 # Code-only repo: exclude AI/agent + process docs (kept local, synced via WinSCP)
 CLAUDE.md
