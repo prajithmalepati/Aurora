@@ -1,0 +1,28 @@
+{
+  "data": {
+    "folders": [
+      {
+        "name": "music",
+        "path": "/music",
+        "song_count": 2,
+        "subfolders": [
+          {
+            "name": "anime",
+            "path": "/music/anime",
+            "song_count": 1
+          },
+          {
+            "name": "rock",
+            "path": "/music/rock",
+            "song_count": 1
+          }
+        ]
+      }
+    ]
+  },
+  "message": "ok",
+  "meta": {
+    "total_folders": 3,
+    "total_songs": 2
+  }
+}

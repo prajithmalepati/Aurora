@@ -35,7 +35,7 @@ export function WelcomeOverlay() {
         >
           <motion.div
             className="absolute -top-1/2 left-1/2 -translate-x-1/2 w-[800px] h-[800px] rounded-full blur-[120px]"
-            style={{ background: "radial-gradient(circle, rgba(99, 102, 241, 0.12), transparent 70%)" }}
+            style={{ background: "radial-gradient(circle, rgba(45, 212, 191, 0.12), transparent 70%)" }}
             animate={{
               scale: [1, 1.08, 1],
               opacity: [0.5, 0.65, 0.5],
@@ -62,7 +62,7 @@ export function WelcomeOverlay() {
           />
           <motion.div
             className="absolute top-1/4 -left-1/4 w-[500px] h-[500px] rounded-full blur-[90px]"
-            style={{ background: "radial-gradient(circle, rgba(59, 130, 246, 0.06), transparent 70%)" }}
+            style={{ background: "radial-gradient(circle, rgba(45, 212, 191, 0.06), transparent 70%)" }}
             animate={{
               scale: [1, 1.1, 1],
               opacity: [0.3, 0.5, 0.3],
@@ -123,7 +123,7 @@ export function WelcomeOverlay() {
             {/* Card 1: Scan Folder */}
             <button
               onClick={() => setScanOpen(true)}
-              className="flex flex-col items-center gap-3 p-5 rounded-xl text-left transition-all duration-200 group"
+              className="flex flex-col items-center gap-3 p-5 rounded-xl text-left transition-[color,background-color,border-color,box-shadow] duration-200 group"
               style={{
                 background: "rgba(255, 255, 255, 0.04)",
                 backdropFilter: "blur(12px)",
@@ -156,7 +156,7 @@ export function WelcomeOverlay() {
             {/* Card 2: Add Song */}
             <button
               onClick={() => setAddSongOpen(true)}
-              className="flex flex-col items-center gap-3 p-5 rounded-xl text-left transition-all duration-200 group"
+              className="flex flex-col items-center gap-3 p-5 rounded-xl text-left transition-[color,background-color,border-color,box-shadow] duration-200 group"
               style={{
                 background: "rgba(255, 255, 255, 0.04)",
                 backdropFilter: "blur(12px)",
@@ -189,7 +189,7 @@ export function WelcomeOverlay() {
             {/* Card 3: View Shortcuts */}
             <button
               onClick={() => setShortcutsOpen(true)}
-              className="flex flex-col items-center gap-3 p-5 rounded-xl text-left transition-all duration-200 group"
+              className="flex flex-col items-center gap-3 p-5 rounded-xl text-left transition-[color,background-color,border-color,box-shadow] duration-200 group"
               style={{
                 background: "rgba(255, 255, 255, 0.04)",
                 backdropFilter: "blur(12px)",

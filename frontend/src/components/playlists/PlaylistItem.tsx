@@ -1,5 +1,6 @@
 import type { Playlist } from "@/types"
 import { playlistThumbnail } from "@/lib/playlistImage"
+import { getBaseUrl } from "@/lib/api"
 
 interface PlaylistItemProps {
   playlist: Playlist
@@ -8,13 +9,13 @@ interface PlaylistItemProps {
 }
 
 export function PlaylistItem({ playlist, isActive, onSelect }: PlaylistItemProps) {
-  const storedImage = playlist.image_url ?? null
+  const storedImage = playlist.image_url ? `${getBaseUrl()}${playlist.image_url}` : null
   const gradient = playlistThumbnail(playlist.name)
 
   return (
     <button
       onClick={() => onSelect(playlist.id)}
-      className={`group relative w-full flex items-center gap-2.5 px-3 py-[7px] rounded-md text-left transition-colors duration-200 ${
+      className={`group relative w-full flex items-center gap-2.5 px-3 py-[7px] rounded-md text-left transition-colors duration-200 active:bg-white/[0.03] ${
         isActive
           ? "text-[var(--aurora-text)]"
           : "text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)]"

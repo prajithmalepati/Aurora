@@ -68,7 +68,7 @@ export function AppShell({ children }: AppShellProps) {
         <motion.div layout="position" className="hidden md:block overflow-y-auto aurora-keyline-right">
           <ErrorBoundary>{children.sidebar}</ErrorBoundary>
         </motion.div>
-        <div className="overflow-y-auto relative">
+        <div className="overflow-y-auto relative pt-14 md:pt-0">
           <div className="aurora-scrim-top" aria-hidden="true" />
           {children.main}
         </div>

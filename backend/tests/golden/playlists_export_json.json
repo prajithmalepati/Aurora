@@ -1,0 +1,26 @@
+{
+  "aurora_version": "1.0",
+  "playlist": {
+    "color": "#457B9D",
+    "crossfade_duration_s": 8,
+    "crossfade_enabled": 1,
+    "emoji": "📚",
+    "name": "Lo-Fi Study"
+  },
+  "songs": [
+    {
+      "album": null,
+      "artist": "LoFi Girl",
+      "duration": 180,
+      "end_time_ms": 0,
+      "file_format": null,
+      "file_path": null,
+      "start_time_ms": 0,
+      "tags": [
+        "slow",
+        "chill"
+      ],
+      "title": "Chill Vibes"
+    }
+  ]
+}

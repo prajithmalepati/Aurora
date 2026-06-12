@@ -1,0 +1,12 @@
+{
+  "data": {
+    "color": "#FF5500",
+    "created_at": "2025-06-01T13:00:00Z",
+    "emoji": "🧪",
+    "id": 4,
+    "name": "Golden Test Create",
+    "song_count": 0,
+    "updated_at": "2025-06-01T13:00:00Z"
+  },
+  "message": "Playlist created successfully"
+}

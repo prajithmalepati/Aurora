@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from app.database import get_db_ctx
+from app.cache import song_cache, tag_cache, folder_cache
 from app.services.file_scanner import AUDIO_EXTENSIONS, extract_metadata, import_scanned_songs
 
 logger = logging.getLogger("aurora.file_watcher")
@@ -36,6 +37,7 @@ class FileWatcher:
         self._stop_event = threading.Event()
         self._thread: threading.Thread | None = None
         self._scan_lock = threading.Lock()
+        self._last_dir_mtimes: dict[str, float] = {}
 
     # ── lifecycle ────────────────────────────────────────────────────
 
@@ -66,6 +68,30 @@ class FileWatcher:
             return self._do_scan(folder_id=folder_id)
 
     # ── internal loop ────────────────────────────────────────────────
+
+    @staticmethod
+    def _tree_mtime(folder_path: str) -> float | None:
+        """Latest mtime of the folder and every directory beneath it.
+
+        import_scanned_songs scans recursively, so the guard must notice
+        adds/removes/renames in nested subdirectories — those bump only
+        their parent directory's mtime, never the watched root's.
+        Stats directories only (not files), so it stays far cheaper than
+        the full import it short-circuits.
+        """
+        try:
+            latest = os.stat(folder_path).st_mtime
+        except OSError:
+            return None
+        for dirpath, dirnames, _files in os.walk(folder_path):
+            for d in dirnames:
+                try:
+                    m = os.stat(os.path.join(dirpath, d)).st_mtime
+                except OSError:
+                    continue
+                if m > latest:
+                    latest = m
+        return latest
 
     def _run(self) -> None:
         while not self._stop_event.is_set():
@@ -103,13 +129,39 @@ class FileWatcher:
                     logger.warning("Watched folder missing: %s", folder_path)
                     continue
 
+                # Cheap interim guard: skip the expensive import_scanned_songs
+                # when no directory in the tree changed since last poll.
+                # Adding, removing, or renaming files bumps the containing
+                # directory's mtime on Linux filesystems (ext4/xfs/btrfs);
+                # _tree_mtime takes the max across the whole tree so nested
+                # changes are seen too. In-place content edits don't bump dir
+                # mtimes — those are caught by manual scans, which always run.
+                current_mtime: float | None = None
+                dir_unchanged = False
+                if folder_id is None:
+                    current_mtime = self._tree_mtime(folder_path)
+                    if current_mtime is not None and current_mtime == self._last_dir_mtimes.get(folder_path):
+                        dir_unchanged = True
+
                 # Use import_scanned_songs for new/changed files
                 try:
-                    result = import_scanned_songs(conn, folder_path)
-                    total_imported += result.get("imported", 0)
-                    total_replaced += result.get("replaced", 0)
-                    total_skipped += result.get("skipped", 0)
-                    total_errors += len(result.get("errors", []))
+                    if not dir_unchanged:
+                        result = import_scanned_songs(conn, folder_path)
+                        total_imported += result.get("imported", 0)
+                        total_replaced += result.get("replaced", 0)
+                        total_skipped += result.get("skipped", 0)
+                        total_errors += len(result.get("errors", []))
+                        # Invalidate caches so new songs appear without waiting for TTL
+                        if result.get("imported", 0) > 0 or result.get("replaced", 0) > 0:
+                            song_cache.invalidate_prefix("songs:")
+                            tag_cache.invalidate("tags:list")
+                            folder_cache.invalidate("folders:tree")
+                        # Record successful scan mtime
+                        if current_mtime is not None:
+                            self._last_dir_mtimes[folder_path] = current_mtime
+                    else:
+                        result = None
+                        logger.debug("FileWatcher: skipping %s — dir mtime unchanged", folder_path)
                 except Exception:
                     logger.exception("Error scanning watched folder %s", folder_path)
                     total_errors += 1
@@ -119,6 +171,11 @@ class FileWatcher:
                 try:
                     deleted = self._mark_missing(conn, folder_path)
                     total_deleted += deleted
+                    # Invalidate caches so removed songs disappear without waiting for TTL
+                    if deleted > 0:
+                        song_cache.invalidate_prefix("songs:")
+                        tag_cache.invalidate("tags:list")
+                        folder_cache.invalidate("folders:tree")
                 except Exception:
                     logger.exception("Error checking missing files in %s", folder_path)
 

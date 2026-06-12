@@ -1,5 +1,4 @@
 """Songs router."""
-import json
 import sqlite3
 from pathlib import Path
 from typing import Optional
@@ -11,86 +10,17 @@ from datetime import datetime, timezone
 from app.database import get_db, get_db_ctx, SONG_SELECT_QUERY, COUNT_SONG_QUERY
 from app.models import SongCreate, SongResponse, SongUpdate
 from app.cache import song_cache
+from app.serializers import song_row_to_dict as _song_row_to_dict
 
 router = APIRouter(tags=["songs"])
 
+# Re-export for routers that import song_row_to_dict from here
+song_row_to_dict = _song_row_to_dict
 
-def _safe_json_loads(raw):
-    """Safely parse JSON, returning None on any failure."""
-    if not raw:
-        return None
-    try:
-        return json.loads(raw)
-    except (json.JSONDecodeError, TypeError):
-        return None
 
 def _get_utc_now() -> str:
     """Return current UTC timestamp in ISO format."""
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-def song_row_to_dict(row: sqlite3.Row) -> dict:
-    """Convert a database row (from joined query) to a response dict.
-    
-    Handles parsing of comma-separated tags and playlists strings into lists.
-    """
-    tags_str = row["tags"] if row["tags"] else ""
-    playlists_str = row["playlists"] if row["playlists"] else ""
-    
-    tags = list(dict.fromkeys(t.strip() for t in tags_str.split(",") if t.strip())) if tags_str else []
-
-    # Parse playlists as objects with id and name — deduplicate by id
-    playlists = []
-    seen_playlist_ids: set[int] = set()
-    if playlists_str:
-        # playlists_str format: "id1:name1,id2:name2,..."
-        for item in playlists_str.split(","):
-            if ":" in item:
-                id_part, name_part = item.split(":", 1)
-                try:
-                    pid = int(id_part)
-                except ValueError:
-                    continue
-                if pid not in seen_playlist_ids:
-                    seen_playlist_ids.add(pid)
-                    playlists.append({"id": pid, "name": name_part.strip()})
-    
-    raw_art = row["album_art_path"] if "album_art_path" in row.keys() else None
-    raw_peaks = row["waveform_peaks"] if "waveform_peaks" in row.keys() else None
-    waveform_peaks = _safe_json_loads(raw_peaks)
-    raw_artists = row["artists"] if "artists" in row.keys() else None
-    raw_featured = row["featured_artists"] if "featured_artists" in row.keys() else None
-    artists = _safe_json_loads(raw_artists)
-    featured_artists = _safe_json_loads(raw_featured)
-    return {
-        "id": row["id"],
-        "title": row["title"],
-        "artist": row["artist"],
-        "album": row["album"],
-        "artists": artists,
-        "featured_artists": featured_artists,
-        "duration": row["duration"],
-        "file_path": row["file_path"],
-        "file_format": row["file_format"] if "file_format" in row.keys() else None,
-        # Empty string is the "attempted, no art" sentinel — expose as None to frontend
-        "album_art_path": raw_art if raw_art else None,
-        "source": row["source"],
-        "tags": tags,
-        "playlists": playlists,
-        "created_at": row["created_at"],
-        "updated_at": row["updated_at"],
-        "bitrate": row["bitrate"] if "bitrate" in row.keys() else None,
-        "sample_rate": row["sample_rate"] if "sample_rate" in row.keys() else None,
-        "bit_depth": row["bit_depth"] if "bit_depth" in row.keys() else None,
-        "file_size": row["file_size"] if "file_size" in row.keys() else None,
-        "waveform_peaks": waveform_peaks,
-        "dominant_color": row["dominant_color"] if "dominant_color" in row.keys() else None,
-        "dominant_color_2": row["dominant_color_2"] if "dominant_color_2" in row.keys() else None,
-        "replaygain_track_gain": row["replaygain_track_gain"] if "replaygain_track_gain" in row.keys() else None,
-        "replaygain_track_peak": row["replaygain_track_peak"] if "replaygain_track_peak" in row.keys() else None,
-        "replaygain_album_gain": row["replaygain_album_gain"] if "replaygain_album_gain" in row.keys() else None,
-        "replaygain_album_peak": row["replaygain_album_peak"] if "replaygain_album_peak" in row.keys() else None,
-    }
 
 
 ALLOWED_SORT_FIELDS = {"title", "artist", "album", "duration", "created_at"}
@@ -174,7 +104,7 @@ def list_songs(
         cursor.execute(count_query, count_params)
         total = cursor.fetchone()["total"]
 
-    data = [song_row_to_dict(row) for row in rows]
+    data = [song_row_to_dict(row, include_peaks=False) for row in rows]
 
     result = {"data": data, "meta": {"total": total}, "message": "ok"}
 
@@ -322,23 +252,14 @@ def create_song(song: SongCreate):
         # Invalidate song caches
         song_cache.invalidate_prefix("songs:")
 
-    # Return the created song with empty tags and playlists
-    import os as _os
-    file_fmt = _os.path.splitext(song.file_path)[1].lstrip(".").lower() if song.file_path else None
-    return {"data": {
-        "id": song_id,
-        "title": song.title,
-        "artist": song.artist,
-        "album": song.album,
-        "duration": song.duration,
-        "file_path": song.file_path,
-        "file_format": file_fmt,
-        "source": "manual",
-        "tags": [],
-        "playlists": [],
-        "created_at": now,
-        "updated_at": now,
-    }, "message": "Song created successfully"}
+    # Fetch and return the full song (consistent with GET /songs/{id})
+    with get_db_ctx() as conn:
+        cursor = conn.cursor()
+        query = SONG_SELECT_QUERY + " WHERE s.id = ? GROUP BY s.id"
+        cursor.execute(query, (song_id,))
+        row = cursor.fetchone()
+
+    return {"data": song_row_to_dict(row), "message": "Song created successfully"}
 
 
 @router.get("/album-art/{filename}")

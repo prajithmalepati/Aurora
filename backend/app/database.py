@@ -2,33 +2,61 @@
 import sqlite3
 from pathlib import Path
 
-DB_PATH = Path(__file__).parent.parent / "aurora.db"
+from app.paths import DB_PATH
+
+# ── Current schema (version 1) ──────────────────────────────────────────
+# All columns that exist today are defined here. Fresh databases create
+# at user_version = 1; existing databases are migrated forward by the
+# version ladder in init_db().
 
 INIT_SQL = """
 PRAGMA foreign_keys = ON;
 PRAGMA journal_mode = WAL;
 
 CREATE TABLE IF NOT EXISTS songs (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    title       TEXT    NOT NULL,
-    artist      TEXT    NOT NULL,
-    album       TEXT,
-    duration    INTEGER,
-    file_path   TEXT    UNIQUE,
-    source      TEXT    NOT NULL DEFAULT 'manual',
-    external_id TEXT,
-    created_at  TEXT    NOT NULL,
-    updated_at  TEXT    NOT NULL
+    id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+    title                   TEXT    NOT NULL,
+    artist                  TEXT    NOT NULL,
+    album                   TEXT,
+    duration                INTEGER,
+    file_path               TEXT    UNIQUE,
+    source                  TEXT    NOT NULL DEFAULT 'manual',
+    external_id             TEXT,
+    created_at              TEXT    NOT NULL,
+    updated_at              TEXT    NOT NULL,
+    file_format             TEXT,
+    album_art_path          TEXT,
+    waveform_peaks          TEXT,
+    dominant_color          TEXT,
+    dominant_color_2        TEXT,
+    bleed_thumb             BLOB,
+    bleed_region_x          INTEGER,
+    bleed_region_y          INTEGER,
+    bleed_region_w          INTEGER,
+    bleed_region_h          INTEGER,
+    file_mtime              REAL,
+    replaygain_track_gain   REAL,
+    replaygain_track_peak   REAL,
+    replaygain_album_gain   REAL,
+    replaygain_album_peak   REAL,
+    bitrate                 INTEGER,
+    sample_rate             INTEGER,
+    bit_depth               INTEGER,
+    file_size               INTEGER,
+    artists                 TEXT,
+    featured_artists        TEXT
 );
 
 CREATE TABLE IF NOT EXISTS playlists (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    name       TEXT    NOT NULL UNIQUE,
-    color      TEXT,
-    emoji      TEXT,
-    image_url  TEXT,
-    created_at TEXT    NOT NULL,
-    updated_at TEXT    NOT NULL
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    name                TEXT    NOT NULL UNIQUE,
+    color               TEXT,
+    emoji               TEXT,
+    image_url           TEXT,
+    created_at          TEXT    NOT NULL,
+    updated_at          TEXT    NOT NULL,
+    crossfade_enabled   INTEGER DEFAULT NULL,
+    crossfade_duration_s INTEGER DEFAULT NULL
 );
 
 CREATE TABLE IF NOT EXISTS tags (
@@ -43,6 +71,8 @@ CREATE TABLE IF NOT EXISTS playlist_songs (
     song_id     INTEGER NOT NULL REFERENCES songs(id)     ON DELETE CASCADE,
     position    INTEGER NOT NULL DEFAULT 0,
     added_at    TEXT    NOT NULL,
+    start_time_ms INTEGER NOT NULL DEFAULT 0,
+    end_time_ms   INTEGER NOT NULL DEFAULT 0,
     UNIQUE(playlist_id, song_id)
 );
 
@@ -63,6 +93,7 @@ CREATE INDEX IF NOT EXISTS idx_playlist_songs_playlist ON playlist_songs(playlis
 CREATE INDEX IF NOT EXISTS idx_playlist_songs_song     ON playlist_songs(song_id);
 CREATE INDEX IF NOT EXISTS idx_song_tags_song          ON song_tags(song_id);
 CREATE INDEX IF NOT EXISTS idx_song_tags_tag           ON song_tags(tag_id);
+CREATE INDEX IF NOT EXISTS idx_songs_title_artist      ON songs(title, artist);
 
 CREATE TABLE IF NOT EXISTS watched_folders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -96,24 +127,105 @@ def get_db_ctx():
         conn.close()
 
 
+# ── Schema migrations ───────────────────────────────────────────────────
+# Each tuple: (version_number, list of SQL statements)
+# Migrations run in order. The ladder is append-only: never modify an
+# existing version number. To add a new migration, append a (N+1, [...])
+# entry and bump CURRENT_VERSION.
+#
+# Columns added here were already baked into INIT_SQL above, so fresh
+# databases skip all migrations and go straight to CURRENT_VERSION.
+
+MIGRATIONS = [
+    # Version 1: base schema (INIT_SQL creates everything).
+    # For databases created before versioning existed (user_version == 0),
+    # this adds columns that were previously added by try/except blocks.
+    (1, [
+        "ALTER TABLE playlists ADD COLUMN image_url TEXT",
+        "ALTER TABLE songs ADD COLUMN file_format TEXT",
+        "ALTER TABLE songs ADD COLUMN album_art_path TEXT",
+        "ALTER TABLE playlist_songs ADD COLUMN start_time_ms INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE playlist_songs ADD COLUMN end_time_ms INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE playlists ADD COLUMN crossfade_enabled INTEGER DEFAULT NULL",
+        "ALTER TABLE playlists ADD COLUMN crossfade_duration_s INTEGER DEFAULT NULL",
+        "ALTER TABLE songs ADD COLUMN waveform_peaks TEXT",
+        "ALTER TABLE songs ADD COLUMN dominant_color TEXT",
+        "ALTER TABLE songs ADD COLUMN dominant_color_2 TEXT",
+        "ALTER TABLE songs ADD COLUMN bleed_thumb BLOB",
+        "ALTER TABLE songs ADD COLUMN bleed_region_x INTEGER",
+        "ALTER TABLE songs ADD COLUMN bleed_region_y INTEGER",
+        "ALTER TABLE songs ADD COLUMN bleed_region_w INTEGER",
+        "ALTER TABLE songs ADD COLUMN bleed_region_h INTEGER",
+        "ALTER TABLE songs ADD COLUMN file_mtime REAL",
+        "ALTER TABLE songs ADD COLUMN replaygain_track_gain REAL",
+        "ALTER TABLE songs ADD COLUMN replaygain_track_peak REAL",
+        "ALTER TABLE songs ADD COLUMN replaygain_album_gain REAL",
+        "ALTER TABLE songs ADD COLUMN replaygain_album_peak REAL",
+        "ALTER TABLE songs ADD COLUMN bitrate INTEGER",
+        "ALTER TABLE songs ADD COLUMN sample_rate INTEGER",
+        "ALTER TABLE songs ADD COLUMN bit_depth INTEGER",
+        "ALTER TABLE songs ADD COLUMN file_size INTEGER",
+        "ALTER TABLE songs ADD COLUMN artists TEXT",
+        "ALTER TABLE songs ADD COLUMN featured_artists TEXT",
+    ]),
+    # (future migrations go here as (2, [...]), (3, [...]), etc.)
+    # Version 2: composite index for title+artist lookups
+    (2, [
+        "CREATE INDEX IF NOT EXISTS idx_songs_title_artist ON songs(title, artist)",
+    ]),
+]
+
+CURRENT_VERSION = len(MIGRATIONS)
+
+
+def _run_migrations(conn: sqlite3.Connection) -> None:
+    """Run the PRAGMA user_version migration ladder."""
+    current = conn.execute("PRAGMA user_version").fetchone()[0]
+
+    if current == 0:
+        # Either a fresh database or one created before versioning existed.
+        # INIT_SQL already created all columns, so just stamp version 1.
+        # If any column already exists (pre-existing DB), the ADD COLUMN
+        # in the migration will fail — that's expected and safe to ignore
+        # via the inner loop below.
+        for version, stmts in MIGRATIONS:
+            for stmt in stmts:
+                try:
+                    conn.execute(stmt)
+                except sqlite3.OperationalError as e:
+                    if "duplicate column" not in str(e):
+                        raise
+            conn.execute(f"PRAGMA user_version = {version}")
+        conn.commit()
+        return
+
+    if current > CURRENT_VERSION:
+        raise RuntimeError(
+            f"Database is at schema version {current}, but this code only "
+            f"understands up to version {CURRENT_VERSION}. "
+            f"Upgrade Aurora before using this database."
+        )
+
+    # Apply forward migrations for existing versioned databases
+    for version, stmts in MIGRATIONS:
+        if version <= current:
+            continue
+        for stmt in stmts:
+            conn.execute(stmt)
+        conn.execute(f"PRAGMA user_version = {version}")
+
+    conn.commit()
+
+
 def init_db():
-    """Initialize the database — create tables if they don't exist."""
+    """Initialize the database — create tables and run migrations."""
     import os
     with get_db_ctx() as conn:
         conn.executescript(INIT_SQL)
-        # Migration: add image_url column to existing databases
-        try:
-            conn.execute("ALTER TABLE playlists ADD COLUMN image_url TEXT")
-            conn.commit()
-        except sqlite3.OperationalError:
-            pass  # Column already exists
-        # Migration: add file_format column to songs table
-        try:
-            conn.execute("ALTER TABLE songs ADD COLUMN file_format TEXT")
-            conn.commit()
-        except sqlite3.OperationalError:
-            pass  # Column already exists
-        # Backfill file_format from file_path extension for existing rows
+        _run_migrations(conn)
+
+        # ── Backfills (idempotent — only touch NULL rows) ───────────────
+        # Backfill file_format from file_path extension
         rows = conn.execute(
             "SELECT id, file_path FROM songs WHERE file_format IS NULL AND file_path IS NOT NULL"
         ).fetchall()
@@ -123,97 +235,9 @@ def init_db():
                 conn.execute("UPDATE songs SET file_format = ? WHERE id = ?", (ext, row["id"]))
         if rows:
             conn.commit()
-        # Migration: add album_art_path column to songs table
-        try:
-            conn.execute("ALTER TABLE songs ADD COLUMN album_art_path TEXT")
-            conn.commit()
-        except sqlite3.OperationalError:
-            pass  # Column already exists
-        # Backfill album_art_path for songs that have a file but no art extracted yet
+
+        # Backfill album art
         _backfill_album_art(conn)
-        # Migration: add trim columns to playlist_songs
-        try:
-            conn.execute("ALTER TABLE playlist_songs ADD COLUMN start_time_ms INTEGER NOT NULL DEFAULT 0")
-            conn.commit()
-        except sqlite3.OperationalError:
-            pass
-        try:
-            conn.execute("ALTER TABLE playlist_songs ADD COLUMN end_time_ms INTEGER NOT NULL DEFAULT 0")
-            conn.commit()
-        except sqlite3.OperationalError:
-            pass
-        # Migration: add crossfade columns to playlists
-        try:
-            conn.execute("ALTER TABLE playlists ADD COLUMN crossfade_enabled INTEGER DEFAULT NULL")
-            conn.commit()
-        except sqlite3.OperationalError:
-            pass
-        try:
-            conn.execute("ALTER TABLE playlists ADD COLUMN crossfade_duration_s INTEGER DEFAULT NULL")
-            conn.commit()
-        except sqlite3.OperationalError:
-            pass
-        # Migration: add visual pipeline columns (waveform peaks + dominant colors)
-        try:
-            conn.execute("ALTER TABLE songs ADD COLUMN waveform_peaks TEXT")
-            conn.commit()
-        except sqlite3.OperationalError:
-            pass  # Column already exists
-        try:
-            conn.execute("ALTER TABLE songs ADD COLUMN dominant_color TEXT")
-            conn.commit()
-        except sqlite3.OperationalError:
-            pass
-        try:
-            conn.execute("ALTER TABLE songs ADD COLUMN dominant_color_2 TEXT")
-            conn.commit()
-        except sqlite3.OperationalError:
-            pass
-        # Migration: add image-region bleed columns
-        try:
-            conn.execute("ALTER TABLE songs ADD COLUMN bleed_thumb BLOB")
-            conn.commit()
-        except sqlite3.OperationalError:
-            pass
-        for col in ("bleed_region_x", "bleed_region_y", "bleed_region_w", "bleed_region_h"):
-            try:
-                conn.execute(f"ALTER TABLE songs ADD COLUMN {col} INTEGER")
-                conn.commit()
-            except sqlite3.OperationalError:
-                pass
-        # Migration: add file_mtime for re-scan detection of edited files
-        try:
-            conn.execute("ALTER TABLE songs ADD COLUMN file_mtime REAL")
-            conn.commit()
-        except sqlite3.OperationalError:
-            pass
-        # Migration: add ReplayGain columns
-        for col in ("replaygain_track_gain", "replaygain_track_peak",
-                    "replaygain_album_gain", "replaygain_album_peak"):
-            try:
-                conn.execute(f"ALTER TABLE songs ADD COLUMN {col} REAL")
-                conn.commit()
-            except sqlite3.OperationalError:
-                pass
-        # Migration: add audio quality metadata columns
-        for col, col_type in [("bitrate", "INTEGER"), ("sample_rate", "INTEGER"),
-                               ("bit_depth", "INTEGER"), ("file_size", "INTEGER")]:
-            try:
-                conn.execute(f"ALTER TABLE songs ADD COLUMN {col} {col_type}")
-                conn.commit()
-            except sqlite3.OperationalError:
-                pass
-        # Migration: add multi-artist columns
-        try:
-            conn.execute("ALTER TABLE songs ADD COLUMN artists TEXT")
-            conn.commit()
-        except sqlite3.OperationalError:
-            pass  # Column already exists
-        try:
-            conn.execute("ALTER TABLE songs ADD COLUMN featured_artists TEXT")
-            conn.commit()
-        except sqlite3.OperationalError:
-            pass  # Column already exists
 
 
 def _backfill_album_art(conn) -> None:
@@ -271,6 +295,7 @@ COUNT_SONG_QUERY = "SELECT COUNT(*) as total FROM songs s"
 PLAYLIST_SONG_SELECT_COLUMNS = """
     s.id, s.title, s.artist, s.album, s.duration,
     s.file_path, s.file_format, s.album_art_path, s.source,
+    s.bitrate, s.sample_rate, s.bit_depth, s.file_size,
     s.waveform_peaks, s.dominant_color, s.dominant_color_2,
     s.replaygain_track_gain, s.replaygain_track_peak,
     s.replaygain_album_gain, s.replaygain_album_peak,

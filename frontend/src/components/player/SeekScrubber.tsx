@@ -8,17 +8,27 @@ interface SeekScrubberProps {
   mobile?: boolean
 }
 
+const SEEK_KEYS = new Set([
+  "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown",
+])
+
 export function SeekScrubber({ hasSong, seekTo, mobile = false }: SeekScrubberProps) {
   const seek = usePlayerStore((state) => state.seek)
   const duration = usePlayerStore((state) => state.duration)
+  const isBuffering = usePlayerStore((state) => state.isBuffering)
+  const startTimeMs = usePlayerStore((state) => state.currentSong?.start_time_ms)
+  const endTimeMs = usePlayerStore((state) => state.currentSong?.end_time_ms)
 
   const containerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const isDraggingRef = useRef(false)
+  const instantTimerRef = useRef<number | null>(null)
 
   // Drag state for smooth scrubbing
   const [isDragging, setIsDragging] = useState(false)
   const [dragValue, setDragValue] = useState<number | null>(null)
+  // Discrete seeks (keyboard/wheel) suppress the fill's catch-up transition for 1:1 response
+  const [instant, setInstant] = useState(false)
 
   // Hover state for time tooltip
   const [hoverX, setHoverX] = useState<number | null>(null)
@@ -31,15 +41,25 @@ export function SeekScrubber({ hasSong, seekTo, mobile = false }: SeekScrubberPr
     }
   }, [])
 
-  // Update seek-bar CSS custom property for fill percentage
+  // Fill percentage drives every visual layer via --seek-pct on the container
   const currentVal = dragValue ?? seek
   const pct = duration > 0 ? (currentVal / duration) * 100 : 0
 
   useEffect(() => {
-    if (inputRef.current) {
-      inputRef.current.style.setProperty("--seek-pct", `${pct}%`)
-    }
+    containerRef.current?.style.setProperty("--seek-pct", `${pct}%`)
   }, [pct])
+
+  const markInstant = useCallback(() => {
+    setInstant(true)
+    if (instantTimerRef.current) window.clearTimeout(instantTimerRef.current)
+    instantTimerRef.current = window.setTimeout(() => setInstant(false), 300)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (instantTimerRef.current) window.clearTimeout(instantTimerRef.current)
+    }
+  }, [])
 
   // --- Drag handlers for smooth scrubbing ---
   const handlePointerDown = useCallback(() => {
@@ -70,6 +90,13 @@ export function SeekScrubber({ hasSong, seekTo, mobile = false }: SeekScrubberPr
     [seekTo]
   )
 
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (SEEK_KEYS.has(e.key)) markInstant()
+    },
+    [markInstant]
+  )
+
   // --- Hover handlers ---
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
@@ -95,9 +122,10 @@ export function SeekScrubber({ hasSong, seekTo, mobile = false }: SeekScrubberPr
       const direction = e.deltaY > 0 ? 1 : -1
       const currentSeek = dragValue ?? seek
       const target = Math.max(0, Math.min(duration, currentSeek + direction * delta))
+      markInstant()
       seekTo(target)
     },
-    [hasSong, duration, seek, dragValue, seekTo]
+    [hasSong, duration, seek, dragValue, seekTo, markInstant]
   )
 
   // Hover time calculation
@@ -105,25 +133,60 @@ export function SeekScrubber({ hasSong, seekTo, mobile = false }: SeekScrubberPr
     ? (hoverX / containerWidth) * duration
     : null
 
+  // Tooltip: follows the cursor on hover; follows the thumb while dragging
+  const thumbX = containerWidth > 0 ? (pct / 100) * containerWidth : null
+  const tooltipX = isDragging ? thumbX : hoverX
+  const tooltipTime = isDragging ? (dragValue ?? seek) : hoverTime
+  const showTooltip = hasSong && tooltipX !== null && tooltipTime !== null
+
+  // Trim-point notches (playlist trim: start_time_ms / end_time_ms)
+  const notches: number[] = []
+  if (duration > 0) {
+    if (startTimeMs && startTimeMs > 0) {
+      notches.push(Math.min(100, (startTimeMs / 1000 / duration) * 100))
+    }
+    if (endTimeMs && endTimeMs > 0) {
+      notches.push(Math.min(100, (endTimeMs / 1000 / duration) * 100))
+    }
+  }
+
   return (
-    <div className={`flex items-center gap-3${mobile ? "" : " w-full"}`}>
+    <div className={`scrub-row flex items-center gap-3${mobile ? "" : " w-full"}`}>
       <span
-        className={`${mobile ? "text-[10px] w-8" : "text-[11px] w-9 font-medium"} text-[var(--aurora-text-secondary)] text-right tabular-nums`}
+        className={`scrub-time ${mobile ? "text-[10px] w-8" : "text-[11px] w-9 font-medium"} text-[var(--aurora-text-secondary)] text-right tabular-nums`}
       >
         {formatDuration(seek)}
       </span>
       <div
         ref={containerRef}
-        className="relative flex-1 group flex items-center"
+        className="scrub flex-1"
+        data-dragging={isDragging || undefined}
+        data-instant={instant || undefined}
+        data-buffering={(hasSong && isBuffering) || undefined}
+        data-disabled={!hasSong || undefined}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
         onWheel={handleWheel}
       >
+        {/* Visual layers — pointer-events-none, behind the input */}
+        <div className="scrub-visual" aria-hidden="true">
+          <div className="scrub-track" />
+          <div className="scrub-shimmer" />
+          <div className="scrub-fill">
+            <div className="scrub-comet" />
+          </div>
+          {notches.map((n, i) => (
+            <div key={i} className="scrub-notch" style={{ left: `${n}%` }} />
+          ))}
+        </div>
+        <div className="scrub-thumb" aria-hidden="true" />
+
+        {/* Invisible native range input — full 24px hitbox, a11y, keyboard */}
         <input
           ref={inputRef}
           type="range"
           aria-label="Seek"
-          className="seek-bar"
+          className="scrub-input"
           min={0}
           max={duration || 100}
           step={1}
@@ -131,24 +194,25 @@ export function SeekScrubber({ hasSong, seekTo, mobile = false }: SeekScrubberPr
           onChange={handleChange}
           onPointerDown={handlePointerDown}
           onPointerUp={handlePointerUp}
+          onKeyDown={handleKeyDown}
           disabled={!hasSong}
         />
 
-        {/* Hover time tooltip */}
-        {hoverTime !== null && !isDragging && (
+        {/* Time tooltip — cursor-anchored on hover, thumb-anchored while dragging */}
+        {showTooltip && (
           <div
             className="pointer-events-none absolute top-[-26px] z-20 px-2 py-0.5 rounded text-[11px] font-medium tabular-nums bg-black/80 text-white border border-white/10 shadow-lg whitespace-nowrap"
             style={{
-              left: `${hoverX! + 8}px`,
+              left: `${tooltipX}px`,
               transform: "translateX(-50%)",
             }}
           >
-            {formatDuration(hoverTime)}
+            {formatDuration(tooltipTime)}
           </div>
         )}
       </div>
       <span
-        className={`${mobile ? "text-[10px] w-8" : "text-[11px] w-9 font-medium"} text-[var(--aurora-text-tertiary)] tabular-nums`}
+        className={`scrub-time ${mobile ? "text-[10px] w-8" : "text-[11px] w-9 font-medium"} text-[var(--aurora-text-tertiary)] tabular-nums`}
       >
         {formatDuration(duration)}
       </span>

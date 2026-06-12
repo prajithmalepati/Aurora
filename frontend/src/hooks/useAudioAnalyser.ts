@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { usePlayerStore } from '@/stores/playerStore'
+import { resumeAudioContext } from '@/lib/howlerCompat'
 
 // createMediaElementSource permanently mutes the <audio> element's direct output,
 // rerouting audio exclusively through the Web Audio graph. Timing between
@@ -15,8 +16,7 @@ export function useAudioAnalyser(): number {
   useEffect(() => {
     isPlayingRef.current = isPlaying
     if (isPlaying) {
-      const ctx: AudioContext | undefined = (window as any).Howler?.ctx
-      if (ctx?.state === 'suspended') ctx.resume().catch(() => {})
+      resumeAudioContext()
     }
   }, [isPlaying])
 
