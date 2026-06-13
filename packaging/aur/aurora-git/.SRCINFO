@@ -1,0 +1,23 @@
+pkgbase = aurora-git
+	pkgdesc = A personal music library with smart tagging and boolean filtering
+	pkgver = 0.1.1.r0.g0000000
+	pkgrel = 1
+	url = https://github.com/prajithmalepati/Aurora
+	arch = x86_64
+	license = MIT
+	makedepends = git
+	makedepends = nodejs
+	makedepends = npm
+	makedepends = rust
+	makedepends = python
+	makedepends = python-pip
+	makedepends = dpkg
+	depends = webkit2gtk-4.1
+	depends = openssl
+	depends = glib2
+	provides = aurora
+	conflicts = aurora-bin
+	source = git+https://github.com/prajithmalepati/Aurora.git
+	sha256sums = SKIP
+
+pkgname = aurora-git
