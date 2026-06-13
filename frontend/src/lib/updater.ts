@@ -1,4 +1,5 @@
 import { toast } from "@/lib/toast"
+import { openUrl } from "@tauri-apps/plugin-opener"
 
 let startupCheckDone = false
 
@@ -55,9 +56,9 @@ async function githubFallbackCheck(manual: boolean): Promise<void> {
 
     if (latestClean && latestClean !== currentClean) {
       const htmlUrl: string = data.html_url ?? ""
-      showUpdateToast(latestClean, () => {
-        // Open release page in default browser
-        window.open(htmlUrl, "_blank")
+      showUpdateToast(latestClean, async () => {
+        // Open release page in system browser
+        await openUrl(htmlUrl)
       })
     } else if (manual) {
       toast("You're on the latest version")
