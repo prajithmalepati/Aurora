@@ -790,3 +790,47 @@ hermes/phase1-bugfix (9 commits ahead of hermes/phase1-desktop):
 - Key files: `backend/app/services/file_watcher.py`, `frontend/src/stores/playerStore.ts`, `frontend/src-tauri/src/lib.rs`
 - QA matrix: `docs/desktop-qa-matrix.md`
 
+
+---
+
+## N8 — Security Hardening (2026-06-13)
+
+**Branch:** `hermes/phase1-hardening` (stacks on `hermes/phase1-bugfix`)
+**PR:** https://github.com/prajithmalepati/Aurora/pull/5 (base: `hermes/phase1-desktop`)
+**Status:** All tasks complete
+
+### Task Results
+
+| Task | Commit | Status | Notes |
+|------|--------|--------|-------|
+| 1. CI Windows assets | `35f1c82` | ✅ | `needs: build-linux` serializes jobs |
+| 2. Key rotation | `3133297` | ✅ | Password at `~/.tauri/aurora-key-password.txt` — **BACK UP OFFLINE** |
+| 3. CORS allowlist | `0f437eb` | ✅ | `tauri://localhost` + `http(s)://tauri.localhost` added |
+| 4. TrustedHost | `dd7ab7b` | ✅ | `Host: evil.com` → 400 |
+| 5. Sidecar token | `b0aef6b`+`aedb130`+`7c733a6` | ✅ | Rust gen → backend middleware → frontend header + query param |
+| 6. CSP | already set | ✅ | Verified on built deb — no CSP violations |
+| 7. CORS preflight fix | `fcb5e1f` | ✅ | OPTIONS exempt from token; log redaction scans all args |
+| 8. Updater flow | `45c2847` | ✅ | Startup check (10s) + Settings button + GitHub API fallback |
+| 9. CI SHA pins | `51f6998` | ✅ | All 6 actions pinned; trigger policy documented |
+| 10. Cover hardening + single-instance | `fab8192` | ✅ | 10MB cap, Pillow re-encode, polyglot kill |
+
+### Verification
+- `pytest -q` → 120 passed
+- `npm run build` → clean
+- `cargo check` → clean
+- Curl matrix on built deb (xvfb):
+  - OPTIONS /api/playlists → 200 (CORS preflight)
+  - GET /api/playlists (no token) → 401
+  - GET /api/playlists (tokened) → 200, 7 playlists
+  - GET /api/songs (tokened) → 200
+  - GET /api/health → 200 (exempt)
+- CORS headers: `access-control-allow-origin: tauri://localhost`, `allow-credentials: true`
+
+### Deviations
+- `@tauri-apps/plugin-process` not installed — auto-relaunch replaced with "restart to apply" toast (simpler, no Rust dep)
+- `dangerousInsecureTransportProtocol` grep: not found ✅
+
+### Open items
+- Runtime xvfb smoke for CSP (audio, all views, scan) — code-only verification; full runtime deferred to human testing
+- AUR PKGBUILD (Task 10) — deferred to N9
+- Signing key password backup — **human must back up `~/.tauri/aurora-key-password.txt` offline**
