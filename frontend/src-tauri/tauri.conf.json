@@ -12,7 +12,14 @@
   "app": {
     "windows": [],
     "security": {
-      "csp": null
+      "csp": {
+        "default-src": "'self'",
+        "connect-src": "'self' http://127.0.0.1:* ipc: http://ipc.localhost https://api.github.com https://github.com",
+        "img-src": "'self' http://127.0.0.1:* data: blob:",
+        "media-src": "'self' http://127.0.0.1:*",
+        "style-src": "'self' 'unsafe-inline'",
+        "script-src": "'self'"
+      }
     }
   },
   "bundle": {
