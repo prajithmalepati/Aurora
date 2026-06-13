@@ -49,18 +49,69 @@ fn spawn_backend(bin: &std::path::Path, port: u16) -> std::io::Result<Child> {
         .spawn()
 }
 
-fn wait_for_health(port: u16, timeout: Duration) -> bool {
-    let url = format!("http://127.0.0.1:{}/api/health", port);
-    let start = Instant::now();
-    while start.elapsed() < timeout {
-        if let Ok(resp) = reqwest::blocking::get(&url) {
-            if resp.status().is_success() {
-                return true;
+/// Spawn backend with health gate, retrying on early exit (port-bind race).
+///
+/// Returns `(child, port, healthy)`. After 3 early-exit attempts, returns Err.
+/// If the child stays alive but unhealthy after 15s, proceeds (slow cold start).
+fn spawn_with_health_gate(app: &tauri::AppHandle) -> std::io::Result<(Child, u16, bool)> {
+    let bin = resolve_backend_bin(app);
+
+    for attempt in 1..=3u32 {
+        let port = find_free_port();
+        log::info!(
+            "sidecar: spawn attempt {}/3 — {} on port {}",
+            attempt,
+            bin.display(),
+            port
+        );
+
+        let mut child = spawn_backend(&bin, port)?;
+        let url = format!("http://127.0.0.1:{}/api/health", port);
+        let start = Instant::now();
+        let mut healthy = false;
+
+        while start.elapsed() < Duration::from_secs(15) {
+            // Early-exit check — bind failure kills uvicorn within ~1s
+            match child.try_wait() {
+                Ok(Some(status)) => {
+                    log::warn!(
+                        "sidecar: backend exited early on port {} ({}), retrying",
+                        port,
+                        status
+                    );
+                    // Don't drop child — let it be cleaned up by going out of scope
+                    // Jump to next attempt
+                    healthy = false;
+                    break;
+                }
+                Ok(None) => { /* still running */ }
+                Err(e) => {
+                    log::error!("sidecar: try_wait error during health gate: {}", e);
+                    break;
+                }
             }
+
+            if let Ok(resp) = reqwest::blocking::get(&url) {
+                if resp.status().is_success() {
+                    healthy = true;
+                    break;
+                }
+            }
+            std::thread::sleep(Duration::from_millis(300));
         }
-        std::thread::sleep(Duration::from_millis(300));
+
+        // If we get here with healthy=false AND the child didn't exit early,
+        // it's a slow cold start — proceed anyway (don't retry)
+        if healthy || child.try_wait().ok().flatten().is_none() {
+            // Either healthy or alive-after-timeout (slow cold start)
+            return Ok((child, port, healthy));
+        }
+        // else: child exited early, loop to next attempt
     }
-    false
+
+    Err(std::io::Error::other(
+        "backend exited early on all 3 port attempts (port-bind race?)",
+    ))
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -84,14 +135,17 @@ pub fn run() {
             }
 
             let bin = resolve_backend_bin(app.handle());
-            let port = find_free_port();
-            log::info!("sidecar: spawning {} on port {}", bin.display(), port);
+            log::info!("sidecar: spawning {}", bin.display());
 
-            let child = match spawn_backend(&bin, port) {
-                Ok(c) => c,
+            let (child, port, healthy) = match spawn_with_health_gate(app.handle()) {
+                Ok(result) => result,
                 Err(e) => {
-                    log::error!("sidecar: failed to spawn backend: {}", e);
-                    let msg = format!("Failed to start backend:\n{}\n\nPath: {}", e, bin.display());
+                    log::error!("sidecar: failed to spawn backend after 3 attempts: {}", e);
+                    let msg = format!(
+                        "Failed to start backend after 3 attempts:\n{}\n\nPath: {}",
+                        e,
+                        bin.display()
+                    );
                     use tauri_plugin_dialog::DialogExt;
                     app.dialog()
                         .message(&msg)
@@ -101,18 +155,17 @@ pub fn run() {
                 }
             };
 
-            // Store port + child in managed state
-            {
-                let state = app.state::<SidecarState>();
-                *state.port.lock().unwrap() = port;
-                *state.child.lock().unwrap() = Some(child);
-            }
-
-            // Health gate — block until backend is ready (up to 15s)
-            let healthy = wait_for_health(port, Duration::from_secs(15));
             if !healthy {
                 log::error!("sidecar: backend did not become healthy in 15s");
                 // Don't block forever — show window anyway, user will see error
+            }
+
+            // Store port + child in managed state
+            {
+                let state = app.state::<SidecarState>();
+                *state.port.lock().unwrap_or_else(|e| e.into_inner()) = port;
+                // Detach child from our handle — stored in state for monitor thread
+                *state.child.lock().unwrap_or_else(|e| e.into_inner()) = Some(child);
             }
 
             // Inject base URL via initialization_script (runs before page JS on every nav)
@@ -138,7 +191,12 @@ pub fn run() {
                     if state.shutting_down.load(Ordering::Acquire) {
                         return;
                     }
-                    let mut guard = state.child.lock().unwrap();
+                    let mut guard = state.child.lock().unwrap_or_else(|e| e.into_inner());
+                    // FIX-003: re-check after acquiring lock — flag may have been set
+                    // between the check above and the lock acquisition
+                    if state.shutting_down.load(Ordering::Acquire) {
+                        return;
+                    }
                     if let Some(ref mut child) = *guard {
                         match child.try_wait() {
                             Ok(Some(status)) => {
@@ -148,7 +206,7 @@ pub fn run() {
                                 if state.shutting_down.load(Ordering::Acquire) {
                                     return;
                                 }
-                                let port = *state.port.lock().unwrap();
+                                let port = *state.port.lock().unwrap_or_else(|e| e.into_inner());
                                 let bin = resolve_backend_bin(&handle);
                                 // 3 attempts with backoff
                                 let mut restarted = false;
@@ -164,7 +222,7 @@ pub fn run() {
                                     if state.shutting_down.load(Ordering::Acquire) {
                                         return;
                                     }
-                                    guard = state.child.lock().unwrap();
+                                    guard = state.child.lock().unwrap_or_else(|e| e.into_inner());
                                     match spawn_backend(&bin, port) {
                                         Ok(new_child) => {
                                             *guard = Some(new_child);
@@ -200,7 +258,7 @@ pub fn run() {
             let state = app_handle.state::<SidecarState>();
             // Signal monitor thread to stop BEFORE killing the child
             state.shutting_down.store(true, Ordering::Release);
-            let mut guard = state.child.lock().unwrap();
+            let mut guard = state.child.lock().unwrap_or_else(|e| e.into_inner());
             if let Some(ref mut child) = *guard {
                 log::info!("sidecar: killing backend on exit");
                 let _ = child.kill();
