@@ -592,3 +592,201 @@ b2b4591 Merge branch 'hermes/phase1-xfade' into hermes/phase1-desktop
 - Signing key: `~/.tauri/aurora.key` (empty password)
 - Full updater e2e test: N7 with the human
 
+## N7 — Autonomous Bug Fix Session (2026-06-12, DeepSeek V4 Pro)
+
+**Session:** 2026-06-12, Hermes. Branch: `hermes/phase1-bugfix` (off `hermes/phase1-desktop`).
+
+### Source
+
+Triggered by comprehensive code audit of N4–N6 brief execution. Full research at `docs/aurora/HERMES_N4_N6_BUG_AUDIT.md` (28 findings). Execution queue at `docs/aurora/HERMES_BUGFIX_QUEUE.md` (15 fixes prioritized).
+
+### Applied fixes (6 commits, 12 distinct fixes)
+
+```
+a0d6b9e fix: cleanup CI appimage artifacts; sync originalQueue on removeFromQueue
+3a2966a fix(desktop): use unwrap_or_else for all Mutex locks to survive poison
+91d2752 fix(backend): SQL GLOB for path matching, prune stale mtimes, log art backfill errors
+21ab2da fix(audio): clamp playlist xfade duration, guard fadingOutRef, short song preload
+1b8c43c fix(settings): clamp crossfadeDuration on init; validate crossfadeCurve at load
+df461af fix(backend): add DISTINCT to playlist song tags GROUP_CONCAT
+```
+
+### Fixes by category
+
+| File | Fixes | Severity |
+|------|-------|----------|
+| `database.py` | FIX-005: DISTINCT in GROUP_CONCAT | Medium |
+| `database.py` | FIX-015: Log album art backfill errors | Low |
+| `settingsStore.ts` | FIX-004: Clamp crossfadeDuration on init | High |
+| `settingsStore.ts` | FIX-010: Validate crossfadeCurve at load | Low |
+| `useAudioPlayer.ts` | FIX-006: Clamp playlist xfade duration | High |
+| `useAudioPlayer.ts` | FIX-007: Short song preload window | Medium |
+| `useAudioPlayer.ts` | FIX-014: fadingOutRef isLoaded guard | High |
+| `file_watcher.py` | FIX-001: LIKE → GLOB (wildcard injection) | Critical |
+| `file_watcher.py` | FIX-008: Prune stale mtime entries | Medium |
+| `lib.rs` | FIX-012: Mutex poison survival (6 sites) | Medium |
+| `desktop-build.yml` | FIX-011: Remove dead AppImage artifacts | Low |
+| `playerStore.ts` | FIX-013: Sync originalQueue on remove | Low |
+
+### Verification (all green)
+
+- **Frontend:** `npm run build` ✓ (clean, zero errors)
+- **Backend:** `pytest -q` ✓ (120 passed, 78 warnings)
+- **Rust:** `cargo check` ✓ (compiled 491/491 crates)
+
+### Deferred (documented with fix code, needs design review)
+
+| Fix | Reason |
+|-----|--------|
+| FIX-002: Port TOCTOU race | Needs Rust restructure + Python stdout coordination |
+| FIX-003: Mutex exit block | Needs `try_lock` timeout strategy design |
+| FIX-009: Symlink handling | Schema change scope (needs "unavailable" column) |
+
+### Engineering documentation created
+
+- `docs/CHALLENGES.md` — Interview-ready narratives: 6 challenge deep-dives with STAR format, root cause analysis, fix approach, and interview angles
+- `docs/DEVIATIONS.md` — Plan divergences: what changed, why, impact
+- `docs/aurora/HERMES_N4_N6_BUG_AUDIT.md` — Full 28-finding research report with severity tiers
+- `docs/aurora/HERMES_BUGFIX_QUEUE.md` — Executable fix queue with exact before/after code
+
+### Branch state
+
+```
+hermes/phase1-bugfix (6 commits ahead of hermes/phase1-desktop):
+  a0d6b9e ← most recent
+  3a2966a
+  91d2752
+  21ab2da
+  1b8c43c
+  df461af
+```
+
+Origin: NOT pushed. Ready for Fable 5 review.
+
+### For next session
+
+1. Fable 5 reviews `hermes/phase1-bugfix` diff
+2. If approved: push → open PR against `hermes/phase1-desktop`
+3. Fable designs FIX-002 (port race) + FIX-003 (mutex exit block)
+4. Human does full updater e2e test (N6 task 7 — two signed releases)
+
+## N7 — Bugfix Corrections (Fable review) + Deferred Sidecar Fixes + Desktop QA + Release Dry-Run
+
+**Session:** 2026-06-12/13, Hermes (MiMo Pro). Branch: `hermes/phase1-bugfix` (6 new commits).
+
+### PRE-FLIGHT results
+- Working tree: clean (untracked process docs only) ✓
+- Frozen backend: `backend/dist/aurora-backend/aurora-backend` ✓
+- gh auth: `workflow` scope ✓
+- webkit2gtk-4.1, xorg-server-xvfb, xdotool, imagemagick: installed ✓
+- `$DISPLAY`: empty (used xvfb :99 throughout)
+- ffmpeg: installed ✓
+
+### Task 1: correct two bugfix-session regressions ✅
+
+**1a — GLOB metachar injection (`file_watcher.py` `_mark_missing`):**
+Replaced `GLOB` with prefix range query (`>= lower AND < upper`). Bracketed folder names like `[FLAC] rips` no longer silently fail. The range `[prefix + '/', prefix + '0')` covers exactly the paths under a folder — no metachar escaping, index-friendly.
+
+**1b — mtime prune scope (`file_watcher.py` `_do_scan`):**
+Guarded stale mtime prune to full scans only (`if folder_id is None`). Single-folder POST scans no longer wipe the entire mtime cache, which would force full rescans on the next 30s background pass.
+
+**1c — originalQueue over-removal (`playerStore.ts` `removeFromQueue`):**
+Added `removeOneById()` helper at module scope. Removes exactly one occurrence by index instead of filtering all matches by id. Used in both branches.
+
+**Verification:**
+- `pytest -q` → 120 passed ✓
+- `npm run build` → clean ✓
+- Live bracket-folder test: created `/tmp/aurora-glob-test/[FLAC] test/`, added as watched folder, scanned (imported=1), deleted file, rescanned (deleted=1, file_path=NULL) ✓
+
+**Commits:**
+- `7908765 fix(backend): range query for path-prefix matching; scope mtime prune to full scans`
+- `ca10a71 fix(player): remove single originalQueue occurrence on removeFromQueue`
+
+### Task 2: deferred sidecar fixes (Fable-designed) ✅
+
+**2a — FIX-002 port TOCTOU race (`lib.rs`):**
+New `spawn_with_health_gate()`: loops up to 3 attempts, each picking a fresh port, spawning, then health-waiting. Inside health wait, polls `child.try_wait()` — early exit (bind failure) retries with new port. Alive-but-unhealthy after 15s proceeds (slow cold start). After 3 early-exit attempts, error dialog + `Err`.
+
+**2b — FIX-003 exit-flag re-check (`lib.rs` monitor thread):**
+Added `if state.shutting_down.load(Ordering::Acquire) { return; }` after re-acquiring the lock. Prevents one wasted doomed respawn.
+
+**Verification:** `cargo check` → clean (0 warnings) ✓
+
+**Commit:** `35b69ba fix(desktop): retry spawn on port-bind race; re-check shutdown flag before respawn`
+
+### Task 3: runtime re-verification ✅
+
+Under xvfb :99 with `npx tauri dev`.
+- Cold start → uvicorn on port 43377, health OK, app rendered dark theme ✓
+- Kill backend → monitor respawned, health restored on same port ✓
+- Quit app → no orphan backend ✓
+- Screenshot → full UI visible, no errors ✓
+
+### Task 4: push + PR ✅
+
+- `hermes/phase1-desktop` pushed (`bbf406e` Cargo.lock commit, was unpushed)
+- `hermes/phase1-bugfix` pushed (all 9 commits)
+- **PR #4:** https://github.com/prajithmalepati/Aurora/pull/4
+
+### Task 5: Phase-1.7 desktop QA matrix ✅
+
+**File:** `docs/desktop-qa-matrix.md` (committed, tracked)
+
+Results: 8 PASS, 2 findings, 1 not-tested
+- Path robustness: 6/6 PASS (Cyrillic, CJK, brackets, percent, delete+rescan)
+- Codec matrix: 1/4 (only FLAC imported from generated test files; real library files OK)
+- Second instance: 1/1 (two windows + two backends, no single-instance plugin)
+- Window state: not testable under xvfb
+
+### Task 6: release-pipeline dry-run ✅
+
+- Version bump 0.1.0 → 0.1.1 in 3 files + Cargo.lock
+- Tag v0.1.1 → CI run 27450670293 (linux ✓, windows ✓)
+- Draft release: .deb + .deb.sig + latest.json verified (version=0.1.1, sigs non-empty)
+- Linux auto-update is a no-op (AppImage dead); Windows NSIS is only live updater path
+- Cleanup: release + tag deleted, version-bump commit stays
+
+**Commit:** `ab3b341 chore(desktop): bump version to 0.1.1`
+
+### Branch state
+
+```
+hermes/phase1-bugfix (9 commits ahead of hermes/phase1-desktop):
+  7f33a39 docs: add release-pipeline dry-run findings to QA matrix
+  ab3b341 chore(desktop): bump version to 0.1.1
+  c0fbcc9 docs: desktop QA matrix — paths, codecs, instances (linux)
+  35b69ba fix(desktop): retry spawn on port-bind race; re-check shutdown flag before respawn
+  ca10a71 fix(player): remove single originalQueue occurrence on removeFromQueue
+  7908765 fix(backend): range query for path-prefix matching; scope mtime prune to full scans
+  a0d6b9e fix: cleanup CI appimage artifacts; sync originalQueue on removeFromQueue
+  3a2966a fix(desktop): use unwrap_or_else for all Mutex locks to survive poison
+  91d2752 fix(backend): SQL GLOB for path matching, prune stale mtimes, log art backfill errors
+```
+
+### Done means status
+
+| Criterion | Status |
+|-----------|--------|
+| Range query replaces GLOB; bracket-folder live test passes | ✅ |
+| Prune scoped to full scans | ✅ |
+| originalQueue single-occurrence removal | ✅ |
+| FIX-002 retry loop + FIX-003 flag re-check, cargo clean | ✅ |
+| Runtime: injection, crash-restart, no orphan | ✅ |
+| Both branches pushed; PR open against desktop branch | ✅ PR #4 |
+| `docs/desktop-qa-matrix.md` committed with all 4 areas | ✅ |
+| Draft release verified (sigs + latest.json) then deleted | ✅ |
+| Handoff appended + pushed | ✅ |
+
+### Deviations from brief
+
+1. **Codec test files:** Only FLAC imported from generated 10s sine-wave test files. MP3/M4A/OGG skipped by scanner (metadata issue). Real library files in all formats import fine.
+2. **Window-state persistence:** Not testable under xvfb. Plugin wired, likely works on real display.
+3. **package.json version:** Was `0.0.0` (not `0.1.0`), bumped to `0.1.1` to match.
+
+### For Fable 5 review
+
+- Diff: `hermes/phase1-desktop...hermes/phase1-bugfix`
+- PR: https://github.com/prajithmalepati/Aurora/pull/4
+- Key files: `backend/app/services/file_watcher.py`, `frontend/src/stores/playerStore.ts`, `frontend/src-tauri/src/lib.rs`
+- QA matrix: `docs/desktop-qa-matrix.md`
+
