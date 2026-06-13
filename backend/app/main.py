@@ -3,6 +3,7 @@ import logging
 import os
 import secrets
 import shutil
+import re
 from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI, Request, Response
@@ -126,6 +127,9 @@ if AURORA_TOKEN:
         # Health endpoint is exempt (Rust health gate polls pre-token)
         if request.url.path == "/api/health":
             return await call_next(request)
+        # CORS preflight carries no custom headers/token — let CORS answer it
+        if request.method == "OPTIONS":
+            return await call_next(request)
         # Check header first, then query param
         token = request.headers.get("X-Aurora-Token")
         if token is None:
@@ -139,13 +143,14 @@ if AURORA_TOKEN:
     # Redact token from uvicorn access logs
     class _TokenRedactFilter(logging.Filter):
         def filter(self, record: logging.LogRecord) -> bool:
-            if record.args and isinstance(record.args, tuple) and len(record.args) >= 3:
-                # Uvicorn access log format: (method, path, status)
-                # path may contain ?token=...
+            if record.args and isinstance(record.args, tuple) and len(record.args) >= 1:
                 args = list(record.args)
-                if isinstance(args[1], str) and "token=" in args[1]:
-                    import re
-                    args[1] = re.sub(r"token=[^&\s]+", "token=REDACTED", args[1])
+                changed = False
+                for i, a in enumerate(args):
+                    if isinstance(a, str) and "token=" in a:
+                        args[i] = re.sub(r"token=[^&\s]+", "token=REDACTED", a)
+                        changed = True
+                if changed:
                     record.args = tuple(args)
             return True
 
