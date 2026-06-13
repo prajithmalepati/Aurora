@@ -16,6 +16,7 @@ import { AuroraColorBridge } from "@/components/aurora/AuroraColorBridge"
 import { WelcomeOverlay, dismissWelcome, isWelcomeDismissed } from "@/components/welcome/WelcomeOverlay"
 import { Search, Shuffle } from "lucide-react"
 import type { Song } from "@/types"
+import { scheduleStartupUpdateCheck } from "@/lib/updater"
 
 // Lazy-loaded views — only one renders at a time
 const SongTable = lazy(() => import("@/components/songs/SongTable").then(m => ({ default: m.SongTable })))
@@ -44,6 +45,11 @@ function App() {
     fetchPlaylists()
     fetchTags()
   }, [fetchSongs, fetchPlaylists, fetchTags])
+
+   // One-shot update check 10s after mount
+   useEffect(() => {
+     scheduleStartupUpdateCheck()
+   }, [])
 
   // Debounced search handler
   useEffect(() => {

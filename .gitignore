@@ -109,3 +109,10 @@ PERFORMANCE_AUDIT.md
 V1_EXECUTION_PLAN.md
 V1_PLAN.md
 VISUAL_AUDIT.md
+
+# cross-machine process docs (local only, synced outside git)
+HERMES_*.md
+
+SECURITY_HARDENING_PLAN.md
+STRATEGIC_PLAN.md
+FUTURE_ARCHITECTURE.md

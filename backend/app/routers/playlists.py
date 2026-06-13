@@ -13,6 +13,8 @@ from app.models import PlaylistCreate, PlaylistUpdate, PlaylistResponse, Playlis
 from app.serializers import song_row_to_dict
 
 from app.paths import PLAYLIST_IMAGES_DIR
+from PIL import Image
+import io
 
 router = APIRouter(tags=["playlists"])
 
@@ -28,6 +30,20 @@ async def upload_playlist_image(playlist_id: int, file: UploadFile = File(...)):
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image")
 
+    # Read and validate size (10 MB cap)
+    data = await file.read()
+    if len(data) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Image too large (max 10 MB)")
+
+    # Re-encode through Pillow to kill polyglot/malicious files
+    try:
+        img = Image.open(io.BytesIO(data))
+        img.verify()  # validate structure
+        # Re-open after verify (verify closes the fp)
+        img = Image.open(io.BytesIO(data))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid or corrupt image file")
+ 
     with get_db_ctx() as conn:
         filepath = None
         try:
@@ -48,8 +64,19 @@ async def upload_playlist_image(playlist_id: int, file: UploadFile = File(...)):
 
             filename = f"{playlist_id}.{ext}"
             filepath = PLAYLIST_IMAGES_DIR / filename
-            with open(filepath, "wb") as f:
-                f.write(await file.read())
+            # Re-encode: convert RGBA/P to RGB for JPEG, keep as-is for PNG/WebP/GIF
+            if ext == "jpg":
+                if img.mode in ("RGBA", "P", "LA"):
+                    img = img.convert("RGB")
+                img.save(filepath, format="JPEG", quality=90)
+            elif ext == "png":
+                img.save(filepath, format="PNG")
+            elif ext == "webp":
+                img.save(filepath, format="WEBP", quality=90)
+            elif ext == "gif":
+                img.save(filepath, format="GIF")
+            else:
+                img.save(filepath)
 
             image_url = f"/api/playlist-images/{filename}"
 

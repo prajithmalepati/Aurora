@@ -13,7 +13,7 @@ import type { ScanResult } from "@/types"
 import { useSongStore } from "@/stores/songStore"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { toast } from "@/lib/toast"
-import { api, getBaseUrl } from "@/lib/api"
+import { api, getBaseUrl, getAuroraToken } from "@/lib/api"
 
 const isTauri = "__TAURI_INTERNALS__" in window
 
@@ -69,7 +69,7 @@ export function ScanDialog({ open, onOpenChange }: ScanDialogProps) {
     try {
       const res = await fetch(`${getBaseUrl()}/api/scan/stream`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(getAuroraToken() ? { "X-Aurora-Token": getAuroraToken()! } : {}) },
         body: JSON.stringify({
           folder_path: state.folderPath.trim(),
           playlist_name: state.playlistName.trim() || undefined,

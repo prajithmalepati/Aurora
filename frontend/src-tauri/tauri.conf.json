@@ -12,7 +12,14 @@
   "app": {
     "windows": [],
     "security": {
-      "csp": null
+      "csp": {
+        "default-src": "'self'",
+        "connect-src": "'self' http://127.0.0.1:* ipc: http://ipc.localhost https://api.github.com https://github.com",
+        "img-src": "'self' http://127.0.0.1:* data: blob:",
+        "media-src": "'self' http://127.0.0.1:*",
+        "style-src": "'self' 'unsafe-inline'",
+        "script-src": "'self'"
+      }
     }
   },
   "bundle": {
@@ -35,7 +42,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDdFRDdGQTVGMjczRjA1QgpSV1JiOEhQeXBYL3RCKzU1VVNzb3hwUUluUCt4UExEQmNJczYxbWY1VmN4QmVFMWZyV1EyS3RRdAo=",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEE4MUVGNkZBQ0Y4Q0M2NkUKUldSdXhvelArdlllcU5NNGEwUk95SE5zUlA2R0RYdTRNQmJKVWd3QWZwMm1zNnhLV1pBYkREL1QK",
       "endpoints": [
         "https://github.com/prajithmalepati/Aurora/releases/latest/download/latest.json"
       ]

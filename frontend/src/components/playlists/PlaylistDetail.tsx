@@ -36,7 +36,7 @@ import { Equalizer } from "@/components/ui/Equalizer"
 import { AlbumArt } from "@/components/songs/AlbumArt"
 import { PlaylistImagePicker } from "@/components/playlists/PlaylistImagePicker"
 import { WaveformTrimEditor } from "@/components/player/WaveformTrimEditor"
-import { api, BASE_URL, getBaseUrl } from "@/lib/api"
+import { api, BASE_URL, getBaseUrl, getAuroraToken, withToken } from "@/lib/api"
 
 interface PlaylistDetailProps {
   playlistId: number
@@ -135,7 +135,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
   )
 
   // Server-stored image URL (comes back from the API on every fetchPlaylistDetail)
-  const heroImage = activePlaylist?.image_url ? `${getBaseUrl()}${activePlaylist.image_url}` : null
+  const heroImage = activePlaylist?.image_url ? withToken(`${getBaseUrl()}${activePlaylist.image_url}`) : null
 
   // Neutral dark gradient for the hero tile — no teal/violet bias.
   // If the playlist has a custom accent colour we let a whisper of it through.
@@ -165,7 +165,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
   const handleExport = async (format: 'm3u' | 'm3u8' | 'json') => {
     if (!activePlaylist) return
     try {
-      const response = await fetch(`${BASE_URL}/playlists/${activePlaylist.id}/export?format=${format}`)
+      const response = await fetch(`${BASE_URL}/playlists/${activePlaylist.id}/export?format=${format}`, { headers: { "X-Aurora-Token": getAuroraToken() ?? "" } })
       if (!response.ok) {
         const err = await response.json().catch(() => ({ detail: 'Export failed' }))
         throw new Error(err.detail || 'Export failed')
@@ -192,7 +192,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
       setEditColor(activePlaylist.color || "")
       setEditEmoji(activePlaylist.emoji || "")
       // Seed picker with the current server URL (displays as <img src>)
-      setEditImageDataUrl(activePlaylist.image_url ? `${getBaseUrl()}${activePlaylist.image_url}` : null)
+      setEditImageDataUrl(activePlaylist.image_url ? withToken(`${getBaseUrl()}${activePlaylist.image_url}`) : null)
       // Seed crossfade settings
       setEditCrossfadeEnabled(
         activePlaylist.crossfade_enabled !== null && activePlaylist.crossfade_enabled !== undefined
