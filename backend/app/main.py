@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.database import init_db
 from app.paths import DATA_DIR, DB_PATH, ALBUM_ART_DIR, PLAYLIST_IMAGES_DIR
@@ -106,6 +107,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Reject requests with untrusted Host headers (DNS rebinding defense)
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost", "testserver"])
 
 # Include routers
 app.include_router(songs.router, prefix="/api")
