@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "0.1.0"
+version = "0.1.1"
 description = "Aurora music player"
 authors = ["Prajith"]
 edition = "2021"
