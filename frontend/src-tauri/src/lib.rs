@@ -127,6 +127,13 @@ pub fn run() {
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+     .plugin(tauri_plugin_single_instance::Builder::new().callback(|app, _argv, _cwd| {
+         // Focus/unminimize existing window when second instance launched
+         if let Some(window) = app.get_webview_window("main") {
+             let _ = window.unminimize();
+             let _ = window.set_focus();
+         }
+     }).build())
         .manage(SidecarState {
             child: Mutex::new(None),
             port: Mutex::new(0),
