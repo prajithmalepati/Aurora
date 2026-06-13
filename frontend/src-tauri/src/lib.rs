@@ -8,6 +8,7 @@ use tauri::{Manager, RunEvent};
 struct SidecarState {
     child: Mutex<Option<Child>>,
     port: Mutex<u16>,
+    token: Mutex<String>,
     shutting_down: AtomicBool,
 }
 
@@ -36,7 +37,7 @@ fn resolve_backend_bin(app: &tauri::AppHandle) -> std::path::PathBuf {
     }
 }
 
-fn spawn_backend(bin: &std::path::Path, port: u16) -> std::io::Result<Child> {
+fn spawn_backend(bin: &std::path::Path, port: u16, token: &str) -> std::io::Result<Child> {
     let (stdout, stderr) = if cfg!(debug_assertions) {
         (std::process::Stdio::inherit(), std::process::Stdio::inherit())
     } else {
@@ -44,6 +45,7 @@ fn spawn_backend(bin: &std::path::Path, port: u16) -> std::io::Result<Child> {
     };
     Command::new(bin)
         .env("AURORA_PORT", port.to_string())
+        .env("AURORA_TOKEN", token)
         .stdout(stdout)
         .stderr(stderr)
         .spawn()
@@ -51,10 +53,15 @@ fn spawn_backend(bin: &std::path::Path, port: u16) -> std::io::Result<Child> {
 
 /// Spawn backend with health gate, retrying on early exit (port-bind race).
 ///
-/// Returns `(child, port, healthy)`. After 3 early-exit attempts, returns Err.
+/// Returns `(child, port, token, healthy)`. After 3 early-exit attempts, returns Err.
 /// If the child stays alive but unhealthy after 15s, proceeds (slow cold start).
-fn spawn_with_health_gate(app: &tauri::AppHandle) -> std::io::Result<(Child, u16, bool)> {
+fn spawn_with_health_gate(app: &tauri::AppHandle) -> std::io::Result<(Child, u16, String, bool)> {
     let bin = resolve_backend_bin(app);
+
+    // Generate 32-byte random auth token, hex-encoded
+    let mut buf = [0u8; 32];
+    getrandom::getrandom(&mut buf).expect("getrandom failed");
+    let token: String = buf.iter().map(|b| format!("{:02x}", b)).collect();
 
     for attempt in 1..=3u32 {
         let port = find_free_port();
@@ -65,7 +72,7 @@ fn spawn_with_health_gate(app: &tauri::AppHandle) -> std::io::Result<(Child, u16
             port
         );
 
-        let mut child = spawn_backend(&bin, port)?;
+        let mut child = spawn_backend(&bin, port, &token)?;
         let url = format!("http://127.0.0.1:{}/api/health", port);
         let start = Instant::now();
         let mut healthy = false;
@@ -104,7 +111,7 @@ fn spawn_with_health_gate(app: &tauri::AppHandle) -> std::io::Result<(Child, u16
         // it's a slow cold start — proceed anyway (don't retry)
         if healthy || child.try_wait().ok().flatten().is_none() {
             // Either healthy or alive-after-timeout (slow cold start)
-            return Ok((child, port, healthy));
+            return Ok((child, port, token, healthy));
         }
         // else: child exited early, loop to next attempt
     }
@@ -123,6 +130,7 @@ pub fn run() {
         .manage(SidecarState {
             child: Mutex::new(None),
             port: Mutex::new(0),
+            token: Mutex::new(String::new()),
             shutting_down: AtomicBool::new(false),
         })
         .setup(|app| {
@@ -137,7 +145,7 @@ pub fn run() {
             let bin = resolve_backend_bin(app.handle());
             log::info!("sidecar: spawning {}", bin.display());
 
-            let (child, port, healthy) = match spawn_with_health_gate(app.handle()) {
+            let (child, port, token, healthy) = match spawn_with_health_gate(app.handle()) {
                 Ok(result) => result,
                 Err(e) => {
                     log::error!("sidecar: failed to spawn backend after 3 attempts: {}", e);
@@ -160,16 +168,20 @@ pub fn run() {
                 // Don't block forever — show window anyway, user will see error
             }
 
-            // Store port + child in managed state
+            // Store port + token + child in managed state
             {
                 let state = app.state::<SidecarState>();
                 *state.port.lock().unwrap_or_else(|e| e.into_inner()) = port;
+                *state.token.lock().unwrap_or_else(|e| e.into_inner()) = token.clone();
                 // Detach child from our handle — stored in state for monitor thread
                 *state.child.lock().unwrap_or_else(|e| e.into_inner()) = Some(child);
             }
 
-            // Inject base URL via initialization_script (runs before page JS on every nav)
-            let init = format!("window.__AURORA_BASE_URL__ = \"http://127.0.0.1:{}\";", port);
+            // Inject base URL and auth token via initialization_script (runs before page JS on every nav)
+            let init = format!(
+                "window.__AURORA_BASE_URL__ = \"http://127.0.0.1:{}\";\nwindow.__AURORA_TOKEN__ = \"{}\";",
+                port, token
+            );
 
             // Create window AFTER health gate — user never sees a white/frozen screen
             tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::default())
@@ -207,6 +219,7 @@ pub fn run() {
                                     return;
                                 }
                                 let port = *state.port.lock().unwrap_or_else(|e| e.into_inner());
+                                let token = state.token.lock().unwrap_or_else(|e| e.into_inner()).clone();
                                 let bin = resolve_backend_bin(&handle);
                                 // 3 attempts with backoff
                                 let mut restarted = false;
@@ -223,7 +236,7 @@ pub fn run() {
                                         return;
                                     }
                                     guard = state.child.lock().unwrap_or_else(|e| e.into_inner());
-                                    match spawn_backend(&bin, port) {
+                                    match spawn_backend(&bin, port, &token) {
                                         Ok(new_child) => {
                                             *guard = Some(new_child);
                                             log::info!("sidecar: restarted successfully");
