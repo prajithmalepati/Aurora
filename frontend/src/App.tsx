@@ -46,10 +46,10 @@ function App() {
     fetchTags()
   }, [fetchSongs, fetchPlaylists, fetchTags])
 
-   // One-shot update check 10s after mount
-   useEffect(() => {
-     scheduleStartupUpdateCheck()
-   }, [])
+  // One-shot update check 10s after mount
+  useEffect(() => {
+    scheduleStartupUpdateCheck()
+  }, [])
 
   // Debounced search handler
   useEffect(() => {
