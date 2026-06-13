@@ -1,10 +1,14 @@
 """FastAPI application factory."""
 import logging
+import os
+import secrets
 import shutil
+import re
 from contextlib import asynccontextmanager
 from pathlib import Path
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.database import init_db
 from app.paths import DATA_DIR, DB_PATH, ALBUM_ART_DIR, PLAYLIST_IMAGES_DIR
@@ -94,11 +98,63 @@ app = FastAPI(title="Aurora", version="0.1.0", lifespan=lifespan)
 # CORS — allow React dev server
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:5174", "http://localhost:5175"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://localhost:5175",
+        "tauri://localhost",
+        "http://tauri.localhost",
+        "https://tauri.localhost",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Reject requests with untrusted Host headers (DNS rebinding defense)
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost", "testserver"])
+
+
+# --- Sidecar auth token middleware ---
+AURORA_TOKEN = os.environ.get("AURORA_TOKEN")
+
+if AURORA_TOKEN:
+    _TOKEN: str = AURORA_TOKEN  # narrow type for Pyright
+
+    @app.middleware("http")
+    async def token_auth(request: Request, call_next):
+        """Reject requests lacking a valid auth token when AURORA_TOKEN is set."""
+        # Health endpoint is exempt (Rust health gate polls pre-token)
+        if request.url.path == "/api/health":
+            return await call_next(request)
+        # CORS preflight carries no custom headers/token — let CORS answer it
+        if request.method == "OPTIONS":
+            return await call_next(request)
+        # Check header first, then query param
+        token = request.headers.get("X-Aurora-Token")
+        if token is None:
+            token = request.query_params.get("token")
+        if token is None:
+            return Response(status_code=401, content="Unauthorized")
+        if not secrets.compare_digest(token, _TOKEN):
+            return Response(status_code=401, content="Unauthorized")
+        return await call_next(request)
+
+    # Redact token from uvicorn access logs
+    class _TokenRedactFilter(logging.Filter):
+        def filter(self, record: logging.LogRecord) -> bool:
+            if record.args and isinstance(record.args, tuple) and len(record.args) >= 1:
+                args = list(record.args)
+                changed = False
+                for i, a in enumerate(args):
+                    if isinstance(a, str) and "token=" in a:
+                        args[i] = re.sub(r"token=[^&\s]+", "token=REDACTED", a)
+                        changed = True
+                if changed:
+                    record.args = tuple(args)
+            return True
+
+    logging.getLogger("uvicorn.access").addFilter(_TokenRedactFilter())
 
 # Include routers
 app.include_router(songs.router, prefix="/api")

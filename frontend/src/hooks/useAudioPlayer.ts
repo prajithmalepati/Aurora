@@ -4,7 +4,7 @@ import { useSettingsStore } from "@/stores/settingsStore"
 import type { CrossfadeCurve } from "@/stores/settingsStore"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { toast } from "@/lib/toast"
-import { getBaseUrl } from "@/lib/api"
+import { getBaseUrl, withToken } from "@/lib/api"
 import { createPlaybackEngine, unlockAudioOutput } from "@/lib/engines/howlerEngine"
 import type { PlaybackEngine, PlaybackSource } from "@/types/playback"
 
@@ -17,7 +17,7 @@ function streamSource(
 ): PlaybackSource {
   const ext = filePath?.split(".").pop()?.toLowerCase()
   return {
-    url: `${getBaseUrl()}/api/songs/${songId}/stream`,
+    url: withToken(`${getBaseUrl()}/api/songs/${songId}/stream`),
     format: ext,
     gapless,
   }

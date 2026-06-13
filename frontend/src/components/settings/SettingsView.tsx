@@ -6,6 +6,7 @@ import { api } from "@/lib/api"
 import { toast } from "@/lib/toast"
 import type { WatchedFolder } from "@/types"
 import type { ApiResponse } from "@/types"
+import { checkForUpdates } from "@/lib/updater"
 
 export function SettingsView() {
   const crossfadeEnabled = useSettingsStore((s) => s.crossfadeEnabled)
@@ -335,8 +336,14 @@ export function SettingsView() {
         </div>
       </div>
 
-      {/* Reset welcome */}
-      <div className="mt-8 text-center">
+      {/* About / Updates */}
+      <div className="mt-8 flex flex-col items-center gap-3">
+        <button
+          onClick={() => checkForUpdates(true)}
+          className="text-[12px] text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-accent-interactive)] transition-colors duration-150"
+        >
+          Check for updates
+        </button>
         <button
           onClick={() => {
             resetWelcome()
