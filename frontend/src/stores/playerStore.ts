@@ -3,6 +3,11 @@ import type { Song } from "@/types"
 
 const MAX_HISTORY = 100
 
+const removeOneById = (list: Song[], id: number) => {
+  const i = list.findIndex((s) => s.id === id)
+  return i === -1 ? list : [...list.slice(0, i), ...list.slice(i + 1)]
+}
+
 interface PlayerState {
   currentSong: Song | null
   queue: Song[]
@@ -300,7 +305,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   removeFromQueue: (index) => {
-    const { queue, queueIndex, currentSong } = get()
+    const { queue, queueIndex, currentSong, isShuffled, originalQueue } = get()
     if (index < 0 || index >= queue.length) return
     if (index === queueIndex && currentSong) {
       // Removing current song — advance to next or stop
@@ -311,6 +316,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       }
       const newIndex = Math.min(index, newQueue.length - 1)
       const nextSong = newQueue[newIndex]
+      const newOrig = isShuffled ? removeOneById(originalQueue, currentSong.id) : []
       set({
         queue: newQueue,
         queueIndex: newIndex,
@@ -318,11 +324,14 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         isPlaying: true,
         seek: 0,
         duration: nextSong.duration ?? 0,
+        originalQueue: newOrig,
       })
     } else {
       const newQueue = queue.filter((_, i) => i !== index)
       const newIndex = index < queueIndex ? queueIndex - 1 : queueIndex
-      set({ queue: newQueue, queueIndex: newIndex })
+      const removed = queue[index]
+      const newOrig = isShuffled ? removeOneById(originalQueue, removed.id) : originalQueue
+      set({ queue: newQueue, queueIndex: newIndex, originalQueue: newOrig })
     }
   },
 

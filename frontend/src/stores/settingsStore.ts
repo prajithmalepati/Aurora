@@ -28,8 +28,12 @@ function load<T>(key: string, fallback: T): T {
 
 export const useSettingsStore = create<SettingsState>((set) => ({
   crossfadeEnabled: load("aurora-xfade-enabled", true),
-  crossfadeDuration: load("aurora-xfade-duration", 5),
-  crossfadeCurve: load<CrossfadeCurve>("aurora-xfade-curve", "equalpower"),
+  crossfadeDuration: Math.max(1, Math.min(12, load("aurora-xfade-duration", 5))),
+  crossfadeCurve: (() => {
+    const raw = load<string>("aurora-xfade-curve", "equalpower")
+    const valid: CrossfadeCurve[] = ["linear", "equalpower", "overlap", "lagged"]
+    return valid.includes(raw as CrossfadeCurve) ? (raw as CrossfadeCurve) : "equalpower"
+  })(),
   replaygainMode: load<"off" | "track" | "album">("aurora-rg-mode", "track"),
   respectTrims: load("aurora-respect-trims", true),
 
