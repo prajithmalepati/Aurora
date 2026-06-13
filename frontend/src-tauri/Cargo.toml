@@ -25,3 +25,4 @@ tauri-plugin-window-state = "2"
 reqwest = { version = "0.12", features = ["blocking"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-updater = "2"
+getrandom = "0.2"
