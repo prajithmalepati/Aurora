@@ -1,9 +1,11 @@
 """FastAPI application factory."""
 import logging
+import os
+import secrets
 import shutil
 from contextlib import asynccontextmanager
 from pathlib import Path
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
@@ -110,6 +112,44 @@ app.add_middleware(
 
 # Reject requests with untrusted Host headers (DNS rebinding defense)
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost", "testserver"])
+
+
+# --- Sidecar auth token middleware ---
+AURORA_TOKEN = os.environ.get("AURORA_TOKEN")
+
+if AURORA_TOKEN:
+    _TOKEN: str = AURORA_TOKEN  # narrow type for Pyright
+
+    @app.middleware("http")
+    async def token_auth(request: Request, call_next):
+        """Reject requests lacking a valid auth token when AURORA_TOKEN is set."""
+        # Health endpoint is exempt (Rust health gate polls pre-token)
+        if request.url.path == "/api/health":
+            return await call_next(request)
+        # Check header first, then query param
+        token = request.headers.get("X-Aurora-Token")
+        if token is None:
+            token = request.query_params.get("token")
+        if token is None:
+            return Response(status_code=401, content="Unauthorized")
+        if not secrets.compare_digest(token, _TOKEN):
+            return Response(status_code=401, content="Unauthorized")
+        return await call_next(request)
+
+    # Redact token from uvicorn access logs
+    class _TokenRedactFilter(logging.Filter):
+        def filter(self, record: logging.LogRecord) -> bool:
+            if record.args and isinstance(record.args, tuple) and len(record.args) >= 3:
+                # Uvicorn access log format: (method, path, status)
+                # path may contain ?token=...
+                args = list(record.args)
+                if isinstance(args[1], str) and "token=" in args[1]:
+                    import re
+                    args[1] = re.sub(r"token=[^&\s]+", "token=REDACTED", args[1])
+                    record.args = tuple(args)
+            return True
+
+    logging.getLogger("uvicorn.access").addFilter(_TokenRedactFilter())
 
 # Include routers
 app.include_router(songs.router, prefix="/api")
