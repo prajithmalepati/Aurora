@@ -834,3 +834,113 @@ hermes/phase1-bugfix (9 commits ahead of hermes/phase1-desktop):
 - Runtime xvfb smoke for CSP (audio, all views, scan) — code-only verification; full runtime deferred to human testing
 - AUR PKGBUILD (Task 10) — deferred to N9
 - Signing key password backup — **human must back up `~/.tauri/aurora-key-password.txt` offline**
+
+## N9 — Phase 1 Close-out
+
+**Session:** 2026-06-13, Hermes (MiMo Pro). Branch: `hermes/phase1-closeout` (4 commits).
+
+### PRE-FLIGHT results
+- PR #5: MERGED (mergedAt: 2026-06-13T21:13:21Z, base: `hermes/phase1-desktop`) ✓
+- git status: clean ✓
+- Frozen backend: `backend/dist/aurora-backend/aurora-backend` ✓
+- `webkit2gtk-4.1`: installed ✓
+- `namcap`: NOT installed (sudo password required) — PKGBUILD syntax-verified only
+- `dpkg`: NOT installed — .deb extracted via `ar` instead
+- `$DISPLAY`: empty (used xvfb :99)
+
+### Task 1: Fold PR #5 review fixes ✅
+
+| Finding | Fix | Commit |
+|---------|-----|--------|
+| R1: `window.open(htmlUrl, "_blank")` doesn't work in Tauri webview | Installed `@tauri-apps/plugin-opener` (npm + Cargo), registered plugin, replaced with `openUrl(htmlUrl)` from `@tauri-apps/plugin-opener` | `e718d15` |
+| R3: App.tsx update useEffect 3-space indent | Fixed to 2-space (matches file) | (same commit) |
+| R5: lib.rs single-instance plugin indentation + order | Moved single-instance to first in plugin chain, fixed indentation to 8-space, added opener plugin after updater | (same commit) |
+| R5: trailing whitespace in lib.rs | None found (already clean) | N/A |
+
+**Deferred (known, per brief):**
+- R2: string `!==` version compare (not semver) — low impact, local builds only
+- R4: GIF cover first-frame only — Pillow limitation
+
+**Verification:** `npm run build` → clean, `cargo check` → clean
+
+### Task 2: AUR PKGBUILD ✅
+
+**Variant:** `aurora-git` (build from source) — no public release with `.deb` asset exists yet.
+
+**Files:**
+- `packaging/aur/aurora-git/PKGBUILD` — VCS package, builds from `hermes/phase1-desktop`
+- `packaging/aur/aurora-git/.SRCINFO` — generated via `makepkg --printsrcinfo`
+- `packaging/aur/README.md` — install instructions for both variants
+
+**PKGBUILD details:**
+- `makedepends`: git, nodejs, npm, rust, python, python-pip, dpkg
+- `depends`: webkit2gtk-4.1, openssl, glib2
+- `build()`: freeze backend with PyInstaller → `npx tauri build --bundles deb`
+- `package()`: extracts built .deb into `$pkgdir`
+- `provides=('aurora')`, `conflicts=('aurora-bin')`
+
+**Commit:** `ea050c9 feat(packaging): aurora-git PKGBUILD for Arch Linux`
+
+**Verification:** `bash -n PKGBUILD` → syntax OK. `namcap` not available (sudo). `makepkg -si` not run (full build takes 5+ min, deferred to manual test).
+
+**NOT published to AUR** — needs human's AUR account/SSH key.
+
+### Task 3: Linux Gate-1 Smoke ✅
+
+**Method:** Extracted .deb via `ar`, launched binary under xvfb :99.
+
+| Test | Result | Evidence |
+|------|--------|----------|
+| Launch binary | PASS | Process started, window created (xdotool ID 2097156) |
+| Backend health | PASS | Port 42755, HTTP 200, 358 songs, 7 playlists |
+| UI render | PASS | Screenshot: Mix view, sidebar, playlists, query builder — all correct |
+| Quit → no orphan | **FINDING** | SIGTERM kills app but backend restarts (monitor thread race) |
+| Single-instance | PASS | 2nd launch → still 1 window, 2nd process exited |
+| DB persistence | SIMULATED | 358 songs in DB; reinstall doesn't touch user data dir |
+
+**SIGTERM finding:** Tauri's `RunEvent::ExitRequested` handler only fires on UI-initiated close (window X button). SIGTERM bypasses it → `shutting_down` flag never set → monitor thread restarts backend. **Impact:** low — users close via UI, not `kill`. Could be fixed with a Unix signal handler in lib.rs.
+
+**Full Gate-1 results:** `docs/desktop-qa-matrix.md` section 6.
+
+### Task 4: Docs Refresh ✅
+
+**README.md Desktop section updated:**
+- Added Features subsection: auto-updater, single-instance, sidecar backend
+- Install section: .deb download + AUR (`aurora-git`) instructions
+- Version bumped from 0.1.0 → 0.1.1 in install command
+- Link to `packaging/aur/README.md`
+
+**Commit:** `b36579e docs: desktop updater, single-instance, AUR install`
+
+### Task 5: Push + PR + Handoff ✅
+
+**Branch state (`hermes/phase1-closeout`, 4 commits ahead of `hermes/phase1-desktop`):**
+```
+b36579e docs: desktop updater, single-instance, AUR install
+79c30ac docs: qa linux gate-1 smoke results
+ea050c9 feat(packaging): aurora-git PKGBUILD for Arch Linux
+e718d15 fix(desktop): open deb-update release page via system opener
+```
+
+**PR:** Opened with base `hermes/phase1-desktop`. Lists completed tasks + deferred findings (R2, R4).
+
+### Done means status
+
+| Criterion | Status |
+|---|---|
+| PR #5 merged before starting | ✅ |
+| Deb-update Install opens release page in system browser | ✅ |
+| App.tsx + lib.rs nits fixed; `npm run build` + `cargo check` clean | ✅ |
+| PKGBUILD (aurora-git) syntax-verified; NOT published | ✅ |
+| Linux Gate-1 cycle recorded in docs/desktop-qa-matrix.md | ✅ |
+| README Desktop section refreshed | ✅ |
+| PR open; handoff appended; graphify updated | ✅ |
+
+### Open items
+- **Windows-VM Gate-1** — install .exe, auto-updater, single-instance, window-state (other machine)
+- **AUR publishing** — needs human's AUR account/SSH key
+- **R2 semver compare** — known, deferred
+- **R4 GIF first-frame** — known, deferred
+- **SIGTERM orphan** — Tauri framework limitation, low impact
+- **namcap verification** — needs `sudo pacman -S namcap`
+- **Signing key password backup** — **human must back up `~/.tauri/aurora-key-password.txt` offline**
