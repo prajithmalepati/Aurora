@@ -5,6 +5,7 @@ import { useSongStore } from "@/stores/songStore"
 import { usePlayerStore } from "@/stores/playerStore"
 
 import { albumGradient } from "@/lib/albumGradient"
+import { extractCoverColor } from "@/lib/extractCoverColor"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -145,13 +146,27 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
     }
   }
 
-  const heroArt = useMemo(
-    () => albumGradient(activePlaylist?.songs[0]?.id?.toString() ?? activePlaylist?.name ?? `playlist-${playlistId}`),
+  // Fallback: procedural gradient from playlist identity
+  const fallbackGlow = useMemo(
+    () => albumGradient(activePlaylist?.songs[0]?.id?.toString() ?? activePlaylist?.name ?? `playlist-${playlistId}`).glow,
     [activePlaylist?.songs, activePlaylist?.name, playlistId]
   )
 
   // Server-stored image URL (comes back from the API on every fetchPlaylistDetail)
   const heroImage = activePlaylist?.image_url ? withToken(`${getBaseUrl()}${activePlaylist.image_url}`) : null
+
+  // Extract dominant color from the cover image — same concept as song bleed-thumb.
+  // Falls back to the procedural albumGradient when no image or extraction fails.
+  const [coverGlow, setCoverGlow] = useState<string | null>(null)
+  useEffect(() => {
+    if (!heroImage) { setCoverGlow(null); return }
+    let cancelled = false
+    extractCoverColor(heroImage).then((color) => {
+      if (!cancelled) setCoverGlow(color)
+    })
+    return () => { cancelled = true }
+  }, [heroImage])
+  const heroGlow = coverGlow ?? fallbackGlow
 
   // Neutral dark gradient for the hero tile — no teal/violet bias.
   // If the playlist has a custom accent colour we let a whisper of it through.
@@ -452,7 +467,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
         <div
           className="absolute inset-0 opacity-60 pointer-events-none"
           style={{
-            background: `radial-gradient(ellipse 700px 400px at 18% 0%, ${heroArt.glow} 0%, transparent 65%)`,
+            background: `radial-gradient(ellipse 700px 400px at 18% 0%, ${heroGlow} 0%, transparent 65%)`,
           }}
           aria-hidden="true"
         />
@@ -462,7 +477,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
             className="w-[96px] h-[96px] sm:w-[168px] sm:h-[168px] rounded-xl flex-shrink-0 aurora-rim overflow-hidden flex items-center justify-center text-3xl sm:text-5xl"
             style={{
               background: heroImage || showArtGrid ? undefined : heroTileGradient,
-              boxShadow: `0 20px 60px -20px ${heroArt.glow}, inset 0 0 0 1px var(--aurora-rim)`,
+              boxShadow: `0 20px 60px -20px ${heroGlow}, inset 0 0 0 1px var(--aurora-rim)`,
             }}
           >
             {heroImage ? (
