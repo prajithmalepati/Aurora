@@ -1,8 +1,8 @@
 import type { Song } from "@/types"
-import { formatDuration, formatFileSize, qualityLabel } from "@/lib/utils"
+import { formatDuration } from "@/lib/utils"
 import { AlbumArt } from "@/components/songs/AlbumArt"
 import { Equalizer } from "@/components/ui/Equalizer"
-import { Trash2, Tag as TagIcon, Pencil, ListPlus } from "lucide-react"
+import { Trash2, Tag as TagIcon, Pencil, ListPlus, Scissors, X, GripVertical, MoreHorizontal } from "lucide-react"
 import { AuroraPlayButton } from "@/components/player/AuroraPlayButton"
 import { EditSongDialog } from "@/components/songs/EditSongDialog"
 import {
@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { useSongStore } from "@/stores/songStore"
 import { usePlayerStore } from "@/stores/playerStore"
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { toast } from "@/lib/toast"
 import { useState, useCallback, useRef, memo } from "react"
 import { TagList } from "@/components/tags/TagList"
@@ -29,28 +30,24 @@ interface SongRowProps {
   onPlay?: (song: Song, index: number) => void
   isSelected?: boolean
   onToggleSelect?: (shiftKey: boolean) => void
+  // Playlist-mode optional props
+  onRemoveFromPlaylist?: () => void
+  onTrim?: () => void
+  // Drag-and-drop
+  isDraggable?: boolean
+  isDragOver?: boolean
+  onDragStart?: (e: React.DragEvent, songId: number) => void
+  onDragOver?: (e: React.DragEvent, songId: number) => void
+  onDragLeave?: () => void
+  onDrop?: (e: React.DragEvent, songId: number) => void
+  onDragEnd?: (e: React.DragEvent) => void
 }
 
-function FormatBadge({ format }: { format: string | null | undefined }) {
-  if (!format) return null
-  const fmt = format.toLowerCase()
-  const isLossless = fmt === "flac" || fmt === "m4a_alac" || fmt === "wav" || fmt === "aiff" || fmt === "wv" || fmt === "ape"
-  const isHiRes = isLossless && fmt !== "m4a_alac" // ALAC is lossless but not typically hi-res
-  const bg = isHiRes
-    ? "bg-emerald-500/15 text-emerald-400"
-    : isLossless
-      ? "bg-emerald-500/10 text-emerald-300"
-      : fmt === "mp3"
-        ? "bg-neutral-500/15 text-neutral-400"
-        : "bg-amber-500/10 text-amber-300"
-  return (
-    <span className={`inline-flex items-center px-1.5 py-0 text-[9px] font-semibold uppercase tracking-wider rounded ${bg}`}>
-      {format.toUpperCase()}
-    </span>
-  )
-}
-
-export const SongRow = memo(function SongRow({ song, index, animIndex, onPlay, isSelected, onToggleSelect }: SongRowProps) {
+export const SongRow = memo(function SongRow({
+  song, index, animIndex, onPlay, isSelected, onToggleSelect,
+  onRemoveFromPlaylist, onTrim,
+  isDraggable, isDragOver, onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd,
+}: SongRowProps) {
   const deleteSong = useSongStore((state) => state.deleteSong)
   const playSong = usePlayerStore((state) => state.playSong)
   const isCurrentSong = usePlayerStore(
@@ -133,11 +130,26 @@ export const SongRow = memo(function SongRow({ song, index, animIndex, onPlay, i
         ref={rowRef}
         onClick={handlePlay}
         onContextMenu={handleContextMenu}
-        className={`group relative transition-colors duration-150 ${
+        draggable={!!isDraggable}
+        onDragStart={isDraggable && onDragStart ? (e) => onDragStart(e, song.id) : undefined}
+        onDragOver={isDraggable && onDragOver ? (e) => onDragOver(e, song.id) : undefined}
+        onDragLeave={isDraggable && onDragLeave ? onDragLeave : undefined}
+        onDrop={isDraggable && onDrop ? (e) => onDrop(e, song.id) : undefined}
+        onDragEnd={isDraggable && onDragEnd ? onDragEnd : undefined}
+        className={`group relative transition-[opacity,border-color] duration-200 ${
           hasFile ? "cursor-pointer" : "cursor-not-allowed opacity-40"
-        } ${isSelected ? "bg-white/[0.04]" : ""} ${shouldStagger ? "song-row-enter" : ""}`}
-        style={shouldStagger ? { animationDelay: `${animIndex! * 0.02}s` } : undefined}
+        } ${isSelected ? "bg-white/[0.04]" : ""} ${shouldStagger ? "song-row-enter" : ""} ${isDraggable && isDragOver ? "" : ""}`}
+        style={{
+          ...(shouldStagger ? { animationDelay: `${animIndex! * 0.02}s` } : undefined),
+          ...(isDragOver ? { borderTop: "2px solid var(--aurora-accent-interactive)" } : {}),
+        }}
       >
+        {/* Drag handle cell (playlist mode) */}
+        {isDraggable && (
+          <td className="px-1 py-3 w-6 text-center cursor-grab active:cursor-grabbing">
+            <GripVertical className="h-3.5 w-3.5 text-[var(--aurora-text-tertiary)] opacity-0 group-hover:opacity-100 transition-opacity duration-150 mx-auto" />
+          </td>
+        )}
         {/* Checkbox column (when multi-select is active) */}
         {onToggleSelect && (
           <td
@@ -265,70 +277,43 @@ export const SongRow = memo(function SongRow({ song, index, animIndex, onPlay, i
           </div>
         </td>
 
-        {/* Duration · Format · Quality */}
-        <td className="relative px-4 py-3 w-36 text-[12px] text-[var(--aurora-text-secondary)] tabular-nums hidden lg:table-cell">
+        {/* Duration */}
+        <td className="relative px-4 py-3 w-20 text-[12px] text-[var(--aurora-text-secondary)] tabular-nums hidden lg:table-cell">
           <span
             className={`absolute inset-0 transition-colors duration-150 pointer-events-none ${
               isCurrentSong ? "" : "group-hover:bg-[var(--aurora-surface-hover)]"
             }`}
             aria-hidden="true"
           />
-          <span className="relative z-10 flex flex-col gap-0.5">
-            <span className="tabular-nums whitespace-nowrap">
-              {formatDuration(song.duration)}
-            </span>
-            <span className="flex items-center gap-1 flex-wrap">
-              <FormatBadge format={song.file_format} />
-              {qualityLabel(song) && (
-                <span className="text-[10px] text-[var(--aurora-text-tertiary)] whitespace-nowrap">
-                  {qualityLabel(song)}
-                </span>
-              )}
-              {formatFileSize(song.file_size) && (
-                <span className="text-[10px] text-[var(--aurora-text-tertiary)] whitespace-nowrap">
-                  {formatFileSize(song.file_size)}
-                </span>
-              )}
-            </span>
+          <span className="relative z-10 tabular-nums whitespace-nowrap">
+            {formatDuration(song.duration)}
           </span>
         </td>
 
-        {/* Playlists */}
-        <td className="relative px-4 py-3 w-40 hidden lg:table-cell">
+        {/* Artist */}
+        <td className="relative px-4 py-3 text-[13px] hidden lg:table-cell">
           <span
             className={`absolute inset-0 transition-colors duration-150 pointer-events-none ${
               isCurrentSong ? "" : "group-hover:bg-[var(--aurora-surface-hover)]"
             }`}
             aria-hidden="true"
           />
-          <div className="relative z-10">
-            {song.playlists.length > 0 ? (
-              <div className="flex flex-col gap-1">
-                {song.playlists.slice(0, 2).map((playlist) => (
-                  <span
-                    key={playlist.id}
-                    className="inline-flex items-center gap-1.5 text-[11px] text-[var(--aurora-text-secondary)] truncate max-w-[140px]"
-                  >
-                    <span
-                      className="w-[5px] h-[5px] rounded-sm flex-shrink-0"
-                      style={{
-                        backgroundColor: "var(--aurora-accent-vivid)",
-                        boxShadow: "0 0 4px var(--aurora-accent-interactive-glow)",
-                      }}
-                    />
-                    {playlist.name}
-                  </span>
-                ))}
-                {song.playlists.length > 2 && (
-                  <span className="text-[10px] text-[var(--aurora-text-tertiary)] pl-3">
-                    +{song.playlists.length - 2} more
-                  </span>
-                )}
-              </div>
-            ) : (
-              <span className="text-[var(--aurora-text-tertiary)] text-[12px]">—</span>
-            )}
-          </div>
+          <span className="relative z-10 truncate text-[var(--aurora-text-secondary)]">
+            {song.artist || "Unknown Artist"}
+          </span>
+        </td>
+
+        {/* Album */}
+        <td className="relative px-4 py-3 text-[13px] hidden lg:table-cell">
+          <span
+            className={`absolute inset-0 transition-colors duration-150 pointer-events-none ${
+              isCurrentSong ? "" : "group-hover:bg-[var(--aurora-surface-hover)]"
+            }`}
+            aria-hidden="true"
+          />
+          <span className="relative z-10 truncate text-[var(--aurora-text-secondary)]">
+            {song.album || "—"}
+          </span>
         </td>
 
         {/* Tags */}
@@ -345,54 +330,57 @@ export const SongRow = memo(function SongRow({ song, index, animIndex, onPlay, i
         </td>
 
         {/* Actions */}
-        <td className="relative px-4 py-3 w-32">
+        <td className="relative px-4 py-3 w-12">
           <span
             className={`absolute inset-0 transition-colors duration-150 pointer-events-none ${
               isCurrentSong ? "" : "group-hover:bg-[var(--aurora-surface-hover)]"
             }`}
             aria-hidden="true"
           />
-          <div className="relative z-10 flex items-center gap-0.5 justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-            <IconBtn
-              label={inQueue ? "Already in queue" : "Add to queue"}
-              onClick={(e) => {
-                e.stopPropagation()
-                if (!inQueue) {
-                  addToQueue(song)
-                  toast.success(`"${song.title}" added to queue`)
-                }
-              }}
-            >
-              <ListPlus className={`h-3.5 w-3.5 ${inQueue ? "opacity-40" : ""}`} />
-            </IconBtn>
-            <IconBtn
-              label="Edit tags"
-              onClick={(e) => {
-                e.stopPropagation()
-                setTagEditorOpen(true)
-              }}
-            >
-              <TagIcon className="h-3.5 w-3.5" />
-            </IconBtn>
-            <IconBtn
-              label="Edit song"
-              onClick={(e) => {
-                e.stopPropagation()
-                setEditDialogOpen(true)
-              }}
-            >
-              <Pencil className="h-3.5 w-3.5" />
-            </IconBtn>
-            <IconBtn
-              label="Delete"
-              danger
-              onClick={(e) => {
-                e.stopPropagation()
-                setDeleteDialogOpen(true)
-              }}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </IconBtn>
+          <div className="relative z-10 flex items-center justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className="aurora-focus h-7 w-7 rounded-md flex items-center justify-center text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-text)] hover:bg-white/[0.04] transition-colors duration-150"
+                aria-label="More actions"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" sideOffset={4}>
+                <DropdownMenuItem onClick={handlePlay}>
+                  <span className="w-4 h-4 flex items-center justify-center text-[var(--aurora-accent)]">▶</span>
+                  Play Now
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleAddToQueue(e as unknown as React.MouseEvent) }}>
+                  <ListPlus className="h-4 w-4" />
+                  {inQueue ? "Already in Queue" : "Add to Queue"}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setTagEditorOpen(true) }}>
+                  <TagIcon className="h-4 w-4" />
+                  Edit Tags
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditDialogOpen(true) }}>
+                  <Pencil className="h-4 w-4" />
+                  Edit Song
+                </DropdownMenuItem>
+                {onTrim && (
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onTrim() }}>
+                    <Scissors className="h-4 w-4" />
+                    Trim
+                  </DropdownMenuItem>
+                )}
+                {onRemoveFromPlaylist && (
+                  <DropdownMenuItem variant="destructive" onClick={(e) => { e.stopPropagation(); onRemoveFromPlaylist() }}>
+                    <X className="h-4 w-4" />
+                    Remove from Playlist
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem variant="destructive" onClick={(e) => { e.stopPropagation(); setDeleteDialogOpen(true) }}>
+                  <Trash2 className="h-4 w-4" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </td>
       </tr>
@@ -486,26 +474,4 @@ export const SongRow = memo(function SongRow({ song, index, animIndex, onPlay, i
   )
 })
 
-interface IconBtnProps {
-  children: React.ReactNode
-  label: string
-  danger?: boolean
-  onClick: (e: React.MouseEvent) => void
-}
 
-function IconBtn({ children, label, danger, onClick }: IconBtnProps) {
-  return (
-    <button
-      onClick={onClick}
-      title={label}
-      aria-label={label}
-      className={`aurora-focus h-7 w-7 rounded-md flex items-center justify-center transition-colors duration-150 ${
-        danger
-          ? "text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-danger)] hover:bg-[var(--aurora-danger)]/10"
-          : "text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-text)] hover:bg-white/[0.04]"
-      }`}
-    >
-      {children}
-    </button>
-  )
-}
