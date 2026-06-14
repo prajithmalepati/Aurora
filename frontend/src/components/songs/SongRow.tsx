@@ -2,7 +2,7 @@ import type { Song } from "@/types"
 import { formatDuration, formatFileSize, qualityLabel } from "@/lib/utils"
 import { AlbumArt } from "@/components/songs/AlbumArt"
 import { Equalizer } from "@/components/ui/Equalizer"
-import { Trash2, Tag as TagIcon, Pencil, ListPlus } from "lucide-react"
+import { Trash2, Tag as TagIcon, Pencil, ListPlus, Scissors, X, GripVertical } from "lucide-react"
 import { AuroraPlayButton } from "@/components/player/AuroraPlayButton"
 import { EditSongDialog } from "@/components/songs/EditSongDialog"
 import {
@@ -29,6 +29,18 @@ interface SongRowProps {
   onPlay?: (song: Song, index: number) => void
   isSelected?: boolean
   onToggleSelect?: (shiftKey: boolean) => void
+  // Playlist-mode optional props
+  onRemoveFromPlaylist?: () => void
+  onTrim?: () => void
+  trimOpen?: boolean
+  // Drag-and-drop
+  isDraggable?: boolean
+  isDragOver?: boolean
+  onDragStart?: (e: React.DragEvent, songId: number) => void
+  onDragOver?: (e: React.DragEvent, songId: number) => void
+  onDragLeave?: () => void
+  onDrop?: (e: React.DragEvent, songId: number) => void
+  onDragEnd?: (e: React.DragEvent) => void
 }
 
 function FormatBadge({ format }: { format: string | null | undefined }) {
@@ -50,7 +62,11 @@ function FormatBadge({ format }: { format: string | null | undefined }) {
   )
 }
 
-export const SongRow = memo(function SongRow({ song, index, animIndex, onPlay, isSelected, onToggleSelect }: SongRowProps) {
+export const SongRow = memo(function SongRow({
+  song, index, animIndex, onPlay, isSelected, onToggleSelect,
+  onRemoveFromPlaylist, onTrim, trimOpen,
+  isDraggable, isDragOver, onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd,
+}: SongRowProps) {
   const deleteSong = useSongStore((state) => state.deleteSong)
   const playSong = usePlayerStore((state) => state.playSong)
   const isCurrentSong = usePlayerStore(
@@ -133,11 +149,26 @@ export const SongRow = memo(function SongRow({ song, index, animIndex, onPlay, i
         ref={rowRef}
         onClick={handlePlay}
         onContextMenu={handleContextMenu}
-        className={`group relative transition-colors duration-150 ${
+        draggable={!!isDraggable}
+        onDragStart={isDraggable && onDragStart ? (e) => onDragStart(e, song.id) : undefined}
+        onDragOver={isDraggable && onDragOver ? (e) => onDragOver(e, song.id) : undefined}
+        onDragLeave={isDraggable && onDragLeave ? onDragLeave : undefined}
+        onDrop={isDraggable && onDrop ? (e) => onDrop(e, song.id) : undefined}
+        onDragEnd={isDraggable && onDragEnd ? onDragEnd : undefined}
+        className={`group relative transition-[opacity,border-color] duration-200 ${
           hasFile ? "cursor-pointer" : "cursor-not-allowed opacity-40"
-        } ${isSelected ? "bg-white/[0.04]" : ""} ${shouldStagger ? "song-row-enter" : ""}`}
-        style={shouldStagger ? { animationDelay: `${animIndex! * 0.02}s` } : undefined}
+        } ${isSelected ? "bg-white/[0.04]" : ""} ${shouldStagger ? "song-row-enter" : ""} ${isDraggable && isDragOver ? "" : ""}`}
+        style={{
+          ...(shouldStagger ? { animationDelay: `${animIndex! * 0.02}s` } : undefined),
+          ...(isDragOver ? { borderTop: "2px solid var(--aurora-accent-interactive)" } : {}),
+        }}
       >
+        {/* Drag handle cell (playlist mode) */}
+        {isDraggable && (
+          <td className="px-1 py-3 w-6 text-center cursor-grab active:cursor-grabbing">
+            <GripVertical className="h-3.5 w-3.5 text-[var(--aurora-text-tertiary)] opacity-0 group-hover:opacity-100 transition-opacity duration-150 mx-auto" />
+          </td>
+        )}
         {/* Checkbox column (when multi-select is active) */}
         {onToggleSelect && (
           <td
@@ -353,6 +384,30 @@ export const SongRow = memo(function SongRow({ song, index, animIndex, onPlay, i
             aria-hidden="true"
           />
           <div className="relative z-10 flex items-center gap-0.5 justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+            {onTrim && (
+              <IconBtn
+                label="Trim"
+                active={trimOpen}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onTrim()
+                }}
+              >
+                <Scissors className="h-3.5 w-3.5" />
+              </IconBtn>
+            )}
+            {onRemoveFromPlaylist && (
+              <IconBtn
+                label="Remove"
+                danger
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onRemoveFromPlaylist()
+                }}
+              >
+                <X className="h-3.5 w-3.5" />
+              </IconBtn>
+            )}
             <IconBtn
               label={inQueue ? "Already in queue" : "Add to queue"}
               onClick={(e) => {
@@ -490,18 +545,21 @@ interface IconBtnProps {
   children: React.ReactNode
   label: string
   danger?: boolean
+  active?: boolean
   onClick: (e: React.MouseEvent) => void
 }
 
-function IconBtn({ children, label, danger, onClick }: IconBtnProps) {
+function IconBtn({ children, label, danger, active, onClick }: IconBtnProps) {
   return (
     <button
       onClick={onClick}
       title={label}
       aria-label={label}
-      className={`aurora-focus h-7 w-7 rounded-md flex items-center justify-center transition-colors duration-150 ${
+      className={`aurora-focus h-7 w-7 rounded-md flex items-center justify-center transition-[color,background-color,box-shadow,opacity] duration-150 ${
         danger
           ? "text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-danger)] hover:bg-[var(--aurora-danger)]/10"
+          : active
+          ? "text-[var(--aurora-accent-interactive)] bg-white/[0.04]"
           : "text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-text)] hover:bg-white/[0.04]"
       }`}
     >
