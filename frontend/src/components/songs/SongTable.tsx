@@ -25,6 +25,8 @@ interface SongTableProps {
   onPlay?: (song: Song, index: number) => void
   animKey?: number
   showSort?: boolean
+  /** When true, songs are the complete set (no pagination). Disables "Load more" and shows songs.length as total. */
+  disableInfiniteScroll?: boolean
 }
 
 const HEADER_CLASS =
@@ -335,13 +337,15 @@ const ROW_HEIGHT = 64
 const OVERSCAN = 10
 const TABLE_COLSPAN = 7
 
-export function SongTable({ songs, loading = false, error = null, onPlay, animKey, showSort = true }: SongTableProps) {
+export function SongTable({ songs, loading = false, error = null, onPlay, animKey, showSort = true, disableInfiniteScroll = false }: SongTableProps) {
   const sortField = useSongStore((state) => state.sortField)
   const sortOrder = useSongStore((state) => state.sortOrder)
   const sortSongs = useSongStore((state) => state.sortSongs)
-  const totalCount = useSongStore((state) => state.totalCount)
-  const hasMore = useSongStore((state) => state.hasMore)
+  const storeTotalCount = useSongStore((state) => state.totalCount)
+  const storeHasMore = useSongStore((state) => state.hasMore)
   const fetchMore = useSongStore((state) => state.fetchMore)
+  const totalCount = disableInfiniteScroll ? songs.length : storeTotalCount
+  const hasMore = disableInfiniteScroll ? false : storeHasMore
 
   const playSong = usePlayerStore((s) => s.playSong)
   const addToQueue = usePlayerStore((s) => s.addToQueue)
