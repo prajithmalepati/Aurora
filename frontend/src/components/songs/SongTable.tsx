@@ -148,8 +148,9 @@ function TableHeader({ sortField, sortOrder, onSort, showCheckbox, isAllSelected
         )}
         <th className={`${HEADER_CLASS} w-12 text-center`}>#</th>
         <SortableTh field="title" label="Title" />
-        <SortableTh field="duration" label="Duration" className="w-28 hidden lg:table-cell" />
-        <th className={`${HEADER_CLASS} w-40 hidden lg:table-cell`}>Playlists</th>
+        <SortableTh field="duration" label="Duration" className="w-20 hidden lg:table-cell" />
+        <SortableTh field="artist" label="Artist" className="hidden lg:table-cell" />
+        <SortableTh field="album" label="Album" className="hidden lg:table-cell" />
         <th className={`${HEADER_CLASS} max-w-[200px]`}>Tags</th>
         <th className={`${HEADER_CLASS} w-32 text-right`}>Actions</th>
       </tr>
@@ -359,7 +360,7 @@ function AddToPlaylistDialog({ open, onOpenChange, songIds, onComplete }: AddToP
 
 const ROW_HEIGHT = 64
 const OVERSCAN = 10
-const BASE_COLSPAN = 7
+const BASE_COLSPAN = 8
 
 export function SongTable({
   songs, loading = false, error = null, onPlay, animKey, showSort = true, disableInfiniteScroll = false,

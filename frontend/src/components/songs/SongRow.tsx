@@ -1,5 +1,5 @@
 import type { Song } from "@/types"
-import { formatDuration, formatFileSize, qualityLabel } from "@/lib/utils"
+import { formatDuration } from "@/lib/utils"
 import { AlbumArt } from "@/components/songs/AlbumArt"
 import { Equalizer } from "@/components/ui/Equalizer"
 import { Trash2, Tag as TagIcon, Pencil, ListPlus, Scissors, X, GripVertical } from "lucide-react"
@@ -41,25 +41,6 @@ interface SongRowProps {
   onDragLeave?: () => void
   onDrop?: (e: React.DragEvent, songId: number) => void
   onDragEnd?: (e: React.DragEvent) => void
-}
-
-function FormatBadge({ format }: { format: string | null | undefined }) {
-  if (!format) return null
-  const fmt = format.toLowerCase()
-  const isLossless = fmt === "flac" || fmt === "m4a_alac" || fmt === "wav" || fmt === "aiff" || fmt === "wv" || fmt === "ape"
-  const isHiRes = isLossless && fmt !== "m4a_alac" // ALAC is lossless but not typically hi-res
-  const bg = isHiRes
-    ? "bg-emerald-500/15 text-emerald-400"
-    : isLossless
-      ? "bg-emerald-500/10 text-emerald-300"
-      : fmt === "mp3"
-        ? "bg-neutral-500/15 text-neutral-400"
-        : "bg-amber-500/10 text-amber-300"
-  return (
-    <span className={`inline-flex items-center px-1.5 py-0 text-[9px] font-semibold uppercase tracking-wider rounded ${bg}`}>
-      {format.toUpperCase()}
-    </span>
-  )
 }
 
 export const SongRow = memo(function SongRow({
@@ -296,70 +277,43 @@ export const SongRow = memo(function SongRow({
           </div>
         </td>
 
-        {/* Duration · Format · Quality */}
-        <td className="relative px-4 py-3 w-36 text-[12px] text-[var(--aurora-text-secondary)] tabular-nums hidden lg:table-cell">
+        {/* Duration */}
+        <td className="relative px-4 py-3 w-20 text-[12px] text-[var(--aurora-text-secondary)] tabular-nums hidden lg:table-cell">
           <span
             className={`absolute inset-0 transition-colors duration-150 pointer-events-none ${
               isCurrentSong ? "" : "group-hover:bg-[var(--aurora-surface-hover)]"
             }`}
             aria-hidden="true"
           />
-          <span className="relative z-10 flex flex-col gap-0.5">
-            <span className="tabular-nums whitespace-nowrap">
-              {formatDuration(song.duration)}
-            </span>
-            <span className="flex items-center gap-1 flex-wrap">
-              <FormatBadge format={song.file_format} />
-              {qualityLabel(song) && (
-                <span className="text-[10px] text-[var(--aurora-text-tertiary)] whitespace-nowrap">
-                  {qualityLabel(song)}
-                </span>
-              )}
-              {formatFileSize(song.file_size) && (
-                <span className="text-[10px] text-[var(--aurora-text-tertiary)] whitespace-nowrap">
-                  {formatFileSize(song.file_size)}
-                </span>
-              )}
-            </span>
+          <span className="relative z-10 tabular-nums whitespace-nowrap">
+            {formatDuration(song.duration)}
           </span>
         </td>
 
-        {/* Playlists */}
-        <td className="relative px-4 py-3 w-40 hidden lg:table-cell">
+        {/* Artist */}
+        <td className="relative px-4 py-3 text-[13px] hidden lg:table-cell">
           <span
             className={`absolute inset-0 transition-colors duration-150 pointer-events-none ${
               isCurrentSong ? "" : "group-hover:bg-[var(--aurora-surface-hover)]"
             }`}
             aria-hidden="true"
           />
-          <div className="relative z-10">
-            {song.playlists.length > 0 ? (
-              <div className="flex flex-col gap-1">
-                {song.playlists.slice(0, 2).map((playlist) => (
-                  <span
-                    key={playlist.id}
-                    className="inline-flex items-center gap-1.5 text-[11px] text-[var(--aurora-text-secondary)] truncate max-w-[140px]"
-                  >
-                    <span
-                      className="w-[5px] h-[5px] rounded-sm flex-shrink-0"
-                      style={{
-                        backgroundColor: "var(--aurora-accent-vivid)",
-                        boxShadow: "0 0 4px var(--aurora-accent-interactive-glow)",
-                      }}
-                    />
-                    {playlist.name}
-                  </span>
-                ))}
-                {song.playlists.length > 2 && (
-                  <span className="text-[10px] text-[var(--aurora-text-tertiary)] pl-3">
-                    +{song.playlists.length - 2} more
-                  </span>
-                )}
-              </div>
-            ) : (
-              <span className="text-[var(--aurora-text-tertiary)] text-[12px]">—</span>
-            )}
-          </div>
+          <span className="relative z-10 truncate text-[var(--aurora-text-secondary)]">
+            {song.artist || "Unknown Artist"}
+          </span>
+        </td>
+
+        {/* Album */}
+        <td className="relative px-4 py-3 text-[13px] hidden lg:table-cell">
+          <span
+            className={`absolute inset-0 transition-colors duration-150 pointer-events-none ${
+              isCurrentSong ? "" : "group-hover:bg-[var(--aurora-surface-hover)]"
+            }`}
+            aria-hidden="true"
+          />
+          <span className="relative z-10 truncate text-[var(--aurora-text-secondary)]">
+            {song.album || "—"}
+          </span>
         </td>
 
         {/* Tags */}
