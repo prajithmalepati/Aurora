@@ -2,7 +2,7 @@ import type { Song } from "@/types"
 import { formatDuration } from "@/lib/utils"
 import { AlbumArt } from "@/components/songs/AlbumArt"
 import { Equalizer } from "@/components/ui/Equalizer"
-import { Trash2, Tag as TagIcon, Pencil, ListPlus, Scissors, X, GripVertical } from "lucide-react"
+import { Trash2, Tag as TagIcon, Pencil, ListPlus, Scissors, X, GripVertical, MoreHorizontal } from "lucide-react"
 import { AuroraPlayButton } from "@/components/player/AuroraPlayButton"
 import { EditSongDialog } from "@/components/songs/EditSongDialog"
 import {
@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { useSongStore } from "@/stores/songStore"
 import { usePlayerStore } from "@/stores/playerStore"
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { toast } from "@/lib/toast"
 import { useState, useCallback, useRef, memo } from "react"
 import { TagList } from "@/components/tags/TagList"
@@ -32,7 +33,6 @@ interface SongRowProps {
   // Playlist-mode optional props
   onRemoveFromPlaylist?: () => void
   onTrim?: () => void
-  trimOpen?: boolean
   // Drag-and-drop
   isDraggable?: boolean
   isDragOver?: boolean
@@ -45,7 +45,7 @@ interface SongRowProps {
 
 export const SongRow = memo(function SongRow({
   song, index, animIndex, onPlay, isSelected, onToggleSelect,
-  onRemoveFromPlaylist, onTrim, trimOpen,
+  onRemoveFromPlaylist, onTrim,
   isDraggable, isDragOver, onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd,
 }: SongRowProps) {
   const deleteSong = useSongStore((state) => state.deleteSong)
@@ -330,78 +330,57 @@ export const SongRow = memo(function SongRow({
         </td>
 
         {/* Actions */}
-        <td className="relative px-4 py-3 w-32">
+        <td className="relative px-4 py-3 w-12">
           <span
             className={`absolute inset-0 transition-colors duration-150 pointer-events-none ${
               isCurrentSong ? "" : "group-hover:bg-[var(--aurora-surface-hover)]"
             }`}
             aria-hidden="true"
           />
-          <div className="relative z-10 flex items-center gap-0.5 justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-            {onTrim && (
-              <IconBtn
-                label="Trim"
-                active={trimOpen}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onTrim()
-                }}
+          <div className="relative z-10 flex items-center justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className="aurora-focus h-7 w-7 rounded-md flex items-center justify-center text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-text)] hover:bg-white/[0.04] transition-colors duration-150"
+                aria-label="More actions"
+                onClick={(e) => e.stopPropagation()}
               >
-                <Scissors className="h-3.5 w-3.5" />
-              </IconBtn>
-            )}
-            {onRemoveFromPlaylist && (
-              <IconBtn
-                label="Remove"
-                danger
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onRemoveFromPlaylist()
-                }}
-              >
-                <X className="h-3.5 w-3.5" />
-              </IconBtn>
-            )}
-            <IconBtn
-              label={inQueue ? "Already in queue" : "Add to queue"}
-              onClick={(e) => {
-                e.stopPropagation()
-                if (!inQueue) {
-                  addToQueue(song)
-                  toast.success(`"${song.title}" added to queue`)
-                }
-              }}
-            >
-              <ListPlus className={`h-3.5 w-3.5 ${inQueue ? "opacity-40" : ""}`} />
-            </IconBtn>
-            <IconBtn
-              label="Edit tags"
-              onClick={(e) => {
-                e.stopPropagation()
-                setTagEditorOpen(true)
-              }}
-            >
-              <TagIcon className="h-3.5 w-3.5" />
-            </IconBtn>
-            <IconBtn
-              label="Edit song"
-              onClick={(e) => {
-                e.stopPropagation()
-                setEditDialogOpen(true)
-              }}
-            >
-              <Pencil className="h-3.5 w-3.5" />
-            </IconBtn>
-            <IconBtn
-              label="Delete"
-              danger
-              onClick={(e) => {
-                e.stopPropagation()
-                setDeleteDialogOpen(true)
-              }}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </IconBtn>
+                <MoreHorizontal className="h-4 w-4" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" sideOffset={4}>
+                <DropdownMenuItem onClick={handlePlay}>
+                  <span className="w-4 h-4 flex items-center justify-center text-[var(--aurora-accent)]">▶</span>
+                  Play Now
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleAddToQueue(e as unknown as React.MouseEvent) }}>
+                  <ListPlus className="h-4 w-4" />
+                  {inQueue ? "Already in Queue" : "Add to Queue"}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setTagEditorOpen(true) }}>
+                  <TagIcon className="h-4 w-4" />
+                  Edit Tags
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditDialogOpen(true) }}>
+                  <Pencil className="h-4 w-4" />
+                  Edit Song
+                </DropdownMenuItem>
+                {onTrim && (
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onTrim() }}>
+                    <Scissors className="h-4 w-4" />
+                    Trim
+                  </DropdownMenuItem>
+                )}
+                {onRemoveFromPlaylist && (
+                  <DropdownMenuItem variant="destructive" onClick={(e) => { e.stopPropagation(); onRemoveFromPlaylist() }}>
+                    <X className="h-4 w-4" />
+                    Remove from Playlist
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem variant="destructive" onClick={(e) => { e.stopPropagation(); setDeleteDialogOpen(true) }}>
+                  <Trash2 className="h-4 w-4" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </td>
       </tr>
@@ -495,29 +474,4 @@ export const SongRow = memo(function SongRow({
   )
 })
 
-interface IconBtnProps {
-  children: React.ReactNode
-  label: string
-  danger?: boolean
-  active?: boolean
-  onClick: (e: React.MouseEvent) => void
-}
 
-function IconBtn({ children, label, danger, active, onClick }: IconBtnProps) {
-  return (
-    <button
-      onClick={onClick}
-      title={label}
-      aria-label={label}
-      className={`aurora-focus h-7 w-7 rounded-md flex items-center justify-center transition-[color,background-color,box-shadow,opacity] duration-150 ${
-        danger
-          ? "text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-danger)] hover:bg-[var(--aurora-danger)]/10"
-          : active
-          ? "text-[var(--aurora-accent-interactive)] bg-white/[0.04]"
-          : "text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-text)] hover:bg-white/[0.04]"
-      }`}
-    >
-      {children}
-    </button>
-  )
-}

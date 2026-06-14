@@ -559,7 +559,6 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
             if (ps) handleRemoveSong(ps)
           }}
           onTrim={(songId) => setOpenTrimId(openTrimId === songId ? null : songId)}
-          openTrimId={openTrimId}
           isDraggable={isDragEnabled}
           dragId={dragId}
           dragOverId={dragOverId}

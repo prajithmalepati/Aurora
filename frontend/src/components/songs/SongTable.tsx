@@ -30,7 +30,6 @@ interface SongTableProps {
   // Playlist-mode optional props (passed through to SongRow)
   onRemoveFromPlaylist?: (song: Song) => void
   onTrim?: (songId: number) => void
-  openTrimId?: number | null
   // Drag-and-drop
   isDraggable?: boolean
   dragId?: number | null
@@ -364,7 +363,7 @@ const BASE_COLSPAN = 8
 
 export function SongTable({
   songs, loading = false, error = null, onPlay, animKey, showSort = true, disableInfiniteScroll = false,
-  onRemoveFromPlaylist, onTrim, openTrimId,
+  onRemoveFromPlaylist, onTrim,
   isDraggable, dragId, dragOverId, onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd,
   extraBulkActions,
 }: SongTableProps) {
@@ -783,7 +782,6 @@ export function SongTable({
                   onToggleSelect={(shiftKey) => toggleSelectOne(song.id, shiftKey)}
                   onRemoveFromPlaylist={onRemoveFromPlaylist ? () => onRemoveFromPlaylist(song) : undefined}
                   onTrim={onTrim ? () => onTrim(song.id) : undefined}
-                  trimOpen={openTrimId === song.id}
                   isDraggable={isDraggable}
                   isDragOver={dragOverId === song.id && dragId !== song.id}
                   onDragStart={onDragStart}
