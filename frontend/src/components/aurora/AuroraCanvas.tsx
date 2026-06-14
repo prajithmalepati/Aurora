@@ -301,19 +301,27 @@ export function AuroraCanvas() {
     }
   }, [draw])
 
-  // Resize handler — DPR capped at 1.5
+  // Resize handler — DPR capped at 1.5, debounced via rAF to avoid buffer clear flash
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
     const dpr = Math.min(window.devicePixelRatio || 1, 1.5)
-    const ro = new ResizeObserver(() => {
+    let rafId: number | null = null
+    const applySize = () => {
+      rafId = null
       canvas.width = canvas.offsetWidth * dpr
       canvas.height = canvas.offsetHeight * dpr
+    }
+    const ro = new ResizeObserver(() => {
+      if (rafId !== null) cancelAnimationFrame(rafId)
+      rafId = requestAnimationFrame(applySize)
     })
     ro.observe(canvas)
-    canvas.width = canvas.offsetWidth * dpr
-    canvas.height = canvas.offsetHeight * dpr
-    return () => ro.disconnect()
+    applySize()
+    return () => {
+      ro.disconnect()
+      if (rafId !== null) cancelAnimationFrame(rafId)
+    }
   }, [])
 
   if (webglFailed) return <div className="aurora-fallback" aria-hidden />
