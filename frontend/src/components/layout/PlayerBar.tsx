@@ -1,4 +1,5 @@
 import { usePlayerStore } from "@/stores/playerStore"
+import { useSongStore } from "@/stores/songStore"
 import { useAudioPlayer } from "@/hooks/useAudioPlayer"
 import { AlbumArt } from "@/components/songs/AlbumArt"
 import { Equalizer } from "@/components/ui/Equalizer"
@@ -243,17 +244,23 @@ export function PlayerBar() {
       {/* ── DESKTOP layout — static height, content fades in/out ── */}
       <div className={`hidden sm:block ${isIdle ? 'h-[52px]' : 'h-[96px]'}`}>
         {isIdle ? (
-          /* Idle: shimmer + text, no controls */
-          <div className="flex items-center h-[52px] px-8 gap-4">
-            <div className="w-[42px] h-[42px] rounded-md flex-shrink-0 aurora-idle-shimmer" />
-            <div className="flex flex-col gap-0.5">
-              <span className="font-display-italic text-[15px] leading-tight text-[var(--aurora-text)]">
-                Nothing playing
-              </span>
-              <span className="text-[11px] text-[var(--aurora-text-tertiary)] tracking-wide">
-                Pick a song or hit Jam
-              </span>
-            </div>
+          /* Idle: muted label + shuffle library affordance */
+          <div className="flex items-center h-[52px] px-8 justify-between">
+            <span className="text-[13px] text-[var(--aurora-text-tertiary)] font-display-italic">
+              Nothing playing
+            </span>
+            <button
+              onClick={() => {
+                const allSongs = useSongStore.getState().songs
+                const playable = allSongs.filter((s) => s.file_path)
+                if (playable.length === 0) return
+                const shuffled = [...playable].sort(() => Math.random() - 0.5)
+                usePlayerStore.getState().playSong(shuffled[0], shuffled)
+              }}
+              className="text-[12px] text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-text-secondary)] transition-colors duration-150 px-3 py-1.5 rounded-md hover:bg-white/[0.04]"
+            >
+              Shuffle library
+            </button>
           </div>
         ) : (
           /* Playing / paused: full controls fade in as bar opens */
