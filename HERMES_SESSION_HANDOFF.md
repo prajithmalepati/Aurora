@@ -944,3 +944,65 @@ e718d15 fix(desktop): open deb-update release page via system opener
 - **SIGTERM orphan** — Tauri framework limitation, low impact
 - **namcap verification** — needs `sudo pacman -S namcap`
 - **Signing key password backup** — **human must back up `~/.tauri/aurora-key-password.txt` offline**
+
+## N10 — Windows Console Fix + Release Logging + Gate-1 Windows Prep
+
+**Session:** 2026-06-13, Hermes (Opus 4.8). Branch: `hermes/phase1-closeout` (5 new commits).
+Driven by the broken Windows v0.1.1 desktop build debug from the prior session.
+
+### Build verification (Task 1)
+- `fcb5e1f` (CORS preflight exempt) **is an ancestor of HEAD** — confirmed via
+  `git merge-base --is-ancestor`. Any desktop build cut from `hermes/phase1-closeout`
+  includes the failed-to-fetch fix. Human must confirm scan/playlists work on the
+  new build and report whether the cmd window still appears.
+
+### Source fixes authored (build/test on Windows — NOT merged)
+
+| Commit | What | Why |
+|--------|------|-----|
+| `fa964c4` | `fix(desktop): suppress backend console window on Windows (CREATE_NO_WINDOW)` | The frozen backend is `console=True`; std `Command` spawned it with no creation flag → visible cmd window; closing it killed backend → monitor respawn → window reopens in a loop. Flag set inside `spawn_backend`, so it covers the initial spawn AND every monitor-thread restart. |
+| `52e770c` | `feat(desktop): file logging in release builds — tauri log dir + backend stderr tee` | Release builds logged nothing (the v0.1.1 debug was blind). Rust sidecar narrative → `<app_log_dir>/aurora.log`; backend stdout/stderr teed (append) → `backend.log`. |
+
+**console=False decision:** NOT taken. Kept `console=True` in the spec.
+CREATE_NO_WINDOW already hides the window for spawn + restart; keeping the console
+subsystem lets a human run `aurora-backend.exe` standalone in a terminal to debug.
+Flipping to windowed gains nothing and complicates the stderr handles used by the
+new file tee.
+
+**Verification:** `cargo check` clean (debug profile). Caveat — the
+`#[cfg(windows)]` `CREATE_NO_WINDOW` block is NOT compiled on this Linux box;
+it is the standard `creation_flags` pattern but the human's Windows build is the
+first real compile of it. The release-tee body (std fs, platform-independent) and
+the `TargetKind::LogDir` log target ARE type-checked here (`if cfg!()` compiles
+both arms).
+
+### Other commits
+- `531e38f` `fix(packaging): correct pkgver git command` — `git rev` → `git rev-parse` in PKGBUILD fallback (Task 5).
+- `4b89008` `docs(qa): windows gate-1 checklist` — `docs/gate1-windows-checklist.md` (Task 3).
+- Release plan: `docs/release-cutting-plan-gate1.md` (Task 4, proposal only).
+
+### Gate-1 status summary (Task 6) — NOT SIGNED
+
+| Platform | Status | Evidence |
+|----------|--------|----------|
+| **Linux** | Smoke complete: 6 PASS, 1 finding, 1 not-tested | `docs/desktop-qa-matrix.md` §6 — install/launch/health/UI/single-instance pass; SIGTERM orphan finding (low impact, UI-quit path clean); full upgrade cycle deferred |
+| **Windows** | PENDING — checklist authored, awaiting human run | `docs/gate1-windows-checklist.md` Part A runnable now; Part B (updater) ⏸ blocked on real releases |
+
+**Gate 1 is NOT signed.** Sign-off needs Windows Part A green (and Linux already
+green). Part B (updater old→new) trails until the release plan ships two published
+releases. Phase 2 docs NOT started (per brief).
+
+### Blocked on human
+1. **Test the new Windows build:** confirm scan/playlists work (fcb5e1f); report if
+   cmd window still shows. If it does (expected — fix `fa964c4` not yet in the built
+   binary), rebuild from `hermes/phase1-closeout` HEAD.
+2. **Run Windows Gate-1 Part A** (`docs/gate1-windows-checklist.md`).
+3. **Merge** the closeout branch (Hermes never merges).
+4. **Release cutting** (`docs/release-cutting-plan-gate1.md`) — unblocks updater
+   Part B + AUR `aurora-bin`.
+5. Still open from N9: AUR publishing, signing-key password backup, namcap.
+
+### For Fable / next session
+- Diff: `hermes/phase1-desktop...hermes/phase1-closeout` (or review the 5 N10 commits).
+- Key file: `frontend/src-tauri/src/lib.rs` (spawn_backend + log setup).
+- Windows runtime is the only true test of `CREATE_NO_WINDOW` + file logging.
