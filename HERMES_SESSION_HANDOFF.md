@@ -1340,3 +1340,124 @@ bea8fab feat(settings): fade-curve SVG diagrams + plain-language descriptions
 ### Out of scope (→ N13 design pass)
 - R8 bulk-bar placement, R9 select-mode toggle, R10 right-click add-tag UX
 - R11 row density, R12 configurable columns, R13 playlist column trim
+
+## N14 — Table Interaction Overhaul + Polish
+
+**Session:** 2026-06-14, Hermes (MiMo 2.5 Pro). Branch: `hermes/n14-interaction` (5 commits off `hermes/phase1-closeout`).
+
+### PRE-FLIGHT results
+- PR #9 (N13) merged ✅
+- `npm run build`: ✅ (534ms)
+- `pytest -q`: ✅ (120 passed)
+- `cargo check`: ✅
+
+### Task 1 — Delete bulk bar; right-click menu becomes action surface ✅
+
+**What changed:**
+- Removed the bulk action bar entirely from `SongTable.tsx` (lines 508-580 of old code)
+- Lifted the context menu from `SongRow` to `SongTable` — now **selection-aware**
+- Right-click a selected row in a multi-selection → menu header shows "{N} songs", all actions apply to all N
+- Right-click an unselected row while a selection exists → acts on that single row only (file-manager convention)
+- Selection intact after single-row action (doesn't clear)
+- Context menu actions: Play Now, Play Next, Add to Queue, Add to Playlist (opens dialog), Add Tag (inline input with quick-pick existing tags), Remove from Playlist (playlist view only), Delete
+- The `⋯` overflow menu (shadcn DropdownMenu) and right-click menu share the same action vocabulary
+- Removed `extraBulkActions` prop from `SongTableProps` — playlist "Remove" now handled via `onRemoveFromPlaylist` prop through the context menu
+- Updated `PlaylistDetail.tsx` to remove `extraBulkActions` usage
+
+**Files:** `SongTable.tsx`, `SongRow.tsx`, `PlaylistDetail.tsx`
+**Commit:** `3cb520c`
+
+### Task 2 — Select-mode toggle ✅
+
+**What changed:**
+- Added `selectMode` state (default false) to `SongTable`
+- "Select" / "Done" toggle button in the toolbar (left side)
+- Checkbox column only visible in select mode
+- Row click forks: select mode → toggles selection; normal mode → plays song
+- `ctrl/meta+click` selects without entering select mode (power user)
+- `shift+click` range selection works in both modes
+- `Esc` exits select mode and clears selection
+- Selection clears on song list change (first ID changes)
+
+**Files:** `SongTable.tsx`, `SongRow.tsx`
+**Commit:** `3024ab9`
+
+### Task 3 — Row density ✅
+
+**What changed:**
+- `ROW_HEIGHT`: 64px → 52px
+- Cell padding: `py-3` → `py-2` (all 9 cell `<td>` elements)
+- Virtualizer `estimateSize` updated automatically (reads `ROW_HEIGHT`)
+
+**Cross-check:** At 52px, album art (size="sm" = 36px) + title/artist two-line stack fits without clipping. Title at 14px, artist at 12px — total ~30px text + 8px padding = 38px within 52px row.
+
+**Files:** `SongTable.tsx`, `SongRow.tsx`
+**Commit:** `a2fe25c`
+
+### Task 4 — Idle player-bar state ✅
+
+**Root cause of black band:** Desktop idle state showed `aurora-idle-shimmer` (animated gradient placeholder) + "Nothing playing" / "Pick a song or hit Jam". The shimmer was visually heavy for a resting state. `AppShell` uses `grid-rows-[1fr_auto]` so the player row adapts to content — no space reservation issue.
+
+**What changed:**
+- Removed shimmer placeholder
+- Left: muted "Nothing playing" label (`text-tertiary`, `font-display-italic`)
+- Right: "Shuffle library" button — shuffles all songs from `useSongStore.getState().songs` and starts playback via `usePlayerStore.getState().playSong()`
+- Subtle hover only (`text-tertiary` → `text-secondary`, `bg-white/[0.04]`)
+- No full-saturation accent on idle surface (product law)
+
+**Files:** `PlayerBar.tsx`
+**Commit:** `048055f`
+
+### Task 5 — About audit ✅
+
+**Discrepancies found and fixed:**
+1. `← →` listed as "Seek backward / forward" — actually bound to Previous/Next song (not seek). **Removed** (duplicate of N/P).
+2. `↑ ↓` listed as "Volume up / down" — **not bound at all** in `useKeyboardShortcuts.ts`. **Removed.**
+3. `Cmd+F` labeled "Focus filter" — actually focuses the search/Mix input. **Relabeled** to "Focus search".
+4. `Cmd+K` (Command palette) — **implemented but not listed**. **Added.**
+
+**No changes needed:** Version string (v1.0 intentionally), GitHub links resolve, "Built With" list current.
+
+**Files:** `AboutView.tsx`
+**Commit:** `4d9fc0d`
+
+### Gates
+- `npm run build`: ✅ (319ms)
+- `pytest -q`: ✅ (120 passed)
+- `cargo check`: ✅
+- `graphify update .`: ✅
+
+### Done-means status
+
+| # | Criterion | Status |
+|---|-----------|--------|
+| 1 | Bulk bar gone everywhere; right-click acts on selection (header shows N); unselected-row right-click acts on one; ⋯ and right-click share vocabulary; Add-tag works inline | ✅ |
+| 2 | Checkboxes hidden by default; Select toggle reveals; Esc exits/clears; shift/ctrl-click select | ✅ |
+| 3 | Rows compact (52px); nothing clipped; scroll smooth | ✅ |
+| 4 | Idle player-bar intentional (no black band); Shuffle library starts playback | ✅ |
+| 5 | About: shortcuts corrected, links OK, Built-With current | ✅ |
+| 6 | Handoff appended, graphify updated, gates green, PR open | ✅ |
+
+### 🔎 DAIKI CROSS-CHECK outcomes
+
+1. **Context menu — inline tag picker:** Built inline inside the context menu (search input + quick-pick existing tags, Enter to add). Works cleanly because the context menu is now a SongTable-level component with access to `allTags` store. No need to fall back to dialog.
+
+2. **Right-click unselected row with active selection:** Leaves selection intact, acts on single clicked row. This matches file-manager convention (Finder, Explorer).
+
+3. **Row click disambiguation:** `handlePlay(e)` checks `selectMode || e.metaKey || e.ctrlKey` → toggle selection. Otherwise → play. The `onPlay` callback from Albums/Folders/Tags callers is unaffected because those callers don't pass `selectMode`.
+
+4. **Row height at 52px:** Album art `size="sm"` is 36px. Title (14px) + artist (12px) + gaps = ~30px text. With `py-2` (8px top+bottom) total content = ~46px, fits in 52px with 6px breathing room.
+
+5. **Idle bar root cause:** Not a space reservation issue — `AppShell` grid uses `auto` row height. The visual "black band" was the shimmer animation being too subtle against the dark surface. Replaced with intentional minimal state.
+
+### Commits
+```
+4d9fc0d docs(about): fix keyboard shortcuts — remove unbound arrows, add cmd+K, correct labels
+048055f fix(player): intentional idle state — muted label + shuffle library button
+a2fe25c fix(songs): compact row density — 64px to 52px, tighter cell padding
+3024ab9 feat(songs): select-mode toggle — checkboxes hidden by default, Esc exits
+3cb520c feat(songs): selection-aware context menu replaces bulk action bar
+```
+
+### Out of scope (→ N15)
+Column show/hide, drag-reorder, drag-resize, per-page column persistence, Type column (R12), playlist column trim (R13).
