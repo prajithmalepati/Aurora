@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Plus } from "lucide-react"
+import { Plus, FolderSearch } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -31,6 +31,19 @@ export function AddSongDialog({ onAdd, open: controlledOpen, onOpenChange }: Add
   const [filePath, setFilePath] = useState("")
   const [error, setError] = useState<string | null>(null)
   const createSong = useSongStore((state) => state.createSong)
+
+  const isTauri = "__TAURI_INTERNALS__" in window
+
+  const handleBrowse = async () => {
+    const { open } = await import("@tauri-apps/plugin-dialog")
+    const selected = await open({
+      multiple: false,
+      filters: [{ name: "Audio", extensions: ["mp3", "flac", "wav", "ogg", "m4a", "aac", "wma", "opus", "aiff"] }],
+    })
+    if (selected) {
+      setFilePath(selected as string)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -139,12 +152,27 @@ export function AddSongDialog({ onAdd, open: controlledOpen, onOpenChange }: Add
               <label htmlFor="file-path" className="label-micro text-[9.5px]">
                 File path (leave empty for metadata-only entry)
               </label>
-              <Input
-                id="file-path"
-                value={filePath}
-                onChange={(e) => setFilePath(e.target.value)}
-                placeholder="/music/artist/song.flac"
-              />
+              <div className="flex gap-2">
+                <Input
+                  id="file-path"
+                  value={filePath}
+                  onChange={(e) => setFilePath(e.target.value)}
+                  placeholder="/music/artist/song.flac"
+                  className="flex-1"
+                />
+                {isTauri && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-9 px-3 gap-1.5 flex-shrink-0"
+                    onClick={handleBrowse}
+                  >
+                    <FolderSearch className="h-3.5 w-3.5" strokeWidth={1.5} />
+                    Browse…
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
 

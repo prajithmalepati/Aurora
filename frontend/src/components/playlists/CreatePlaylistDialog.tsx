@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { PlaylistImagePicker } from "@/components/playlists/PlaylistImagePicker"
-import { api } from "@/lib/api"
+import { api, dataUrlToBlob } from "@/lib/api"
 import { toast } from "@/lib/toast"
 
 // Preset color swatches — retuned to the aurora palette
@@ -56,7 +56,7 @@ export function CreatePlaylistDialog({ open, onOpenChange }: CreatePlaylistDialo
         emoji: emoji.trim() || undefined,
       })
       if (imageDataUrl?.startsWith("data:")) {
-        const blob = await fetch(imageDataUrl).then((r) => r.blob())
+        const blob = dataUrlToBlob(imageDataUrl)
         const ext =
           blob.type === "image/png" ? "png"
           : blob.type === "image/gif" ? "gif"

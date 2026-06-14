@@ -91,6 +91,18 @@ async function postUploadRequest<T>(path: string, formData: FormData): Promise<T
   return res.json()
 }
 
+/** Convert a data-URL to a Blob without fetch() (avoids CSP connect-src restriction in Tauri). */
+export function dataUrlToBlob(dataUrl: string): Blob {
+  const comma = dataUrl.indexOf(",")
+  const meta = dataUrl.slice(0, comma); // e.g. "data:image/png;base64"
+  const raw = dataUrl.slice(comma + 1);
+  const mime = meta.match(/:(.*?);/)?.[1] || "application/octet-stream";
+  const binary = atob(raw);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: mime });
+}
+
 export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body: unknown) => request<T>(path, { method: "POST", body: JSON.stringify(body) }),

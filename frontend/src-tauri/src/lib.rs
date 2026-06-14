@@ -37,18 +37,66 @@ fn resolve_backend_bin(app: &tauri::AppHandle) -> std::path::PathBuf {
     }
 }
 
-fn spawn_backend(bin: &std::path::Path, port: u16, token: &str) -> std::io::Result<Child> {
-    let (stdout, stderr) = if cfg!(debug_assertions) {
-        (std::process::Stdio::inherit(), std::process::Stdio::inherit())
+/// Resolve the backend log file path under the app log dir, creating the dir.
+/// Returns None if the platform log dir can't be resolved.
+fn backend_log_path(app: &tauri::AppHandle) -> Option<std::path::PathBuf> {
+    let dir = app.path().app_log_dir().ok()?;
+    let _ = std::fs::create_dir_all(&dir);
+    Some(dir.join("backend.log"))
+}
+
+fn spawn_backend(
+    bin: &std::path::Path,
+    port: u16,
+    token: &str,
+    log_path: Option<&std::path::Path>,
+) -> std::io::Result<Child> {
+    let mut cmd = Command::new(bin);
+    cmd.env("AURORA_PORT", port.to_string())
+        .env("AURORA_TOKEN", token);
+
+    if cfg!(debug_assertions) {
+        cmd.stdout(std::process::Stdio::inherit())
+            .stderr(std::process::Stdio::inherit());
+    } else if let Some(path) = log_path {
+        // Release: tee backend stdout+stderr to a file so backend-side failures
+        // (Python tracebacks, uvicorn access log, port-bind errors) survive for
+        // post-mortem — release builds otherwise log nothing. Append so monitor
+        // -thread restarts don't truncate the history.
+        match std::fs::OpenOptions::new().create(true).append(true).open(path) {
+            Ok(file) => match file.try_clone() {
+                Ok(err_file) => {
+                    cmd.stdout(file).stderr(err_file);
+                }
+                Err(e) => {
+                    log::warn!("sidecar: could not clone backend log handle: {}", e);
+                    cmd.stdout(file).stderr(std::process::Stdio::null());
+                }
+            },
+            Err(e) => {
+                log::warn!("sidecar: could not open backend log {}: {}", path.display(), e);
+                cmd.stdout(std::process::Stdio::null())
+                    .stderr(std::process::Stdio::null());
+            }
+        }
     } else {
-        (std::process::Stdio::null(), std::process::Stdio::null())
-    };
-    Command::new(bin)
-        .env("AURORA_PORT", port.to_string())
-        .env("AURORA_TOKEN", token)
-        .stdout(stdout)
-        .stderr(stderr)
-        .spawn()
+        cmd.stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null());
+    }
+
+    // Windows: the frozen backend is a console exe (console=True in the
+    // PyInstaller spec). Without this flag Windows gives it a visible console
+    // window; closing that window kills the backend and the monitor thread
+    // respawns it → the window reopens in a loop. CREATE_NO_WINDOW suppresses
+    // the console for the initial spawn AND every monitor-thread restart, since
+    // both go through this function.
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    cmd.spawn()
 }
 
 /// Spawn backend with health gate, retrying on early exit (port-bind race).
@@ -57,6 +105,7 @@ fn spawn_backend(bin: &std::path::Path, port: u16, token: &str) -> std::io::Resu
 /// If the child stays alive but unhealthy after 15s, proceeds (slow cold start).
 fn spawn_with_health_gate(app: &tauri::AppHandle) -> std::io::Result<(Child, u16, String, bool)> {
     let bin = resolve_backend_bin(app);
+    let log_path = backend_log_path(app);
 
     // Generate 32-byte random auth token, hex-encoded
     let mut buf = [0u8; 32];
@@ -72,7 +121,7 @@ fn spawn_with_health_gate(app: &tauri::AppHandle) -> std::io::Result<(Child, u16
             port
         );
 
-        let mut child = spawn_backend(&bin, port, &token)?;
+        let mut child = spawn_backend(&bin, port, &token, log_path.as_deref())?;
         let url = format!("http://127.0.0.1:{}/api/health", port);
         let start = Instant::now();
         let mut healthy = false;
@@ -142,13 +191,22 @@ pub fn run() {
             shutting_down: AtomicBool::new(false),
         })
         .setup(|app| {
-            if cfg!(debug_assertions) {
-                app.handle().plugin(
-                    tauri_plugin_log::Builder::default()
-                        .level(log::LevelFilter::Info)
-                        .build(),
-                )?;
-            }
+            // Logging: debug → stdout; release → file in the app log dir.
+            // Release builds previously logged nothing, which made the v0.1.1
+            // field debugging blind. The Rust side now records the sidecar
+            // narrative (spawn attempts, ports, health, exits, restarts) to
+            // <app_log_dir>/aurora.log; backend stdout/stderr is teed to
+            // backend.log in the same dir (see spawn_backend).
+            let log_builder = tauri_plugin_log::Builder::default()
+                .level(log::LevelFilter::Info)
+                .target(if cfg!(debug_assertions) {
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout)
+                } else {
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::LogDir {
+                        file_name: Some("aurora".into()),
+                    })
+                });
+            app.handle().plugin(log_builder.build())?;
 
             let bin = resolve_backend_bin(app.handle());
             log::info!("sidecar: spawning {}", bin.display());
@@ -229,6 +287,7 @@ pub fn run() {
                                 let port = *state.port.lock().unwrap_or_else(|e| e.into_inner());
                                 let token = state.token.lock().unwrap_or_else(|e| e.into_inner()).clone();
                                 let bin = resolve_backend_bin(&handle);
+                                let log_path = backend_log_path(&handle);
                                 // 3 attempts with backoff
                                 let mut restarted = false;
                                 for attempt in 1..=3u32 {
@@ -244,7 +303,7 @@ pub fn run() {
                                         return;
                                     }
                                     guard = state.child.lock().unwrap_or_else(|e| e.into_inner());
-                                    match spawn_backend(&bin, port, &token) {
+                                    match spawn_backend(&bin, port, &token, log_path.as_deref()) {
                                         Ok(new_child) => {
                                             *guard = Some(new_child);
                                             log::info!("sidecar: restarted successfully");
