@@ -140,7 +140,7 @@ export function QueryBuilder() {
           ) : results.length === 0 ? (
             <MixEmptyState />
           ) : (
-            <SongTable songs={results} loading={false} onPlay={handlePlaySong} animKey={resultsVersion} showSort={false} />
+            <SongTable songs={results} loading={false} onPlay={handlePlaySong} animKey={resultsVersion} showSort={false} disableInfiniteScroll />
           )}
         </div>
       </div>
@@ -335,7 +335,7 @@ export function QueryBuilder() {
             <p className="label-micro mb-3 text-[var(--aurora-text-secondary)]">
               {results.length} {results.length === 1 ? "song" : "songs"}
             </p>
-            <SongTable songs={results} loading={false} onPlay={handlePlaySong} animKey={resultsVersion} showSort={false} />
+            <SongTable songs={results} loading={false} onPlay={handlePlaySong} animKey={resultsVersion} showSort={false} disableInfiniteScroll />
           </>
         )}
       </div>
