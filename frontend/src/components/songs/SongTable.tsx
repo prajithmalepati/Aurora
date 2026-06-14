@@ -377,6 +377,7 @@ export function SongTable({
   // Multi-select state
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const lastSelectedIndexRef = useRef<number | null>(null)
+  const [selectMode, setSelectMode] = useState(false)
 
   // Context menu state (lifted from SongRow — selection-aware)
   const [contextMenu, setContextMenu] = useState<{
@@ -396,9 +397,24 @@ export function SongTable({
     if (newFirstId !== firstIdRef.current) {
       setSelectedIds(new Set())
       lastSelectedIndexRef.current = null
+      setSelectMode(false)
     }
     firstIdRef.current = newFirstId
   }, [songs])
+
+  // Esc exits select mode
+  useEffect(() => {
+    if (!selectMode) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setSelectMode(false)
+        setSelectedIds(new Set())
+        lastSelectedIndexRef.current = null
+      }
+    }
+    window.addEventListener("keydown", handler)
+    return () => window.removeEventListener("keydown", handler)
+  }, [selectMode])
 
   const isAllSelected = songs.length > 0 && songs.every((s) => selectedIds.has(s.id))
 
@@ -535,8 +551,28 @@ export function SongTable({
 
   const sortDropdownValue = `${sortField}-${sortOrder}`
 
-  const toolbar = showSort ? (
-    <div className="flex items-center justify-end px-4 pb-2 shrink-0">
+  const toolbar = (
+    <div className="flex items-center justify-between px-4 pb-2 shrink-0">
+      {/* Select mode toggle */}
+      <button
+        onClick={() => {
+          if (selectMode) {
+            setSelectMode(false)
+            setSelectedIds(new Set())
+            lastSelectedIndexRef.current = null
+          } else {
+            setSelectMode(true)
+          }
+        }}
+        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors duration-150 ${
+          selectMode
+            ? "text-[var(--aurora-accent-interactive)] bg-[var(--aurora-accent-interactive)]/10"
+            : "text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-text-secondary)] hover:bg-white/[0.04]"
+        }`}
+      >
+        {selectMode ? "Done" : "Select"}
+      </button>
+      {showSort && (
       <div className="flex items-center gap-2">
         <span className="text-[10px] text-[var(--aurora-text-tertiary)] uppercase tracking-wide">Sort</span>
         <select
@@ -556,8 +592,9 @@ export function SongTable({
           <option value="created_at-asc">Oldest first</option>
         </select>
       </div>
+      )}
     </div>
-  ) : null
+  )
 
   // ── Virtualizer ──
   const tableContainerRef = useRef<HTMLDivElement>(null)
@@ -730,7 +767,7 @@ export function SongTable({
             sortField={sortField}
             sortOrder={sortOrder}
             onSort={handleColumnSort}
-            showCheckbox
+            showCheckbox={selectMode}
             isAllSelected={isAllSelected}
             isIndeterminate={!isAllSelected && selectedIds.size > 0}
             onSelectAll={toggleSelectAll}
@@ -760,6 +797,7 @@ export function SongTable({
                   isSelected={selectedIds.has(song.id)}
                   onToggleSelect={(shiftKey) => toggleSelectOne(song.id, shiftKey)}
                   onContextMenu={(e) => handleContextMenuEvent(e, song, virtualRow.index)}
+                  selectMode={selectMode}
                   onRemoveFromPlaylist={onRemoveFromPlaylist ? () => onRemoveFromPlaylist(song) : undefined}
                   onTrim={onTrim ? () => onTrim(song.id) : undefined}
                   isDraggable={isDraggable}

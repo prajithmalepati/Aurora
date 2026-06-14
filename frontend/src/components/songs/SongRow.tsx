@@ -31,6 +31,7 @@ interface SongRowProps {
   isSelected?: boolean
   onToggleSelect?: (shiftKey: boolean) => void
   onContextMenu?: (e: React.MouseEvent) => void
+  selectMode?: boolean
   // Playlist-mode optional props
   onRemoveFromPlaylist?: () => void
   onTrim?: () => void
@@ -45,7 +46,7 @@ interface SongRowProps {
 }
 
 export const SongRow = memo(function SongRow({
-  song, index, animIndex, onPlay, isSelected, onToggleSelect, onContextMenu: onContextMenuProp,
+  song, index, animIndex, onPlay, isSelected, onToggleSelect, onContextMenu: onContextMenuProp, selectMode,
   onRemoveFromPlaylist, onTrim,
   isDraggable, isDragOver, onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd,
 }: SongRowProps) {
@@ -83,8 +84,13 @@ export const SongRow = memo(function SongRow({
     toast.success(`"${song.title}" added to queue`)
   }, [song, addToQueue])
 
-  const handlePlay = () => {
+  const handlePlay = (e?: React.MouseEvent) => {
     if (!song.file_path) return
+    // In select mode or when ctrl/meta held, toggle selection instead of playing
+    if (selectMode || e?.metaKey || e?.ctrlKey) {
+      if (onToggleSelect) onToggleSelect(e?.shiftKey ?? false)
+      return
+    }
     if (onPlay) {
       onPlay(song, index)
     } else {
@@ -100,7 +106,7 @@ export const SongRow = memo(function SongRow({
     <>
       <tr
         ref={rowRef}
-        onClick={handlePlay}
+        onClick={(e) => handlePlay(e)}
         onContextMenu={onContextMenuProp}
         draggable={!!isDraggable}
         onDragStart={isDraggable && onDragStart ? (e) => onDragStart(e, song.id) : undefined}
@@ -122,8 +128,8 @@ export const SongRow = memo(function SongRow({
             <GripVertical className="h-3.5 w-3.5 text-[var(--aurora-text-tertiary)] opacity-0 group-hover:opacity-100 transition-opacity duration-150 mx-auto" />
           </td>
         )}
-        {/* Checkbox column (when multi-select is active) */}
-        {onToggleSelect && (
+        {/* Checkbox column (select mode only) */}
+        {selectMode && onToggleSelect && (
           <td
             className="relative px-2 py-3 w-10 text-center"
             onClick={(e) => e.stopPropagation()}
