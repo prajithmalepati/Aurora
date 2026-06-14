@@ -1121,3 +1121,172 @@ fd4b759 fix(folders): auto-select first leaf folder on entry; disable infinite s
 
 1. **Windows runtime test:** Rebuilt deb verified on Linux. Console-window fix + cover upload + scan need Windows Part A run (`docs/gate1-windows-checklist.md`).
 2. **Merge:** Branch pushed, PR open. Hermes never merges.
+
+## N12 — UX/IA Overhaul (Gate-1 Dogfood Follow-up)
+
+**Session:** 2026-06-14, Hermes implementing agent (MiMo Pro). Branch: `hermes/phase18-uxia` (off `hermes/phase1-closeout` post-merge), 7 commits.
+
+### PRE-FLIGHT results
+- PR #7 merged into `hermes/phase1-closeout` (commit `23cae08`) ✓
+- Branch `hermes/phase18-uxia` created, clean tree ✓
+- `npm run build`: ✓ built in 576ms
+- `pytest -q`: 120 passed, 78 warnings
+- `cargo check`: Finished in 0.37s
+- xvfb: available ✓
+
+### Task 1: Row unification (C1) ✅
+
+**🔎 Cross-check result:** Enumerated all PlaylistSongRow behaviors (lines 1163–1361) vs SongRow. SongRow is a strict superset minus drag/reorder and remove-from-playlist. Path taken: add optional props to SongRow, no fallback needed.
+
+**Changes:**
+- Added optional props to `SongRow`: `onRemoveFromPlaylist`, `onTrim`, `isDraggable`, drag handler props
+- Added `extraBulkActions` injection prop to `SongTable` for playlist-specific bulk remove
+- Added `PlaylistSong → Song` conversion helper in PlaylistDetail
+- Replaced PlaylistDetail's bespoke `<table>` + `PlaylistSongRow` with shared `<SongTable>`
+- SongTable owns selection state, sort, and bulk bar (single source of truth)
+- Removed ~620 lines: `PlaylistSongRow`, `Checkbox`, `IconBtn` components, local selection/sort/bulk state
+
+**Commit:** `2ff59c0 fix(songs): unify SongRow across all views — playlist uses shared SongTable`
+
+**Evidence:**
+- `npm run build` clean
+- Runtime under xvfb: All Songs 22 rows, Anime playlist 22 rows
+- Edit tags buttons: 21 visible on hover (B2 fix confirmed)
+- Remove buttons: 21 visible on hover (playlist affordance preserved)
+- Trim buttons: 21 visible on hover
+- Drag handle visible on left
+
+### Task 2: Per-page columns + decramp duration (C2) ✅
+
+**🔎 Cross-check result:** EditSongDialog had NO file metadata display. Added read-only "File info" block showing format, bitrate, sample rate, bit depth, file size.
+
+**Changes:**
+- Simplified Duration cell: removed `FormatBadge`, `qualityLabel`, `formatFileSize` — now shows only `formatDuration`
+- Added separate Artist and Album columns to SongRow and SongTable headers
+- Removed Playlists column from default row view
+- Updated `BASE_COLSPAN` to 8
+- Added "File info" read-only section to `EditSongDialog`
+
+**Commit:** `87c0d82 fix(songs): decramp duration cell — artist/album columns, file info in edit dialog`
+
+**Evidence:**
+- Headers: `# | Title | Duration | Artist | Album | Tags | Actions`
+- Duration cells: only time (4:50, 3:36, 0:10)
+- Edit dialog: "File info" section with Format: MP3
+
+### Task 3: Per-row ⋯ overflow menu (C3) ✅
+
+**Changes:**
+- Replaced individual action buttons (Trim, Remove, Queue, Edit Tags, Edit Song, Delete) with single ⋯ button opening shadcn `DropdownMenu`
+- Menu items: Play Now, Add to Queue, Edit Tags, Edit Song, Trim (conditional), Remove from Playlist (conditional), Delete
+- Removed unused `trimOpen` prop, `IconBtn` component and interface
+- Removed `FormatBadge` component (no longer needed)
+
+**Commit:** `1d50813 feat(songs): per-row ⋯ overflow menu via shadcn DropdownMenu`
+
+**Evidence:**
+- ⋯ button visible on row hover
+- Menu items: `▶Play Now | Add to Queue | Edit Tags | Edit Song | Delete`
+
+### Task 4: Context-menu suppressor hardening (B5+T5) ✅
+
+**🔎 Cross-check result:** N11 suppressor was unconditional (`document.addEventListener("contextmenu", (e) => e.preventDefault())`) — fired in dev too, killed paste in inputs.
+
+**Changes:**
+- Gated suppression to `import.meta.env.PROD` (dev keeps browser/devtools menu)
+- Exempts editable targets: `<input>`, `<textarea>`, `[contenteditable]`
+- SongRow's existing React-rendered context menu (Play Now/Next/Queue) preserved
+
+**Commit:** `3e6d730 fix(desktop): context-menu suppressor — prod-only, exempt editable targets`
+
+**Evidence:**
+- `npm run build` clean
+- Code review: `import.meta.env.PROD` guard + editable target exemption
+
+### Task 5: Albums pagination carry-over (B4) ✅
+
+**Changes:**
+- Added `disableInfiniteScroll` to `AlbumsView.tsx` SongTable at line 345
+- Audited all 7 SongTable callers: AlbumsView was the only one missing the prop (QueryBuilder, FoldersView, PlaylistDetail already had it)
+
+**Commit:** `645d908 fix(albums): add disableInfiniteScroll to album detail SongTable`
+
+**Evidence:**
+- One-line change, `npm run build` clean
+
+### Task 6: Sidebar → Settings IA (D1/D2/D4/D5) ✅
+
+**🔎 D4 cross-check result:** Import creates NEW playlist from M3U/JSON file — not "add to existing playlist." Kept in Settings as "Import Playlist" with clear description. Not folded into per-playlist flow.
+
+**Changes:**
+- **Sidebar:** Removed Scan Folder, Add Song, Import from footer. Added inline "+" button next to "Playlists" heading (hover-reveal). Footer now only shows Settings + About.
+- **Settings:** Added "Library Management" card section (before Audio) with Scan Folder, Add Song, Import Playlist buttons. Each opens the corresponding dialog.
+- **D5 — Per-playlist add-song:** Added "+" button in PlaylistDetail header that opens a Popover with search field to find and add songs from the library to that specific playlist.
+
+**Commit:** `8596f17 refactor(ia): move library actions to settings; inline playlist "+" create; per-playlist add-song`
+
+**Evidence:**
+- `npm run build` clean
+- Sidebar footer: Settings + About only
+- Settings page: Library Management section with 3 actions
+- PlaylistDetail: "+" add-song popover
+
+### Task 7: Fade-curve visual explainer (E1) ✅
+
+**🔎 Cross-check result:** Read actual curve math from `useAudioPlayer.ts`:
+- **Linear**: engine-native fade, both tracks linear 0→1 / 1→0 over full duration
+- **Equal Power**: cosine curves (`sin(t*π/2)`, `cos(t*π/2)`) — constant power
+- **Overlap**: both at full volume for N, outgoing tapers over 250ms at end
+- **Lagged**: outgoing linear fade over full N, incoming delayed N/2 then fades up over N/2
+
+**Changes:**
+- Added mini SVG diagrams (80×40 viewBox) for each curve with accurate gain shapes
+- Outgoing track = orange (`#f97316`), incoming = teal (`#5eead4`)
+- Added one-line plain-language descriptions below the buttons
+- Shapes match engine's real behavior
+
+**Commit:** `bea8fab feat(settings): fade-curve SVG diagrams + plain-language descriptions`
+
+**Evidence:**
+- `npm run build` clean
+- SVG paths verified against engine code
+
+### Final gates (all green)
+- `npm run build`: ✓ built in 314ms
+- `pytest -q`: 120 passed, 78 warnings
+- `cargo check`: Finished in 0.16s
+- `graphify update .`: 4627 nodes, 5821 edges, 393 communities
+
+### Commits on `hermes/phase18-uxia` (7 commits ahead of `hermes/phase1-closeout`)
+```
+bea8fab feat(settings): fade-curve SVG diagrams + plain-language descriptions
+8596f17 refactor(ia): move library actions to settings; inline playlist "+" create; per-playlist add-song
+645d908 fix(albums): add disableInfiniteScroll to album detail SongTable
+3e6d730 fix(desktop): context-menu suppressor — prod-only, exempt editable targets
+1d50813 feat(songs): per-row ⋯ overflow menu via shadcn DropdownMenu
+87c0d82 fix(songs): decramp duration cell — artist/album columns, file info in edit dialog
+2ff59c0 fix(songs): unify SongRow across all views — playlist uses shared SongTable
+```
+
+### Cross-check outcomes
+| # | Tag | Finding | Decision |
+|---|-----|---------|----------|
+| T1 | 🔎 Row unification | SongRow is superset minus drag/reorder + remove | Added optional props, no fallback needed |
+| T2 | 🔎 File metadata | EditSongDialog had no file info | Added read-only File info block |
+| T4 | 🔎 Context suppressor | Unconditional, killed paste in inputs | Gated to PROD + exempt editable targets |
+| T6 | 🔎 Import (D4) | Creates NEW playlist, not add-to-existing | Kept standalone in Settings with clear label |
+| T7 | 🔎 Fade curves | Read actual engine math | SVGs drawn from real gain functions |
+
+### Deviations from brief
+1. **Sort UI:** PlaylistDetail's sort popover was removed (SongTable owns sort via store). PlaylistDetail's local sort state kept as read-only at 'position' default. Full sort unification (C4) deferred — SongTable's store-based sort doesn't cover playlist-specific sort fields.
+2. **Bulk bar:** SongTable owns selection + bulk bar. PlaylistDetail's bulk bar removed. Extra bulk action (Remove from playlist) injected via `extraBulkActions` prop.
+3. **`trimOpen` prop removed:** After Task 3 replaced action buttons with DropdownMenu, the `trimOpen` active-state prop was no longer needed. Removed from SongRow, SongTable, and PlaylistDetail.
+
+### Out of scope (→ N13)
+- A2 canvas resize stutter
+- A3 empty player-bar state
+- E2 About audit
+
+### Blocked on human
+1. **Review + merge:** Branch pushed, PR open. Hermes never merges.
+2. **Windows runtime test:** Verify on real desktop build.

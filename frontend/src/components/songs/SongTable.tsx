@@ -27,6 +27,25 @@ interface SongTableProps {
   showSort?: boolean
   /** When true, songs are the complete set (no pagination). Disables "Load more" and shows songs.length as total. */
   disableInfiniteScroll?: boolean
+  // Playlist-mode optional props (passed through to SongRow)
+  onRemoveFromPlaylist?: (song: Song) => void
+  onTrim?: (songId: number) => void
+  // Drag-and-drop
+  isDraggable?: boolean
+  dragId?: number | null
+  dragOverId?: number | null
+  onDragStart?: (e: React.DragEvent, songId: number) => void
+  onDragOver?: (e: React.DragEvent, songId: number) => void
+  onDragLeave?: () => void
+  onDrop?: (e: React.DragEvent, songId: number) => void
+  onDragEnd?: (e: React.DragEvent) => void
+  // Extra bulk actions injected into the bulk bar (e.g. Remove from playlist)
+  extraBulkActions?: Array<{
+    label: string
+    icon: React.ReactNode
+    onClick: (selectedSongs: Song[]) => void
+    variant?: "default" | "danger"
+  }>
 }
 
 const HEADER_CLASS =
@@ -81,9 +100,10 @@ interface TableHeaderProps {
   isAllSelected: boolean
   isIndeterminate: boolean
   onSelectAll: () => void
+  isDraggable?: boolean
 }
 
-function TableHeader({ sortField, sortOrder, onSort, showCheckbox, isAllSelected, isIndeterminate, onSelectAll }: TableHeaderProps) {
+function TableHeader({ sortField, sortOrder, onSort, showCheckbox, isAllSelected, isIndeterminate, onSelectAll, isDraggable }: TableHeaderProps) {
   const SortArrow = sortOrder === "asc" ? ChevronUp : ChevronDown
 
   function SortableTh({
@@ -112,6 +132,9 @@ function TableHeader({ sortField, sortOrder, onSort, showCheckbox, isAllSelected
   return (
     <thead>
       <tr>
+        {isDraggable && (
+          <th className="px-1 py-3 w-6" />
+        )}
         {showCheckbox && (
           <th className="px-2 py-3 w-10 text-center">
             <Checkbox
@@ -124,8 +147,9 @@ function TableHeader({ sortField, sortOrder, onSort, showCheckbox, isAllSelected
         )}
         <th className={`${HEADER_CLASS} w-12 text-center`}>#</th>
         <SortableTh field="title" label="Title" />
-        <SortableTh field="duration" label="Duration" className="w-28 hidden lg:table-cell" />
-        <th className={`${HEADER_CLASS} w-40 hidden lg:table-cell`}>Playlists</th>
+        <SortableTh field="duration" label="Duration" className="w-20 hidden lg:table-cell" />
+        <SortableTh field="artist" label="Artist" className="hidden lg:table-cell" />
+        <SortableTh field="album" label="Album" className="hidden lg:table-cell" />
         <th className={`${HEADER_CLASS} max-w-[200px]`}>Tags</th>
         <th className={`${HEADER_CLASS} w-32 text-right`}>Actions</th>
       </tr>
@@ -335,9 +359,15 @@ function AddToPlaylistDialog({ open, onOpenChange, songIds, onComplete }: AddToP
 
 const ROW_HEIGHT = 64
 const OVERSCAN = 10
-const TABLE_COLSPAN = 7
+const BASE_COLSPAN = 8
 
-export function SongTable({ songs, loading = false, error = null, onPlay, animKey, showSort = true, disableInfiniteScroll = false }: SongTableProps) {
+export function SongTable({
+  songs, loading = false, error = null, onPlay, animKey, showSort = true, disableInfiniteScroll = false,
+  onRemoveFromPlaylist, onTrim,
+  isDraggable, dragId, dragOverId, onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd,
+  extraBulkActions,
+}: SongTableProps) {
+  const tableColspan = BASE_COLSPAN + (isDraggable ? 1 : 0)
   const sortField = useSongStore((state) => state.sortField)
   const sortOrder = useSongStore((state) => state.sortOrder)
   const sortSongs = useSongStore((state) => state.sortSongs)
@@ -520,6 +550,24 @@ export function SongTable({ songs, loading = false, error = null, onPlay, animKe
         <TagIcon className="h-3.5 w-3.5" />
         Tag
       </button>
+      {extraBulkActions?.map((action) => {
+        const selectedSongs = songs.filter((s) => selectedIds.has(s.id))
+        return (
+          <button
+            key={action.label}
+            onClick={() => action.onClick(selectedSongs)}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium transition-colors duration-150 ${
+              action.variant === "danger"
+                ? "text-[var(--aurora-danger)] hover:bg-[var(--aurora-danger)]/10"
+                : "text-[var(--aurora-text)] hover:bg-white/[0.06]"
+            }`}
+            title={action.label}
+          >
+            {action.icon}
+            {action.label}
+          </button>
+        )
+      })}
       <button
         onClick={() => { setSelectedIds(new Set()); lastSelectedIndexRef.current = null }}
         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-text)] hover:bg-white/[0.04] transition-colors duration-150"
@@ -574,6 +622,7 @@ export function SongTable({ songs, loading = false, error = null, onPlay, animKe
             isAllSelected={false}
             isIndeterminate={false}
             onSelectAll={toggleSelectAll}
+            isDraggable={isDraggable}
           />
           <tbody>
             {[...Array(6)].map((_, i) => (
@@ -627,6 +676,7 @@ export function SongTable({ songs, loading = false, error = null, onPlay, animKe
             isAllSelected={false}
             isIndeterminate={false}
             onSelectAll={toggleSelectAll}
+            isDraggable={isDraggable}
           />
         </table>
         <div className="py-20 flex flex-col items-center justify-center gap-3">
@@ -668,6 +718,7 @@ export function SongTable({ songs, loading = false, error = null, onPlay, animKe
             isAllSelected={false}
             isIndeterminate={false}
             onSelectAll={toggleSelectAll}
+            isDraggable={isDraggable}
           />
         </table>
         <div className="py-20 flex flex-col items-center justify-center gap-3">
@@ -704,13 +755,14 @@ export function SongTable({ songs, loading = false, error = null, onPlay, animKe
             isAllSelected={isAllSelected}
             isIndeterminate={!isAllSelected && selectedIds.size > 0}
             onSelectAll={toggleSelectAll}
+            isDraggable={isDraggable}
           />
           <tbody key={animKey}>
             {/* Top spacer */}
             {topSpacerHeight > 0 && (
               <tr aria-hidden="true">
                 <td
-                  colSpan={TABLE_COLSPAN}
+                  colSpan={tableColspan}
                   style={{ height: topSpacerHeight, padding: 0, border: 0, lineHeight: 0 }}
                 />
               </tr>
@@ -728,6 +780,15 @@ export function SongTable({ songs, loading = false, error = null, onPlay, animKe
                   animIndex={virtualRow.index < 16 ? virtualRow.index : undefined}
                   isSelected={selectedIds.has(song.id)}
                   onToggleSelect={(shiftKey) => toggleSelectOne(song.id, shiftKey)}
+                  onRemoveFromPlaylist={onRemoveFromPlaylist ? () => onRemoveFromPlaylist(song) : undefined}
+                  onTrim={onTrim ? () => onTrim(song.id) : undefined}
+                  isDraggable={isDraggable}
+                  isDragOver={dragOverId === song.id && dragId !== song.id}
+                  onDragStart={onDragStart}
+                  onDragOver={onDragOver}
+                  onDragLeave={onDragLeave}
+                  onDrop={onDrop}
+                  onDragEnd={onDragEnd}
                 />
               )
             })}
@@ -735,7 +796,7 @@ export function SongTable({ songs, loading = false, error = null, onPlay, animKe
             {bottomSpacerHeight > 0 && (
               <tr aria-hidden="true">
                 <td
-                  colSpan={TABLE_COLSPAN}
+                  colSpan={tableColspan}
                   style={{ height: bottomSpacerHeight, padding: 0, border: 0, lineHeight: 0 }}
                 />
               </tr>
@@ -743,7 +804,7 @@ export function SongTable({ songs, loading = false, error = null, onPlay, animKe
             {/* Load-more row */}
             {isLoadingMore && (
               <tr>
-                <td colSpan={TABLE_COLSPAN} className="text-center py-4">
+                <td colSpan={tableColspan} className="text-center py-4">
                   <span className="inline-flex items-center gap-2 text-[12px] text-[var(--aurora-text-tertiary)]">
                     <span aria-hidden="true" className="inline-block w-3.5 h-3.5 border-2 border-[var(--aurora-accent)] border-t-transparent rounded-full animate-spin" />
                     Loading more songs...
