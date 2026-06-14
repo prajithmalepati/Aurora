@@ -395,13 +395,13 @@ export const SongRow = memo(function SongRow({
             onContextMenu={(e) => { e.preventDefault(); closeContextMenu() }}
           />
           <div
-            className="fixed z-50 min-w-[180px] py-1.5 rounded-lg shadow-xl border"
+            className="fixed z-50 min-w-[180px] py-1.5 rounded-lg shadow-xl border backdrop-blur-xl"
             style={{
               left: `${contextMenu.x}px`,
               top: `${contextMenu.y}px`,
-              background: "var(--aurora-surface)",
+              background: "color-mix(in oklch, var(--aurora-surface) 92%, transparent)",
               borderColor: "var(--aurora-rim)",
-              boxShadow: "0 8px 30px rgba(0,0,0,0.4)",
+              boxShadow: "0 8px 30px rgba(0,0,0,0.5)",
             }}
           >
             <button
