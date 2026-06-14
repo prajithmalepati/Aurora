@@ -187,12 +187,18 @@ function AlbumCard({ album, onClick, onPlay, onShuffle }: AlbumCardProps) {
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick() }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className="group relative flex flex-col rounded-xl overflow-hidden text-left transition-[box-shadow] duration-200 aurora-focus cursor-pointer"
-      style={{
-        background: "var(--aurora-surface)",
-        boxShadow: "inset 0 0 0 1px var(--aurora-rim)",
-      }}
+      className="group relative flex flex-col rounded-xl overflow-hidden text-left aurora-focus cursor-pointer"
+      style={{ background: "var(--aurora-surface)" }}
     >
+      {/* Composited rim — opacity transition (GPU-composited, no box-shadow jank) */}
+      <div
+        className="pointer-events-none absolute inset-0 z-10 rounded-xl transition-opacity duration-200"
+        style={{
+          boxShadow: "inset 0 0 0 1px var(--aurora-rim), inset 0 1px 4px rgba(94,234,212,0.15)",
+          opacity: hovered ? 1 : 0.6,
+        }}
+        aria-hidden
+      />
       {/* Cover art */}
       <div className="relative aspect-square w-full overflow-hidden">
         {coverUrl ? (

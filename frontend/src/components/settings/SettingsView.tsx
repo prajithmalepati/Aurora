@@ -273,14 +273,14 @@ export function SettingsView() {
               {
                 value: "linear" as CrossfadeCurve,
                 label: "Linear",
-                outgoing: "M 0 40 L 80 0",
-                incoming: "M 0 0 L 80 40",
+                outgoing: "M 0 0 L 80 40",
+                incoming: "M 0 40 L 80 0",
               },
               {
                 value: "equalpower" as CrossfadeCurve,
                 label: "Equal Power",
-                outgoing: "M 0 40 C 20 40 60 0 80 0",
-                incoming: "M 0 0 C 20 0 60 40 80 40",
+                outgoing: "M 0 0 C 20 0 60 40 80 40",
+                incoming: "M 0 40 C 20 40 60 0 80 0",
               },
               {
                 value: "overlap" as CrossfadeCurve,
@@ -291,7 +291,7 @@ export function SettingsView() {
               {
                 value: "lagged" as CrossfadeCurve,
                 label: "Lagged",
-                outgoing: "M 0 40 L 80 0",
+                outgoing: "M 0 0 L 80 40",
                 incoming: "M 0 40 L 40 40 L 80 0",
               },
             ]).map(({ value, label, outgoing, incoming }) => (

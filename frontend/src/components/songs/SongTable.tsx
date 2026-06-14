@@ -816,7 +816,7 @@ export function SongTable({
         </table>
 
         {/* Song count footer */}
-        <div className="sticky bottom-0 text-center py-2.5 text-[11px] text-[var(--aurora-text-tertiary)] bg-[var(--aurora-obsidian)]/90 backdrop-blur-sm border-t border-[var(--aurora-rim)]">
+        <div className="sticky bottom-0 text-center py-2.5 text-[11px] text-[var(--aurora-text-secondary)] bg-[var(--aurora-obsidian)] backdrop-blur-sm border-t border-[var(--aurora-rim)]">
           Showing {songs.length} of {totalCount.toLocaleString()}
           {hasMore && !isLoadingMore && (
             <button

@@ -10,17 +10,12 @@ from app.cache import folder_cache, song_cache
 router = APIRouter(tags=["folders"])
 
 
-def _build_tree(paths: list[str]) -> list[dict]:
-    """Build a nested folder tree from a list of directory paths.
+def _build_tree(dir_counts: dict[str, int]) -> list[dict]:
+    """Build a nested folder tree from a mapping of directory paths to song counts.
 
     Each path is a directory containing songs. Returns a list of top-level
     folder nodes, each with name, path, song_count, and subfolders.
     """
-    # Count songs per directory
-    dir_counts: dict[str, int] = {}
-    for p in paths:
-        dir_counts[p] = dir_counts.get(p, 0) + 1
-
     # Build nested tree structure
     # We use an intermediate dict where keys are path components
     # and leaves carry the aggregate counts
@@ -80,17 +75,18 @@ def get_folder_tree():
         )
         rows = cursor.fetchall()
 
-    # Extract unique directory paths (parent directory of each file)
+    # Count songs per directory (parent directory of each file)
     import os
-    dirs: set[str] = set()
+    from collections import Counter
+    dir_counts: Counter[str] = Counter()
     for row in rows:
         fp = row["file_path"]
         d = os.path.dirname(fp)
         if d:
-            dirs.add(d)
+            dir_counts[d] += 1
 
     # Build and return the tree
-    tree = _build_tree(list(dirs))
+    tree = _build_tree(dir_counts)
 
     result = {
         "data": {"folders": tree},
