@@ -25,7 +25,7 @@ export function FoldersView({ }: FoldersViewProps) {
   const [songs, setSongs] = useState<Song[]>([])
   const [songsLoading, setSongsLoading] = useState(false)
   const [songsError, setSongsError] = useState<string | null>(null)
-  const [recursive, setRecursive] = useState(false)
+  const [recursive, setRecursive] = useState(true)
 
   // Tree expansion state
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set())
