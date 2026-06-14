@@ -124,14 +124,14 @@ export const SongRow = memo(function SongRow({
       >
         {/* Drag handle cell (playlist mode) */}
         {isDraggable && (
-          <td className="px-1 py-3 w-6 text-center cursor-grab active:cursor-grabbing">
+          <td className="px-1 py-2 w-6 text-center cursor-grab active:cursor-grabbing">
             <GripVertical className="h-3.5 w-3.5 text-[var(--aurora-text-tertiary)] opacity-0 group-hover:opacity-100 transition-opacity duration-150 mx-auto" />
           </td>
         )}
         {/* Checkbox column (select mode only) */}
         {selectMode && onToggleSelect && (
           <td
-            className="relative px-2 py-3 w-10 text-center"
+            className="relative px-2 py-2 w-10 text-center"
             onClick={(e) => e.stopPropagation()}
           >
             <span
@@ -178,7 +178,7 @@ export const SongRow = memo(function SongRow({
 
         {/* # column / play indicator */}
         <td
-          className={`relative px-4 py-3 w-12 text-center ${
+          className={`relative px-4 py-2 w-12 text-center ${
             isCurrentSong ? "" : "text-[var(--aurora-text-tertiary)]"
           }`}
         >
@@ -224,7 +224,7 @@ export const SongRow = memo(function SongRow({
         </td>
 
         {/* Title / Artist + art thumbnail */}
-        <td className="relative px-4 py-3">
+        <td className="relative px-4 py-2">
           <span
             className={`absolute inset-0 transition-colors duration-150 pointer-events-none ${
               isCurrentSong ? "" : "group-hover:bg-[var(--aurora-surface-hover)]"
@@ -256,7 +256,7 @@ export const SongRow = memo(function SongRow({
         </td>
 
         {/* Duration */}
-        <td className="relative px-4 py-3 w-20 text-[12px] text-[var(--aurora-text-secondary)] tabular-nums hidden lg:table-cell">
+        <td className="relative px-4 py-2 w-20 text-[12px] text-[var(--aurora-text-secondary)] tabular-nums hidden lg:table-cell">
           <span
             className={`absolute inset-0 transition-colors duration-150 pointer-events-none ${
               isCurrentSong ? "" : "group-hover:bg-[var(--aurora-surface-hover)]"
@@ -269,7 +269,7 @@ export const SongRow = memo(function SongRow({
         </td>
 
         {/* Artist */}
-        <td className="relative px-4 py-3 text-[13px] hidden lg:table-cell">
+        <td className="relative px-4 py-2 text-[13px] hidden lg:table-cell">
           <span
             className={`absolute inset-0 transition-colors duration-150 pointer-events-none ${
               isCurrentSong ? "" : "group-hover:bg-[var(--aurora-surface-hover)]"
@@ -282,7 +282,7 @@ export const SongRow = memo(function SongRow({
         </td>
 
         {/* Album */}
-        <td className="relative px-4 py-3 text-[13px] hidden lg:table-cell">
+        <td className="relative px-4 py-2 text-[13px] hidden lg:table-cell">
           <span
             className={`absolute inset-0 transition-colors duration-150 pointer-events-none ${
               isCurrentSong ? "" : "group-hover:bg-[var(--aurora-surface-hover)]"
@@ -295,7 +295,7 @@ export const SongRow = memo(function SongRow({
         </td>
 
         {/* Tags */}
-        <td className="relative px-4 py-3 max-w-[200px]">
+        <td className="relative px-4 py-2 max-w-[200px]">
           <span
             className={`absolute inset-0 transition-colors duration-150 pointer-events-none ${
               isCurrentSong ? "" : "group-hover:bg-[var(--aurora-surface-hover)]"
@@ -308,7 +308,7 @@ export const SongRow = memo(function SongRow({
         </td>
 
         {/* Actions */}
-        <td className="relative px-4 py-3 w-12">
+        <td className="relative px-4 py-2 w-12">
           <span
             className={`absolute inset-0 transition-colors duration-150 pointer-events-none ${
               isCurrentSong ? "" : "group-hover:bg-[var(--aurora-surface-hover)]"

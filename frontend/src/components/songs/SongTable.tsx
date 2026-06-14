@@ -350,7 +350,7 @@ function AddToPlaylistDialog({ open, onOpenChange, songIds, onComplete }: AddToP
 
 // ── SongTable ──
 
-const ROW_HEIGHT = 64
+const ROW_HEIGHT = 52
 const OVERSCAN = 10
 const BASE_COLSPAN = 8
 
