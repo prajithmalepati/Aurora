@@ -36,7 +36,7 @@ import { Equalizer } from "@/components/ui/Equalizer"
 import { AlbumArt } from "@/components/songs/AlbumArt"
 import { PlaylistImagePicker } from "@/components/playlists/PlaylistImagePicker"
 import { WaveformTrimEditor } from "@/components/player/WaveformTrimEditor"
-import { api, BASE_URL, getBaseUrl, getAuroraToken, withToken } from "@/lib/api"
+import { api, BASE_URL, dataUrlToBlob, getBaseUrl, getAuroraToken, withToken } from "@/lib/api"
 
 interface PlaylistDetailProps {
   playlistId: number
@@ -217,7 +217,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
 
       if (editImageDataUrl?.startsWith("data:")) {
         // New file was picked — convert base64 preview to Blob and upload
-        const blob = await fetch(editImageDataUrl).then((r) => r.blob())
+        const blob = dataUrlToBlob(editImageDataUrl)
         const ext =
           blob.type === "image/png" ? "png"
           : blob.type === "image/gif" ? "gif"
