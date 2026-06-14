@@ -30,6 +30,7 @@ interface SongRowProps {
   onPlay?: (song: Song, index: number) => void
   isSelected?: boolean
   onToggleSelect?: (shiftKey: boolean) => void
+  onContextMenu?: (e: React.MouseEvent) => void
   // Playlist-mode optional props
   onRemoveFromPlaylist?: () => void
   onTrim?: () => void
@@ -44,7 +45,7 @@ interface SongRowProps {
 }
 
 export const SongRow = memo(function SongRow({
-  song, index, animIndex, onPlay, isSelected, onToggleSelect,
+  song, index, animIndex, onPlay, isSelected, onToggleSelect, onContextMenu: onContextMenuProp,
   onRemoveFromPlaylist, onTrim,
   isDraggable, isDragOver, onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd,
 }: SongRowProps) {
@@ -59,12 +60,10 @@ export const SongRow = memo(function SongRow({
   const inQueue = usePlayerStore(
     (state) => state.queue.some((q) => q.id === song.id)
   )
-  const playNext = usePlayerStore((state) => state.playNext)
   const addToQueue = usePlayerStore((state) => state.addToQueue)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [tagEditorOpen, setTagEditorOpen] = useState(false)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
   const rowRef = useRef<HTMLTableRowElement>(null)
 
   const handleDelete = async () => {
@@ -78,38 +77,11 @@ export const SongRow = memo(function SongRow({
     }
   }
 
-  const handleContextMenu = useCallback((e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    const x = Math.min(e.clientX, window.innerWidth - 188)
-    const y = Math.min(e.clientY, window.innerHeight - 128)
-    setContextMenu({ x, y })
-  }, [])
-
-  const closeContextMenu = useCallback(() => {
-    setContextMenu(null)
-  }, [])
-
-  const handlePlayNext = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation()
-    playNext(song)
-    toast.success(`"${song.title}" will play next`)
-    closeContextMenu()
-  }, [song, playNext, closeContextMenu])
-
   const handleAddToQueue = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
     addToQueue(song)
     toast.success(`"${song.title}" added to queue`)
-    closeContextMenu()
-  }, [song, addToQueue, closeContextMenu])
-
-  const handlePlayNow = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation()
-    const songs = useSongStore.getState().songs
-    playSong(song, songs.length > 0 ? songs : undefined)
-    closeContextMenu()
-  }, [song, playSong, closeContextMenu])
+  }, [song, addToQueue])
 
   const handlePlay = () => {
     if (!song.file_path) return
@@ -129,7 +101,7 @@ export const SongRow = memo(function SongRow({
       <tr
         ref={rowRef}
         onClick={handlePlay}
-        onContextMenu={handleContextMenu}
+        onContextMenu={onContextMenuProp}
         draggable={!!isDraggable}
         onDragStart={isDraggable && onDragStart ? (e) => onDragStart(e, song.id) : undefined}
         onDragOver={isDraggable && onDragOver ? (e) => onDragOver(e, song.id) : undefined}
@@ -384,56 +356,6 @@ export const SongRow = memo(function SongRow({
           </div>
         </td>
       </tr>
-
-      {/* Context Menu */}
-      {contextMenu && (
-        <>
-          {/* Click-away backdrop */}
-          <div
-            className="fixed inset-0 z-40"
-            onClick={closeContextMenu}
-            onContextMenu={(e) => { e.preventDefault(); closeContextMenu() }}
-          />
-          <div
-            className="fixed z-50 min-w-[180px] py-1.5 rounded-lg shadow-xl border backdrop-blur-xl"
-            style={{
-              left: `${contextMenu.x}px`,
-              top: `${contextMenu.y}px`,
-              background: "color-mix(in oklch, var(--aurora-surface) 92%, transparent)",
-              borderColor: "var(--aurora-rim)",
-              boxShadow: "0 8px 30px rgba(0,0,0,0.5)",
-            }}
-          >
-            <button
-              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-[13px] text-[var(--aurora-text)] hover:bg-[var(--aurora-surface-hover)] transition-colors text-left"
-              onClick={handlePlayNow}
-            >
-              <span className="w-4 h-4 flex items-center justify-center text-[var(--aurora-accent)]">
-                ▶
-              </span>
-              Play Now
-            </button>
-            <button
-              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-[13px] text-[var(--aurora-text)] hover:bg-[var(--aurora-surface-hover)] transition-colors text-left"
-              onClick={handlePlayNext}
-            >
-              <span className="w-4 h-4 flex items-center justify-center text-[var(--aurora-text-secondary)]">
-                ↳
-              </span>
-              Play Next
-            </button>
-            <button
-              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-[13px] text-[var(--aurora-text)] hover:bg-[var(--aurora-surface-hover)] transition-colors text-left"
-              onClick={handleAddToQueue}
-            >
-              <span className="w-4 h-4 flex items-center justify-center text-[var(--aurora-text-secondary)]">
-                <ListPlus className="h-3.5 w-3.5" />
-              </span>
-              {inQueue ? "Already in Queue" : "Add to Queue"}
-            </button>
-          </div>
-        </>
-      )}
 
       {/* Delete confirmation */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
