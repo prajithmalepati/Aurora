@@ -59,7 +59,6 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
   const deletePlaylist = usePlaylistStore((state) => state.deletePlaylist)
   const removeSongFromPlaylist = usePlaylistStore((state) => state.removeSongFromPlaylist)
   const reorderSongs = usePlaylistStore((state) => state.reorderSongs)
-  const fetchPlaylists = usePlaylistStore((state) => state.fetchPlaylists)
   const addSongToPlaylist = usePlaylistStore((state) => state.addSongToPlaylist)
 
   const playSong = usePlayerStore((state) => state.playSong)
@@ -664,26 +663,6 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           onDragEnd={handleDragEnd}
-          extraBulkActions={[
-            {
-              label: "Remove",
-              icon: <Trash2 className="h-3.5 w-3.5" />,
-              onClick: async (selectedSongs) => {
-                if (!activePlaylist) return
-                try {
-                  for (const s of selectedSongs) {
-                    await api.delete(`/playlists/${activePlaylist.id}/songs/${s.id}`)
-                  }
-                  await fetchPlaylists()
-                  await fetchPlaylistDetail(activePlaylist.id)
-                  toast.success(`${selectedSongs.length} song${selectedSongs.length === 1 ? "" : "s"} removed`)
-                } catch {
-                  toast.error("Failed to remove songs")
-                }
-              },
-              variant: "danger",
-            },
-          ]}
         />
       </div>
 

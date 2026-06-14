@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dialog"
 import { toast } from "@/lib/toast"
 import { api } from "@/lib/api"
-import { Music, ChevronUp, ChevronDown, AlertTriangle, RefreshCw, Play, ListPlus, Tag as TagIcon, X } from "lucide-react"
+import { Music, ChevronUp, ChevronDown, AlertTriangle, RefreshCw, ListPlus, Tag as TagIcon, X, Trash2 } from "lucide-react"
 
 interface SongTableProps {
   songs: Song[]
@@ -39,13 +39,6 @@ interface SongTableProps {
   onDragLeave?: () => void
   onDrop?: (e: React.DragEvent, songId: number) => void
   onDragEnd?: (e: React.DragEvent) => void
-  // Extra bulk actions injected into the bulk bar (e.g. Remove from playlist)
-  extraBulkActions?: Array<{
-    label: string
-    icon: React.ReactNode
-    onClick: (selectedSongs: Song[]) => void
-    variant?: "default" | "danger"
-  }>
 }
 
 const HEADER_CLASS =
@@ -365,7 +358,6 @@ export function SongTable({
   songs, loading = false, error = null, onPlay, animKey, showSort = true, disableInfiniteScroll = false,
   onRemoveFromPlaylist, onTrim,
   isDraggable, dragId, dragOverId, onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd,
-  extraBulkActions,
 }: SongTableProps) {
   const tableColspan = BASE_COLSPAN + (isDraggable ? 1 : 0)
   const sortField = useSongStore((state) => state.sortField)
@@ -379,11 +371,19 @@ export function SongTable({
 
   const playSong = usePlayerStore((s) => s.playSong)
   const addToQueue = usePlayerStore((s) => s.addToQueue)
+  const deleteSong = useSongStore((s) => s.deleteSong)
+  const allTags = useTagStore((s) => s.tags)
 
   // Multi-select state
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const lastSelectedIndexRef = useRef<number | null>(null)
-  const showBulkBar = selectedIds.size > 0
+
+  // Context menu state (lifted from SongRow — selection-aware)
+  const [contextMenu, setContextMenu] = useState<{
+    x: number; y: number; song: Song; songIndex: number
+  } | null>(null)
+  const [contextTagSearch, setContextTagSearch] = useState("")
+  const contextTagInputRef = useRef<HTMLInputElement>(null)
 
   // Bulk dialog state
   const [bulkTagDialogOpen, setBulkTagDialogOpen] = useState(false)
@@ -436,35 +436,89 @@ export function SongTable({
     lastSelectedIndexRef.current = index
   }, [songs])
 
-  // Bulk actions
-  const getSelectedSongs = useCallback((): Song[] => {
-    return songs.filter((s) => selectedIds.has(s.id))
-  }, [songs, selectedIds])
-
-  const handlePlaySelected = () => {
-    const selected = getSelectedSongs()
-    const playable = selected.filter((s) => s.file_path)
-    if (playable.length === 0) {
-      toast.error("No playable files in selection")
-      return
-    }
-    playSong(playable[0], playable)
-  }
-
-  const handleAddSelectedToQueue = () => {
-    const selected = getSelectedSongs()
-    const playable = selected.filter((s) => s.file_path)
-    if (playable.length === 0) {
-      toast.error("No playable files in selection")
-      return
-    }
-    for (const s of playable) {
-      addToQueue(s)
-    }
-    toast.success(`${playable.length} song${playable.length === 1 ? "" : "s"} added to queue`)
-  }
-
   const selectedIdsArray = useMemo(() => Array.from(selectedIds), [selectedIds])
+
+  // Determine if right-clicked song is part of the current selection
+  const contextTargets = useMemo((): Song[] => {
+    if (!contextMenu) return []
+    // If the right-clicked song is in a multi-selection, act on all selected
+    if (selectedIds.size > 1 && selectedIds.has(contextMenu.song.id)) {
+      return songs.filter((s) => selectedIds.has(s.id))
+    }
+    // Otherwise act on the single clicked song only
+    return [contextMenu.song]
+  }, [contextMenu, selectedIds, songs])
+
+  const handleContextMenuEvent = useCallback((e: React.MouseEvent, song: Song, songIndex: number) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const x = Math.min(e.clientX, window.innerWidth - 220)
+    const y = Math.min(e.clientY, window.innerHeight - 300)
+    setContextMenu({ x, y, song, songIndex })
+    setContextTagSearch("")
+  }, [])
+
+  const closeContextMenu = useCallback(() => {
+    setContextMenu(null)
+    setContextTagSearch("")
+  }, [])
+
+  // Context menu actions (operate on contextTargets)
+  const ctxPlayNow = useCallback(() => {
+    const targets = contextTargets.filter((s) => s.file_path)
+    if (targets.length === 0) { toast.error("No playable files"); return }
+    playSong(targets[0], targets.length > 1 ? targets : songs)
+    closeContextMenu()
+  }, [contextTargets, songs, playSong, closeContextMenu])
+
+  const ctxPlayNext = useCallback(() => {
+    const targets = contextTargets.filter((s) => s.file_path)
+    if (targets.length === 0) { toast.error("No playable files"); return }
+    for (const s of targets) usePlayerStore.getState().playNext(s)
+    toast.success(`${targets.length === 1 ? `"${targets[0].title}" will play next` : `${targets.length} songs queued next`}`)
+    closeContextMenu()
+  }, [contextTargets, closeContextMenu])
+
+  const ctxAddToQueue = useCallback(() => {
+    const targets = contextTargets.filter((s) => s.file_path)
+    if (targets.length === 0) { toast.error("No playable files"); return }
+    for (const s of targets) addToQueue(s)
+    toast.success(`${targets.length} song${targets.length === 1 ? "" : "s"} added to queue`)
+    closeContextMenu()
+  }, [contextTargets, addToQueue, closeContextMenu])
+
+  const ctxDelete = useCallback(async () => {
+    const targets = [...contextTargets]
+    closeContextMenu()
+    for (const s of targets) {
+      try { await deleteSong(s.id) } catch { toast.error(`Failed to delete "${s.title}"`) }
+    }
+    if (targets.length > 0) toast.success(`${targets.length} song${targets.length === 1 ? "" : "s"} deleted`)
+    setSelectedIds(new Set())
+    lastSelectedIndexRef.current = null
+  }, [contextTargets, closeContextMenu, deleteSong])
+
+  const ctxAddTag = useCallback(async (tagName: string) => {
+    const trimmed = tagName.trim().toLowerCase()
+    if (!trimmed) return
+    const ids = contextTargets.map((s) => s.id)
+    try {
+      await Promise.all(ids.map((id) => api.post(`/songs/${id}/tags`, { tag_names: [trimmed] })))
+      await useTagStore.getState().fetchTags()
+      await useSongStore.getState().fetchSongs()
+      toast.success(`Tag "${trimmed}" added to ${ids.length} song${ids.length === 1 ? "" : "s"}`)
+    } catch {
+      toast.error("Failed to add tag")
+    }
+    closeContextMenu()
+  }, [contextTargets, closeContextMenu])
+
+  const ctxRemoveFromPlaylist = useCallback(async () => {
+    if (!onRemoveFromPlaylist) return
+    const targets = [...contextTargets]
+    closeContextMenu()
+    for (const s of targets) onRemoveFromPlaylist(s)
+  }, [contextTargets, onRemoveFromPlaylist, closeContextMenu])
 
   function handleColumnSort(field: SortField) {
     if (field === sortField) {
@@ -502,80 +556,6 @@ export function SongTable({
           <option value="created_at-asc">Oldest first</option>
         </select>
       </div>
-    </div>
-  ) : null
-
-  // Bulk action bar
-  const bulkBar = showBulkBar ? (
-    <div
-      className="flex items-center gap-3 px-4 py-2 mb-2 rounded-lg aurora-fade-in shrink-0"
-      style={{
-        background: "var(--aurora-surface-2)",
-        border: "1px solid var(--aurora-rim)",
-      }}
-    >
-      <span className="text-[12px] font-medium text-[var(--aurora-text)] tabular-nums">
-        {selectedIds.size} selected
-      </span>
-      <div className="flex-1" />
-      <button
-        onClick={handlePlaySelected}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-[var(--aurora-text)] hover:bg-white/[0.06] transition-colors duration-150"
-        title="Play selected"
-      >
-        <Play className="h-3.5 w-3.5" />
-        Play
-      </button>
-      <button
-        onClick={handleAddSelectedToQueue}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-[var(--aurora-text)] hover:bg-white/[0.06] transition-colors duration-150"
-        title="Add to queue"
-      >
-        <ListPlus className="h-3.5 w-3.5" />
-        Queue
-      </button>
-      <button
-        onClick={() => setAddToPlaylistDialogOpen(true)}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-[var(--aurora-text)] hover:bg-white/[0.06] transition-colors duration-150"
-        title="Add to playlist"
-      >
-        <ListPlus className="h-3.5 w-3.5" />
-        Playlist
-      </button>
-      <button
-        onClick={() => setBulkTagDialogOpen(true)}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-[var(--aurora-text)] hover:bg-white/[0.06] transition-colors duration-150"
-        title="Tag selected"
-      >
-        <TagIcon className="h-3.5 w-3.5" />
-        Tag
-      </button>
-      {extraBulkActions?.map((action) => {
-        const selectedSongs = songs.filter((s) => selectedIds.has(s.id))
-        return (
-          <button
-            key={action.label}
-            onClick={() => action.onClick(selectedSongs)}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium transition-colors duration-150 ${
-              action.variant === "danger"
-                ? "text-[var(--aurora-danger)] hover:bg-[var(--aurora-danger)]/10"
-                : "text-[var(--aurora-text)] hover:bg-white/[0.06]"
-            }`}
-            title={action.label}
-          >
-            {action.icon}
-            {action.label}
-          </button>
-        )
-      })}
-      <button
-        onClick={() => { setSelectedIds(new Set()); lastSelectedIndexRef.current = null }}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-text)] hover:bg-white/[0.04] transition-colors duration-150"
-        title="Clear selection"
-      >
-        <X className="h-3.5 w-3.5" />
-        Clear
-      </button>
     </div>
   ) : null
 
@@ -745,7 +725,6 @@ export function SongTable({
         onScroll={handleScroll}
       >
         {toolbar}
-        {bulkBar}
         <table className="w-full border-separate border-spacing-0">
           <TableHeader
             sortField={sortField}
@@ -780,6 +759,7 @@ export function SongTable({
                   animIndex={virtualRow.index < 16 ? virtualRow.index : undefined}
                   isSelected={selectedIds.has(song.id)}
                   onToggleSelect={(shiftKey) => toggleSelectOne(song.id, shiftKey)}
+                  onContextMenu={(e) => handleContextMenuEvent(e, song, virtualRow.index)}
                   onRemoveFromPlaylist={onRemoveFromPlaylist ? () => onRemoveFromPlaylist(song) : undefined}
                   onTrim={onTrim ? () => onTrim(song.id) : undefined}
                   isDraggable={isDraggable}
@@ -842,6 +822,137 @@ export function SongTable({
         songIds={selectedIdsArray}
         onComplete={() => { setSelectedIds(new Set()); lastSelectedIndexRef.current = null }}
       />
+
+      {/* ── Selection-aware context menu (lifted from SongRow) ── */}
+      {contextMenu && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={closeContextMenu}
+            onContextMenu={(e) => { e.preventDefault(); closeContextMenu() }}
+          />
+          <div
+            className="fixed z-50 min-w-[200px] max-w-[260px] py-1.5 rounded-lg shadow-xl border backdrop-blur-xl"
+            style={{
+              left: `${contextMenu.x}px`,
+              top: `${contextMenu.y}px`,
+              background: "color-mix(in oklch, var(--aurora-surface) 92%, transparent)",
+              borderColor: "var(--aurora-rim)",
+              boxShadow: "0 8px 30px rgba(0,0,0,0.5)",
+            }}
+          >
+            {/* Header: selection count */}
+            {selectedIds.size > 1 && selectedIds.has(contextMenu.song.id) && (
+              <div className="px-3.5 py-1.5 border-b border-[var(--aurora-rim)] mb-1">
+                <span className="text-[11px] font-medium text-[var(--aurora-text-secondary)] tabular-nums">
+                  {selectedIds.size} songs
+                </span>
+              </div>
+            )}
+
+            {/* Play Now */}
+            <button
+              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-[13px] text-[var(--aurora-text)] hover:bg-[var(--aurora-surface-hover)] transition-colors text-left"
+              onClick={ctxPlayNow}
+            >
+              <span className="w-4 h-4 flex items-center justify-center text-[var(--aurora-accent)]">▶</span>
+              Play Now
+            </button>
+
+            {/* Play Next */}
+            <button
+              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-[13px] text-[var(--aurora-text)] hover:bg-[var(--aurora-surface-hover)] transition-colors text-left"
+              onClick={ctxPlayNext}
+            >
+              <span className="w-4 h-4 flex items-center justify-center text-[var(--aurora-text-secondary)]">↳</span>
+              Play Next
+            </button>
+
+            {/* Add to Queue */}
+            <button
+              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-[13px] text-[var(--aurora-text)] hover:bg-[var(--aurora-surface-hover)] transition-colors text-left"
+              onClick={ctxAddToQueue}
+            >
+              <ListPlus className="h-3.5 w-3.5 text-[var(--aurora-text-secondary)]" />
+              Add to Queue
+            </button>
+
+            <div className="h-px my-1 bg-[var(--aurora-rim)]" />
+
+            {/* Add to Playlist */}
+            <button
+              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-[13px] text-[var(--aurora-text)] hover:bg-[var(--aurora-surface-hover)] transition-colors text-left"
+              onClick={() => { closeContextMenu(); setAddToPlaylistDialogOpen(true) }}
+            >
+              <ListPlus className="h-3.5 w-3.5 text-[var(--aurora-text-secondary)]" />
+              Add to Playlist
+            </button>
+
+            {/* Add Tag — inline picker */}
+            <div className="px-3.5 py-2">
+              <div className="flex items-center gap-2 mb-1.5">
+                <TagIcon className="h-3.5 w-3.5 text-[var(--aurora-text-secondary)]" />
+                <span className="text-[13px] text-[var(--aurora-text)]">Add Tag</span>
+              </div>
+              <input
+                ref={contextTagInputRef}
+                value={contextTagSearch}
+                onChange={(e) => setContextTagSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === ",") {
+                    e.preventDefault()
+                    ctxAddTag(contextTagSearch)
+                  }
+                  if (e.key === "Escape") closeContextMenu()
+                }}
+                placeholder="Type and press Enter…"
+                className="w-full text-[12px] px-2.5 py-1.5 rounded-md bg-transparent border border-[var(--aurora-rim)] text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-tertiary)] focus:outline-none focus:border-[var(--aurora-accent-interactive)]"
+                onClick={(e) => e.stopPropagation()}
+                autoFocus
+              />
+              {/* Quick-pick existing tags */}
+              {contextTagSearch === "" && (
+                <div className="mt-1.5 max-h-[100px] overflow-y-auto">
+                  {allTags.slice(0, 8).map((tag) => (
+                    <button
+                      key={tag.id}
+                      className="w-full text-left px-2 py-1 text-[11px] text-[var(--aurora-text-secondary)] hover:bg-[var(--aurora-surface-hover)] rounded transition-colors"
+                      onClick={(e) => { e.stopPropagation(); ctxAddTag(tag.name) }}
+                    >
+                      {tag.name}
+                      <span className="ml-1 text-[var(--aurora-text-tertiary)] tabular-nums">{tag.song_count}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Remove from Playlist (playlist view only) */}
+            {onRemoveFromPlaylist && (
+              <>
+                <div className="h-px my-1 bg-[var(--aurora-rim)]" />
+                <button
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-[13px] text-[var(--aurora-danger)] hover:bg-[var(--aurora-danger)]/10 transition-colors text-left"
+                  onClick={ctxRemoveFromPlaylist}
+                >
+                  <X className="h-3.5 w-3.5" />
+                  Remove from Playlist
+                </button>
+              </>
+            )}
+
+            {/* Delete */}
+            <div className="h-px my-1 bg-[var(--aurora-rim)]" />
+            <button
+              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-[13px] text-[var(--aurora-danger)] hover:bg-[var(--aurora-danger)]/10 transition-colors text-left"
+              onClick={ctxDelete}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Delete
+            </button>
+          </div>
+        </>
+      )}
     </>
   )
 }
