@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useSettingsStore } from "@/stores/settingsStore"
 import type { CrossfadeCurve } from "@/stores/settingsStore"
 import { resetWelcome } from "@/components/welcome/WelcomeOverlay"
@@ -7,6 +7,10 @@ import { toast } from "@/lib/toast"
 import type { WatchedFolder } from "@/types"
 import type { ApiResponse } from "@/types"
 import { checkForUpdates } from "@/lib/updater"
+import { ScanDialog } from "@/components/scanner/ScanDialog"
+import { AddSongDialog } from "@/components/songs/AddSongDialog"
+import { usePlaylistStore } from "@/stores/playlistStore"
+import { FolderSearch, Music, Upload } from "lucide-react"
 
 export function SettingsView() {
   const crossfadeEnabled = useSettingsStore((s) => s.crossfadeEnabled)
@@ -21,6 +25,38 @@ export function SettingsView() {
   const setRespectTrims = useSettingsStore((s) => s.setRespectTrims)
 
   const durPct = ((crossfadeDuration - 1) / 11) * 100
+
+  // ── Library management state ──────────────────────────────────────
+  const [scanOpen, setScanOpen] = useState(false)
+  const [addSongOpen, setAddSongOpen] = useState(false)
+  const [importLoading, setImportLoading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const fetchPlaylists = usePlaylistStore((state) => state.fetchPlaylists)
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImportLoading(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await api.postUpload<{data: {playlist_id: number, name: string, matched_count: number, unmatched_paths: string[]}, message: string}>('/playlists/import', formData)
+      const { name, matched_count, unmatched_paths } = res.data
+      toast.success(`Imported: ${matched_count} songs matched to "${name}"`)
+      if (unmatched_paths && unmatched_paths.length > 0) {
+        toast(`${unmatched_paths.length} file(s) not found in library`, { duration: 6000 })
+      }
+      await fetchPlaylists()
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Import failed'
+      toast.error(message)
+    } finally {
+      setImportLoading(false)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    }
+  }
 
   // ── Watched folders state ──────────────────────────────────────────
   const [watchedFolders, setWatchedFolders] = useState<WatchedFolder[]>([])
@@ -75,9 +111,67 @@ export function SettingsView() {
         Settings
       </h1>
 
-      {/* Audio section */}
+      {/* Library Management section */}
       <div
         className="rounded-xl overflow-hidden"
+        style={{
+          background: "var(--aurora-surface)",
+          border: "1px solid var(--aurora-rim)",
+          backdropFilter: "blur(12px)",
+        }}
+      >
+        <div className="px-5 py-3 border-b border-[var(--aurora-rim)]">
+          <p className="label-micro text-[10px] tracking-[0.2em] text-[var(--aurora-text-tertiary)]">Library Management</p>
+        </div>
+
+        <button
+          onClick={() => setScanOpen(true)}
+          className="w-full px-5 py-4 flex items-center gap-3 hover:bg-white/[0.03] transition-colors text-left border-b border-[var(--aurora-rim)]"
+        >
+          <FolderSearch className="h-4 w-4 text-[var(--aurora-text-secondary)]" />
+          <div>
+            <p className="text-[14px] text-[var(--aurora-text)] font-medium">Scan Folder</p>
+            <p className="text-[12px] text-[var(--aurora-text-secondary)] mt-0.5">
+              Add music from a folder to your library
+            </p>
+          </div>
+        </button>
+
+        <button
+          onClick={() => setAddSongOpen(true)}
+          className="w-full px-5 py-4 flex items-center gap-3 hover:bg-white/[0.03] transition-colors text-left border-b border-[var(--aurora-rim)]"
+        >
+          <Music className="h-4 w-4 text-[var(--aurora-text-secondary)]" />
+          <div>
+            <p className="text-[14px] text-[var(--aurora-text)] font-medium">Add Song</p>
+            <p className="text-[12px] text-[var(--aurora-text-secondary)] mt-0.5">
+              Add a single song file to your library
+            </p>
+          </div>
+        </button>
+
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          disabled={importLoading}
+          className="w-full px-5 py-4 flex items-center gap-3 hover:bg-white/[0.03] transition-colors text-left disabled:opacity-50"
+        >
+          {importLoading ? (
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent text-[var(--aurora-text-secondary)]" />
+          ) : (
+            <Upload className="h-4 w-4 text-[var(--aurora-text-secondary)]" />
+          )}
+          <div>
+            <p className="text-[14px] text-[var(--aurora-text)] font-medium">Import Playlist</p>
+            <p className="text-[12px] text-[var(--aurora-text-secondary)] mt-0.5">
+              Import songs from an M3U, M3U8, or JSON file into a new playlist
+            </p>
+          </div>
+        </button>
+      </div>
+
+      {/* Audio section */}
+      <div
+        className="rounded-xl overflow-hidden mt-6"
         style={{
           background: "var(--aurora-surface)",
           border: "1px solid var(--aurora-rim)",
@@ -335,6 +429,19 @@ export function SettingsView() {
           )}
         </div>
       </div>
+
+      {/* Hidden file input for import */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".m3u,.m3u8,.json"
+        className="hidden"
+        onChange={handleImport}
+      />
+
+      {/* Dialogs */}
+      <ScanDialog open={scanOpen} onOpenChange={setScanOpen} />
+      <AddSongDialog open={addSongOpen} onOpenChange={setAddSongOpen} />
 
       {/* About / Updates */}
       <div className="mt-8 flex flex-col items-center gap-3">

@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { toast } from "@/lib/toast"
-import { Pencil, Trash2, Search, Sparkles, ArrowLeft, AlertTriangle, Download } from "lucide-react"
+import { Pencil, Trash2, Search, Sparkles, ArrowLeft, AlertTriangle, Download, Plus } from "lucide-react"
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { useSettingsStore } from "@/stores/settingsStore"
@@ -59,6 +59,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
   const removeSongFromPlaylist = usePlaylistStore((state) => state.removeSongFromPlaylist)
   const reorderSongs = usePlaylistStore((state) => state.reorderSongs)
   const fetchPlaylists = usePlaylistStore((state) => state.fetchPlaylists)
+  const addSongToPlaylist = usePlaylistStore((state) => state.addSongToPlaylist)
 
   const playSong = usePlayerStore((state) => state.playSong)
   const activePlaylist = usePlaylistStore((state) => state.activePlaylist)
@@ -75,6 +76,8 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
   const [editCrossfadeEnabled, setEditCrossfadeEnabled] = useState(false)
   const [editCrossfadeDuration, setEditCrossfadeDuration] = useState(5)
   const [searchQuery, setSearchQuery] = useState("")
+  const [addSongSearch, setAddSongSearch] = useState("")
+  const [addSongOpen, setAddSongOpen] = useState(false)
   const [sortField] = useState<'position'|'title'|'artist'|'album'|'duration'>('position')
   const [sortOrder] = useState<'asc'|'desc'>('asc')
 
@@ -113,6 +116,34 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
   }, [filteredSongs, sortField, sortOrder])
 
   const songsForTable = useMemo(() => sortedSongs.map(playlistSongToSong), [sortedSongs])
+
+  // ── Add song to playlist search ──
+  const allSongs = useSongStore((s) => s.songs)
+  const fetchSongs = useSongStore((s) => s.fetchSongs)
+  const addSongResults = useMemo(() => {
+    const q = addSongSearch.trim().toLowerCase()
+    if (!q) return []
+    const playlistSongIds = new Set(activePlaylist?.songs.map((s) => s.id) ?? [])
+    return allSongs
+      .filter((s) => !playlistSongIds.has(s.id))
+      .filter(
+        (s) =>
+          s.title.toLowerCase().includes(q) ||
+          (s.artist ?? "").toLowerCase().includes(q) ||
+          (s.album ?? "").toLowerCase().includes(q)
+      )
+      .slice(0, 8)
+  }, [addSongSearch, allSongs, activePlaylist])
+
+  const handleAddSongToPlaylist = async (songId: number) => {
+    if (!activePlaylist) return
+    try {
+      await addSongToPlaylist(activePlaylist.id, songId)
+      setAddSongSearch("")
+    } catch {
+      // toast is already in store
+    }
+  }
 
   const heroArt = useMemo(
     () => albumGradient(activePlaylist?.songs[0]?.id?.toString() ?? activePlaylist?.name ?? `playlist-${playlistId}`),
@@ -493,6 +524,57 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
                     {label}
                   </button>
                 ))}
+              </PopoverContent>
+            </Popover>
+            <Popover open={addSongOpen} onOpenChange={(open) => {
+              setAddSongOpen(open)
+              if (open && allSongs.length === 0) fetchSongs()
+            }}>
+              <PopoverTrigger
+                title="Add song to playlist"
+                aria-label="Add song to playlist"
+                className="h-9 w-9 rounded-md flex items-center justify-center text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] hover:bg-white/[0.04] transition-[color,background-color] duration-150"
+              >
+                <Plus className="h-4 w-4" />
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-72 p-0">
+                <div className="p-2">
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--aurora-text-tertiary)] pointer-events-none" />
+                    <input
+                      type="text"
+                      placeholder="Search songs to add..."
+                      value={addSongSearch}
+                      onChange={(e) => setAddSongSearch(e.target.value)}
+                      className="w-full bg-white/[0.04] border border-[var(--aurora-rim)] rounded-md pl-8 pr-3 py-1.5 text-[12px] text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-tertiary)] placeholder:font-display-italic outline-none focus:border-[var(--aurora-accent-interactive)]/50"
+                      autoFocus
+                    />
+                  </div>
+                </div>
+                <div className="max-h-60 overflow-y-auto">
+                  {addSongSearch.trim() === "" ? (
+                    <p className="px-3 py-4 text-[11px] text-[var(--aurora-text-tertiary)] text-center font-display-italic">
+                      Type to search your library...
+                    </p>
+                  ) : addSongResults.length === 0 ? (
+                    <p className="px-3 py-4 text-[11px] text-[var(--aurora-text-tertiary)] text-center font-display-italic">
+                      No matching songs found
+                    </p>
+                  ) : (
+                    addSongResults.map((song) => (
+                      <button
+                        key={song.id}
+                        onClick={() => handleAddSongToPlaylist(song.id)}
+                        className="w-full text-left px-3 py-2 text-[12px] hover:bg-white/[0.04] transition-colors flex flex-col gap-0.5"
+                      >
+                        <span className="text-[var(--aurora-text)] font-medium truncate">{song.title}</span>
+                        <span className="text-[10px] text-[var(--aurora-text-tertiary)] truncate">
+                          {song.artist ?? "Unknown artist"}{song.album ? ` · ${song.album}` : ""}
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
               </PopoverContent>
             </Popover>
             <button
