@@ -43,12 +43,24 @@ fn spawn_backend(bin: &std::path::Path, port: u16, token: &str) -> std::io::Resu
     } else {
         (std::process::Stdio::null(), std::process::Stdio::null())
     };
-    Command::new(bin)
-        .env("AURORA_PORT", port.to_string())
+    let mut cmd = Command::new(bin);
+    cmd.env("AURORA_PORT", port.to_string())
         .env("AURORA_TOKEN", token)
         .stdout(stdout)
-        .stderr(stderr)
-        .spawn()
+        .stderr(stderr);
+    // Windows: the frozen backend is a console exe (console=True in the
+    // PyInstaller spec). Without this flag Windows gives it a visible console
+    // window; closing that window kills the backend and the monitor thread
+    // respawns it → the window reopens in a loop. CREATE_NO_WINDOW suppresses
+    // the console for the initial spawn AND every monitor-thread restart, since
+    // both go through this function.
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    cmd.spawn()
 }
 
 /// Spawn backend with health gate, retrying on early exit (port-bind race).
