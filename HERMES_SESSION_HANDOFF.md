@@ -1290,3 +1290,53 @@ bea8fab feat(settings): fade-curve SVG diagrams + plain-language descriptions
 ### Blocked on human
 1. **Review + merge:** Branch pushed, PR open. Hermes never merges.
 2. **Windows runtime test:** Verify on real desktop build.
+
+---
+
+## N13 — Bug + Performance Fix Sweep
+
+**Branch:** `hermes/n13-bugfix` off `hermes/phase1-closeout` (post-N12/PR#8)
+**Date:** 2026-06-14
+**Models used:** MiMo V2.5 Pro (Tasks 1, 3, 4), DS V4 Pro (Task 2), Flash (Tasks 5, 6)
+
+### Task 1 — Folders show no songs (R1) ✅
+- **Root cause:** Backend `/folders/songs` returned only direct children. Auto-selected first leaf folder had 0 direct songs (songs lived in subfolders). Sidebar `song_count` showed 0 for parent folders.
+- **Fix:** Default to recursive (`?recursive=true`) view. Backend now returns subtree songs by default. Sidebar tree aggregates `song_count` across subtree.
+- **Cross-check:** Subtree default matches file manager UX (Nautilus/Finder/Explorer). "Subfolders" toggle provides escape hatch for direct-only view.
+- **Commit:** `d23f3b1`
+- **Verification:** `/api/folders/songs?path=.../Anime` = 65 songs, `/api/folders/songs?path=.../Music&recursive=true` = 345 songs, build passes.
+
+### Task 2 — Lagged crossfade overlap (R3) + SVG diagrams (R4) ✅
+- **Finding:** The lagged curve code was already correct — `lagDelay = fadeDuration / 2` creates 50% overlap. The brief's premise that "delay ≈ full fade" was incorrect.
+- **Real bug:** All four SVG curve diagrams had **swapped paths** — linear and equal-power showed outgoing as fade-in (should be fade-out) and vice versa. Lagged outgoing showed fade-in direction.
+- **Fix:** Swapped SVG paths for linear, equal-power. Fixed lagged outgoing direction. Overlap was already correct.
+- **Commit:** `38d7b8e`
+- **Verification:** Build passes. Diagrams now match real gain-over-time functions.
+
+### Task 3 — Playlist cover bleed color (R2) ✅
+- **Root cause:** Songs use backend `extract_dominant_colors()` (Pillow MedianCut) stored in DB at scan time. Playlists used `albumGradient()` — a procedural hash-based generator ignoring the actual cover image.
+- **Fix:** Created `frontend/src/lib/extractCoverColor.ts` — client-side canvas pixel extraction (32×32 canvas, RGB averaging). No DB migration needed. Playlist covers change dynamically (unlike song art).
+- **Cross-check:** CORS-safe — playlist images served from same backend origin. Fallback to procedural gradient if extraction fails.
+- **Commit:** `07f98fe`
+
+### Task 4 — Performance sweep (A2 canvas + R5 album glow) ✅
+- **A2 (canvas resize white flash):** ResizeObserver callback was synchronous — set `canvas.width/height` on every resize, clearing the buffer. Fixed with `requestAnimationFrame` debounce + background repaint before resize.
+- **R5 (album glow jank):** `transition-[box-shadow] duration-200` is not GPU-composited. Inline `boxShadow` style conflicted with Tailwind hover classes. Fixed with composited pseudo-element approach.
+- **Commits:** `c0bd8c2` (canvas), `39aeb0d` (albums)
+
+### Task 5 — Right-click menu opacity (R6) ✅
+- **Fix:** Added `backdrop-blur-xl` + `bg-popover/95` to dropdown-menu.tsx (both main and sub-content). SongRow context menu: `backdrop-blur-xl` + `color-mix(oklch, surface 92%, transparent)`.
+- **Commit:** `1780a34`
+
+### Task 6 — Pagination footer restyle (R7) ✅
+- **Fix:** Changed `bg-[var(--aurora-obsidian)]/90` → full opacity. Upgraded text from `text-tertiary` → `text-secondary` for better legibility.
+- **Commit:** `1780a34`
+
+### Gates
+- `npm run build`: ✅ (305ms)
+- `pytest -q`: ✅ (120 passed)
+- `cargo check`: ✅
+
+### Out of scope (→ N13 design pass)
+- R8 bulk-bar placement, R9 select-mode toggle, R10 right-click add-tag UX
+- R11 row density, R12 configurable columns, R13 playlist column trim
