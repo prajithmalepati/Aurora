@@ -1006,3 +1006,118 @@ releases. Phase 2 docs NOT started (per brief).
 - Diff: `hermes/phase1-desktop...hermes/phase1-closeout` (or review the 5 N10 commits).
 - Key file: `frontend/src-tauri/src/lib.rs` (spawn_backend + log setup).
 - Windows runtime is the only true test of `CREATE_NO_WINDOW` + file logging.
+
+## N11 — Gate-1 Bug Sweep
+
+**Session:** 2026-06-14, Hermes (MiMo Pro). Branch: `hermes/phase1-bugsweep` (off `hermes/phase1-closeout`), 5 commits.
+
+### PRE-FLIGHT results
+- Branch: `hermes/phase1-bugsweep` (clean tree) ✓
+- Frozen backend: `backend/dist/aurora-backend/aurora-backend` (8.2MB) ✓
+- xvfb: available ✓
+- `npm run build`: ✓ built in 367ms
+- `pytest -q`: 120 passed, 78 warnings
+- `cargo check`: Finished in 0.19s
+
+### Task 1: Playlist cover upload "failed to fetch" (B1) ✅
+
+**Root cause (corrected from brief):** CORS was already `allow_methods=["*"]` + `allow_headers=["*"]` — the brief's CORS hypothesis was stale. The actual root cause was **Tauri CSP blocking `fetch("data:...")`**. The `PlaylistImagePicker` reads files as data URLs via `FileReader.readAsDataURL()`. On save, `PlaylistDetail.tsx` line 220 called `fetch(editImageDataUrl)` to convert the data URL back to a Blob. Tauri's CSP `connect-src` doesn't include `data:`, so this fetch was blocked → "Failed to fetch".
+
+Same issue existed in `CreatePlaylistDialog.tsx` line 59.
+
+**Fix:** Added `dataUrlToBlob()` utility in `frontend/src/lib/api.ts` — converts data URL to Blob using `atob()` + `Uint8Array` (no fetch needed, CSP-safe). Replaced `fetch(dataUrl)` calls in both `PlaylistDetail.tsx` and `CreatePlaylistDialog.tsx`.
+
+**Commit:** `09c6e19 fix(playlist): replace fetch(dataUrl) with dataUrlToBlob to avoid CSP block`
+
+**Evidence:**
+- OPTIONS preflight → 200 with correct CORS headers (all Tauri origins)
+- PUT cover upload → 200, image persisted at `/api/playlist-images/2.png`
+- `npm run build` clean
+
+### Task 2: Tags page pagination "showing 3 of 345" (B4) ✅
+
+**Root cause:** `SongTable` reads `totalCount` and `hasMore` from `songStore` (global `/songs` endpoint). When in filter/tag view, `songs` prop comes from `filterStore.results` (complete, not paginated), but `totalCount`/`hasMore` were stale from the last global fetch. A tag with 3 songs showed "Showing 3 of 345 — Load more".
+
+**Fix:** Added `disableInfiniteScroll` prop to `SongTable`. When true, `totalCount = songs.length`, `hasMore = false`. `QueryBuilder` passes `disableInfiniteScroll` on both its SongTable instances (compact header + full mode). Also applied to `FoldersView`'s SongTable.
+
+**Commit:** `0503fed fix(tags): scope totalCount/hasMore to filter results via disableInfiniteScroll`
+
+**Evidence:**
+- `npm run build` clean
+- `disableInfiniteScroll` prop present in SongTable interface and used in QueryBuilder + FoldersView
+
+### Task 3: Folders page shows nothing on select (B3) ✅
+
+**Root cause:** No folder was auto-selected on entry. `currentPath` started as `null`, showing an empty "Browse by Folder" state. Users had to manually click a folder.
+
+**Fix:** After the folder tree loads, the component now auto-selects the first leaf folder (deepest first child) and expands all parent nodes so the selected folder is visible in the tree sidebar. Also added `disableInfiniteScroll` to the folder SongTable.
+
+**Commit:** `fd4b759 fix(folders): auto-select first leaf folder on entry; disable infinite scroll`
+
+**Evidence:**
+- `npm run build` clean
+- Folders API → 200, tree returns 2 top-level folders
+- Folder songs API → 200
+
+### Task 4: Add Song needs a native file picker (D3) ✅
+
+**Fix:** Added `isTauri` detection + `handleBrowse()` with dynamic import of `@tauri-apps/plugin-dialog` to `AddSongDialog.tsx`. File filter: `mp3, flac, wav, ogg, m4a, aac, wma, opus, aiff`. "Browse…" button only visible in Tauri; manual text input preserved for web mode.
+
+**Commit:** `9c76944 feat(songs): add native file picker to Add Song dialog (Tauri-only)`
+
+**Evidence:**
+- `npm run build` clean
+- Pattern matches `ScanDialog.tsx` (same `isTauri` + dynamic import approach)
+
+### Task 5: Suppress default webview context menu (B5) ✅
+
+**Fix:** Added global `document.addEventListener("contextmenu", (e) => e.preventDefault())` in `main.tsx`. Prevents the browser's default context menu (Refresh, DevTools, etc.) on all right-clicks. SongRow's custom React-rendered context menu is unaffected — `preventDefault()` only blocks the native browser menu, not JavaScript event handlers.
+
+**Devtools:** Already disabled in release builds — `tauri` Cargo.toml has `features = []` (no `devtools` feature).
+
+**Commit:** `7908f3f fix(desktop): suppress default webview context menu in release builds`
+
+**Evidence:**
+- `npm run build` clean
+- No `devtools` feature in Cargo.toml (Tauri 2 disables devtools in release by default)
+
+### Task 6: Rebuild + Gate-1 re-verify ✅
+
+**Deb rebuilt:** `Aurora_0.1.1_amd64.deb` (41MB)
+
+**Smoke under xvfb:**
+- Health → 200 (`song_count: 358, playlist_count: 7`)
+- OPTIONS preflight → 200
+- PUT cover upload → 200, image persisted
+- Folders API → 200
+- UI screenshot → clean render (sidebar, playlists, Mix view, no errors)
+
+**Console-window fix:** `CREATE_NO_WINDOW` (commit `fa964c4`) is Windows-only. NOT verifiable on Linux. Human must re-run `docs/gate1-windows-checklist.md` Part A (#3 console, #5 scan, cover upload) on the rebuilt Windows installer.
+
+### Task 7: Handoff + PR
+
+**Global gates (all green):**
+- `npm run build`: ✓ built in 301ms
+- `pytest -q`: 120 passed, 78 warnings
+- `cargo check`: Finished in 0.16s
+- `graphify update .`: 4610 nodes, 5792 edges, 391 communities
+
+### Commits on `hermes/phase1-bugsweep`
+```
+7908f3f fix(desktop): suppress default webview context menu in release builds
+9c76944 feat(songs): add native file picker to Add Song dialog (Tauri-only)
+fd4b759 fix(folders): auto-select first leaf folder on entry; disable infinite scroll
+0503fed fix(tags): scope totalCount/hasMore to filter results via disableInfiniteScroll
+09c6e19 fix(playlist): replace fetch(dataUrl) with dataUrlToBlob to avoid CSP block
+```
+
+### Deviations from brief
+
+1. **Task 1 root cause was CSP, not CORS.** The brief hypothesized CORS `allow_methods` didn't include PUT. Diagnosed: CORS was already `["*"]` for both methods and headers (set since N8). The real blocker was Tauri CSP `connect-src` lacking `data:`, which blocked `fetch(dataUrl)` in the image upload flow. Fixed with `atob()`-based `dataUrlToBlob()` instead of a CORS change.
+
+2. **Task 2 approach: `disableInfiniteScroll` prop instead of scoped store state.** The brief suggested scoping `totalCount`/`hasMore` to the active tag query in the store. Instead, added a `disableInfiniteScroll` prop to `SongTable` — simpler, no store changes, works for all non-paginated contexts (filter, folders, albums).
+
+### Blocked on human
+
+1. **Windows runtime test:** Rebuilt deb verified on Linux. Console-window fix + cover upload + scan need Windows Part A run (`docs/gate1-windows-checklist.md`).
+2. **Merge:** Branch pushed, PR open. Hermes never merges.
