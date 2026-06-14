@@ -348,6 +348,7 @@ function AlbumDetail({ album, loading, error, onBack, onPlaySong }: AlbumDetailP
           error={null}
           onPlay={(song) => onPlaySong(song, album.songs)}
           showSort={false}
+          disableInfiniteScroll
         />
       )}
     </div>
