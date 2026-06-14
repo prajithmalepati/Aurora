@@ -270,24 +270,55 @@ export function SettingsView() {
           </div>
           <div className="flex gap-2">
             {([
-              { value: "linear" as CrossfadeCurve, label: "Linear" },
-              { value: "equalpower" as CrossfadeCurve, label: "Equal Power" },
-              { value: "overlap" as CrossfadeCurve, label: "Overlap" },
-              { value: "lagged" as CrossfadeCurve, label: "Lagged" },
-            ]).map(({ value, label }) => (
+              {
+                value: "linear" as CrossfadeCurve,
+                label: "Linear",
+                outgoing: "M 0 40 L 80 0",
+                incoming: "M 0 0 L 80 40",
+              },
+              {
+                value: "equalpower" as CrossfadeCurve,
+                label: "Equal Power",
+                outgoing: "M 0 40 C 20 40 60 0 80 0",
+                incoming: "M 0 0 C 20 0 60 40 80 40",
+              },
+              {
+                value: "overlap" as CrossfadeCurve,
+                label: "Overlap",
+                outgoing: "M 0 0 L 65 0 L 80 40",
+                incoming: "M 0 0 L 80 0",
+              },
+              {
+                value: "lagged" as CrossfadeCurve,
+                label: "Lagged",
+                outgoing: "M 0 40 L 80 0",
+                incoming: "M 0 40 L 40 40 L 80 0",
+              },
+            ]).map(({ value, label, outgoing, incoming }) => (
               <button
                 key={value}
                 onClick={() => setCrossfadeCurve(value)}
-                className={`px-3 py-1.5 rounded-lg text-[13px] font-medium transition-colors active:bg-white/[0.03] ${
+                className={`flex flex-col items-center gap-1.5 px-3 py-3 rounded-lg text-[12px] font-medium transition-colors active:bg-white/[0.03] ${
                   crossfadeCurve === value
-                    ? "bg-[var(--aurora-accent-interactive)] text-white"
-                    : "bg-white/[0.08] text-[var(--aurora-text-secondary)] hover:bg-white/[0.12]"
+                    ? "bg-[var(--aurora-accent-interactive)]/15 text-[var(--aurora-accent-interactive)] ring-1 ring-[var(--aurora-accent-interactive)]/30"
+                    : "bg-white/[0.06] text-[var(--aurora-text-secondary)] hover:bg-white/[0.10] hover:text-[var(--aurora-text)]"
                 }`}
               >
-                {label}
+                <svg viewBox="0 0 80 40" className="w-20 h-10" fill="none">
+                  <line x1="0" y1="20" x2="80" y2="20" stroke="currentColor" strokeOpacity={0.15} strokeWidth="0.75" strokeDasharray="2 2" />
+                  <path d={outgoing} stroke="#f97316" strokeOpacity={0.7} strokeWidth="1.5" />
+                  <path d={incoming} stroke="#5eead4" strokeOpacity={0.7} strokeWidth="1.5" strokeDasharray="3 2" />
+                </svg>
+                <span>{label}</span>
               </button>
             ))}
           </div>
+          <p className="text-[11px] text-[var(--aurora-text-tertiary)] mt-2">
+            {crossfadeCurve === "linear" && "Both tracks fade evenly — a smooth X-shaped crossfade."}
+            {crossfadeCurve === "equalpower" && "Keeps combined volume steady so the mix doesn't dip in the middle."}
+            {crossfadeCurve === "overlap" && "Both play at full volume, then the old track cuts out at the end."}
+            {crossfadeCurve === "lagged" && "Outgoing starts fading first; incoming joins halfway through."}
+          </p>
         </div>
 
         {/* ReplayGain mode */}
