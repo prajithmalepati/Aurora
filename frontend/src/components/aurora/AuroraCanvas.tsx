@@ -163,6 +163,7 @@ export function AuroraCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const glRef = useRef<{ gl: WebGLRenderingContext; uniforms: Record<string, WebGLUniformLocation> } | null>(null)
   const rafRef = useRef<number | null>(null)
+  const drawRef = useRef<() => void>(() => {})
   const startRef = useRef<number>(performance.now())
   const [webglFailed, setWebglFailed] = useState(false)
 
@@ -238,6 +239,7 @@ export function AuroraCanvas() {
 
     if (!document.hidden) rafRef.current = requestAnimationFrame(draw)
   }, [])
+  drawRef.current = draw
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -311,6 +313,9 @@ export function AuroraCanvas() {
       rafId = null
       canvas.width = canvas.offsetWidth * dpr
       canvas.height = canvas.offsetHeight * dpr
+      // N18 A2: render immediately so the cleared buffer is never shown blank
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+      rafRef.current = requestAnimationFrame(drawRef.current)
     }
     const ro = new ResizeObserver(() => {
       if (rafId !== null) cancelAnimationFrame(rafId)
@@ -336,6 +341,7 @@ export function AuroraCanvas() {
         height: '100%',
         zIndex: 0,
         pointerEvents: 'none',
+        background: 'var(--aurora-obsidian)',
       }}
       aria-hidden
     />
