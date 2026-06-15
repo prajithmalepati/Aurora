@@ -1461,3 +1461,135 @@ a2fe25c fix(songs): compact row density — 64px to 52px, tighter cell padding
 
 ### Out of scope (→ N15)
 Column show/hide, drag-reorder, drag-resize, per-page column persistence, Type column (R12), playlist column trim (R13).
+
+## N15 — Configurable Columns + N14 Review Fixes
+
+**Session:** 2026-06-14, Hermes (MiMo 2.5 Pro). Branch: `hermes/n15-columns` (6 commits off `hermes/n14-interaction`).
+
+### PRE-FLIGHT results
+- HEAD of `hermes/n14-interaction` = `453faff` ✅
+- `npm run build`: ✅ (309ms)
+- `pytest -q`: ✅ (120 passed)
+- `cargo check`: ✅
+
+### Task 0 — N14 review fixes ✅
+
+1. **`ctxPlayNext` multi order:** Fixed by iterating `[...targets].reverse()` so the first selected song ends up first in queue. Commit `81a4df7`.
+
+2. **Menu parity:** Right-click menu now includes Edit Song + Edit Tags (single-song only, opens dialogs). `⋯` overflow menu now includes Play Next + Add to Playlist. Both menus share the same action vocabulary. Commit `81a4df7`.
+
+3. **Toolbar gating:** Toolbar now only renders when `showSort=true` or `selectMode=true`. Compact/embedded SongTable instances (QueryBuilder, Folders) no longer show empty toolbar space. Commit `81a4df7`.
+
+4. **Ctrl/cmd-click auto-select mode:** First `ctrl/cmd+click` now auto-enters select mode, making the checkbox column and selection visible. `metaKey` threaded through `onToggleSelect` prop chain. Commit `81a4df7`.
+
+5. **Dead code audit:** `contextTagInputRef` is actually used (ref on inline tag input). `autoFocus` is the only focus mechanism. **Brief was wrong — both are in use, no removal needed.**
+
+**Commit:** `81a4df7`
+
+### Task 1 — Column registry + registry-driven rendering ✅
+
+**What changed:**
+- Created `frontend/src/components/songs/columns.tsx` — single source of truth for column definitions
+- `ColumnId` type: `'index' | 'title' | 'type' | 'duration' | 'artist' | 'album' | 'tags' | 'actions'`
+- `ColumnDef` interface: id, label, fixed, sortable, defaultWidth, minWidth, headerClassName, cellClassName, render function
+- `CellCtx` interface: all state + callbacks a cell render function needs
+- Fixed columns (always present, not hideable): `index`, `title`, `actions`
+- Toggleable columns: `type`, `duration`, `artist`, `album`, `tags`
+- `Type` column renders codec badge from `song.file_format` (e.g. `mp3` → `MP3` chip)
+- `SongRow` rewritten to accept `visibleColumns: ColumnDef[]` and map over them
+- `TableHeader` rewritten to map over `visibleColumns` for `<th>` rendering
+- `BASE_COLSPAN` replaced with computed `visibleColumns.length + drag + checkbox`
+- All existing cell patterns preserved: hover overlay, current-song gradient, truncation, album art
+- `SortField` exported from `SongTable.tsx` for registry use
+
+**Files:** `columns.tsx` (new), `SongRow.tsx` (rewritten), `SongTable.tsx` (refactored)
+**Commit:** `03744f6`
+
+### Task 2 — Per-page column persistence ✅
+
+**What changed:**
+- Created `frontend/src/stores/columnStore.ts` — Zustand store following `settingsStore` pattern
+- `ColumnContext` type: `'all-songs' | 'playlist' | 'album' | 'folder' | 'tags'`
+- Per-context config: `{ order: ColumnId[], hidden: ColumnId[], widths: Partial<Record<ColumnId, number>> }`
+- Persisted in localStorage under `aurora-cols-{context}` keys
+- **Migration safety:** drops unknown column ids, appends new registry columns, validates widths against `minWidth`
+- **Per-page defaults (R13):**
+  - `all-songs`: all columns visible
+  - `playlist`: trimmed — no Artist/Album/Type by default
+  - `album`: trimmed — Album redundant inside an album
+  - `folder`/`tags`: all columns visible
+- `SongTable` accepts `columnContext` prop, wired at all 8 call sites:
+  - `App.tsx` → `all-songs`
+  - `PlaylistDetail.tsx` → `playlist`
+  - `AlbumsView.tsx` → `album`
+  - `FoldersView.tsx` → `folder`
+  - `QueryBuilder.tsx` (×4) → `tags`
+
+**Files:** `columnStore.ts` (new), `SongTable.tsx`, `App.tsx`, `AlbumsView.tsx`, `FoldersView.tsx`, `PlaylistDetail.tsx`, `QueryBuilder.tsx`
+**Commit:** `bf8e846`
+
+### Task 3 — Column picker: show/hide + drag-reorder ✅
+
+**What changed:**
+- Created `frontend/src/components/songs/ColumnPicker.tsx`
+- "Columns" button in the toolbar (next to Sort dropdown)
+- Anchored popover panel (same pattern as context menu — fixed position, click-outside to close, Escape to close)
+- Lists toggleable columns with:
+  - Drag handle (native HTML5 drag, same pattern as playlist row reorder)
+  - Checkbox toggle for visibility
+  - Column label (dimmed when hidden)
+- Drag-reorder updates `order` in the store; toggles update `hidden`
+- "Reset to default" button at the bottom
+- Fixed columns (`index`, `title`, `actions`) don't appear in the picker
+
+**Files:** `ColumnPicker.tsx` (new), `SongTable.tsx`
+**Commit:** `47b87c5`
+
+### Task 4 — Column resize ✅
+
+**What changed:**
+- Table switched to `table-layout: fixed` with `<colgroup>` defining column widths
+- Widths come from store config (persisted) or registry defaults
+- `title` column has no explicit width — flexes to fill remaining space
+- Resize handles on each non-fixed `<th>` right edge (thin accent-colored div, visible on hover)
+- Mousedown starts tracking, mousemove updates width live, mouseup persists to store
+- Width clamped to `minWidth` from column definition
+- Cursor changes to `col-resize` during drag, `user-select: none` prevents text selection
+
+**🔎 CROSS-CHECK verdict:** `table-layout: fixed` + `@tanstack/react-virtual` spacer-based virtualization works correctly. Spacer `<tr>` elements use `colSpan={tableColspan}` which distributes width evenly across all columns. With `<colgroup>` defining explicit widths, the browser applies consistent column sizing to both spacer and content rows. No misalignment observed in build.
+
+**Files:** `SongTable.tsx`
+**Commit:** `f7e5cca`
+
+### Gates
+- `npm run build`: ✅ (330ms)
+- `pytest -q`: ✅ (120 passed)
+- `cargo check`: ✅
+
+### Done-means status
+
+| # | Criterion | Status |
+|---|-----------|--------|
+| 0 | N14 nits fixed: multi Play-Next order correct; menus reconciled; compact-toolbar gated; ctrl-click auto-enters select mode; dead code audit (brief was wrong) | ✅ |
+| 1 | Header + rows render from one column registry; default columns look identical to N14; Type column back; colspan computed | ✅ |
+| 2 | Order/visibility/widths persist per page context; playlist defaults trimmed; corrupt/old configs don't crash | ✅ |
+| 3 | Columns popover: show/hide + drag-reorder + reset; changes persist and reflect live | ✅ |
+| 4 | Resize works with table-layout: fixed + colgroup; widths persist; resize handle on hover | ✅ |
+| 5 | Handoff appended, gates green, PR open | ✅ |
+
+### 🔎 DAIKI CROSS-CHECK outcomes
+
+1. **Dead code audit (Task 0.5):** `contextTagInputRef` IS used (line 936 — ref on inline tag input in context menu). `autoFocus` on that input is the sole focus mechanism. Brief was wrong — neither is dead code.
+
+2. **table-layout: fixed + virtualizer (Task 4):** Spacer `<tr>` elements with `colSpan` distribute width evenly in fixed layout. With `<colgroup>` providing explicit widths, column sizing is consistent across spacer and content rows. No scroll jank or misalignment in the build output.
+
+3. **Resize handle scope:** Resize handles only appear on non-fixed columns (`type`, `duration`, `artist`, `album`, `tags`). Fixed columns (`index`, `title`, `actions`) are not resizable.
+
+### Commits
+```
+81a4df7 fix(songs): N14 review fixes — play-next order, menu parity, toolbar gating, auto-select mode
+03744f6 feat(songs): column registry with registry-driven rendering
+bf8e846 feat(stores): per-page column persistence with localStorage migration
+47b87c5 feat(songs): column picker with show/hide and drag-reorder
+f7e5cca feat(songs): column resize with table-layout fixed and persistent widths
+```
