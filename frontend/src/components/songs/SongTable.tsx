@@ -830,7 +830,7 @@ export function SongTable({
     <>
       <div
         ref={tableContainerRef}
-        className="w-full h-[calc(100vh-15rem)] overflow-auto aurora-fade-in bg-[var(--aurora-obsidian)]"
+        className="w-full h-[calc(100vh-15rem)] overflow-auto aurora-fade-in"
         onScroll={handleScroll}
       >
         {toolbar}
@@ -922,7 +922,7 @@ export function SongTable({
         </table>
 
         {/* Song count footer */}
-        <div className="sticky bottom-0 text-center py-2.5 text-[11px] text-[var(--aurora-text-tertiary)] bg-[var(--aurora-obsidian)] border-t border-[var(--aurora-rim-bright)] shadow-[0_-8px_16px_-8px_rgba(0,0,0,0.5)]">
+        <div className="sticky bottom-0 text-center py-2.5 text-[11px] text-[var(--aurora-text-tertiary)] bg-[var(--aurora-obsidian)]/70 backdrop-blur-md border-t border-[var(--aurora-rim-bright)] shadow-[0_-8px_16px_-8px_rgba(0,0,0,0.5)]">
           Showing {songs.length} of {totalCount.toLocaleString()}
           {hasMore && !isLoadingMore && (
             <Button
