@@ -347,6 +347,7 @@ export function FoldersView({ }: FoldersViewProps) {
 
               {/* Song table */}
               <SongTable
+              columnContext="folder"
                 songs={songs}
                 loading={songsLoading}
                 error={songsError}
