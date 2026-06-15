@@ -186,7 +186,7 @@ export const SongRow = memo(function SongRow({
 
         {/* Registry-driven cells */}
         {visibleColumns.map((col) => (
-          <td key={col.id} className={`relative ${col.cellClassName ?? ""}`}>
+          <td key={col.id} className={`relative overflow-hidden ${col.cellClassName ?? ""}`}>
             {col.render(song, cellCtx)}
           </td>
         ))}
