@@ -8,7 +8,12 @@
  *
  * Returns a CSS color string (rgb) suitable for glow/bleed effects,
  * or null if extraction fails.
+ *
+ * N19: Fetches image as blob via fetch() to avoid canvas taint from
+ * crossOrigin="anonymous" + mismatched Origin header in Tauri webview.
  */
+
+import { getAuroraToken } from "@/lib/api"
 
 const SAMPLE_SIZE = 32 // downscale to 32×32 for fast sampling
 
@@ -31,19 +36,27 @@ function hueBucket(r: number, g: number, b: number): number {
 
 /**
  * Extract the dominant color from an image URL.
- * Loads the image into an off-screen canvas, builds a hue histogram,
- * and returns the dominant saturated color with boosted brightness.
+ * Fetches as blob to avoid CORS canvas taint, then samples via hue histogram.
  */
 export async function extractCoverColor(imageUrl: string): Promise<string | null> {
+  let objectUrl: string | null = null
   try {
+    // Fetch as blob with auth header — avoids crossOrigin taint entirely.
+    // blob: URLs are same-origin, so getImageData() never throws SecurityError.
+    const token = getAuroraToken()
+    const headers: Record<string, string> = token ? { "X-Aurora-Token": token } : {}
+    const res = await fetch(imageUrl, { headers })
+    if (!res.ok) return null
+    const blob = await res.blob()
+    objectUrl = URL.createObjectURL(blob)
+
     const img = new Image()
-    img.crossOrigin = "anonymous"
     img.decoding = "async"
 
     const loaded = new Promise<void>((resolve, reject) => {
       img.onload = () => resolve()
       img.onerror = () => reject(new Error("Image load failed"))
-      img.src = imageUrl
+      img.src = objectUrl!
     })
 
     await loaded
@@ -86,8 +99,8 @@ export async function extractCoverColor(imageUrl: string): Promise<string | null
 
     // Pick the most-populated saturated bucket
     let best = buckets[0]
-    for (const b of buckets) {
-      if (b.count > best.count) best = b
+    for (const bucket of buckets) {
+      if (bucket.count > best.count) best = bucket
     }
 
     let r: number, g: number, b: number
@@ -115,5 +128,8 @@ export async function extractCoverColor(imageUrl: string): Promise<string | null
     return `rgb(${r}, ${g}, ${b})`
   } catch {
     return null
+  } finally {
+    // Clean up the object URL to avoid memory leaks
+    if (objectUrl) URL.revokeObjectURL(objectUrl)
   }
 }
