@@ -1,9 +1,10 @@
 import type { Song } from "@/types"
-import { formatDuration } from "@/lib/utils"
-import { AlbumArt } from "@/components/songs/AlbumArt"
-import { Equalizer } from "@/components/ui/Equalizer"
-import { Trash2, Tag as TagIcon, Pencil, ListPlus, Scissors, X, GripVertical, MoreHorizontal } from "lucide-react"
-import { AuroraPlayButton } from "@/components/player/AuroraPlayButton"
+import { GripVertical } from "lucide-react"
+import { useSongStore } from "@/stores/songStore"
+import { usePlayerStore } from "@/stores/playerStore"
+import { toast } from "@/lib/toast"
+import { useState, useCallback, useRef, memo } from "react"
+import { TagEditor } from "@/components/tags/TagEditor"
 import { EditSongDialog } from "@/components/songs/EditSongDialog"
 import {
   AlertDialog,
@@ -15,18 +16,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { useSongStore } from "@/stores/songStore"
-import { usePlayerStore } from "@/stores/playerStore"
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu"
-import { toast } from "@/lib/toast"
-import { useState, useCallback, useRef, memo } from "react"
-import { TagList } from "@/components/tags/TagList"
-import { TagEditor } from "@/components/tags/TagEditor"
+import type { ColumnDef, CellCtx } from "./columns"
 
 interface SongRowProps {
   song: Song
   index: number
   animIndex?: number
+  visibleColumns: ColumnDef[]
   onPlay?: (song: Song, index: number) => void
   isSelected?: boolean
   onToggleSelect?: (shiftKey: boolean, metaKey?: boolean) => void
@@ -49,7 +45,7 @@ interface SongRowProps {
 }
 
 export const SongRow = memo(function SongRow({
-  song, index, animIndex, onPlay, isSelected, onToggleSelect, onContextMenu: onContextMenuProp, selectMode,
+  song, index, animIndex, visibleColumns, onPlay, isSelected, onToggleSelect, onContextMenu: onContextMenuProp, selectMode,
   onPlayNext, onAddToPlaylist,
   onRemoveFromPlaylist, onTrim,
   isDraggable, isDragOver, onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd,
@@ -103,8 +99,28 @@ export const SongRow = memo(function SongRow({
   }
 
   const hasFile = song.file_path !== null
-
   const shouldStagger = animIndex !== undefined && animIndex < 16
+
+  // Build cell context for registry render functions
+  const cellCtx: CellCtx = {
+    isCurrentSong,
+    isCurrentlyPlaying,
+    isSelected: !!isSelected,
+    index,
+    hasFile,
+    selectMode: !!selectMode,
+    inQueue,
+    onPlay: handlePlay,
+    onToggleSelect: onToggleSelect ?? (() => {}),
+    onDelete: () => setDeleteDialogOpen(true),
+    onAddToQueue: handleAddToQueue,
+    onEditTags: () => setTagEditorOpen(true),
+    onEditSong: () => setEditDialogOpen(true),
+    onPlayNext,
+    onAddToPlaylist,
+    onTrim,
+    onRemoveFromPlaylist,
+  }
 
   return (
     <>
@@ -126,13 +142,13 @@ export const SongRow = memo(function SongRow({
           ...(isDragOver ? { borderTop: "2px solid var(--aurora-accent-interactive)" } : {}),
         }}
       >
-        {/* Drag handle cell (playlist mode) */}
+        {/* Drag handle cell (playlist mode — outside registry) */}
         {isDraggable && (
           <td className="px-1 py-2 w-6 text-center cursor-grab active:cursor-grabbing">
             <GripVertical className="h-3.5 w-3.5 text-[var(--aurora-text-tertiary)] opacity-0 group-hover:opacity-100 transition-opacity duration-150 mx-auto" />
           </td>
         )}
-        {/* Checkbox column (select mode only) */}
+        {/* Checkbox column (select mode only — outside registry) */}
         {selectMode && onToggleSelect && (
           <td
             className="relative px-2 py-2 w-10 text-center"
@@ -180,203 +196,12 @@ export const SongRow = memo(function SongRow({
           </td>
         )}
 
-        {/* # column / play indicator */}
-        <td
-          className={`relative px-4 py-2 w-12 text-center ${
-            isCurrentSong ? "" : "text-[var(--aurora-text-tertiary)]"
-          }`}
-        >
-          {/* Row-level hover background */}
-          <span
-            className={`absolute inset-0 transition-colors duration-150 pointer-events-none ${
-              isCurrentSong
-                ? ""
-                : "group-hover:bg-[var(--aurora-surface-hover)]"
-            }`}
-            style={
-              isCurrentSong
-                ? {
-                    background:
-                      "linear-gradient(to right, rgba(94,234,212,0.06) 0%, transparent 60%)",
-                  }
-                : undefined
-            }
-            aria-hidden="true"
-          />
-          {/* Static content (row number / equalizer) */}
-          <span className="relative z-10 flex items-center justify-center">
-            {isCurrentSong ? (
-              <Equalizer playing={isCurrentlyPlaying} />
-            ) : (
-              <span className="text-xs tabular-nums transition-opacity duration-150 group-hover:opacity-0 select-none">
-                {index + 1}
-              </span>
-            )}
-          </span>
-          {/* Circular play button — inset-0 flex overlay centers it in the cell
-              (avoids the td percentage-positioning bug), fades in on hover. */}
-          {!isCurrentSong && (
-            <span className="absolute inset-0 z-20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-              <AuroraPlayButton
-                variant="row"
-                isPlaying={false}
-                onClick={(e) => { e.stopPropagation(); handlePlay() }}
-                ariaLabel={`Play ${song.title}`}
-              />
-            </span>
-          )}
-        </td>
-
-        {/* Title / Artist + art thumbnail */}
-        <td className="relative px-4 py-2">
-          <span
-            className={`absolute inset-0 transition-colors duration-150 pointer-events-none ${
-              isCurrentSong ? "" : "group-hover:bg-[var(--aurora-surface-hover)]"
-            }`}
-            aria-hidden="true"
-          />
-          <div className="relative z-10 flex items-center gap-3 min-w-0">
-            <AlbumArt song={song} size="sm" className="aurora-rim" />
-            <div className="flex flex-col min-w-0">
-              <span
-                className={`truncate text-[14px] font-medium leading-tight ${
-                  isCurrentSong
-                    ? "text-white/90"
-                    : "text-[var(--aurora-text)]"
-                }`}
-              >
-                {song.title || "Untitled"}
-              </span>
-              <span className="truncate text-[12px] text-[var(--aurora-text-secondary)] mt-0.5">
-                {song.artist || "Unknown Artist"}
-                {song.featured_artists && song.featured_artists.length > 0 && (
-                  <span className="text-[var(--aurora-text-tertiary)]">
-                    {" "}feat. {song.featured_artists.join(", ")}
-                  </span>
-                )}
-              </span>
-            </div>
-          </div>
-        </td>
-
-        {/* Duration */}
-        <td className="relative px-4 py-2 w-20 text-[12px] text-[var(--aurora-text-secondary)] tabular-nums hidden lg:table-cell">
-          <span
-            className={`absolute inset-0 transition-colors duration-150 pointer-events-none ${
-              isCurrentSong ? "" : "group-hover:bg-[var(--aurora-surface-hover)]"
-            }`}
-            aria-hidden="true"
-          />
-          <span className="relative z-10 tabular-nums whitespace-nowrap">
-            {formatDuration(song.duration)}
-          </span>
-        </td>
-
-        {/* Artist */}
-        <td className="relative px-4 py-2 text-[13px] hidden lg:table-cell">
-          <span
-            className={`absolute inset-0 transition-colors duration-150 pointer-events-none ${
-              isCurrentSong ? "" : "group-hover:bg-[var(--aurora-surface-hover)]"
-            }`}
-            aria-hidden="true"
-          />
-          <span className="relative z-10 truncate text-[var(--aurora-text-secondary)]">
-            {song.artist || "Unknown Artist"}
-          </span>
-        </td>
-
-        {/* Album */}
-        <td className="relative px-4 py-2 text-[13px] hidden lg:table-cell">
-          <span
-            className={`absolute inset-0 transition-colors duration-150 pointer-events-none ${
-              isCurrentSong ? "" : "group-hover:bg-[var(--aurora-surface-hover)]"
-            }`}
-            aria-hidden="true"
-          />
-          <span className="relative z-10 truncate text-[var(--aurora-text-secondary)]">
-            {song.album || "—"}
-          </span>
-        </td>
-
-        {/* Tags */}
-        <td className="relative px-4 py-2 max-w-[200px]">
-          <span
-            className={`absolute inset-0 transition-colors duration-150 pointer-events-none ${
-              isCurrentSong ? "" : "group-hover:bg-[var(--aurora-surface-hover)]"
-            }`}
-            aria-hidden="true"
-          />
-          <div className="relative z-10">
-            <TagList tags={song.tags} />
-          </div>
-        </td>
-
-        {/* Actions */}
-        <td className="relative px-4 py-2 w-12">
-          <span
-            className={`absolute inset-0 transition-colors duration-150 pointer-events-none ${
-              isCurrentSong ? "" : "group-hover:bg-[var(--aurora-surface-hover)]"
-            }`}
-            aria-hidden="true"
-          />
-          <div className="relative z-10 flex items-center justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                className="aurora-focus h-7 w-7 rounded-md flex items-center justify-center text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-text)] hover:bg-white/[0.04] transition-colors duration-150"
-                aria-label="More actions"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <MoreHorizontal className="h-4 w-4" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" sideOffset={4}>
-                <DropdownMenuItem onClick={handlePlay}>
-                  <span className="w-4 h-4 flex items-center justify-center text-[var(--aurora-accent)]">▶</span>
-                  Play Now
-                </DropdownMenuItem>
-                {onPlayNext && (
-                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onPlayNext() }}>
-                    <span className="w-4 h-4 flex items-center justify-center text-[var(--aurora-text-secondary)]">↳</span>
-                    Play Next
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleAddToQueue(e as unknown as React.MouseEvent) }}>
-                  <ListPlus className="h-4 w-4" />
-                  {inQueue ? "Already in Queue" : "Add to Queue"}
-                </DropdownMenuItem>
-                {onAddToPlaylist && (
-                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onAddToPlaylist() }}>
-                    <ListPlus className="h-4 w-4" />
-                    Add to Playlist
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setTagEditorOpen(true) }}>
-                  <TagIcon className="h-4 w-4" />
-                  Edit Tags
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditDialogOpen(true) }}>
-                  <Pencil className="h-4 w-4" />
-                  Edit Song
-                </DropdownMenuItem>
-                {onTrim && (
-                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onTrim() }}>
-                    <Scissors className="h-4 w-4" />
-                    Trim
-                  </DropdownMenuItem>
-                )}
-                {onRemoveFromPlaylist && (
-                  <DropdownMenuItem variant="destructive" onClick={(e) => { e.stopPropagation(); onRemoveFromPlaylist() }}>
-                    <X className="h-4 w-4" />
-                    Remove from Playlist
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuItem variant="destructive" onClick={(e) => { e.stopPropagation(); setDeleteDialogOpen(true) }}>
-                  <Trash2 className="h-4 w-4" />
-                  Delete
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </td>
+        {/* Registry-driven cells */}
+        {visibleColumns.map((col) => (
+          <td key={col.id} className={`relative ${col.cellClassName ?? ""}`}>
+            {col.render(song, cellCtx)}
+          </td>
+        ))}
       </tr>
 
       {/* Delete confirmation */}
@@ -417,5 +242,3 @@ export const SongRow = memo(function SongRow({
     </>
   )
 })
-
-
