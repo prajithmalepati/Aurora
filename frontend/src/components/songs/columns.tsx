@@ -46,23 +46,6 @@ export interface ColumnDef {
   render: (song: Song, ctx: CellCtx) => React.ReactNode
 }
 
-// ── Hover overlay helper (matches existing pattern exactly) ──
-function HoverOverlay({ isCurrentSong }: { isCurrentSong: boolean }) {
-  return (
-    <span
-      className={`absolute inset-0 transition-colors duration-150 pointer-events-none ${
-        isCurrentSong ? "" : "group-hover:bg-[var(--aurora-surface-hover)]"
-      }`}
-      style={
-        isCurrentSong
-          ? { background: "linear-gradient(to right, rgba(94,234,212,0.06) 0%, transparent 60%)" }
-          : undefined
-      }
-      aria-hidden="true"
-    />
-  )
-}
-
 // ── Column registry ──
 export const COLUMN_REGISTRY: ColumnDef[] = [
   {
@@ -75,7 +58,6 @@ export const COLUMN_REGISTRY: ColumnDef[] = [
     cellClassName: "px-4 py-2 w-12 text-center",
     render: (song, ctx) => (
       <>
-        <HoverOverlay isCurrentSong={ctx.isCurrentSong} />
         <span className="relative z-10 flex items-center justify-center">
           {ctx.isCurrentSong ? (
             <Equalizer playing={ctx.isCurrentlyPlaying} />
@@ -108,7 +90,6 @@ export const COLUMN_REGISTRY: ColumnDef[] = [
     cellClassName: "px-4 py-2",
     render: (song, ctx) => (
       <>
-        <HoverOverlay isCurrentSong={ctx.isCurrentSong} />
         <div className="relative z-10 flex items-center gap-3 min-w-0">
           <AlbumArt song={song} size="sm" className="aurora-rim" />
           <div className="flex flex-col min-w-0">
@@ -139,9 +120,8 @@ export const COLUMN_REGISTRY: ColumnDef[] = [
     minWidth: 48,
     headerClassName: "hidden lg:table-cell",
     cellClassName: "relative px-4 py-2 text-[12px] hidden lg:table-cell",
-    render: (song, ctx) => (
+    render: (song, _ctx) => (
       <>
-        <HoverOverlay isCurrentSong={ctx.isCurrentSong} />
         <span className="relative z-10">
           {song.file_format ? (
             <span
@@ -169,9 +149,8 @@ export const COLUMN_REGISTRY: ColumnDef[] = [
     minWidth: 64,
     headerClassName: "w-20 hidden lg:table-cell",
     cellClassName: "relative px-4 py-2 w-20 text-[12px] text-[var(--aurora-text-secondary)] tabular-nums hidden lg:table-cell",
-    render: (_song, ctx) => (
+    render: (_song, _ctx) => (
       <>
-        <HoverOverlay isCurrentSong={ctx.isCurrentSong} />
         <span className="relative z-10 tabular-nums whitespace-nowrap">
           {formatDuration(_song.duration)}
         </span>
@@ -186,9 +165,8 @@ export const COLUMN_REGISTRY: ColumnDef[] = [
     minWidth: 100,
     headerClassName: "hidden lg:table-cell",
     cellClassName: "relative px-4 py-2 text-[13px] hidden lg:table-cell",
-    render: (song, ctx) => (
+    render: (song, _ctx) => (
       <>
-        <HoverOverlay isCurrentSong={ctx.isCurrentSong} />
         <span className="relative z-10 truncate text-[var(--aurora-text-secondary)]">
           {song.artist || "Unknown Artist"}
         </span>
@@ -203,9 +181,8 @@ export const COLUMN_REGISTRY: ColumnDef[] = [
     minWidth: 100,
     headerClassName: "hidden lg:table-cell",
     cellClassName: "relative px-4 py-2 text-[13px] hidden lg:table-cell",
-    render: (song, ctx) => (
+    render: (song, _ctx) => (
       <>
-        <HoverOverlay isCurrentSong={ctx.isCurrentSong} />
         <span className="relative z-10 truncate text-[var(--aurora-text-secondary)]">
           {song.album || "—"}
         </span>
@@ -219,9 +196,8 @@ export const COLUMN_REGISTRY: ColumnDef[] = [
     minWidth: 100,
     headerClassName: "max-w-[200px]",
     cellClassName: "relative px-4 py-2 max-w-[200px]",
-    render: (song, ctx) => (
+    render: (song, _ctx) => (
       <>
-        <HoverOverlay isCurrentSong={ctx.isCurrentSong} />
         <div className="relative z-10">
           <TagList tags={song.tags} />
         </div>
@@ -238,7 +214,6 @@ export const COLUMN_REGISTRY: ColumnDef[] = [
     cellClassName: "relative px-4 py-2 w-12",
     render: (_song, ctx) => (
       <>
-        <HoverOverlay isCurrentSong={ctx.isCurrentSong} />
         <div className="relative z-10 flex items-center justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-200">
           <DropdownMenu>
             <DropdownMenuTrigger

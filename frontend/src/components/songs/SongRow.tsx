@@ -134,12 +134,14 @@ export const SongRow = memo(function SongRow({
         onDragLeave={isDraggable && onDragLeave ? onDragLeave : undefined}
         onDrop={isDraggable && onDrop ? (e) => onDrop(e, song.id) : undefined}
         onDragEnd={isDraggable && onDragEnd ? onDragEnd : undefined}
-        className={`group relative transition-[opacity,border-color] duration-200 ${
+        className={`group relative transition-[opacity,border-color,background-color] duration-100 ${
           hasFile ? "cursor-pointer" : "cursor-not-allowed opacity-40"
-        } ${isSelected ? "bg-white/[0.04]" : ""} ${shouldStagger ? "song-row-enter" : ""} ${isDraggable && isDragOver ? "" : ""}`}
+        } ${isSelected ? "bg-white/[0.04]" : isCurrentSong ? "" : "hover:bg-[var(--aurora-surface-hover)]"} ${shouldStagger ? "song-row-enter" : ""}`}
         style={{
           ...(shouldStagger ? { animationDelay: `${animIndex! * 0.02}s` } : undefined),
           ...(isDragOver ? { borderTop: "2px solid var(--aurora-accent-interactive)" } : {}),
+          ...(isCurrentSong ? { background: "rgba(94,234,212,0.05)" } : {}),
+          ...(isCurrentSong && isSelected ? { boxShadow: "inset 0 0 0 1px rgba(94,234,212,0.08)" } : {}),
         }}
       >
         {/* Drag handle cell (playlist mode — outside registry) */}
@@ -154,20 +156,6 @@ export const SongRow = memo(function SongRow({
             className="relative px-2 py-2 w-10 text-center"
             onClick={(e) => e.stopPropagation()}
           >
-            <span
-              className={`absolute inset-0 transition-colors duration-150 pointer-events-none ${
-                isCurrentSong ? "" : isSelected ? "bg-white/[0.04]" : ""
-              }`}
-              style={
-                isCurrentSong
-                  ? {
-                      background:
-                        "linear-gradient(to right, rgba(94,234,212,0.06) 0%, transparent 60%)",
-                    }
-                  : undefined
-              }
-              aria-hidden="true"
-            />
             <span className="relative z-10 flex items-center justify-center">
               <button
                 type="button"
