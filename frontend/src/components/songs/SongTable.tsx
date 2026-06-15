@@ -16,7 +16,9 @@ import {
 } from "@/components/ui/dialog"
 import { toast } from "@/lib/toast"
 import { api } from "@/lib/api"
-import { Music, ChevronUp, ChevronDown, AlertTriangle, RefreshCw, ListPlus, Tag as TagIcon, X, Trash2 } from "lucide-react"
+import { EditSongDialog } from "@/components/songs/EditSongDialog"
+import { TagEditor } from "@/components/tags/TagEditor"
+import { Music, ChevronUp, ChevronDown, AlertTriangle, RefreshCw, ListPlus, Tag as TagIcon, X, Trash2, Pencil } from "lucide-react"
 
 interface SongTableProps {
   songs: Song[]
@@ -389,6 +391,9 @@ export function SongTable({
   // Bulk dialog state
   const [bulkTagDialogOpen, setBulkTagDialogOpen] = useState(false)
   const [addToPlaylistDialogOpen, setAddToPlaylistDialogOpen] = useState(false)
+  // Single-song edit dialog state (for right-click Edit Song / Edit Tags)
+  const [contextEditSong, setContextEditSong] = useState<Song | null>(null)
+  const [contextTagEditorOpen, setContextTagEditorOpen] = useState(false)
 
   // Only clear selection when songs are replaced (first ID changes), not when appended
   const firstIdRef = useRef<number | null>(songs[0]?.id ?? null)
@@ -427,7 +432,11 @@ export function SongTable({
     lastSelectedIndexRef.current = null
   }
 
-  const toggleSelectOne = useCallback((songId: number, shiftKey: boolean) => {
+  const toggleSelectOne = useCallback((songId: number, shiftKey: boolean, metaKey?: boolean) => {
+    // Auto-enter select mode on ctrl/cmd-click so selection is visible
+    if (!selectMode && metaKey) {
+      setSelectMode(true)
+    }
     setSelectedIds((prev) => {
       const next = new Set(prev)
       if (shiftKey && lastSelectedIndexRef.current !== null) {
@@ -450,7 +459,7 @@ export function SongTable({
     })
     const index = songs.findIndex((s) => s.id === songId)
     lastSelectedIndexRef.current = index
-  }, [songs])
+  }, [songs, selectMode])
 
   const selectedIdsArray = useMemo(() => Array.from(selectedIds), [selectedIds])
 
@@ -490,7 +499,8 @@ export function SongTable({
   const ctxPlayNext = useCallback(() => {
     const targets = contextTargets.filter((s) => s.file_path)
     if (targets.length === 0) { toast.error("No playable files"); return }
-    for (const s of targets) usePlayerStore.getState().playNext(s)
+    // Insert in reverse so the first selected song ends up first in queue
+    for (const s of [...targets].reverse()) usePlayerStore.getState().playNext(s)
     toast.success(`${targets.length === 1 ? `"${targets[0].title}" will play next` : `${targets.length} songs queued next`}`)
     closeContextMenu()
   }, [contextTargets, closeContextMenu])
@@ -552,6 +562,7 @@ export function SongTable({
   const sortDropdownValue = `${sortField}-${sortOrder}`
 
   const toolbar = (
+    (showSort || selectMode) ? (
     <div className="flex items-center justify-between px-4 pb-2 shrink-0">
       {/* Select mode toggle */}
       <button
@@ -594,6 +605,7 @@ export function SongTable({
       </div>
       )}
     </div>
+    ) : null
   )
 
   // ── Virtualizer ──
@@ -795,9 +807,11 @@ export function SongTable({
                   onPlay={onPlay}
                   animIndex={virtualRow.index < 16 ? virtualRow.index : undefined}
                   isSelected={selectedIds.has(song.id)}
-                  onToggleSelect={(shiftKey) => toggleSelectOne(song.id, shiftKey)}
+                  onToggleSelect={(shiftKey, metaKey) => toggleSelectOne(song.id, shiftKey, metaKey)}
                   onContextMenu={(e) => handleContextMenuEvent(e, song, virtualRow.index)}
                   selectMode={selectMode}
+                  onPlayNext={() => usePlayerStore.getState().playNext(song)}
+                  onAddToPlaylist={() => { closeContextMenu(); setAddToPlaylistDialogOpen(true) }}
                   onRemoveFromPlaylist={onRemoveFromPlaylist ? () => onRemoveFromPlaylist(song) : undefined}
                   onTrim={onTrim ? () => onTrim(song.id) : undefined}
                   isDraggable={isDraggable}
@@ -979,6 +993,27 @@ export function SongTable({
               </>
             )}
 
+            {/* Edit Tags / Edit Song (single-song actions) */}
+            {contextTargets.length === 1 && (
+              <>
+                <div className="h-px my-1 bg-[var(--aurora-rim)]" />
+                <button
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-[13px] text-[var(--aurora-text)] hover:bg-[var(--aurora-surface-hover)] transition-colors text-left"
+                  onClick={() => { const song = contextTargets[0]; closeContextMenu(); setContextEditSong(song) }}
+                >
+                  <Pencil className="h-3.5 w-3.5 text-[var(--aurora-text-secondary)]" />
+                  Edit Song
+                </button>
+                <button
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-[13px] text-[var(--aurora-text)] hover:bg-[var(--aurora-surface-hover)] transition-colors text-left"
+                  onClick={() => { closeContextMenu(); setContextTagEditorOpen(true) }}
+                >
+                  <TagIcon className="h-3.5 w-3.5 text-[var(--aurora-text-secondary)]" />
+                  Edit Tags
+                </button>
+              </>
+            )}
+
             {/* Delete */}
             <div className="h-px my-1 bg-[var(--aurora-rim)]" />
             <button
@@ -990,6 +1025,26 @@ export function SongTable({
             </button>
           </div>
         </>
+      )}
+
+      {/* Edit Song dialog (from right-click context menu) */}
+      {contextEditSong && (
+        <EditSongDialog
+          song={contextEditSong}
+          open={true}
+          onOpenChange={(open) => { if (!open) setContextEditSong(null) }}
+        />
+      )}
+
+      {/* Tag Editor dialog (from right-click context menu) */}
+      {contextMenu && contextTagEditorOpen && (
+        <TagEditor
+          songId={contextMenu.song.id}
+          songTitle={contextMenu.song.title}
+          currentTags={contextMenu.song.tags}
+          open={contextTagEditorOpen}
+          onOpenChange={setContextTagEditorOpen}
+        />
       )}
     </>
   )

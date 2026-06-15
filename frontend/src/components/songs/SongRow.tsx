@@ -29,9 +29,12 @@ interface SongRowProps {
   animIndex?: number
   onPlay?: (song: Song, index: number) => void
   isSelected?: boolean
-  onToggleSelect?: (shiftKey: boolean) => void
+  onToggleSelect?: (shiftKey: boolean, metaKey?: boolean) => void
   onContextMenu?: (e: React.MouseEvent) => void
   selectMode?: boolean
+  // Actions from parent (context-menu parity)
+  onPlayNext?: () => void
+  onAddToPlaylist?: () => void
   // Playlist-mode optional props
   onRemoveFromPlaylist?: () => void
   onTrim?: () => void
@@ -47,6 +50,7 @@ interface SongRowProps {
 
 export const SongRow = memo(function SongRow({
   song, index, animIndex, onPlay, isSelected, onToggleSelect, onContextMenu: onContextMenuProp, selectMode,
+  onPlayNext, onAddToPlaylist,
   onRemoveFromPlaylist, onTrim,
   isDraggable, isDragOver, onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd,
 }: SongRowProps) {
@@ -88,7 +92,7 @@ export const SongRow = memo(function SongRow({
     if (!song.file_path) return
     // In select mode or when ctrl/meta held, toggle selection instead of playing
     if (selectMode || e?.metaKey || e?.ctrlKey) {
-      if (onToggleSelect) onToggleSelect(e?.shiftKey ?? false)
+      if (onToggleSelect) onToggleSelect(e?.shiftKey ?? false, e?.metaKey || e?.ctrlKey)
       return
     }
     if (onPlay) {
@@ -329,10 +333,22 @@ export const SongRow = memo(function SongRow({
                   <span className="w-4 h-4 flex items-center justify-center text-[var(--aurora-accent)]">▶</span>
                   Play Now
                 </DropdownMenuItem>
+                {onPlayNext && (
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onPlayNext() }}>
+                    <span className="w-4 h-4 flex items-center justify-center text-[var(--aurora-text-secondary)]">↳</span>
+                    Play Next
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleAddToQueue(e as unknown as React.MouseEvent) }}>
                   <ListPlus className="h-4 w-4" />
                   {inQueue ? "Already in Queue" : "Add to Queue"}
                 </DropdownMenuItem>
+                {onAddToPlaylist && (
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onAddToPlaylist() }}>
+                    <ListPlus className="h-4 w-4" />
+                    Add to Playlist
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setTagEditorOpen(true) }}>
                   <TagIcon className="h-4 w-4" />
                   Edit Tags
