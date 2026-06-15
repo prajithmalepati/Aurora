@@ -80,7 +80,7 @@ def get_folder_tree():
     from collections import Counter
     dir_counts: Counter[str] = Counter()
     for row in rows:
-        fp = row["file_path"]
+        fp = row["file_path"].replace("\\", "/")
         d = os.path.dirname(fp)
         if d:
             dir_counts[d] += 1
@@ -143,21 +143,28 @@ def get_folder_songs(
         # For non-recursive, exclude files with deeper paths
         deeper_pattern = escaped_path + "/%/%" if not recursive else None
 
-        query = SONG_SELECT_QUERY + " WHERE s.file_path LIKE ?"
+        # Normalize file_path to forward-slash with leading / for cross-platform matching
+        # (Windows stores backslash paths; tree always builds /-prefixed node paths)
+        # char(92) = backslash; REPLACE normalizes to '/', LTRIM+'/' ensures leading slash
+        norm_col = "('/' || LTRIM(REPLACE(s.file_path, char(92), '/'), '/'))"
+        like_clause = norm_col + " LIKE ? ESCAPE char(92)"
+        not_like_clause = norm_col + " NOT LIKE ? ESCAPE char(92)"
+
+        query = SONG_SELECT_QUERY + " WHERE " + like_clause
 
         params: list = [like_pattern]
 
         if not recursive and deeper_pattern is not None:
-            query += " AND s.file_path NOT LIKE ? ESCAPE '\\'"
+            query += " AND " + not_like_clause
             params.append(deeper_pattern)
 
         query += " GROUP BY s.id ORDER BY s.title COLLATE NOCASE, s.id ASC"
 
         # Count query
-        count_query = COUNT_SONG_QUERY + " WHERE s.file_path LIKE ?"
+        count_query = COUNT_SONG_QUERY + " WHERE " + like_clause
         count_params: list = [like_pattern]
         if not recursive and deeper_pattern is not None:
-            count_query += " AND s.file_path NOT LIKE ? ESCAPE '\\'"
+            count_query += " AND " + not_like_clause
             count_params.append(deeper_pattern)
 
         if limit is not None and limit > 0:
