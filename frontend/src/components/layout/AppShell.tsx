@@ -63,7 +63,7 @@ export function AppShell({ children }: AppShellProps) {
         <ErrorBoundary>{children.sidebar}</ErrorBoundary>
       </div>
 
-      <motion.div layout transition={{ type: "spring", stiffness: 400, damping: 33 }} className="relative z-10 grid grid-cols-1 md:grid-cols-[240px_1fr] grid-rows-[1fr_auto] h-screen overflow-hidden">
+      <motion.div className="relative z-10 grid grid-cols-1 md:grid-cols-[240px_1fr] grid-rows-[1fr_auto] h-screen overflow-hidden">
         {/* Desktop sidebar */}
         <motion.div layout="position" className="hidden md:block overflow-y-auto aurora-keyline-right">
           <ErrorBoundary>{children.sidebar}</ErrorBoundary>

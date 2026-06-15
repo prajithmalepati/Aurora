@@ -181,10 +181,10 @@ function App() {
         }>
           <motion.div
             key={view.kind === "playlist" ? `playlist-${view.playlistId}` : view.kind}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={{ type: "spring", stiffness: 280, damping: 30 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15, ease: "easeOut" }}
           >
             {content}
           </motion.div>

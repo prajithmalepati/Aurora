@@ -183,7 +183,7 @@ export const COLUMN_REGISTRY: ColumnDef[] = [
     cellClassName: "relative px-4 py-2 text-[13px] hidden lg:table-cell",
     render: (song, _ctx) => (
       <>
-        <span className="relative z-10 truncate text-[var(--aurora-text-secondary)]">
+        <span className="relative z-10 inline-block truncate max-w-full text-[var(--aurora-text-secondary)]">
           {song.album || "—"}
         </span>
       </>
