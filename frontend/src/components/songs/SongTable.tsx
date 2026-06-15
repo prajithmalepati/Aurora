@@ -7,7 +7,7 @@ import { useTagStore } from "@/stores/tagStore"
 import { useColumnStore, type ColumnContext } from "@/stores/columnStore"
 import type { Song } from "@/types"
 import { SongRow } from "./SongRow"
-import { getColumn, type ColumnDef, DEFAULT_ORDER } from "./columns"
+import { getColumn, type ColumnId, type ColumnDef, DEFAULT_ORDER } from "./columns"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Input } from "@/components/ui/input"
 import {
@@ -101,10 +101,42 @@ interface TableHeaderProps {
   isIndeterminate: boolean
   onSelectAll: () => void
   isDraggable?: boolean
+  onResize?: (id: ColumnId, width: number) => void
+  columnWidths?: Partial<Record<ColumnId, number>>
 }
 
-function TableHeader({ visibleColumns, sortField, sortOrder, onSort, showCheckbox, isAllSelected, isIndeterminate, onSelectAll, isDraggable }: TableHeaderProps) {
+function TableHeader({ visibleColumns, sortField, sortOrder, onSort, showCheckbox, isAllSelected, isIndeterminate, onSelectAll, isDraggable, onResize, columnWidths }: TableHeaderProps) {
   const SortArrow = sortOrder === "asc" ? ChevronUp : ChevronDown
+
+  // Resize state
+  const resizingRef = useRef<{ id: ColumnId; startX: number; startWidth: number } | null>(null)
+
+  const handleResizeStart = useCallback((e: React.MouseEvent, col: ColumnDef) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const startWidth = columnWidths?.[col.id] ?? col.defaultWidth ?? 100
+    resizingRef.current = { id: col.id, startX: e.clientX, startWidth }
+
+    const handleMouseMove = (ev: MouseEvent) => {
+      if (!resizingRef.current) return
+      const delta = ev.clientX - resizingRef.current.startX
+      const newWidth = Math.max(resizingRef.current.startWidth + delta, col.minWidth ?? 48)
+      onResize?.(resizingRef.current.id, newWidth)
+    }
+
+    const handleMouseUp = () => {
+      resizingRef.current = null
+      document.removeEventListener("mousemove", handleMouseMove)
+      document.removeEventListener("mouseup", handleMouseUp)
+      document.body.style.cursor = ""
+      document.body.style.userSelect = ""
+    }
+
+    document.addEventListener("mousemove", handleMouseMove)
+    document.addEventListener("mouseup", handleMouseUp)
+    document.body.style.cursor = "col-resize"
+    document.body.style.userSelect = "none"
+  }, [columnWidths, onResize])
 
   return (
     <thead>
@@ -125,10 +157,11 @@ function TableHeader({ visibleColumns, sortField, sortOrder, onSort, showCheckbo
         {visibleColumns.map((col) => {
           const active = col.sortable && sortField === col.sortable
           const isSortable = !!col.sortable
+          const isResizable = !!onResize && !col.fixed
           return (
             <th
               key={col.id}
-              className={`${HEADER_CLASS} ${isSortable ? "cursor-pointer select-none hover:text-[var(--aurora-text-secondary)]" : ""} ${active ? "text-[var(--aurora-text-secondary)]" : ""} ${col.headerClassName ?? ""}`}
+              className={`${HEADER_CLASS} ${isSortable ? "cursor-pointer select-none hover:text-[var(--aurora-text-secondary)]" : ""} ${active ? "text-[var(--aurora-text-secondary)]" : ""} ${col.headerClassName ?? ""} relative`}
               onClick={isSortable ? () => onSort(col.sortable!) : undefined}
             >
               {isSortable ? (
@@ -138,6 +171,15 @@ function TableHeader({ visibleColumns, sortField, sortOrder, onSort, showCheckbo
                 </span>
               ) : (
                 col.label
+              )}
+              {/* Resize handle */}
+              {isResizable && (
+                <div
+                  className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize opacity-0 hover:opacity-100 transition-opacity"
+                  style={{ background: "var(--aurora-accent-interactive)" }}
+                  onMouseDown={(e) => handleResizeStart(e, col)}
+                  onClick={(e) => e.stopPropagation()}
+                />
               )}
             </th>
           )
@@ -377,6 +419,11 @@ export function SongTable({
   // Column state from persistent store (or defaults if no context)
   const columnContext = _columnContext ?? "all-songs"
   const columnConfig = useColumnStore((s) => s.getConfig(columnContext))
+  const setColumnWidth = useColumnStore((s) => s.setWidth)
+
+  const handleResize = useCallback((id: ColumnId, width: number) => {
+    setColumnWidth(columnContext, id, width)
+  }, [columnContext, setColumnWidth])
 
   // Compute visible columns from store config
   const visibleColumns = useMemo(() => {
@@ -787,7 +834,17 @@ export function SongTable({
         onScroll={handleScroll}
       >
         {toolbar}
-        <table className="w-full border-separate border-spacing-0">
+        <table className="w-full border-separate border-spacing-0" style={{ tableLayout: "fixed" }}>
+          <colgroup>
+            {isDraggable && <col style={{ width: 24 }} />}
+            {selectMode && <col style={{ width: 40 }} />}
+            {visibleColumns.map((col) => (
+              <col
+                key={col.id}
+                style={{ width: col.id === "title" ? undefined : (columnConfig.widths[col.id] ?? col.defaultWidth) }}
+              />
+            ))}
+          </colgroup>
           <TableHeader
             visibleColumns={visibleColumns}
             sortField={sortField}
@@ -798,6 +855,8 @@ export function SongTable({
             isIndeterminate={!isAllSelected && selectedIds.size > 0}
             onSelectAll={toggleSelectAll}
             isDraggable={isDraggable}
+            onResize={handleResize}
+            columnWidths={columnConfig.widths}
           />
           <tbody key={animKey}>
             {/* Top spacer */}
