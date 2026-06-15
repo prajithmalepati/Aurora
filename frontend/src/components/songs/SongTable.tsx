@@ -829,7 +829,7 @@ export function SongTable({
     <>
       <div
         ref={tableContainerRef}
-        className="w-full h-[calc(100vh-15rem)] overflow-auto aurora-fade-in"
+        className="w-full h-[calc(100vh-15rem)] overflow-auto aurora-fade-in bg-[var(--aurora-obsidian)]"
         onScroll={handleScroll}
       >
         {toolbar}
