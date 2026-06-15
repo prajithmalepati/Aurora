@@ -26,6 +26,7 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
 
   const [historyOpen, setHistoryOpen] = useState(false)
   const [dragIndex, setDragIndex] = useState<number | null>(null)
+  const dragStartRef = useRef<number | null>(null)
   const dragOverIndex = useRef<number | null>(null)
 
   // Up Next = songs after current
@@ -52,20 +53,25 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
   // Drag handlers
   const handleDragStart = useCallback((index: number) => {
     setDragIndex(index)
+    dragStartRef.current = index
   }, [])
 
   const handleDragOver = useCallback((e: React.DragEvent, index: number) => {
     e.preventDefault()
+    e.dataTransfer.dropEffect = "move"
     dragOverIndex.current = index
   }, [])
 
   const handleDragEnd = useCallback(() => {
-    if (dragIndex !== null && dragOverIndex.current !== null && dragIndex !== dragOverIndex.current) {
-      reorderQueue(dragIndex, dragOverIndex.current)
+    const from = dragStartRef.current
+    const to = dragOverIndex.current
+    if (from !== null && to !== null && from !== to) {
+      reorderQueue(from, to)
     }
     setDragIndex(null)
+    dragStartRef.current = null
     dragOverIndex.current = null
-  }, [dragIndex, reorderQueue])
+  }, [reorderQueue])
 
   const handleSongClick = (song: Song) => {
     playSong(song, queue)
