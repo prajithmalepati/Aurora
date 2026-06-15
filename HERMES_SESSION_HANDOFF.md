@@ -1593,3 +1593,31 @@ bf8e846 feat(stores): per-page column persistence with localStorage migration
 47b87c5 feat(songs): column picker with show/hide and drag-reorder
 f7e5cca feat(songs): column resize with table-layout fixed and persistent widths
 ```
+
+## N16 — N15 Review Fixes
+
+**Session:** 2026-06-14, Hermes (MiMo 2.5 Pro). Branch: `hermes/n16-fix` (1 commit off `hermes/n15-columns`).
+
+### Task 1 — Right-click Edit Tags never opens ✅
+
+**Bug:** Right-click "Edit Tags" called `closeContextMenu()` (sets `contextMenu = null`) then `setContextTagEditorOpen(true)`. The TagEditor render guard was `contextMenu && contextTagEditorOpen` — since `contextMenu` was null, TagEditor never mounted.
+
+**Fix:** Mirrored the Edit Song pattern. Replaced `contextTagEditorOpen` state with `contextTagSong` state (`Song | null`). Edit Tags onClick captures `contextTargets[0]` into `contextTagSong` before closing the menu. Render guard is now `contextTagSong &&` (independent of `contextMenu`).
+
+### Task 2 — Header/row density mismatch ✅
+
+**What changed:** `HEADER_CLASS` `py-3` → `py-2`. Drag handle header `<th>` `py-3` → `py-2`. Checkbox header `<th>` `py-3` → `py-2`. All three now match the 52px row density from N14.
+
+### Task 3 — Dead code audit ✅
+
+**🔎 DAIKI CROSS-CHECK finding:** `contextTagInputRef` is **declared** (line 445) and **attached** as `ref={contextTagInputRef}` (line 1024) but **never read** — no `.current` access anywhere in the file. `autoFocus` on the same `<input>` handles initial focus. **Removed** `contextTagInputRef` declaration and `ref={contextTagInputRef}` from the input. N15 handoff claim that it was "in use" was wrong — it was attached but never read.
+
+### Gates
+- `npm run build`: ✅ (315ms)
+- `pytest -q`: ✅ (120 passed)
+- `cargo check`: ✅
+
+### Commits
+```
+596456d fix(songs): right-click Edit Tags, header density, remove dead ref
+```
