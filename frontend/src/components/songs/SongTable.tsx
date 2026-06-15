@@ -48,7 +48,7 @@ interface SongTableProps {
 }
 
 const HEADER_CLASS =
-  "px-4 py-3 text-left label-micro text-[10px] text-[var(--aurora-text-tertiary)] font-medium"
+  "px-4 py-2 text-left label-micro text-[10px] text-[var(--aurora-text-tertiary)] font-medium"
 
 export type SortField = "title" | "artist" | "album" | "duration" | "created_at"
 
@@ -142,10 +142,10 @@ function TableHeader({ visibleColumns, sortField, sortOrder, onSort, showCheckbo
     <thead>
       <tr>
         {isDraggable && (
-          <th className="px-1 py-3 w-6" />
+          <th className="px-1 py-2 w-6" />
         )}
         {showCheckbox && (
-          <th className="px-2 py-3 w-10 text-center">
+          <th className="px-2 py-2 w-10 text-center">
             <Checkbox
               checked={isAllSelected}
               indeterminate={isIndeterminate}
@@ -442,14 +442,13 @@ export function SongTable({
     x: number; y: number; song: Song; songIndex: number
   } | null>(null)
   const [contextTagSearch, setContextTagSearch] = useState("")
-  const contextTagInputRef = useRef<HTMLInputElement>(null)
 
   // Bulk dialog state
   const [bulkTagDialogOpen, setBulkTagDialogOpen] = useState(false)
   const [addToPlaylistDialogOpen, setAddToPlaylistDialogOpen] = useState(false)
   // Single-song edit dialog state (for right-click Edit Song / Edit Tags)
   const [contextEditSong, setContextEditSong] = useState<Song | null>(null)
-  const [contextTagEditorOpen, setContextTagEditorOpen] = useState(false)
+  const [contextTagSong, setContextTagSong] = useState<Song | null>(null)
 
   // Only clear selection when songs are replaced (first ID changes), not when appended
   const firstIdRef = useRef<number | null>(songs[0]?.id ?? null)
@@ -1021,7 +1020,6 @@ export function SongTable({
                 <span className="text-[13px] text-[var(--aurora-text)]">Add Tag</span>
               </div>
               <input
-                ref={contextTagInputRef}
                 value={contextTagSearch}
                 onChange={(e) => setContextTagSearch(e.target.value)}
                 onKeyDown={(e) => {
@@ -1080,7 +1078,7 @@ export function SongTable({
                 </button>
                 <button
                   className="w-full flex items-center gap-2.5 px-3.5 py-2 text-[13px] text-[var(--aurora-text)] hover:bg-[var(--aurora-surface-hover)] transition-colors text-left"
-                  onClick={() => { closeContextMenu(); setContextTagEditorOpen(true) }}
+                  onClick={() => { const song = contextTargets[0]; closeContextMenu(); setContextTagSong(song) }}
                 >
                   <TagIcon className="h-3.5 w-3.5 text-[var(--aurora-text-secondary)]" />
                   Edit Tags
@@ -1111,13 +1109,13 @@ export function SongTable({
       )}
 
       {/* Tag Editor dialog (from right-click context menu) */}
-      {contextMenu && contextTagEditorOpen && (
+      {contextTagSong && (
         <TagEditor
-          songId={contextMenu.song.id}
-          songTitle={contextMenu.song.title}
-          currentTags={contextMenu.song.tags}
-          open={contextTagEditorOpen}
-          onOpenChange={setContextTagEditorOpen}
+          songId={contextTagSong.id}
+          songTitle={contextTagSong.title}
+          currentTags={contextTagSong.tags}
+          open={true}
+          onOpenChange={(open) => { if (!open) setContextTagSong(null) }}
         />
       )}
     </>
