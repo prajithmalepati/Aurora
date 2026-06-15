@@ -6,6 +6,7 @@ import { usePlaylistStore } from "@/stores/playlistStore"
 import { useTagStore } from "@/stores/tagStore"
 import type { Song } from "@/types"
 import { SongRow } from "./SongRow"
+import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Input } from "@/components/ui/input"
 import {
@@ -751,15 +752,17 @@ export function SongTable({ songs, loading = false, error = null, onPlay, animKe
         </table>
 
         {/* Song count footer */}
-        <div className="sticky bottom-0 text-center py-2.5 text-[11px] text-[var(--aurora-text-tertiary)] bg-[var(--aurora-obsidian)]/90 backdrop-blur-sm border-t border-[var(--aurora-rim)]">
+        <div className="sticky bottom-0 text-center py-2.5 text-[11px] text-[var(--aurora-text-tertiary)] bg-[var(--aurora-obsidian)] border-t border-[var(--aurora-rim-bright)] shadow-[0_-8px_16px_-8px_rgba(0,0,0,0.5)]">
           Showing {songs.length} of {totalCount.toLocaleString()}
           {hasMore && !isLoadingMore && (
-            <button
+            <Button
+              size="sm"
+              variant="outline"
               onClick={fetchMore}
-              className="ml-2 text-[var(--aurora-accent)] hover:underline cursor-pointer"
+              className="ml-2"
             >
               Load more
-            </button>
+            </Button>
           )}
         </div>
       </div>
