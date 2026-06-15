@@ -6,6 +6,7 @@ import { usePlaylistStore } from "@/stores/playlistStore"
 import { useTagStore } from "@/stores/tagStore"
 import type { Song } from "@/types"
 import { SongRow } from "./SongRow"
+import { getColumn, type ColumnId, type ColumnDef, DEFAULT_ORDER, DEFAULT_HIDDEN } from "./columns"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Input } from "@/components/ui/input"
 import {
@@ -46,7 +47,7 @@ interface SongTableProps {
 const HEADER_CLASS =
   "px-4 py-3 text-left label-micro text-[10px] text-[var(--aurora-text-tertiary)] font-medium"
 
-type SortField = "title" | "artist" | "album" | "duration" | "created_at"
+export type SortField = "title" | "artist" | "album" | "duration" | "created_at"
 
 // ── Checkbox (matches PlaylistDetail pattern) ──
 
@@ -88,6 +89,7 @@ function Checkbox({ checked, indeterminate, onChange, ariaLabel }: CheckboxProps
 // ── TableHeader ──
 
 interface TableHeaderProps {
+  visibleColumns: ColumnDef[]
   sortField: SortField
   sortOrder: "asc" | "desc"
   onSort: (field: SortField) => void
@@ -98,31 +100,8 @@ interface TableHeaderProps {
   isDraggable?: boolean
 }
 
-function TableHeader({ sortField, sortOrder, onSort, showCheckbox, isAllSelected, isIndeterminate, onSelectAll, isDraggable }: TableHeaderProps) {
+function TableHeader({ visibleColumns, sortField, sortOrder, onSort, showCheckbox, isAllSelected, isIndeterminate, onSelectAll, isDraggable }: TableHeaderProps) {
   const SortArrow = sortOrder === "asc" ? ChevronUp : ChevronDown
-
-  function SortableTh({
-    field,
-    label,
-    className,
-  }: {
-    field: SortField
-    label: string
-    className?: string
-  }) {
-    const active = sortField === field
-    return (
-      <th
-        className={`${HEADER_CLASS} cursor-pointer select-none hover:text-[var(--aurora-text-secondary)] ${active ? "text-[var(--aurora-text-secondary)]" : ""} ${className ?? ""}`}
-        onClick={() => onSort(field)}
-      >
-        <span className="inline-flex items-center gap-0.5">
-          {label}
-          {active && <SortArrow className="h-2.5 w-2.5" />}
-        </span>
-      </th>
-    )
-  }
 
   return (
     <thead>
@@ -140,13 +119,26 @@ function TableHeader({ sortField, sortOrder, onSort, showCheckbox, isAllSelected
             />
           </th>
         )}
-        <th className={`${HEADER_CLASS} w-12 text-center`}>#</th>
-        <SortableTh field="title" label="Title" />
-        <SortableTh field="duration" label="Duration" className="w-20 hidden lg:table-cell" />
-        <SortableTh field="artist" label="Artist" className="hidden lg:table-cell" />
-        <SortableTh field="album" label="Album" className="hidden lg:table-cell" />
-        <th className={`${HEADER_CLASS} max-w-[200px]`}>Tags</th>
-        <th className={`${HEADER_CLASS} w-32 text-right`}>Actions</th>
+        {visibleColumns.map((col) => {
+          const active = col.sortable && sortField === col.sortable
+          const isSortable = !!col.sortable
+          return (
+            <th
+              key={col.id}
+              className={`${HEADER_CLASS} ${isSortable ? "cursor-pointer select-none hover:text-[var(--aurora-text-secondary)]" : ""} ${active ? "text-[var(--aurora-text-secondary)]" : ""} ${col.headerClassName ?? ""}`}
+              onClick={isSortable ? () => onSort(col.sortable!) : undefined}
+            >
+              {isSortable ? (
+                <span className="inline-flex items-center gap-0.5">
+                  {col.label}
+                  {active && <SortArrow className="h-2.5 w-2.5" />}
+                </span>
+              ) : (
+                col.label
+              )}
+            </th>
+          )
+        })}
       </tr>
     </thead>
   )
@@ -354,14 +346,12 @@ function AddToPlaylistDialog({ open, onOpenChange, songIds, onComplete }: AddToP
 
 const ROW_HEIGHT = 52
 const OVERSCAN = 10
-const BASE_COLSPAN = 8
 
 export function SongTable({
   songs, loading = false, error = null, onPlay, animKey, showSort = true, disableInfiniteScroll = false,
   onRemoveFromPlaylist, onTrim,
   isDraggable, dragId, dragOverId, onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd,
 }: SongTableProps) {
-  const tableColspan = BASE_COLSPAN + (isDraggable ? 1 : 0)
   const sortField = useSongStore((state) => state.sortField)
   const sortOrder = useSongStore((state) => state.sortOrder)
   const sortSongs = useSongStore((state) => state.sortSongs)
@@ -380,6 +370,20 @@ export function SongTable({
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const lastSelectedIndexRef = useRef<number | null>(null)
   const [selectMode, setSelectMode] = useState(false)
+
+  // Column state (registry-driven)
+  const [columnOrder] = useState<ColumnId[]>(DEFAULT_ORDER)
+  const [hiddenColumns] = useState<Set<ColumnId>>(new Set(DEFAULT_HIDDEN))
+
+  // Compute visible columns from registry + order + hidden
+  const visibleColumns = useMemo(() => {
+    return columnOrder
+      .filter((id) => !hiddenColumns.has(id))
+      .map((id) => getColumn(id))
+  }, [columnOrder, hiddenColumns])
+
+  // Compute colspan from visible columns + drag + checkbox
+  const tableColspan = visibleColumns.length + (isDraggable ? 1 : 0) + (selectMode ? 1 : 0)
 
   // Context menu state (lifted from SongRow — selection-aware)
   const [contextMenu, setContextMenu] = useState<{
@@ -644,6 +648,7 @@ export function SongTable({
         {toolbar}
         <table className="w-full border-separate border-spacing-0">
           <TableHeader
+            visibleColumns={visibleColumns}
             sortField={sortField}
             sortOrder={sortOrder}
             onSort={handleColumnSort}
@@ -698,6 +703,7 @@ export function SongTable({
         {toolbar}
         <table className="w-full border-separate border-spacing-0">
           <TableHeader
+            visibleColumns={visibleColumns}
             sortField={sortField}
             sortOrder={sortOrder}
             onSort={handleColumnSort}
@@ -740,6 +746,7 @@ export function SongTable({
         {toolbar}
         <table className="w-full border-separate border-spacing-0">
           <TableHeader
+            visibleColumns={visibleColumns}
             sortField={sortField}
             sortOrder={sortOrder}
             onSort={handleColumnSort}
@@ -776,6 +783,7 @@ export function SongTable({
         {toolbar}
         <table className="w-full border-separate border-spacing-0">
           <TableHeader
+            visibleColumns={visibleColumns}
             sortField={sortField}
             sortOrder={sortOrder}
             onSort={handleColumnSort}
@@ -804,6 +812,7 @@ export function SongTable({
                   key={song.id}
                   song={song}
                   index={virtualRow.index}
+                  visibleColumns={visibleColumns}
                   onPlay={onPlay}
                   animIndex={virtualRow.index < 16 ? virtualRow.index : undefined}
                   isSelected={selectedIds.has(song.id)}
