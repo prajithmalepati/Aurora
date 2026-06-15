@@ -4,9 +4,10 @@ import { useSongStore } from "@/stores/songStore"
 import { usePlayerStore } from "@/stores/playerStore"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { useTagStore } from "@/stores/tagStore"
+import { useColumnStore, type ColumnContext } from "@/stores/columnStore"
 import type { Song } from "@/types"
 import { SongRow } from "./SongRow"
-import { getColumn, type ColumnId, type ColumnDef, DEFAULT_ORDER, DEFAULT_HIDDEN } from "./columns"
+import { getColumn, type ColumnDef, DEFAULT_ORDER } from "./columns"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Input } from "@/components/ui/input"
 import {
@@ -28,6 +29,7 @@ interface SongTableProps {
   onPlay?: (song: Song, index: number) => void
   animKey?: number
   showSort?: boolean
+  columnContext?: ColumnContext
   /** When true, songs are the complete set (no pagination). Disables "Load more" and shows songs.length as total. */
   disableInfiniteScroll?: boolean
   // Playlist-mode optional props (passed through to SongRow)
@@ -348,7 +350,7 @@ const ROW_HEIGHT = 52
 const OVERSCAN = 10
 
 export function SongTable({
-  songs, loading = false, error = null, onPlay, animKey, showSort = true, disableInfiniteScroll = false,
+  songs, loading = false, error = null, onPlay, animKey, showSort = true, columnContext: _columnContext, disableInfiniteScroll = false,
   onRemoveFromPlaylist, onTrim,
   isDraggable, dragId, dragOverId, onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd,
 }: SongTableProps) {
@@ -371,16 +373,18 @@ export function SongTable({
   const lastSelectedIndexRef = useRef<number | null>(null)
   const [selectMode, setSelectMode] = useState(false)
 
-  // Column state (registry-driven)
-  const [columnOrder] = useState<ColumnId[]>(DEFAULT_ORDER)
-  const [hiddenColumns] = useState<Set<ColumnId>>(new Set(DEFAULT_HIDDEN))
+  // Column state from persistent store (or defaults if no context)
+  const columnContext = _columnContext ?? "all-songs"
+  const columnConfig = useColumnStore((s) => s.getConfig(columnContext))
 
-  // Compute visible columns from registry + order + hidden
+  // Compute visible columns from store config
   const visibleColumns = useMemo(() => {
-    return columnOrder
-      .filter((id) => !hiddenColumns.has(id))
+    const order = columnConfig.order.length > 0 ? columnConfig.order : DEFAULT_ORDER
+    const hidden = new Set(columnConfig.hidden)
+    return order
+      .filter((id) => !hidden.has(id))
       .map((id) => getColumn(id))
-  }, [columnOrder, hiddenColumns])
+  }, [columnConfig])
 
   // Compute colspan from visible columns + drag + checkbox
   const tableColspan = visibleColumns.length + (isDraggable ? 1 : 0) + (selectMode ? 1 : 0)

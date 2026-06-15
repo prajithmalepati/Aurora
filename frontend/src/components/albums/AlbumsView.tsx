@@ -349,6 +349,7 @@ function AlbumDetail({ album, loading, error, onBack, onPlaySong }: AlbumDetailP
         </div>
       ) : (
         <SongTable
+            columnContext="album"
           songs={album.songs}
           loading={false}
           error={null}

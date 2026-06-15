@@ -641,6 +641,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
           </div>
         )}
         <SongTable
+            columnContext="playlist"
           songs={songsForTable}
           loading={false}
           error={null}
