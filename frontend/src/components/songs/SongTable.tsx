@@ -20,6 +20,7 @@ import { toast } from "@/lib/toast"
 import { api } from "@/lib/api"
 import { EditSongDialog } from "@/components/songs/EditSongDialog"
 import { TagEditor } from "@/components/tags/TagEditor"
+import { ColumnPicker } from "./ColumnPicker"
 import { Music, ChevronUp, ChevronDown, AlertTriangle, RefreshCw, ListPlus, Tag as TagIcon, X, Trash2, Pencil } from "lucide-react"
 
 interface SongTableProps {
@@ -610,6 +611,7 @@ export function SongTable({
           <option value="created_at-desc">Newest first</option>
           <option value="created_at-asc">Oldest first</option>
         </select>
+        <ColumnPicker columnContext={columnContext} />
       </div>
       )}
     </div>
