@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react"
 import { GripVertical, RotateCcw, Columns3 } from "lucide-react"
 import { useColumnStore, type ColumnContext } from "@/stores/columnStore"
-import { TOGGLEABLE_COLUMN_IDS, getColumn, type ColumnId } from "./columns"
+import { TOGGLEABLE_COLUMN_IDS, DEFAULT_ORDER, getColumn, type ColumnId } from "./columns"
 
 interface ColumnPickerProps {
   columnContext: ColumnContext
@@ -65,36 +65,17 @@ export function ColumnPicker({ columnContext }: ColumnPickerProps) {
     const sourceId = dragIdRef.current
     if (!sourceId || sourceId === targetId) return
 
-    // Reorder: move sourceId to targetId's position
-    const currentOrder = config.order.length > 0 ? config.order : TOGGLEABLE_COLUMN_IDS
-    const without = currentOrder.filter((id) => id !== sourceId)
-    const targetIndex = without.indexOf(targetId)
-    if (targetIndex === -1) return
-    const newOrder = [...without.slice(0, targetIndex), sourceId, ...without.slice(targetIndex)]
+    // Operate on the full current order array directly
+    const currentOrder = config.order.length > 0 ? [...config.order] : [...DEFAULT_ORDER]
+    const sourceIndex = currentOrder.indexOf(sourceId)
+    const targetIndex = currentOrder.indexOf(targetId)
+    if (sourceIndex === -1 || targetIndex === -1) return
 
-    // Keep fixed columns at their positions, only reorder toggleable ones
-    const fixed = ["index", "title", "actions"] as ColumnId[]
-    const toggleable = newOrder.filter((id) => !fixed.includes(id))
-    // Maintain the original full order with fixed columns in place
-    const fullOrderFixed: ColumnId[] = []
-    let ti = 0
-    for (const id of config.order.length > 0 ? config.order : ["index", "title", ...TOGGLEABLE_COLUMN_IDS, "actions"] as ColumnId[]) {
-      if (id === "index" || id === "title" || id === "actions") {
-        fullOrderFixed.push(id)
-      } else {
-        if (ti < toggleable.length) {
-          fullOrderFixed.push(toggleable[ti])
-          ti++
-        }
-      }
-    }
-    // Append any remaining toggleable columns
-    while (ti < toggleable.length) {
-      fullOrderFixed.push(toggleable[ti])
-      ti++
-    }
+    // Splice: remove source, insert at target's position
+    currentOrder.splice(sourceIndex, 1)
+    currentOrder.splice(targetIndex, 0, sourceId)
 
-    setOrder(columnContext, fullOrderFixed)
+    setOrder(columnContext, currentOrder)
     dragIdRef.current = null
     setDragOverId(null)
   }, [config.order, columnContext, setOrder])
