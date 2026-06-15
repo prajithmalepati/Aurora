@@ -1031,6 +1031,29 @@ input[type="text"]:focus-visible {
   background: rgba(255, 255, 255, 0.18) !important;
   background-clip: padding-box;
 }
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ============================================================
+   TEXT SELECTION — disabled globally for desktop polish
+   ============================================================ */
+body {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Re-enable selection for genuinely editable/copyable content */
+input, textarea, [contenteditable="true"], [contenteditable=""] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Allow selection in code blocks and preformatted text */
+pre, code {
+  -webkit-user-select: text;
+  user-select: text;
+}
 
 /* ============================================================
    SELECTION
