@@ -137,7 +137,7 @@ export function ColumnPicker({ columnContext }: ColumnPickerProps) {
                   onDragOver={(e) => handleDragOver(e, id)}
                   onDrop={(e) => handleDrop(e, id)}
                   onDragEnd={handleDragEnd}
-                  className={`flex items-center gap-2 px-3.5 py-1.5 text-[12px] cursor-grab active:cursor-grabbing transition-colors duration-150 ${
+                  className={`flex items-center gap-2 px-3.5 py-1.5 text-[12px] cursor-grab select-none active:cursor-grabbing transition-colors duration-150 ${
                     isDragging ? "opacity-40" : ""
                   } ${isDragOver ? "border-t-2 border-[var(--aurora-accent-interactive)]" : ""}`}
                 >

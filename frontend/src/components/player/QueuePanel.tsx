@@ -51,7 +51,9 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
   }
 
   // Drag handlers
-  const handleDragStart = useCallback((index: number) => {
+  const handleDragStart = useCallback((e: React.DragEvent, index: number) => {
+    e.dataTransfer.effectAllowed = "move"
+    e.dataTransfer.setData("text/plain", String(index))
     setDragIndex(index)
     dragStartRef.current = index
   }, [])
@@ -67,6 +69,17 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
     const to = dragOverIndex.current
     if (from !== null && to !== null && from !== to) {
       reorderQueue(from, to)
+    }
+    setDragIndex(null)
+    dragStartRef.current = null
+    dragOverIndex.current = null
+  }, [reorderQueue])
+
+  const handleDrop = useCallback((e: React.DragEvent, index: number) => {
+    e.preventDefault()
+    const from = dragStartRef.current
+    if (from !== null && from !== index) {
+      reorderQueue(from, index)
     }
     setDragIndex(null)
     dragStartRef.current = null
@@ -186,7 +199,7 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
                           return (
                             <div
                               key={`${song.id}-${actualIndex}`}
-                              className={`group flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors cursor-pointer active:bg-white/[0.03] ${
+                              className={`group flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors cursor-pointer select-none active:bg-white/[0.03] ${
                                 isDragging ? "opacity-50" : ""
                               }`}
                               style={{
@@ -195,8 +208,9 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
                                   : undefined,
                               }}
                               draggable
-                              onDragStart={() => handleDragStart(actualIndex)}
+                              onDragStart={(e) => handleDragStart(e, actualIndex)}
                               onDragOver={(e) => handleDragOver(e, actualIndex)}
+                              onDrop={(e) => handleDrop(e, actualIndex)}
                               onDragEnd={handleDragEnd}
                               onClick={() => handleSongClick(song)}
                             >
