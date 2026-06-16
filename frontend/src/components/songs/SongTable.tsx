@@ -184,7 +184,7 @@ function TableHeader({ visibleColumns, sortField, sortOrder, onSort, showCheckbo
               {/* Resize handle */}
               {isResizable && (
                 <div
-                  className="absolute right-0 top-0 bottom-0 w-[6px] cursor-col-resize opacity-0 group-hover/th:opacity-60 hover:!opacity-100 transition-opacity z-10"
+                  className="absolute right-0 top-0 bottom-0 w-[6px] cursor-col-resize opacity-0 pointer-events-none group-hover/th:opacity-60 group-hover/th:pointer-events-auto hover:!opacity-100 transition-opacity z-10"
                   style={{ background: "var(--aurora-accent-interactive)" }}
                   onMouseDown={(e) => handleResizeStart(e, col)}
                   onClick={(e) => e.stopPropagation()}

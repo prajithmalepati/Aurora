@@ -1,5 +1,6 @@
 """Playlists router."""
 import json
+import logging
 import re
 import sqlite3
 from pathlib import Path
@@ -18,6 +19,7 @@ import io
 from app.services.file_scanner import extract_dominant_colors
 
 router = APIRouter(tags=["playlists"])
+logger = logging.getLogger(__name__)
 
 
 def _backfill_dominant_color(playlist_id: int, image_url: str | None, dominant_color: str | None, dominant_color_2: str | None) -> tuple[str | None, str | None]:
@@ -43,8 +45,8 @@ def _backfill_dominant_color(playlist_id: int, image_url: str | None, dominant_c
                 )
                 conn.commit()
             return dc, dc2
-    except Exception:
-        pass  # non-fatal — skip this playlist
+    except Exception as e:
+        logger.warning("Backfill dominant_color failed for playlist %s: %s", playlist_id, e)
     return None, None
 
 def _get_utc_now() -> str:
@@ -755,6 +757,8 @@ def add_song_to_playlist(playlist_id: int, song_add: PlaylistSongAdd):
             "crossfade_enabled": row["crossfade_enabled"],
             "crossfade_duration_s": row["crossfade_duration_s"],
             "song_count": song_count,
+            "dominant_color": row["dominant_color"],
+            "dominant_color_2": row["dominant_color_2"],
             "songs": songs,
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
