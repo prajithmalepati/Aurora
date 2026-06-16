@@ -57,6 +57,8 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
   const tagsError = useTagStore((state) => state.error)
   const setQuery = useFilterStore((state) => state.setQuery)
   const setIsQuickTagView = useFilterStore((state) => state.setIsQuickTagView)
+  const isQuickTagView = useFilterStore((state) => state.isQuickTagView)
+  const filterQuery = useFilterStore((state) => state.query)
 
   const handleTagClick = (tagName: string) => {
     const term = `"${tagName}"`
@@ -107,7 +109,7 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
           <NavItem
             icon={<SlidersHorizontal className="h-4 w-4" strokeWidth={1.5} />}
             label="Mix"
-            active={isActive({ kind: "filter" })}
+            active={isActive({ kind: "filter" }) && !isQuickTagView}
             onClick={() => {
               setIsQuickTagView(false)
               onViewChange({ kind: "filter" })
@@ -233,6 +235,7 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
                     key={tag.id}
                     name={tag.name}
                     count={tag.song_count}
+                    active={isQuickTagView && currentView.kind === "filter" && filterQuery === `"${tag.name}"`}
                     onClick={() => handleTagClick(tag.name)}
                   />
                 ))}
@@ -337,24 +340,39 @@ function FooterAction({ icon, label, active, onClick }: FooterActionProps) {
 interface TagSidebarItemProps {
   name: string
   count: number
+  active?: boolean
   onClick: () => void
 }
 
-function TagSidebarItem({ name, count, onClick }: TagSidebarItemProps) {
+function TagSidebarItem({ name, count, active, onClick }: TagSidebarItemProps) {
   return (
     <button
       onClick={onClick}
-      className="group relative w-full flex items-center gap-2 px-3 py-[6px] rounded-md text-left text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] transition-colors duration-150 active:bg-white/[0.03]"
+      className={`group relative w-full flex items-center gap-2 px-3 py-[6px] rounded-md text-left transition-colors duration-150 active:bg-white/[0.03] ${
+        active
+          ? "text-[var(--aurora-text)] bg-white/[0.05]"
+          : "text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)]"
+      }`}
     >
+      {/* Active indicator — matches NavItem's layoutId pattern */}
+      {active && (
+        <span
+          className="absolute inset-0 rounded-md pointer-events-none"
+          style={{ background: "var(--aurora-surface)" }}
+          aria-hidden="true"
+        />
+      )}
       <span
-        className="absolute inset-0 rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none"
+        className={`absolute inset-0 rounded-md transition-opacity duration-150 pointer-events-none ${
+          active ? "opacity-0" : "opacity-0 group-hover:opacity-100"
+        }`}
         style={{ background: "var(--aurora-surface-hover)" }}
         aria-hidden="true"
       />
       <span
         className="relative z-10 w-[4px] h-[4px] rounded-full flex-shrink-0"
         style={{
-          background: "var(--aurora-muted)",
+          background: active ? "var(--aurora-accent-interactive)" : "var(--aurora-muted)",
         }}
         aria-hidden="true"
       />
