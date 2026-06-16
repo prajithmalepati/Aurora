@@ -18,7 +18,7 @@ import {
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { useColumnStore, type ColumnContext } from "@/stores/columnStore"
-import { TOGGLEABLE_COLUMN_IDS, getColumn, type ColumnId } from "./columns"
+import { TOGGLEABLE_COLUMN_IDS, DEFAULT_ORDER, FIXED_COLUMN_IDS, getColumn, type ColumnId } from "./columns"
 
 // ── Sortable item ──────────────────────────────────────────────────
 function SortableColumnItem({
@@ -151,12 +151,12 @@ export function ColumnPicker({ columnContext }: ColumnPickerProps) {
 
       const newToggleable = arrayMove(orderedIds, oldIndex, newIndex)
 
-      // Rebuild full order: keep non-toggleable in place, replace toggleable section
-      const nonToggleable = config.order.filter(
-        (id) => !TOGGLEABLE_COLUMN_IDS.includes(id as ColumnId)
+      // Rebuild full order: walk DEFAULT_ORDER, pin fixed columns to their
+      // canonical slots, fill toggleable slots with newToggleable in order.
+      let t = 0
+      const fullOrder = DEFAULT_ORDER.map((id) =>
+        FIXED_COLUMN_IDS.includes(id) ? id : newToggleable[t++]
       ) as ColumnId[]
-      // Merge: all toggleable in new order + non-toggleable appended
-      const fullOrder = [...newToggleable, ...nonToggleable]
       setOrder(columnContext, fullOrder)
     },
     [orderedIds, config.order, columnContext, setOrder]

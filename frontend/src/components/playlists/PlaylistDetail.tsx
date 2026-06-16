@@ -152,8 +152,9 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
   // Server-stored image URL (comes back from the API on every fetchPlaylistDetail)
   const heroImage = activePlaylist?.image_url ? withToken(`${getBaseUrl()}${activePlaylist.image_url}`) : null
 
-  // Use backend-computed dominant_color (same as songs) — no client canvas extraction.
-  const heroGlow = activePlaylist?.dominant_color ?? fallbackGlow
+  // Use backend-computed dominant_color only as fallback (no cover image).
+  // When a cover exists, the IMAGE itself is the bleed (always matches).
+  const heroGlow = heroImage ? null : fallbackGlow
 
   // Neutral dark gradient for the hero tile — no teal/violet bias.
   // If the playlist has a custom accent colour we let a whisper of it through.
@@ -404,23 +405,60 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
     <div className="aurora-view-enter">
       {/* ── HERO HEADER ── */}
       <div className="relative px-4 pt-6 pb-6 sm:px-10 sm:pt-10 sm:pb-8 overflow-hidden">
-        {/* Background halo derived from playlist art */}
-        <div
-          className="absolute inset-0 opacity-60 pointer-events-none"
-          style={{
-            background: `radial-gradient(ellipse 700px 400px at 18% 0%, ${heroGlow} 0%, transparent 65%)`,
-          }}
-          aria-hidden="true"
-        />
+        {/* Background bleed: blurred cover image when available, procedural fallback otherwise */}
+        {heroImage ? (
+          <div
+            className="absolute inset-0 pointer-events-none overflow-hidden"
+            aria-hidden="true"
+          >
+            <img
+              src={heroImage}
+              alt=""
+              className="absolute -inset-[20%] w-[140%] h-[140%] object-cover blur-[60px] opacity-[0.35]"
+              style={{
+                maskImage: "radial-gradient(ellipse 700px 400px at 18% 0%, black 0%, transparent 65%)",
+                WebkitMaskImage: "radial-gradient(ellipse 700px 400px at 18% 0%, black 0%, transparent 65%)",
+              }}
+            />
+          </div>
+        ) : (
+          <div
+            className="absolute inset-0 opacity-60 pointer-events-none"
+            style={{
+              background: `radial-gradient(ellipse 700px 400px at 18% 0%, ${heroGlow} 0%, transparent 65%)`,
+            }}
+            aria-hidden="true"
+          />
+        )}
         <div className="relative flex flex-wrap items-end gap-4 sm:gap-7">
           {/* Hero art tile */}
           <div
-            className="w-[96px] h-[96px] sm:w-[168px] sm:h-[168px] rounded-xl flex-shrink-0 aurora-rim overflow-hidden flex items-center justify-center text-3xl sm:text-5xl"
+            className="relative w-[96px] h-[96px] sm:w-[168px] sm:h-[168px] rounded-xl flex-shrink-0 aurora-rim overflow-hidden flex items-center justify-center text-3xl sm:text-5xl"
             style={{
               background: heroImage || showArtGrid ? undefined : heroTileGradient,
-              boxShadow: `0 20px 60px -20px ${heroGlow}, inset 0 0 0 1px var(--aurora-rim)`,
             }}
           >
+            {/* Glow layer: blurred cover behind tile when image exists */}
+            {heroImage && (
+              <div
+                className="absolute -inset-4 -z-10 rounded-xl overflow-hidden"
+                aria-hidden="true"
+              >
+                <img
+                  src={heroImage}
+                  alt=""
+                  className="w-full h-full object-cover blur-[20px] opacity-40 scale-150"
+                />
+              </div>
+            )}
+            <div
+              className="absolute inset-0 rounded-xl pointer-events-none"
+              style={{
+                boxShadow: heroImage
+                  ? "inset 0 0 0 1px var(--aurora-rim), 0 20px 60px -20px rgba(0,0,0,0.6)"
+                  : `0 20px 60px -20px ${heroGlow}, inset 0 0 0 1px var(--aurora-rim)`,
+              }}
+            />
             {heroImage ? (
               <img src={heroImage} alt="" className="w-full h-full object-cover" />
             ) : showArtGrid ? (
