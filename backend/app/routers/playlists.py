@@ -15,9 +15,37 @@ from app.serializers import song_row_to_dict
 from app.paths import PLAYLIST_IMAGES_DIR
 from PIL import Image
 import io
+from app.services.file_scanner import extract_dominant_colors
 
 router = APIRouter(tags=["playlists"])
 
+
+def _backfill_dominant_color(playlist_id: int, image_url: str | None, dominant_color: str | None, dominant_color_2: str | None) -> tuple[str | None, str | None]:
+    """Lazy backfill: if image_url exists but dominant_color is NULL, read the stored
+    cover file, extract colors, persist, and return them.  Returns (dominant_color, dominant_color_2)."""
+    if not image_url or dominant_color:
+        return dominant_color, dominant_color_2  # nothing to do or already has color
+
+    # Resolve file path from image_url  (/api/playlist-images/123.jpg -> PLAYLIST_IMAGES_DIR/123.jpg)
+    filename = image_url.rsplit("/", 1)[-1] if "/" in image_url else image_url
+    file_path = PLAYLIST_IMAGES_DIR / filename
+    if not file_path.exists():
+        return None, None
+
+    try:
+        data = file_path.read_bytes()
+        dc, dc2 = extract_dominant_colors(data)
+        if dc:
+            with get_db_ctx() as conn:
+                conn.execute(
+                    "UPDATE playlists SET dominant_color = ?, dominant_color_2 = ? WHERE id = ?",
+                    (dc, dc2, playlist_id),
+                )
+                conn.commit()
+            return dc, dc2
+    except Exception:
+        pass  # non-fatal — skip this playlist
+    return None, None
 
 def _get_utc_now() -> str:
     """Return current UTC timestamp in ISO format."""
@@ -44,7 +72,6 @@ async def upload_playlist_image(playlist_id: int, file: UploadFile = File(...)):
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid or corrupt image file")
     # Extract dominant colors (same pipeline as songs)
-    from app.services.file_scanner import extract_dominant_colors
     dominant_color, dominant_color_2 = extract_dominant_colors(data)
 
     with get_db_ctx() as conn:
@@ -193,6 +220,8 @@ def list_playlists():
                 p.crossfade_enabled,
                 p.crossfade_duration_s,
                 COUNT(ps.song_id) as song_count,
+                p.dominant_color,
+                p.dominant_color_2,
                 p.created_at,
                 p.updated_at
             FROM playlists p
@@ -204,23 +233,26 @@ def list_playlists():
         cursor.execute(query)
         rows = cursor.fetchall()
 
-    data = [
-        PlaylistResponse(
-            id=row["id"],
-            name=row["name"],
-            color=row["color"],
-            emoji=row["emoji"],
-            image_url=row["image_url"],
-            crossfade_enabled=row["crossfade_enabled"],
-            crossfade_duration_s=row["crossfade_duration_s"],
-            song_count=row["song_count"],
-            dominant_color=row["dominant_color"],
-            dominant_color_2=row["dominant_color_2"],
-            created_at=row["created_at"],
-            updated_at=row["updated_at"],
+    data = []
+    for row in rows:
+        # Lazy backfill: extract dominant_color from stored cover if missing
+        dc, dc2 = _backfill_dominant_color(row["id"], row["image_url"], row["dominant_color"], row["dominant_color_2"])
+        data.append(
+            PlaylistResponse(
+                id=row["id"],
+                name=row["name"],
+                color=row["color"],
+                emoji=row["emoji"],
+                image_url=row["image_url"],
+                crossfade_enabled=row["crossfade_enabled"],
+                crossfade_duration_s=row["crossfade_duration_s"],
+                song_count=row["song_count"],
+                dominant_color=dc,
+                dominant_color_2=dc2,
+                created_at=row["created_at"],
+                updated_at=row["updated_at"],
+            )
         )
-        for row in rows
-    ]
     
     return {
         "data": data,
@@ -456,7 +488,10 @@ def get_playlist(playlist_id: int):
 
     if not row:
         raise HTTPException(status_code=404, detail="Playlist not found")
-    
+
+    # Lazy backfill: extract dominant_color from stored cover if missing
+    dc, dc2 = _backfill_dominant_color(row["id"], row["image_url"], row["dominant_color"], row["dominant_color_2"])
+
     # Fetch songs with tags ordered by position
     with get_db_ctx() as conn:
         cursor = conn.cursor()
@@ -482,8 +517,8 @@ def get_playlist(playlist_id: int):
             "crossfade_enabled": row["crossfade_enabled"],
             "crossfade_duration_s": row["crossfade_duration_s"],
             "song_count": song_count,
-            "dominant_color": row["dominant_color"],
-            "dominant_color_2": row["dominant_color_2"],
+            "dominant_color": dc,
+            "dominant_color_2": dc2,
             "songs": songs,
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
