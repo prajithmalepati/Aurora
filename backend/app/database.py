@@ -221,7 +221,11 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
         if version <= current:
             continue
         for stmt in stmts:
-            conn.execute(stmt)
+            try:
+                conn.execute(stmt)
+            except sqlite3.OperationalError as e:
+                if "duplicate column" not in str(e):
+                    raise
         conn.execute(f"PRAGMA user_version = {version}")
 
     conn.commit()
