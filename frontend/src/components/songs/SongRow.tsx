@@ -17,6 +17,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import type { ColumnDef, CellCtx } from "./columns"
+import { useSortable } from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
 
 interface SongRowProps {
   song: Song
@@ -34,21 +36,15 @@ interface SongRowProps {
   // Playlist-mode optional props
   onRemoveFromPlaylist?: () => void
   onTrim?: () => void
-  // Drag-and-drop
+  // Drag-and-drop (dnd-kit)
   isDraggable?: boolean
-  isDragOver?: boolean
-  onDragStart?: (e: React.DragEvent, songId: number) => void
-  onDragOver?: (e: React.DragEvent, songId: number) => void
-  onDragLeave?: () => void
-  onDrop?: (e: React.DragEvent, songId: number) => void
-  onDragEnd?: (e: React.DragEvent) => void
 }
 
 export const SongRow = memo(function SongRow({
   song, index, animIndex, visibleColumns, onPlay, isSelected, onToggleSelect, onContextMenu: onContextMenuProp, selectMode,
   onPlayNext, onAddToPlaylist,
   onRemoveFromPlaylist, onTrim,
-  isDraggable, isDragOver, onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd,
+  isDraggable,
 }: SongRowProps) {
   const deleteSong = useSongStore((state) => state.deleteSong)
   const playSong = usePlayerStore((state) => state.playSong)
@@ -66,6 +62,24 @@ export const SongRow = memo(function SongRow({
   const [tagEditorOpen, setTagEditorOpen] = useState(false)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const rowRef = useRef<HTMLTableRowElement>(null)
+
+  // dnd-kit sortable (only active when isDraggable)
+  const {
+    attributes,
+    listeners,
+    setNodeRef: setSortableRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: song.id, disabled: !isDraggable })
+
+  const sortableStyle: React.CSSProperties = isDraggable
+    ? {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.4 : 1,
+      }
+    : {}
 
   const handleDelete = async () => {
     setDeleteDialogOpen(false)
@@ -122,31 +136,35 @@ export const SongRow = memo(function SongRow({
     onRemoveFromPlaylist,
   }
 
+  // Merge refs (rowRef + sortable ref)
+  const mergedRef = (el: HTMLTableRowElement | null) => {
+    rowRef.current = el
+    if (isDraggable) setSortableRef(el)
+  }
+
   return (
     <>
       <tr
-        ref={rowRef}
+        ref={mergedRef}
         onClick={(e) => handlePlay(e)}
         onContextMenu={onContextMenuProp}
-        draggable={!!isDraggable}
-        onDragStart={isDraggable && onDragStart ? (e) => onDragStart(e, song.id) : undefined}
-        onDragOver={isDraggable && onDragOver ? (e) => onDragOver(e, song.id) : undefined}
-        onDragLeave={isDraggable && onDragLeave ? onDragLeave : undefined}
-        onDrop={isDraggable && onDrop ? (e) => onDrop(e, song.id) : undefined}
-        onDragEnd={isDraggable && onDragEnd ? onDragEnd : undefined}
         className={`group relative transition-[opacity,border-color,background-color] duration-100 ${
           hasFile ? "cursor-pointer" : "cursor-not-allowed opacity-40"
         } ${isSelected ? "bg-white/[0.04]" : isCurrentSong ? "" : "hover:bg-[var(--aurora-surface-hover)]"} ${shouldStagger ? "song-row-enter" : ""}`}
         style={{
+          ...sortableStyle,
           ...(shouldStagger ? { animationDelay: `${animIndex! * 0.02}s` } : undefined),
-          ...(isDragOver ? { borderTop: "2px solid var(--aurora-accent-interactive)" } : {}),
           ...(isCurrentSong ? { background: "rgba(94,234,212,0.05)" } : {}),
           ...(isCurrentSong && isSelected ? { boxShadow: "inset 0 0 0 1px rgba(94,234,212,0.08)" } : {}),
         }}
       >
         {/* Drag handle cell (playlist mode — outside registry) */}
         {isDraggable && (
-          <td className="px-1 py-2 w-6 text-center cursor-grab active:cursor-grabbing">
+          <td
+            className="px-1 py-2 w-6 text-center cursor-grab active:cursor-grabbing"
+            {...attributes}
+            {...listeners}
+          >
             <GripVertical className="h-3.5 w-3.5 text-[var(--aurora-text-tertiary)] opacity-0 group-hover:opacity-100 transition-opacity duration-150 mx-auto" />
           </td>
         )}

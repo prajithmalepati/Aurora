@@ -5,7 +5,7 @@ import { useSongStore } from "@/stores/songStore"
 import { usePlayerStore } from "@/stores/playerStore"
 
 import { albumGradient } from "@/lib/albumGradient"
-import { extractCoverColor } from "@/lib/extractCoverColor"
+
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -81,9 +81,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
   const [sortField] = useState<'position'|'title'|'artist'|'album'|'duration'>('position')
   const [sortOrder] = useState<'asc'|'desc'>('asc')
 
-  // Drag-and-drop state
-  const [dragId, setDragId] = useState<number | null>(null)
-  const [dragOverId, setDragOverId] = useState<number | null>(null)
+  // Drag state removed — now handled by dnd-kit in SongTable
 
   useEffect(() => {
     fetchPlaylistDetail(playlistId)
@@ -154,18 +152,8 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
   // Server-stored image URL (comes back from the API on every fetchPlaylistDetail)
   const heroImage = activePlaylist?.image_url ? withToken(`${getBaseUrl()}${activePlaylist.image_url}`) : null
 
-  // Extract dominant color from the cover image — same concept as song bleed-thumb.
-  // Falls back to the procedural albumGradient when no image or extraction fails.
-  const [coverGlow, setCoverGlow] = useState<string | null>(null)
-  useEffect(() => {
-    if (!heroImage) { setCoverGlow(null); return }
-    let cancelled = false
-    extractCoverColor(heroImage).then((color) => {
-      if (!cancelled) setCoverGlow(color)
-    })
-    return () => { cancelled = true }
-  }, [heroImage])
-  const heroGlow = coverGlow ?? fallbackGlow
+  // Use backend-computed dominant_color (same as songs) — no client canvas extraction.
+  const heroGlow = activePlaylist?.dominant_color ?? fallbackGlow
 
   // Neutral dark gradient for the hero tile — no teal/violet bias.
   // If the playlist has a custom accent colour we let a whisper of it through.
@@ -302,67 +290,28 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
     }
   }
 
-  // ── Drag-and-drop ──
+  // ── Drag-and-drop (dnd-kit) ──
 
   const isDragEnabled = sortField === 'position'
 
-  const handleDragStart = useCallback((e: React.DragEvent, songId: number) => {
-    if (!isDragEnabled) {
-      e.preventDefault()
-      return
-    }
-    setDragId(songId)
-    e.dataTransfer.effectAllowed = "move"
-    e.dataTransfer.setData("text/plain", String(songId))
-    // Slight delay for visual feedback
-    requestAnimationFrame(() => {
-      const el = e.currentTarget as HTMLElement
-      el.style.opacity = "0.4"
-    })
-  }, [isDragEnabled])
-
-  const handleDragOver = useCallback((e: React.DragEvent, songId: number) => {
-    e.preventDefault()
-    if (dragId !== songId) {
-      setDragOverId(songId)
-    }
-    e.dataTransfer.dropEffect = "move"
-  }, [dragId])
-
-  const handleDragLeave = useCallback(() => {
-    setDragOverId(null)
-  }, [])
-
-  const handleDrop = useCallback(async (e: React.DragEvent, targetId: number) => {
-    e.preventDefault()
-    if (!activePlaylist || !dragId || dragId === targetId) {
-      setDragId(null)
-      setDragOverId(null)
-      return
-    }
+  const handleReorder = useCallback(async (fromId: number, toId: number) => {
+    if (!activePlaylist || fromId === toId || !isDragEnabled) return
 
     const songs = activePlaylist.songs
-    const dragIndex = songs.findIndex(s => s.id === dragId)
-    const dropIndex = songs.findIndex(s => s.id === targetId)
-    if (dragIndex === -1 || dropIndex === -1) {
-      setDragId(null)
-      setDragOverId(null)
-      return
-    }
+    const fromIndex = songs.findIndex(s => s.id === fromId)
+    const toIndex = songs.findIndex(s => s.id === toId)
+    if (fromIndex === -1 || toIndex === -1) return
 
     // Compute new order
     const newSongs = [...songs]
-    const [moved] = newSongs.splice(dragIndex, 1)
-    newSongs.splice(dropIndex, 0, moved)
+    const [moved] = newSongs.splice(fromIndex, 1)
+    newSongs.splice(toIndex, 0, moved)
     const newOrderedIds = newSongs.map(s => s.id)
 
     // Optimistic update
     usePlaylistStore.setState({
       activePlaylist: { ...activePlaylist, songs: newSongs }
     })
-
-    setDragId(null)
-    setDragOverId(null)
 
     try {
       await reorderSongs(activePlaylist.id, newOrderedIds)
@@ -372,14 +321,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
       toast.error(message)
       fetchPlaylistDetail(activePlaylist.id)
     }
-  }, [activePlaylist, dragId, reorderSongs, fetchPlaylistDetail])
-
-  const handleDragEnd = useCallback((e: React.DragEvent) => {
-    const el = e.currentTarget as HTMLElement
-    el.style.opacity = ""
-    setDragId(null)
-    setDragOverId(null)
-  }, [])
+  }, [activePlaylist, isDragEnabled, reorderSongs, fetchPlaylistDetail])
 
   const handlePlaySong = (song: PlaylistSong) => {
     if (!song.file_path || !activePlaylist) return
@@ -657,13 +599,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
           }}
           onTrim={(songId) => setOpenTrimId(openTrimId === songId ? null : songId)}
           isDraggable={isDragEnabled}
-          dragId={dragId}
-          dragOverId={dragOverId}
-          onDragStart={handleDragStart}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          onDragEnd={handleDragEnd}
+          onReorder={handleReorder}
         />
       </div>
 
