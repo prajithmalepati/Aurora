@@ -396,6 +396,94 @@ function AddToPlaylistDialog({ open, onOpenChange, songIds, onComplete }: AddToP
   )
 }
 
+// ── SortDropdown ──
+const SORT_OPTIONS: { value: string; label: string }[] = [
+  { value: "title-asc", label: "Title A–Z" },
+  { value: "title-desc", label: "Title Z–A" },
+  { value: "artist-asc", label: "Artist A–Z" },
+  { value: "artist-desc", label: "Artist Z–A" },
+  { value: "album-asc", label: "Album A–Z" },
+  { value: "album-desc", label: "Album Z–A" },
+  { value: "duration-asc", label: "Duration ↑" },
+  { value: "duration-desc", label: "Duration ↓" },
+  { value: "created_at-desc", label: "Newest first" },
+  { value: "created_at-asc", label: "Oldest first" },
+]
+
+function SortDropdown({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (
+        panelRef.current && !panelRef.current.contains(e.target as Node) &&
+        buttonRef.current && !buttonRef.current.contains(e.target as Node)
+      ) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener("mousedown", handler)
+    return () => document.removeEventListener("mousedown", handler)
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false)
+    }
+    document.addEventListener("keydown", handler)
+    return () => document.removeEventListener("keydown", handler)
+  }, [open])
+
+  const currentLabel = SORT_OPTIONS.find((o) => o.value === value)?.label ?? value
+
+  return (
+    <div className="relative">
+      <button
+        ref={buttonRef}
+        onClick={() => setOpen(!open)}
+        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors duration-150 ${
+          open
+            ? "text-[var(--aurora-accent-interactive)] bg-[var(--aurora-accent-interactive)]/10"
+            : "text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-text-secondary)] hover:bg-white/[0.04]"
+        }`}
+      >
+        {currentLabel}
+        <ChevronDown className="h-3.5 w-3.5" />
+      </button>
+
+      {open && (
+        <div
+          ref={panelRef}
+          className="absolute right-0 top-full mt-1 z-50 min-w-[180px] py-1.5 rounded-lg shadow-xl border backdrop-blur-xl"
+          style={{
+            background: "color-mix(in oklch, var(--aurora-surface) 92%, transparent)",
+            borderColor: "var(--aurora-rim)",
+            boxShadow: "0 8px 30px rgba(0,0,0,0.5)",
+          }}
+        >
+          {SORT_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => { onChange(opt.value); setOpen(false) }}
+              className={`w-full text-left px-3 py-1.5 text-[11px] rounded-sm transition-colors duration-100 ${
+                value === opt.value
+                  ? "text-[var(--aurora-accent-interactive)] bg-[var(--aurora-accent-interactive)]/10"
+                  : "text-[var(--aurora-text-secondary)] hover:bg-white/[0.04] hover:text-[var(--aurora-text)]"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── SongTable ──
 
 const ROW_HEIGHT = 52
@@ -630,8 +718,8 @@ export function SongTable({
     }
   }
 
-  function handleDropdownChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const [field, order] = e.target.value.split("-") as [SortField, "asc" | "desc"]
+  function handleSortSelect(value: string) {
+    const [field, order] = value.split("-") as [SortField, "asc" | "desc"]
     sortSongs(field, order)
   }
 
@@ -662,22 +750,7 @@ export function SongTable({
       {showSort && (
       <div className="flex items-center gap-2">
         <span className="text-[10px] text-[var(--aurora-text-tertiary)] uppercase tracking-wide">Sort</span>
-        <select
-          value={sortDropdownValue}
-          onChange={handleDropdownChange}
-          className="text-[11px] bg-transparent text-[var(--aurora-text-secondary)] border border-[var(--aurora-rim)] rounded px-2 py-1 focus:outline-none cursor-pointer hover:border-[var(--aurora-muted)]"
-        >
-          <option value="title-asc">Title A–Z</option>
-          <option value="title-desc">Title Z–A</option>
-          <option value="artist-asc">Artist A–Z</option>
-          <option value="artist-desc">Artist Z–A</option>
-          <option value="album-asc">Album A–Z</option>
-          <option value="album-desc">Album Z–A</option>
-          <option value="duration-asc">Duration ↑</option>
-          <option value="duration-desc">Duration ↓</option>
-          <option value="created_at-desc">Newest first</option>
-          <option value="created_at-asc">Oldest first</option>
-        </select>
+        <SortDropdown value={sortDropdownValue} onChange={handleSortSelect} />
         <ColumnPicker columnContext={columnContext} />
       </div>
       )}

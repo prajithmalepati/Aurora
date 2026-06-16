@@ -414,10 +414,10 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
             <img
               src={heroImage}
               alt=""
-              className="absolute -inset-[20%] w-[140%] h-[140%] object-cover blur-[60px] opacity-[0.35]"
+              className="absolute -inset-[20%] w-[140%] h-[140%] object-cover blur-[60px] opacity-[0.55] saturate-[1.4]"
               style={{
-                maskImage: "radial-gradient(ellipse 700px 400px at 18% 0%, black 0%, transparent 65%)",
-                WebkitMaskImage: "radial-gradient(ellipse 700px 400px at 18% 0%, black 0%, transparent 65%)",
+                maskImage: "linear-gradient(to bottom, black 0%, black 35%, transparent 95%)",
+                WebkitMaskImage: "linear-gradient(to bottom, black 0%, black 35%, transparent 95%)",
               }}
             />
           </div>
@@ -438,19 +438,6 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
               background: heroImage || showArtGrid ? undefined : heroTileGradient,
             }}
           >
-            {/* Glow layer: blurred cover behind tile when image exists */}
-            {heroImage && (
-              <div
-                className="absolute -inset-4 -z-10 rounded-xl overflow-hidden"
-                aria-hidden="true"
-              >
-                <img
-                  src={heroImage}
-                  alt=""
-                  className="w-full h-full object-cover blur-[20px] opacity-40 scale-150"
-                />
-              </div>
-            )}
             <div
               className="absolute inset-0 rounded-xl pointer-events-none"
               style={{
