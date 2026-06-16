@@ -1,8 +1,93 @@
 import { useState, useRef, useCallback, useEffect } from "react"
 import { GripVertical, RotateCcw, Columns3 } from "lucide-react"
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core"
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
 import { useColumnStore, type ColumnContext } from "@/stores/columnStore"
-import { TOGGLEABLE_COLUMN_IDS, DEFAULT_ORDER, getColumn, type ColumnId } from "./columns"
+import { TOGGLEABLE_COLUMN_IDS, getColumn, type ColumnId } from "./columns"
 
+// ── Sortable item ──────────────────────────────────────────────────
+function SortableColumnItem({
+  id,
+  isHidden,
+  onToggle,
+}: {
+  id: ColumnId
+  isHidden: boolean
+  onToggle: () => void
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id })
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+  }
+
+  const col = getColumn(id)
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-2 px-3.5 py-1.5 text-[12px] cursor-grab select-none active:cursor-grabbing transition-colors duration-150"
+    >
+      <button
+        type="button"
+        className="flex-shrink-0 cursor-grab active:cursor-grabbing"
+        {...attributes}
+        {...listeners}
+      >
+        <GripVertical className="h-3 w-3 text-[var(--aurora-text-tertiary)]" />
+      </button>
+      <button
+        type="button"
+        role="checkbox"
+        aria-checked={!isHidden}
+        onClick={onToggle}
+        className="h-3.5 w-3.5 rounded-[2px] flex items-center justify-center transition-[color,background-color,border-color] duration-150 flex-shrink-0"
+        style={{
+          background: isHidden ? "transparent" : "var(--aurora-accent-interactive)",
+          border: isHidden
+            ? "1.5px solid var(--aurora-text-tertiary)"
+            : "1.5px solid var(--aurora-accent-interactive)",
+        }}
+      >
+        {!isHidden && (
+          <svg width="8" height="6" viewBox="0 0 10 8" fill="none" className="text-black">
+            <path d="M1 4L3.5 6.5L9 1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        )}
+      </button>
+      <span className={isHidden ? "text-[var(--aurora-text-tertiary)]" : "text-[var(--aurora-text)]"}>
+        {col.label}
+      </span>
+    </div>
+  )
+}
+
+// ── Main picker ────────────────────────────────────────────────────
 interface ColumnPickerProps {
   columnContext: ColumnContext
 }
@@ -42,52 +127,41 @@ export function ColumnPicker({ columnContext }: ColumnPickerProps) {
     return () => document.removeEventListener("keydown", handler)
   }, [open])
 
-  // Drag state
-  const dragIdRef = useRef<ColumnId | null>(null)
-  const [dragOverId, setDragOverId] = useState<ColumnId | null>(null)
+  // dnd-kit sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
 
-  const handleDragStart = useCallback((e: React.DragEvent, id: ColumnId) => {
-    dragIdRef.current = id
-    e.dataTransfer.effectAllowed = "move"
-    e.dataTransfer.setData("text/plain", id)
-  }, [])
+  // Build ordered toggleable list: start from canonical set, order by config.order
+  const orderedIds = (() => {
+    const inOrder = config.order.filter((id) => TOGGLEABLE_COLUMN_IDS.includes(id as ColumnId)) as ColumnId[]
+    const missing = TOGGLEABLE_COLUMN_IDS.filter((id) => !inOrder.includes(id))
+    return [...inOrder, ...missing]
+  })()
 
-  const handleDragOver = useCallback((e: React.DragEvent, id: ColumnId) => {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = "move"
-    if (dragIdRef.current && dragIdRef.current !== id) {
-      setDragOverId(id)
-    }
-  }, [])
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event
+      if (!over || active.id === over.id) return
 
-  const handleDrop = useCallback((e: React.DragEvent, targetId: ColumnId) => {
-    e.preventDefault()
-    const sourceId = dragIdRef.current
-    if (!sourceId || sourceId === targetId) return
+      const oldIndex = orderedIds.indexOf(active.id as ColumnId)
+      const newIndex = orderedIds.indexOf(over.id as ColumnId)
+      if (oldIndex === -1 || newIndex === -1) return
 
-    // Operate on the full current order array directly
-    const currentOrder = config.order.length > 0 ? [...config.order] : [...DEFAULT_ORDER]
-    const sourceIndex = currentOrder.indexOf(sourceId)
-    const targetIndex = currentOrder.indexOf(targetId)
-    if (sourceIndex === -1 || targetIndex === -1) return
+      const newToggleable = arrayMove(orderedIds, oldIndex, newIndex)
 
-    // Splice: remove source, insert at target's position
-    currentOrder.splice(sourceIndex, 1)
-    currentOrder.splice(targetIndex, 0, sourceId)
+      // Rebuild full order: keep non-toggleable in place, replace toggleable section
+      const nonToggleable = config.order.filter(
+        (id) => !TOGGLEABLE_COLUMN_IDS.includes(id as ColumnId)
+      ) as ColumnId[]
+      // Merge: all toggleable in new order + non-toggleable appended
+      const fullOrder = [...newToggleable, ...nonToggleable]
+      setOrder(columnContext, fullOrder)
+    },
+    [orderedIds, config.order, columnContext, setOrder]
+  )
 
-    setOrder(columnContext, currentOrder)
-    dragIdRef.current = null
-    setDragOverId(null)
-  }, [config.order, columnContext, setOrder])
-
-  const handleDragEnd = useCallback(() => {
-    dragIdRef.current = null
-    setDragOverId(null)
-  }, [])
-
-  // Get the toggleable columns in their current order
-  const fullOrder = config.order.length > 0 ? config.order : ["index", "title", ...TOGGLEABLE_COLUMN_IDS, "actions"] as ColumnId[]
-  const toggleableOrder = fullOrder.filter((id) => TOGGLEABLE_COLUMN_IDS.includes(id))
   const hiddenSet = new Set(config.hidden)
 
   return (
@@ -121,53 +195,25 @@ export function ColumnPicker({ columnContext }: ColumnPickerProps) {
             </span>
           </div>
 
-          {/* Column list — drag-reorderable */}
-          <div className="py-0.5">
-            {toggleableOrder.map((id) => {
-              const col = getColumn(id)
-              const isHidden = hiddenSet.has(id)
-              const isDragging = dragIdRef.current === id
-              const isDragOver = dragOverId === id
-
-              return (
-                <div
-                  key={id}
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, id)}
-                  onDragOver={(e) => handleDragOver(e, id)}
-                  onDrop={(e) => handleDrop(e, id)}
-                  onDragEnd={handleDragEnd}
-                  className={`flex items-center gap-2 px-3.5 py-1.5 text-[12px] cursor-grab select-none active:cursor-grabbing transition-colors duration-150 ${
-                    isDragging ? "opacity-40" : ""
-                  } ${isDragOver ? "border-t-2 border-[var(--aurora-accent-interactive)]" : ""}`}
-                >
-                  <GripVertical className="h-3 w-3 text-[var(--aurora-text-tertiary)] flex-shrink-0" />
-                  <button
-                    type="button"
-                    role="checkbox"
-                    aria-checked={!isHidden}
-                    onClick={() => toggleVisible(columnContext, id)}
-                    className="h-3.5 w-3.5 rounded-[2px] flex items-center justify-center transition-[color,background-color,border-color] duration-150 flex-shrink-0"
-                    style={{
-                      background: isHidden ? "transparent" : "var(--aurora-accent-interactive)",
-                      border: isHidden
-                        ? "1.5px solid var(--aurora-text-tertiary)"
-                        : "1.5px solid var(--aurora-accent-interactive)",
-                    }}
-                  >
-                    {!isHidden && (
-                      <svg width="8" height="6" viewBox="0 0 10 8" fill="none" className="text-black">
-                        <path d="M1 4L3.5 6.5L9 1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    )}
-                  </button>
-                  <span className={`${isHidden ? "text-[var(--aurora-text-tertiary)]" : "text-[var(--aurora-text)]"}`}>
-                    {col.label}
-                  </span>
-                </div>
-              )
-            })}
-          </div>
+          {/* Column list — dnd-kit sortable */}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext items={orderedIds} strategy={verticalListSortingStrategy}>
+              <div className="py-0.5">
+                {orderedIds.map((id) => (
+                  <SortableColumnItem
+                    key={id}
+                    id={id}
+                    isHidden={hiddenSet.has(id)}
+                    onToggle={() => toggleVisible(columnContext, id)}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
 
           {/* Reset */}
           <div className="border-t border-[var(--aurora-rim)] mt-1 pt-1">

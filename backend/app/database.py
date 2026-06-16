@@ -59,7 +59,9 @@ CREATE TABLE IF NOT EXISTS playlists (
     created_at          TEXT    NOT NULL,
     updated_at          TEXT    NOT NULL,
     crossfade_enabled   INTEGER DEFAULT NULL,
-    crossfade_duration_s INTEGER DEFAULT NULL
+    crossfade_duration_s INTEGER DEFAULT NULL,
+    dominant_color      TEXT,
+    dominant_color_2    TEXT
 );
 
 CREATE TABLE IF NOT EXISTS tags (
@@ -175,6 +177,11 @@ MIGRATIONS = [
     # Version 2: composite index for title+artist lookups
     (2, [
         "CREATE INDEX IF NOT EXISTS idx_songs_title_artist ON songs(title, artist)",
+    ]),
+    # Version 3: playlist dominant colors for cover bleed
+    (3, [
+        "ALTER TABLE playlists ADD COLUMN dominant_color TEXT",
+        "ALTER TABLE playlists ADD COLUMN dominant_color_2 TEXT",
     ]),
 ]
 

@@ -56,14 +56,15 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
   const tagsLoading = useTagStore((state) => state.loading)
   const tagsError = useTagStore((state) => state.error)
   const setQuery = useFilterStore((state) => state.setQuery)
-  const executeFilter = useFilterStore((state) => state.executeFilter)
   const setIsQuickTagView = useFilterStore((state) => state.setIsQuickTagView)
 
   const handleTagClick = (tagName: string) => {
     const term = `"${tagName}"`
     setQuery(term)
     setIsQuickTagView(true)
-    executeFilter()
+    // Don't call executeFilter() here — QueryBuilder's debounced useEffect
+    // watches `query` and fires executeFilter after 280ms. Calling it here
+    // AND in the effect causes a double-refresh.
     onViewChange({ kind: "filter" })
   }
 

@@ -23,6 +23,20 @@ import { EditSongDialog } from "@/components/songs/EditSongDialog"
 import { TagEditor } from "@/components/tags/TagEditor"
 import { ColumnPicker } from "./ColumnPicker"
 import { Music, ChevronUp, ChevronDown, AlertTriangle, RefreshCw, ListPlus, Tag as TagIcon, X, Trash2, Pencil } from "lucide-react"
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core"
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable"
 
 interface SongTableProps {
   songs: Song[]
@@ -37,15 +51,9 @@ interface SongTableProps {
   // Playlist-mode optional props (passed through to SongRow)
   onRemoveFromPlaylist?: (song: Song) => void
   onTrim?: (songId: number) => void
-  // Drag-and-drop
+  // Drag-and-drop (dnd-kit)
   isDraggable?: boolean
-  dragId?: number | null
-  dragOverId?: number | null
-  onDragStart?: (e: React.DragEvent, songId: number) => void
-  onDragOver?: (e: React.DragEvent, songId: number) => void
-  onDragLeave?: () => void
-  onDrop?: (e: React.DragEvent, songId: number) => void
-  onDragEnd?: (e: React.DragEvent) => void
+  onReorder?: (fromId: number, toId: number) => void
 }
 
 const HEADER_CLASS =
@@ -162,7 +170,7 @@ function TableHeader({ visibleColumns, sortField, sortOrder, onSort, showCheckbo
           return (
             <th
               key={col.id}
-              className={`${HEADER_CLASS} ${isSortable ? "cursor-pointer select-none hover:text-[var(--aurora-text-secondary)]" : ""} ${active ? "text-[var(--aurora-text-secondary)]" : ""} ${col.headerClassName ?? ""} relative`}
+              className={`${HEADER_CLASS} ${isSortable ? "cursor-pointer select-none hover:text-[var(--aurora-text-secondary)]" : ""} ${active ? "text-[var(--aurora-text-secondary)]" : ""} ${col.headerClassName ?? ""} relative group/th`}
               onClick={isSortable ? () => onSort(col.sortable!) : undefined}
             >
               {isSortable ? (
@@ -176,7 +184,7 @@ function TableHeader({ visibleColumns, sortField, sortOrder, onSort, showCheckbo
               {/* Resize handle */}
               {isResizable && (
                 <div
-                  className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize opacity-0 hover:opacity-100 transition-opacity"
+                  className="absolute right-0 top-0 bottom-0 w-[6px] cursor-col-resize opacity-0 group-hover/th:opacity-60 hover:!opacity-100 transition-opacity z-10"
                   style={{ background: "var(--aurora-accent-interactive)" }}
                   onMouseDown={(e) => handleResizeStart(e, col)}
                   onClick={(e) => e.stopPropagation()}
@@ -396,7 +404,7 @@ const OVERSCAN = 10
 export function SongTable({
   songs, loading = false, error = null, onPlay, animKey, showSort = true, columnContext: _columnContext, disableInfiniteScroll = false,
   onRemoveFromPlaylist, onTrim,
-  isDraggable, dragId, dragOverId, onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd,
+  isDraggable, onReorder,
 }: SongTableProps) {
   const sortField = useSongStore((state) => state.sortField)
   const sortOrder = useSongStore((state) => state.sortOrder)
@@ -417,6 +425,12 @@ export function SongTable({
   const lastSelectedIndexRef = useRef<number | null>(null)
   const [selectMode, setSelectMode] = useState(false)
 
+  // dnd-kit sensors (for playlist drag reorder)
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
+
   // Column state from persistent store (or defaults if no context)
   const columnContext = _columnContext ?? "all-songs"
   const columnConfig = useColumnStore((s) => s.getConfig(columnContext))
@@ -425,6 +439,12 @@ export function SongTable({
   const handleResize = useCallback((id: ColumnId, width: number) => {
     setColumnWidth(columnContext, id, width)
   }, [columnContext, setColumnWidth])
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id || !onReorder) return
+    onReorder(active.id as number, over.id as number)
+  }, [onReorder])
 
   // Compute visible columns from store config
   const visibleColumns = useMemo(() => {
@@ -868,36 +888,44 @@ export function SongTable({
                 />
               </tr>
             )}
-            {/* Visible rows */}
-            {virtualItems.map((virtualRow) => {
-              const song = songs[virtualRow.index]
-              if (!song) return null
-              return (
-                <SongRow
-                  key={song.id}
-                  song={song}
-                  index={virtualRow.index}
-                  visibleColumns={visibleColumns}
-                  onPlay={onPlay}
-                  animIndex={virtualRow.index < 16 ? virtualRow.index : undefined}
-                  isSelected={selectedIds.has(song.id)}
-                  onToggleSelect={(shiftKey, metaKey) => toggleSelectOne(song.id, shiftKey, metaKey)}
-                  onContextMenu={(e) => handleContextMenuEvent(e, song, virtualRow.index)}
-                  selectMode={selectMode}
-                  onPlayNext={() => usePlayerStore.getState().playNext(song)}
-                  onAddToPlaylist={() => { closeContextMenu(); setAddToPlaylistDialogOpen(true) }}
-                  onRemoveFromPlaylist={onRemoveFromPlaylist ? () => onRemoveFromPlaylist(song) : undefined}
-                  onTrim={onTrim ? () => onTrim(song.id) : undefined}
-                  isDraggable={isDraggable}
-                  isDragOver={dragOverId === song.id && dragId !== song.id}
-                  onDragStart={onDragStart}
-                  onDragOver={onDragOver}
-                  onDragLeave={onDragLeave}
-                  onDrop={onDrop}
-                  onDragEnd={onDragEnd}
-                />
-              )
-            })}
+            {/* Visible rows — wrapped in dnd-kit context when draggable */}
+            {(() => {
+              const rowContent = virtualItems.map((virtualRow) => {
+                const song = songs[virtualRow.index]
+                if (!song) return null
+                return (
+                  <SongRow
+                    key={song.id}
+                    song={song}
+                    index={virtualRow.index}
+                    visibleColumns={visibleColumns}
+                    onPlay={onPlay}
+                    animIndex={virtualRow.index < 16 ? virtualRow.index : undefined}
+                    isSelected={selectedIds.has(song.id)}
+                    onToggleSelect={(shiftKey, metaKey) => toggleSelectOne(song.id, shiftKey, metaKey)}
+                    onContextMenu={(e) => handleContextMenuEvent(e, song, virtualRow.index)}
+                    selectMode={selectMode}
+                    onPlayNext={() => usePlayerStore.getState().playNext(song)}
+                    onAddToPlaylist={() => { closeContextMenu(); setAddToPlaylistDialogOpen(true) }}
+                    onRemoveFromPlaylist={onRemoveFromPlaylist ? () => onRemoveFromPlaylist(song) : undefined}
+                    onTrim={onTrim ? () => onTrim(song.id) : undefined}
+                    isDraggable={isDraggable}
+                  />
+                )
+              })
+
+              if (isDraggable) {
+                const songIds = songs.map(s => s.id)
+                return (
+                  <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                    <SortableContext items={songIds} strategy={verticalListSortingStrategy}>
+                      {rowContent}
+                    </SortableContext>
+                  </DndContext>
+                )
+              }
+              return rowContent
+            })()}
             {/* Bottom spacer */}
             {bottomSpacerHeight > 0 && (
               <tr aria-hidden="true">

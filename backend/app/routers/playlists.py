@@ -43,7 +43,10 @@ async def upload_playlist_image(playlist_id: int, file: UploadFile = File(...)):
         img = Image.open(io.BytesIO(data))
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid or corrupt image file")
- 
+    # Extract dominant colors (same pipeline as songs)
+    from app.services.file_scanner import extract_dominant_colors
+    dominant_color, dominant_color_2 = extract_dominant_colors(data)
+
     with get_db_ctx() as conn:
         filepath = None
         try:
@@ -81,8 +84,8 @@ async def upload_playlist_image(playlist_id: int, file: UploadFile = File(...)):
             image_url = f"/api/playlist-images/{filename}"
 
             conn.execute(
-                "UPDATE playlists SET image_url = ?, updated_at = ? WHERE id = ?",
-                (image_url, _get_utc_now(), playlist_id),
+                "UPDATE playlists SET image_url = ?, dominant_color = ?, dominant_color_2 = ?, updated_at = ? WHERE id = ?",
+                (image_url, dominant_color, dominant_color_2, _get_utc_now(), playlist_id),
             )
             conn.commit()
         except Exception:
@@ -115,7 +118,7 @@ def delete_playlist_image(playlist_id: int):
 
     with get_db_ctx() as conn:
         conn.execute(
-            "UPDATE playlists SET image_url = NULL, updated_at = ? WHERE id = ?",
+            "UPDATE playlists SET image_url = NULL, dominant_color = NULL, dominant_color_2 = NULL, updated_at = ? WHERE id = ?",
             (_get_utc_now(), playlist_id),
         )
         conn.commit()
@@ -211,6 +214,8 @@ def list_playlists():
             crossfade_enabled=row["crossfade_enabled"],
             crossfade_duration_s=row["crossfade_duration_s"],
             song_count=row["song_count"],
+            dominant_color=row["dominant_color"],
+            dominant_color_2=row["dominant_color_2"],
             created_at=row["created_at"],
             updated_at=row["updated_at"],
         )
@@ -288,7 +293,7 @@ def reorder_playlist_songs(playlist_id: int, reorder: PlaylistReorder):
 
         cursor.execute(
             """
-            SELECT id, name, color, emoji, image_url, crossfade_enabled, crossfade_duration_s, created_at, updated_at
+            SELECT id, name, color, emoji, image_url, crossfade_enabled, crossfade_duration_s, dominant_color, dominant_color_2, created_at, updated_at
             FROM playlists
             WHERE id = ?
             """,
@@ -308,6 +313,8 @@ def reorder_playlist_songs(playlist_id: int, reorder: PlaylistReorder):
             "crossfade_enabled": row["crossfade_enabled"],
             "crossfade_duration_s": row["crossfade_duration_s"],
             "song_count": song_count,
+            "dominant_color": row["dominant_color"],
+            "dominant_color_2": row["dominant_color_2"],
             "songs": songs,
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
@@ -400,7 +407,7 @@ def delete_song_from_playlist(playlist_id: int, song_id: int):
 
         cursor.execute(
             """
-            SELECT id, name, color, emoji, image_url, crossfade_enabled, crossfade_duration_s, created_at, updated_at
+            SELECT id, name, color, emoji, image_url, crossfade_enabled, crossfade_duration_s, dominant_color, dominant_color_2, created_at, updated_at
             FROM playlists
             WHERE id = ?
             """,
@@ -420,6 +427,8 @@ def delete_song_from_playlist(playlist_id: int, song_id: int):
             "crossfade_enabled": row["crossfade_enabled"],
             "crossfade_duration_s": row["crossfade_duration_s"],
             "song_count": song_count,
+            "dominant_color": row["dominant_color"],
+            "dominant_color_2": row["dominant_color_2"],
             "songs": songs,
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
@@ -437,7 +446,7 @@ def get_playlist(playlist_id: int):
         # Fetch playlist metadata
         cursor.execute(
             """
-            SELECT id, name, color, emoji, image_url, crossfade_enabled, crossfade_duration_s, created_at, updated_at
+            SELECT id, name, color, emoji, image_url, crossfade_enabled, crossfade_duration_s, dominant_color, dominant_color_2, created_at, updated_at
             FROM playlists
             WHERE id = ?
             """,
@@ -473,6 +482,8 @@ def get_playlist(playlist_id: int):
             "crossfade_enabled": row["crossfade_enabled"],
             "crossfade_duration_s": row["crossfade_duration_s"],
             "song_count": song_count,
+            "dominant_color": row["dominant_color"],
+            "dominant_color_2": row["dominant_color_2"],
             "songs": songs,
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
@@ -559,6 +570,8 @@ def update_playlist(playlist_id: int, playlist: PlaylistUpdate):
                 p.crossfade_enabled,
                 p.crossfade_duration_s,
                 COUNT(ps.song_id) as song_count,
+                p.dominant_color,
+                p.dominant_color_2,
                 p.created_at,
                 p.updated_at
             FROM playlists p
@@ -579,6 +592,8 @@ def update_playlist(playlist_id: int, playlist: PlaylistUpdate):
         "crossfade_enabled": row["crossfade_enabled"],
         "crossfade_duration_s": row["crossfade_duration_s"],
         "song_count": row["song_count"],
+        "dominant_color": row["dominant_color"],
+        "dominant_color_2": row["dominant_color_2"],
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
     }, "message": "ok"}
@@ -685,7 +700,7 @@ def add_song_to_playlist(playlist_id: int, song_add: PlaylistSongAdd):
 
         cursor.execute(
             """
-            SELECT id, name, color, emoji, image_url, crossfade_enabled, crossfade_duration_s, created_at, updated_at
+            SELECT id, name, color, emoji, image_url, crossfade_enabled, crossfade_duration_s, dominant_color, dominant_color_2, created_at, updated_at
             FROM playlists
             WHERE id = ?
             """,
