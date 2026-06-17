@@ -79,7 +79,7 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
 
   return (
     <>
-      <aside className="w-60 h-full flex flex-col bg-[var(--aurora-obsidian)]/60 backdrop-blur-xl">
+      <aside className="w-60 h-full flex flex-col bg-[var(--aurora-obsidian)]/95">
         {/* Brand lockup */}
         <div className="px-6 pt-7 pb-5">
           <button
