@@ -52,6 +52,9 @@ interface SongTableProps {
   onRemoveFromPlaylist?: (song: Song) => void
   onTrim?: (songId: number) => void
   fillHeight?: boolean
+  /** Optional empty-state override (e.g. search-aware message). Falls back to default. */
+  emptyTitle?: string
+  emptyHint?: string
   // Drag-and-drop (dnd-kit)
   isDraggable?: boolean
   onReorder?: (fromId: number, toId: number) => void
@@ -493,6 +496,8 @@ const OVERSCAN = 10
 export function SongTable({
   songs, loading = false, error = null, onPlay, animKey, showSort = true, columnContext: _columnContext, disableInfiniteScroll = false,
   onRemoveFromPlaylist, onTrim, fillHeight = false,
+  emptyTitle = "Nothing here yet",
+  emptyHint = "Scan a folder or add a song to begin.",
   isDraggable, onReorder,
 }: SongTableProps) {
   const sortField = useSongStore((state) => state.sortField)
@@ -907,10 +912,10 @@ export function SongTable({
         <div className="py-20 flex flex-col items-center justify-center gap-3">
           <Music className="h-8 w-8 text-[var(--aurora-text-tertiary)] opacity-40" />
           <p className="font-display-italic text-[22px] text-[var(--aurora-text-tertiary)]">
-            Nothing here yet
+            {emptyTitle}
           </p>
           <p className="text-xs text-[var(--aurora-text-tertiary)]">
-            Scan a folder or add a song to begin.
+            {emptyHint}
           </p>
         </div>
       </div>
