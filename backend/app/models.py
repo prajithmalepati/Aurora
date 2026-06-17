@@ -109,6 +109,8 @@ class PlaylistResponse(BaseModel):
     crossfade_enabled: Optional[int] = None
     crossfade_duration_s: Optional[int] = None
     song_count: int
+    dominant_color: Optional[str] = None
+    dominant_color_2: Optional[str] = None
     created_at: str
     updated_at: str
 

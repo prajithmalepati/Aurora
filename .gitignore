@@ -88,6 +88,8 @@ verify-*.jpg
 # Research / process docs (never commit — local only)
 docs/research/
 docs/*.docx
+docs/CHALLENGES.md
+docs/DEVIATIONS.md
 
 # Code-only repo: exclude AI/agent + process docs (kept local, synced via WinSCP)
 CLAUDE.md
@@ -107,3 +109,10 @@ PERFORMANCE_AUDIT.md
 V1_EXECUTION_PLAN.md
 V1_PLAN.md
 VISUAL_AUDIT.md
+
+# Hermes/Fable cross-machine process docs (local only, synced outside git)
+HERMES_*.md
+FABLE*.md
+SECURITY_HARDENING_PLAN.md
+STRATEGIC_PLAN.md
+FUTURE_ARCHITECTURE.md

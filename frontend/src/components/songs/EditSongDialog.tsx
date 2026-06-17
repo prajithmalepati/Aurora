@@ -174,6 +174,30 @@ export function EditSongDialog({ song, open: controlledOpen, onOpenChange, onEdi
                 </Button>
               </div>
             </div>
+
+            {/* File info (read-only) */}
+            {(song.file_format || song.bitrate || song.sample_rate || song.file_size) && (
+              <div className="border-t border-[var(--aurora-surface-border)] pt-3 grid gap-1.5">
+                <label className="label-micro text-[9.5px]">File info</label>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-[var(--aurora-text-secondary)]">
+                  {song.file_format && (
+                    <span>Format: <span className="text-[var(--aurora-text)]">{song.file_format.toUpperCase()}</span></span>
+                  )}
+                  {song.bitrate && (
+                    <span>Bitrate: <span className="text-[var(--aurora-text)]">{song.bitrate} kbps</span></span>
+                  )}
+                  {song.sample_rate && (
+                    <span>Sample rate: <span className="text-[var(--aurora-text)]">{(song.sample_rate / 1000).toFixed(1)} kHz</span></span>
+                  )}
+                  {song.bit_depth && (
+                    <span>Bit depth: <span className="text-[var(--aurora-text)]">{song.bit_depth} bit</span></span>
+                  )}
+                  {song.file_size && (
+                    <span>Size: <span className="text-[var(--aurora-text)]">{(song.file_size / (1024 * 1024)).toFixed(1)} MB</span></span>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {error && (

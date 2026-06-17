@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react"
 import { albumGradient } from "@/lib/albumGradient"
-import { getBaseUrl } from "@/lib/api"
+import { getBaseUrl, withToken } from "@/lib/api"
 
 const ALBUM_ART_BASE = `${getBaseUrl()}/api/album-art`
 
@@ -24,7 +24,7 @@ export function AlbumArt({ song, size, className = "", style }: AlbumArtProps) {
   const imgRef = useRef<HTMLImageElement>(null)
 
   const art = albumGradient(song.id ?? song.title ?? "void")
-  const src = song.album_art_path ? `${ALBUM_ART_BASE}/${song.album_art_path}` : undefined
+  const src = song.album_art_path ? withToken(`${ALBUM_ART_BASE}/${song.album_art_path}`) : undefined
   const showImg = !!src && !error
 
   useEffect(() => {

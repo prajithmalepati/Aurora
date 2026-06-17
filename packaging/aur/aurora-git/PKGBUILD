@@ -1,0 +1,62 @@
+# Maintainer: Prajith <prajithmalepati@gmail.com>
+pkgname=aurora-git
+pkgver=0.1.1.r0.g0000000
+pkgrel=1
+pkgdesc="A personal music library with smart tagging and boolean filtering"
+arch=('x86_64')
+url="https://github.com/prajithmalepati/Aurora"
+license=('MIT')
+depends=('webkit2gtk-4.1' 'openssl' 'glib2')
+makedepends=('git' 'nodejs' 'npm' 'rust' 'python' 'python-pip' 'dpkg')
+provides=('aurora')
+conflicts=('aurora-bin')
+source=("git+${url}.git")
+sha256sums=('SKIP')
+
+pkgver() {
+  cd Aurora
+  git describe --long --tags 2>/dev/null | sed 's/^v//;s/\([^-]*-g\)/r\1/;s/-/./g' || echo "0.1.1.r$(git rev-list --count HEAD).g$(git rev-parse --short HEAD)"
+}
+
+prepare() {
+  cd Aurora/frontend
+  npm ci --ignore-scripts
+}
+
+build() {
+  cd Aurora
+
+  # Freeze Python backend with PyInstaller
+  (
+    cd backend
+    python -m venv venv
+    source venv/bin/activate
+    pip install -q -r requirements.txt pyinstaller
+    pyinstaller aurora-backend.spec --distpath dist --workpath build -y
+  )
+
+  # Build Tauri desktop app (produces .deb)
+  cd frontend
+  npx tauri build --bundles deb
+}
+
+package() {
+  # Extract the built .deb into pkgdir
+  local deb
+  deb=$(find "$srcdir/Aurora/frontend/src-tauri/target/release/bundle/deb" -name '*.deb' -print -quit)
+  if [[ -z "$deb" ]]; then
+    error "No .deb found in build output"
+    return 1
+  fi
+  dpkg-deb -x "$deb" "$pkgdir/"
+
+  # Desktop entry + icon (Tauri deb includes these, but ensure correct permissions)
+  install -Dm644 "$pkgdir/usr/share/applications/aurora-music.desktop" \
+    "$pkgdir/usr/share/applications/aurora-music.desktop" 2>/dev/null || true
+  install -Dm644 "$srcdir/Aurora/frontend/src-tauri/icons/128x128.png" \
+    "$pkgdir/usr/share/icons/hicolor/128x128/apps/aurora.png" 2>/dev/null || true
+
+  # License
+  install -Dm644 "$srcdir/Aurora/LICENSE" \
+    "$pkgdir/usr/share/licenses/$pkgname/LICENSE" 2>/dev/null || true
+}

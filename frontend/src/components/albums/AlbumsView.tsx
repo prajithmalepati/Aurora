@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react"
 import type { AlbumInfo, AlbumDetail, ApiResponse, Song } from "@/types"
 import { usePlayerStore } from "@/stores/playerStore"
-import { api, getBaseUrl } from "@/lib/api"
+import { api, getBaseUrl, withToken } from "@/lib/api"
 import { SongTable } from "@/components/songs/SongTable"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Disc3, Play, Shuffle, ChevronLeft, Music } from "lucide-react"
@@ -176,7 +176,7 @@ interface AlbumCardProps {
 function AlbumCard({ album, onClick, onPlay, onShuffle }: AlbumCardProps) {
   const [hovered, setHovered] = useState(false)
   const coverUrl = album.cover_art_path
-    ? `${getBaseUrl()}/api/album-art/${album.cover_art_path}`
+    ? withToken(`${getBaseUrl()}/api/album-art/${album.cover_art_path}`)
     : null
 
   return (
@@ -187,12 +187,18 @@ function AlbumCard({ album, onClick, onPlay, onShuffle }: AlbumCardProps) {
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick() }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className="group relative flex flex-col rounded-xl overflow-hidden text-left transition-[box-shadow] duration-200 aurora-focus cursor-pointer"
-      style={{
-        background: "var(--aurora-surface)",
-        boxShadow: "inset 0 0 0 1px var(--aurora-rim)",
-      }}
+      className="group relative flex flex-col rounded-xl overflow-hidden text-left aurora-focus cursor-pointer"
+      style={{ background: "var(--aurora-surface)" }}
     >
+      {/* Composited rim — opacity transition (GPU-composited, no box-shadow jank) */}
+      <div
+        className="pointer-events-none absolute inset-0 z-10 rounded-xl transition-opacity duration-200"
+        style={{
+          boxShadow: "inset 0 0 0 1px var(--aurora-rim), inset 0 1px 4px rgba(94,234,212,0.15)",
+          opacity: hovered ? 1 : 0.6,
+        }}
+        aria-hidden
+      />
       {/* Cover art */}
       <div className="relative aspect-square w-full overflow-hidden">
         {coverUrl ? (
@@ -343,11 +349,13 @@ function AlbumDetail({ album, loading, error, onBack, onPlaySong }: AlbumDetailP
         </div>
       ) : (
         <SongTable
+            columnContext="album"
           songs={album.songs}
           loading={false}
           error={null}
           onPlay={(song) => onPlaySong(song, album.songs)}
           showSort={false}
+          disableInfiniteScroll
         />
       )}
     </div>

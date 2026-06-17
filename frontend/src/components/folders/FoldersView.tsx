@@ -25,19 +25,50 @@ export function FoldersView({ }: FoldersViewProps) {
   const [songs, setSongs] = useState<Song[]>([])
   const [songsLoading, setSongsLoading] = useState(false)
   const [songsError, setSongsError] = useState<string | null>(null)
-  const [recursive, setRecursive] = useState(false)
+  const [recursive, setRecursive] = useState(true)
 
   // Tree expansion state
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set())
 
-  // Fetch folder tree on mount
+  // Fetch folder tree on mount, auto-select first leaf folder
   useEffect(() => {
     setTreeLoading(true)
     setTreeError(null)
     api.get<FolderTreeResponse>("/folders")
       .then((res) => {
-        setTree(res.data.folders)
+        const folders = res.data.folders
+        setTree(folders)
         setTreeLoading(false)
+        // Auto-select first leaf folder so the page isn't blank
+        const findFirstLeaf = (nodes: FolderNode[]): FolderNode | null => {
+          for (const node of nodes) {
+            if (!node.subfolders || node.subfolders.length === 0) return node
+            const child = findFirstLeaf(node.subfolders)
+            if (child) return child
+          }
+          return null
+        }
+        const firstLeaf = findFirstLeaf(folders)
+        if (firstLeaf) {
+          setCurrentPath(firstLeaf.path)
+          // Also expand parents so the selected node is visible
+          const expandParents = (nodes: FolderNode[], target: string, chain: string[]): boolean => {
+            for (const node of nodes) {
+              if (node.path === target) return true
+              if (node.subfolders && expandParents(node.subfolders, target, [...chain, node.path])) {
+                setExpandedPaths(prev => {
+                  const next = new Set(prev)
+                  for (const p of chain) next.add(p)
+                  next.add(node.path)
+                  return next
+                })
+                return true
+              }
+            }
+            return false
+          }
+          expandParents(folders, firstLeaf.path, [])
+        }
       })
       .catch((err) => {
         setTreeError(err.message)
@@ -316,10 +347,12 @@ export function FoldersView({ }: FoldersViewProps) {
 
               {/* Song table */}
               <SongTable
+              columnContext="folder"
                 songs={songs}
                 loading={songsLoading}
                 error={songsError}
                 onPlay={handlePlaySong}
+                disableInfiniteScroll
               />
             </>
           ) : (

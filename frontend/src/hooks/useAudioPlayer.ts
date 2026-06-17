@@ -4,7 +4,7 @@ import { useSettingsStore } from "@/stores/settingsStore"
 import type { CrossfadeCurve } from "@/stores/settingsStore"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { toast } from "@/lib/toast"
-import { getBaseUrl } from "@/lib/api"
+import { getBaseUrl, withToken } from "@/lib/api"
 import { createPlaybackEngine, unlockAudioOutput } from "@/lib/engines/howlerEngine"
 import type { PlaybackEngine, PlaybackSource } from "@/types/playback"
 
@@ -17,7 +17,7 @@ function streamSource(
 ): PlaybackSource {
   const ext = filePath?.split(".").pop()?.toLowerCase()
   return {
-    url: `${getBaseUrl()}/api/songs/${songId}/stream`,
+    url: withToken(`${getBaseUrl()}/api/songs/${songId}/stream`),
     format: ext,
     gapless,
   }
@@ -32,6 +32,9 @@ export function useAudioPlayer() {
   // Outgoing engine while a crossfade is in flight — the pause/resume effect
   // must reach it (prevEngineRef is already nulled by then)
   const fadingOutRef = useRef<PlaybackEngine | null>(null)
+  // Pending delayed start of the incoming engine (lagged curve) — cleared on
+  // transition cleanup so a skip during the delay can't start a ghost engine
+  const laggedStartTimerRef = useRef<number | null>(null)
   // Preloaded next song's engine — created ~5s before song end to eliminate silence gap
   const nextEngineRef = useRef<{ engine: PlaybackEngine; songId: string } | null>(null)
   // Tracks whether the preloaded engine has finished loading (fully decoded, ready to play)
@@ -86,7 +89,7 @@ export function useAudioPlayer() {
       if (playlist && playlist.crossfade_enabled !== null && playlist.crossfade_enabled !== undefined) {
         return {
           enabled: playlist.crossfade_enabled === 1,
-          duration: playlist.crossfade_duration_s ?? settings.crossfadeDuration,
+          duration: Math.max(1, Math.min(12, playlist.crossfade_duration_s ?? settings.crossfadeDuration)),
           curve: settings.crossfadeCurve,
         }
       }
@@ -103,7 +106,8 @@ export function useAudioPlayer() {
   function initEngineAfterLoad(engine: PlaybackEngine) {
     setDuration(engine.duration())
     const song = usePlayerStore.getState().currentSong
-    if (song?.start_time_ms && song.start_time_ms > 0) {
+    const { respectTrims } = useSettingsStore.getState()
+    if (respectTrims && song?.start_time_ms && song.start_time_ms > 0) {
       engine.seek(song.start_time_ms / 1000)
     }
   }
@@ -134,12 +138,20 @@ export function useAudioPlayer() {
             })
           }
 
-          // End-time enforcement (playlist trim)
+          // Trim-out as effective end (Apple Music "Stop Time" convention),
+          // only when the user wants trims respected
           const song = usePlayerStore.getState().currentSong
-          if (song?.end_time_ms && song.end_time_ms > 0 && seekSec * 1000 >= song.end_time_ms) {
+          const { respectTrims } = useSettingsStore.getState()
+          const trimEndSec =
+            respectTrims && song?.end_time_ms && song.end_time_ms > 0
+              ? Math.min(song.end_time_ms / 1000, engineRef.current.duration() || Infinity)
+              : null
+
+          // End-time enforcement (playlist trim) — backstop hard advance
+          if (trimEndSec !== null && seekSec >= trimEndSec) {
             const { repeatMode } = usePlayerStore.getState()
             if (repeatMode === "one") {
-              const startSec = (song.start_time_ms ?? 0) / 1000
+              const startSec = (song?.start_time_ms ?? 0) / 1000
               engineRef.current?.seek(startSec)
               updateSeek(startSec)
             } else {
@@ -148,13 +160,15 @@ export function useAudioPlayer() {
             return
           }
 
-          // Crossfade early trigger — fires at crossfadeDuration seconds before end.
-          // Skipped on repeat-one: the song must loop via the end handler, not advance.
+          // Crossfade early trigger — fires at crossfadeDuration seconds
+          // before the EFFECTIVE end (trim-out if set, else file end).
+          // Skipped on repeat-one: the song must loop via the end handler.
           const { enabled: xEnabled, duration: xDuration } = resolveXfade()
           if (xEnabled && usePlayerStore.getState().repeatMode !== "one") {
             const engineDuration = engineRef.current.duration()
-            if (engineDuration > 0) {
-              const triggerPoint = Math.max(0, engineDuration - xDuration)
+            const effectiveEnd = trimEndSec ?? (engineDuration > 0 ? engineDuration : 0)
+            if (effectiveEnd > 0) {
+              const triggerPoint = Math.max(0, effectiveEnd - xDuration)
               if (seekSec >= triggerPoint) {
                 if (intervalRef.current) { window.clearTimeout(intervalRef.current); intervalRef.current = null }
                 next()
@@ -188,7 +202,8 @@ export function useAudioPlayer() {
         console.log("[audio] natural end", { song: song?.id, repeat: repeatMode })
       }
       if (repeatMode === "one") {
-        const startSec = (song?.start_time_ms ?? 0) / 1000
+        const { respectTrims } = useSettingsStore.getState()
+        const startSec = respectTrims ? (song?.start_time_ms ?? 0) / 1000 : 0
         engine.seek(startSec)
         engine.play()
         updateSeek(startSec)
@@ -236,8 +251,15 @@ export function useAudioPlayer() {
   function preloadNextIfNeeded(currentSeekSec: number) {
     const curDuration = engineRef.current?.duration()
     if (!curDuration || curDuration <= 0) return
-    // For songs > 5s: preload in last 5 seconds. For short songs: preload immediately.
-    if (curDuration > 5 && currentSeekSec < curDuration - 5) return
+    const curSong = usePlayerStore.getState().currentSong
+    const { respectTrims } = useSettingsStore.getState()
+    const effectiveEnd =
+      respectTrims && curSong?.end_time_ms && curSong.end_time_ms > 0
+        ? Math.min(curSong.end_time_ms / 1000, curDuration)
+        : curDuration
+    // Preload in last 5 seconds (or last 80% for songs ≤ 5s) before effective end.
+    const preloadWindow = Math.min(5, effectiveEnd * 0.8)
+    if (currentSeekSec < effectiveEnd - preloadWindow) return
 
     const state = usePlayerStore.getState()
     const { queue, queueIndex, repeatMode, currentSong } = state
@@ -301,6 +323,7 @@ export function useAudioPlayer() {
       if (prevEngineRef.current) { prevEngineRef.current.stop(); prevEngineRef.current.unload() }
       if (nextEngineRef.current) { nextEngineRef.current.engine.unload(); nextEngineRef.current = null; preloadReadyRef.current = false }
       if (intervalRef.current) window.clearTimeout(intervalRef.current)
+      if (laggedStartTimerRef.current) window.clearTimeout(laggedStartTimerRef.current)
     }
   }, [])
 
@@ -472,6 +495,36 @@ export function useAudioPlayer() {
             }
           }, 33) // ~30fps
           xfadeIntervalRef.current = equalPowerInterval as unknown as number
+        } else if (curve === 'lagged') {
+          // Lagged: outgoing fades to 0 over the full N (handled in the
+          // `if (prev)` block below — it shares the linear fade-out path);
+          // incoming stays parked for N/2, then plays and fades up over
+          // the remaining N/2. See PLAYLOCK TRAP note: volume set before
+          // play, fade started from the play event.
+          engine.setVolume(0)
+          const startFade = () => {
+            engine.off("play", startFade)
+            engine.fade(0, targetVol, fadeDurationMs / 2)
+          }
+          engine.on("play", startFade)
+          laggedStartTimerRef.current = window.setTimeout(() => {
+            laggedStartTimerRef.current = null
+            // A newer transition replaced this engine — do nothing
+            if (engineRef.current !== engine) return
+            // Resume during the delay already started this engine via the
+            // isPlaying effect — a second play() would spawn a second Howler
+            // sound instance of the same file (double audio)
+            if (engine.isPlaying()) return
+            if (!usePlayerStore.getState().isPlaying) {
+              // User paused during the delay: don't start. Park the engine at
+              // target volume so resume (isPlaying effect) comes in audible.
+              engine.off("play", startFade)
+              engine.setVolume(targetVol)
+              return
+            }
+            engine.play()
+          }, fadeDurationMs / 2)
+          usePlayerStore.getState().setCrossfading(true, prevTitleRef.current ?? undefined)
         } else {
           // Linear: engine-native fade, deferred to the play event (see Howler
           // trap note above — fade() during _playLock is silently dropped)
@@ -504,7 +557,7 @@ export function useAudioPlayer() {
           // Already handled above via setInterval
           // prev volume is being manually ramped down
         } else {
-          // Linear: engine-native fade out
+          // Linear AND lagged: engine-native fade out over the full duration
           prev.fade(prev.getVolume(), 0, fadeDurationMs)
           setTimeout(() => {
             prev.stop()
@@ -536,6 +589,10 @@ export function useAudioPlayer() {
         // If crossfade was interrupted, ensure state is cleaned up
         usePlayerStore.getState().setCrossfading(false)
       }
+      if (laggedStartTimerRef.current) {
+        window.clearTimeout(laggedStartTimerRef.current)
+        laggedStartTimerRef.current = null
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentSong?.id])
@@ -552,7 +609,7 @@ export function useAudioPlayer() {
       // Resume a mid-crossfade outgoing engine only if it's still audible —
       // pausing snaps Howler fades to their end value, so a faded-out engine
       // reads 0 here and stays stopped
-      if (fadingOutRef.current && fadingOutRef.current.getVolume() > 0.05) {
+      if (fadingOutRef.current && fadingOutRef.current.isLoaded() && fadingOutRef.current.getVolume() > 0.05) {
         fadingOutRef.current.play()
       }
     } else {

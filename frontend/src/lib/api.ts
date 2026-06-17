@@ -12,6 +12,29 @@ const BASE_URL = `${getBaseUrl()}/api`
 
 export { BASE_URL }
 
+/** Get the sidecar auth token injected by Tauri, or undefined in dev mode. */
+export function getAuroraToken(): string | undefined {
+  if (typeof window !== "undefined" && (window as any).__AURORA_TOKEN__) {
+    return (window as any).__AURORA_TOKEN__ as string
+  }
+  return undefined
+}
+
+/** Append ?token= query param to a URL (for media/resource GETs). */
+export function withToken(url: string): string {
+  const token = getAuroraToken()
+  if (!token) return url
+  const sep = url.includes("?") ? "&" : "?"
+  return `${url}${sep}token=${token}`
+}
+
+/** Build auth headers for fetch requests. */
+function authHeaders(): Record<string, string> {
+  const token = getAuroraToken()
+  if (token) return { "X-Aurora-Token": token }
+  return {}
+}
+
 export class ApiError extends Error {
   status: number
   constructor(message: string, status: number) {
@@ -25,7 +48,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   let res: Response
   try {
     res = await fetch(`${BASE_URL}${path}`, {
-      headers: { "Content-Type": "application/json", ...options.headers },
+      headers: { "Content-Type": "application/json", ...authHeaders(), ...options.headers },
       ...options,
     })
   } catch {
@@ -42,7 +65,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 async function uploadRequest<T>(path: string, formData: FormData): Promise<T> {
   let res: Response
   try {
-    res = await fetch(`${BASE_URL}${path}`, { method: "PUT", body: formData })
+    res = await fetch(`${BASE_URL}${path}`, { method: "PUT", body: formData, headers: authHeaders() })
   } catch {
     throw new ApiError("Cannot reach server — check that the backend is running", 0)
   }
@@ -57,7 +80,7 @@ async function uploadRequest<T>(path: string, formData: FormData): Promise<T> {
 async function postUploadRequest<T>(path: string, formData: FormData): Promise<T> {
   let res: Response
   try {
-    res = await fetch(`${BASE_URL}${path}`, { method: "POST", body: formData })
+    res = await fetch(`${BASE_URL}${path}`, { method: "POST", body: formData, headers: authHeaders() })
   } catch {
     throw new ApiError("Cannot reach server — check that the backend is running", 0)
   }
@@ -66,6 +89,18 @@ async function postUploadRequest<T>(path: string, formData: FormData): Promise<T
     throw new ApiError(err.detail || res.statusText, res.status)
   }
   return res.json()
+}
+
+/** Convert a data-URL to a Blob without fetch() (avoids CSP connect-src restriction in Tauri). */
+export function dataUrlToBlob(dataUrl: string): Blob {
+  const comma = dataUrl.indexOf(",")
+  const meta = dataUrl.slice(0, comma); // e.g. "data:image/png;base64"
+  const raw = dataUrl.slice(comma + 1);
+  const mime = meta.match(/:(.*?);/)?.[1] || "application/octet-stream";
+  const binary = atob(raw);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: mime });
 }
 
 export const api = {

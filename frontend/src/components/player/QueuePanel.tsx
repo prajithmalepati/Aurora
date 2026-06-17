@@ -6,8 +6,129 @@ import { AlbumArt } from "@/components/songs/AlbumArt"
 import { Equalizer } from "@/components/ui/Equalizer"
 import { X, GripVertical, ListMusic, ChevronDown, ChevronUp, Trash2 } from "lucide-react"
 import { motion, AnimatePresence } from "motion/react"
-import { useState, useRef, useCallback } from "react"
+import { useState, useCallback } from "react"
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core"
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
 
+// ── Sortable queue item ────────────────────────────────────────────
+function SortableQueueItem({
+  song,
+  actualIndex,
+  displayIndex,
+  queueLength,
+  onSongClick,
+  onMoveUp,
+  onMoveDown,
+  onRemove,
+}: {
+  song: Song
+  actualIndex: number
+  displayIndex: number
+  queueLength: number
+  onSongClick: () => void
+  onMoveUp: () => void
+  onMoveDown: () => void
+  onRemove: () => void
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: `queue-${actualIndex}` })
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    background: isDragging ? "var(--aurora-surface-hover)" : undefined,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="group flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors cursor-pointer select-none active:bg-white/[0.03]"
+      onClick={onSongClick}
+    >
+      {/* Drag handle */}
+      <span
+        className="flex-shrink-0 text-[var(--aurora-text-tertiary)] opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
+        aria-label="Drag to reorder"
+        {...attributes}
+        {...listeners}
+      >
+        <GripVertical className="h-3.5 w-3.5" />
+      </span>
+
+      <span className="text-[10px] text-[var(--aurora-text-tertiary)] tabular-nums w-5 text-right flex-shrink-0">
+        {displayIndex}
+      </span>
+
+      <AlbumArt song={song} size="sm" className="flex-shrink-0 rounded-sm" />
+
+      <div className="flex-1 min-w-0">
+        <p className="text-[13px] text-[var(--aurora-text)] truncate leading-tight">
+          {song.title}
+        </p>
+        <p className="text-[10px] text-[var(--aurora-text-secondary)] truncate">
+          {song.artist}
+        </p>
+      </div>
+
+      <span className="text-[10px] text-[var(--aurora-text-tertiary)] tabular-nums flex-shrink-0 w-10 text-right">
+        {formatDuration(song.duration)}
+      </span>
+
+      {/* Reorder buttons */}
+      <div className="flex flex-col opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+        <button
+          onClick={(e) => { e.stopPropagation(); onMoveUp() }}
+          disabled={actualIndex === 0}
+          className="h-4 w-5 flex items-center justify-center text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-text)] disabled:opacity-40"
+          aria-label="Move up"
+        >
+          <ChevronUp className="h-3 w-3" />
+        </button>
+        <button
+          onClick={(e) => { e.stopPropagation(); onMoveDown() }}
+          disabled={actualIndex === queueLength - 1}
+          className="h-4 w-5 flex items-center justify-center text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-text)] disabled:opacity-40"
+          aria-label="Move down"
+        >
+          <ChevronDown className="h-3 w-3" />
+        </button>
+      </div>
+
+      {/* Remove */}
+      <button
+        onClick={(e) => { e.stopPropagation(); onRemove() }}
+        className="flex-shrink-0 h-6 w-6 rounded flex items-center justify-center text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-danger)] hover:bg-[var(--aurora-danger)]/10 transition-colors opacity-0 group-hover:opacity-100"
+        aria-label={`Remove ${song.title} from queue`}
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  )
+}
+
+// ── Main panel ─────────────────────────────────────────────────────
 interface QueuePanelProps {
   open: boolean
   onClose: () => void
@@ -25,47 +146,34 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
   const playSong = usePlayerStore((state) => state.playSong)
 
   const [historyOpen, setHistoryOpen] = useState(false)
-  const [dragIndex, setDragIndex] = useState<number | null>(null)
-  const dragOverIndex = useRef<number | null>(null)
 
   // Up Next = songs after current
   const upNext = queue.slice(queueIndex + 1)
   // History = last 20 entries (most recent last)
   const recentHistory = queueHistory.slice(-20).reverse()
 
-  const handleRemove = (index: number) => {
-    removeFromQueue(index)
-  }
+  // dnd-kit sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
 
-  const handleMoveUp = (index: number) => {
-    if (index > 0) {
-      reorderQueue(index, index - 1)
-    }
-  }
+  // Sortable IDs for up-next items
+  const sortableIds = upNext.map((_, i) => `queue-${queueIndex + 1 + i}`)
 
-  const handleMoveDown = (index: number) => {
-    if (index < queue.length - 1) {
-      reorderQueue(index, index + 1)
-    }
-  }
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event
+      if (!over || active.id === over.id) return
 
-  // Drag handlers
-  const handleDragStart = useCallback((index: number) => {
-    setDragIndex(index)
-  }, [])
+      const fromActual = Number(String(active.id).replace("queue-", ""))
+      const toActual = Number(String(over.id).replace("queue-", ""))
+      if (isNaN(fromActual) || isNaN(toActual) || fromActual === toActual) return
 
-  const handleDragOver = useCallback((e: React.DragEvent, index: number) => {
-    e.preventDefault()
-    dragOverIndex.current = index
-  }, [])
-
-  const handleDragEnd = useCallback(() => {
-    if (dragIndex !== null && dragOverIndex.current !== null && dragIndex !== dragOverIndex.current) {
-      reorderQueue(dragIndex, dragOverIndex.current)
-    }
-    setDragIndex(null)
-    dragOverIndex.current = null
-  }, [dragIndex, reorderQueue])
+      reorderQueue(fromActual, toActual)
+    },
+    [reorderQueue]
+  )
 
   const handleSongClick = (song: Song) => {
     playSong(song, queue)
@@ -173,86 +281,36 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
                       <p className="text-[10px] uppercase tracking-widest text-[var(--aurora-text-tertiary)] mb-3 font-medium">
                         Up Next · {upNext.length}
                       </p>
-                      <div className="flex flex-col gap-0.5">
-                        {upNext.map((song, i) => {
-                          const actualIndex = queueIndex + 1 + i
-                          const isDragging = dragIndex === actualIndex
-                          return (
-                            <div
-                              key={`${song.id}-${actualIndex}`}
-                              className={`group flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors cursor-pointer active:bg-white/[0.03] ${
-                                isDragging ? "opacity-50" : ""
-                              }`}
-                              style={{
-                                background: isDragging
-                                  ? "var(--aurora-surface-hover)"
-                                  : undefined,
-                              }}
-                              draggable
-                              onDragStart={() => handleDragStart(actualIndex)}
-                              onDragOver={(e) => handleDragOver(e, actualIndex)}
-                              onDragEnd={handleDragEnd}
-                              onClick={() => handleSongClick(song)}
-                            >
-                              {/* Drag handle */}
-                              <span
-                                className="flex-shrink-0 text-[var(--aurora-text-tertiary)] opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
-                                aria-label="Drag to reorder"
-                              >
-                                <GripVertical className="h-3.5 w-3.5" />
-                              </span>
-
-                              <span className="text-[10px] text-[var(--aurora-text-tertiary)] tabular-nums w-5 text-right flex-shrink-0">
-                                {i + 1}
-                              </span>
-
-                              <AlbumArt song={song} size="sm" className="flex-shrink-0 rounded-sm" />
-
-                              <div className="flex-1 min-w-0">
-                                <p className="text-[13px] text-[var(--aurora-text)] truncate leading-tight">
-                                  {song.title}
-                                </p>
-                                <p className="text-[10px] text-[var(--aurora-text-secondary)] truncate">
-                                  {song.artist}
-                                </p>
-                              </div>
-
-                              <span className="text-[10px] text-[var(--aurora-text-tertiary)] tabular-nums flex-shrink-0 w-10 text-right">
-                                {formatDuration(song.duration)}
-                              </span>
-
-                              {/* Reorder buttons */}
-                              <div className="flex flex-col opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); handleMoveUp(actualIndex) }}
-                                  disabled={actualIndex === 0}
-                                  className="h-4 w-5 flex items-center justify-center text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-text)] disabled:opacity-40"
-                                  aria-label="Move up"
-                                >
-                                  <ChevronUp className="h-3 w-3" />
-                                </button>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); handleMoveDown(actualIndex) }}
-                                  disabled={actualIndex === queue.length - 1}
-                                  className="h-4 w-5 flex items-center justify-center text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-text)] disabled:opacity-40"
-                                  aria-label="Move down"
-                                >
-                                  <ChevronDown className="h-3 w-3" />
-                                </button>
-                              </div>
-
-                              {/* Remove */}
-                              <button
-                                onClick={(e) => { e.stopPropagation(); handleRemove(actualIndex) }}
-                                className="flex-shrink-0 h-6 w-6 rounded flex items-center justify-center text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-danger)] hover:bg-[var(--aurora-danger)]/10 transition-colors opacity-0 group-hover:opacity-100"
-                                aria-label={`Remove ${song.title} from queue`}
-                              >
-                                <X className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          )
-                        })}
-                      </div>
+                      <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={handleDragEnd}
+                      >
+                        <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
+                          <div className="flex flex-col gap-0.5">
+                            {upNext.map((song, i) => {
+                              const actualIndex = queueIndex + 1 + i
+                              return (
+                                <SortableQueueItem
+                                  key={`${song.id}-${actualIndex}`}
+                                  song={song}
+                                  actualIndex={actualIndex}
+                                  displayIndex={i + 1}
+                                  queueLength={queue.length}
+                                  onSongClick={() => handleSongClick(song)}
+                                  onMoveUp={() => {
+                                    if (actualIndex > 0) reorderQueue(actualIndex, actualIndex - 1)
+                                  }}
+                                  onMoveDown={() => {
+                                    if (actualIndex < queue.length - 1) reorderQueue(actualIndex, actualIndex + 1)
+                                  }}
+                                  onRemove={() => removeFromQueue(actualIndex)}
+                                />
+                              )
+                            })}
+                          </div>
+                        </SortableContext>
+                      </DndContext>
                     </div>
                   )}
 
