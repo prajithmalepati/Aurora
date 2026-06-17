@@ -34,6 +34,7 @@ function App() {
   const songs = useSongStore((state) => state.songs)
   const songsLoading = useSongStore((state) => state.loading)
   const songsError = useSongStore((state) => state.error)
+  const totalCount = useSongStore((state) => state.totalCount)
   const view = useSongStore((state) => state.view)
   const setView = useSongStore((state) => state.setView)
   const fetchPlaylists = usePlaylistStore((state) => state.fetchPlaylists)
@@ -132,7 +133,7 @@ function App() {
               <span>Shuffle</span>
             </button>
             <span className="label-micro text-[var(--aurora-text-secondary)]">
-              {songs.length} {songs.length === 1 ? "song" : "songs"}
+              {totalCount} {totalCount === 1 ? "song" : "songs"}
             </span>
           </div>
           <div
@@ -155,7 +156,16 @@ function App() {
               className="w-full bg-transparent border-0 outline-none pl-11 pr-5 py-2.5 text-[13px] text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-tertiary)] placeholder:font-display-italic placeholder:text-[14px] focus-visible:shadow-none"
             />
           </div>
-          <SongTable songs={songs} loading={songsLoading} error={songsError} onPlay={handlePlaySong} columnContext="all-songs" fillHeight />
+          <SongTable
+            songs={songs}
+            loading={songsLoading}
+            error={songsError}
+            onPlay={handlePlaySong}
+            columnContext="all-songs"
+            fillHeight
+            emptyTitle={searchQuery.trim() ? "No results" : undefined}
+            emptyHint={searchQuery.trim() ? `Nothing matches "${searchQuery.trim()}"` : undefined}
+          />
         </div>
       )
     } else if (view.kind === "filter") {
