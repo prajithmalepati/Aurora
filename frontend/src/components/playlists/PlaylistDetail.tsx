@@ -152,9 +152,11 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
   // Server-stored image URL (comes back from the API on every fetchPlaylistDetail)
   const heroImage = activePlaylist?.image_url ? withToken(`${getBaseUrl()}${activePlaylist.image_url}`) : null
 
-  // Use backend-computed dominant_color only as fallback (no cover image).
-  // When a cover exists, the IMAGE itself is the bleed (always matches).
-  const heroGlow = heroImage ? null : fallbackGlow
+  // Procedural fallback color (no cover image)
+  const heroGlow = fallbackGlow
+
+  // Even ambient wash: dominant color from the cover (backend-computed), else procedural fallback
+  const bleedColor = activePlaylist?.dominant_color ?? fallbackGlow
 
   // Neutral dark gradient for the hero tile — no teal/violet bias.
   // If the playlist has a custom accent colour we let a whisper of it through.
@@ -405,31 +407,17 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
     <div className="aurora-view-enter">
       {/* ── HERO HEADER ── */}
       <div className="relative px-4 pt-6 pb-6 sm:px-10 sm:pt-10 sm:pb-8 overflow-hidden">
-        {/* Background bleed: blurred cover image when available, procedural fallback otherwise */}
-        {heroImage ? (
-          <div
-            className="absolute inset-0 pointer-events-none overflow-hidden"
-            aria-hidden="true"
-          >
-            <img
-              src={heroImage}
-              alt=""
-              className="absolute -inset-[20%] w-[140%] h-[140%] object-cover blur-[60px] opacity-[0.55] saturate-[1.4]"
-              style={{
-                maskImage: "linear-gradient(to bottom, black 0%, black 35%, transparent 95%)",
-                WebkitMaskImage: "linear-gradient(to bottom, black 0%, black 35%, transparent 95%)",
-              }}
-            />
-          </div>
-        ) : (
-          <div
-            className="absolute inset-0 opacity-60 pointer-events-none"
-            style={{
-              background: `radial-gradient(ellipse 700px 400px at 18% 0%, ${heroGlow} 0%, transparent 65%)`,
-            }}
-            aria-hidden="true"
-          />
-        )}
+        {/* Background bleed: even dominant-color wash, pooled top, fading down */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          aria-hidden="true"
+          style={{
+            background: `radial-gradient(ellipse 120% 80% at 50% -20%, ${bleedColor} 0%, transparent 72%)`,
+            opacity: 0.4,
+            maskImage: "linear-gradient(to bottom, black 0%, black 40%, transparent 100%)",
+            WebkitMaskImage: "linear-gradient(to bottom, black 0%, black 40%, transparent 100%)",
+          }}
+        />
         <div className="relative flex flex-wrap items-end gap-4 sm:gap-7">
           {/* Hero art tile */}
           <div

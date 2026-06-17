@@ -26,25 +26,25 @@ interface ColumnState {
 // ── Per-context defaults ──
 const CONTEXT_DEFAULTS: Record<ColumnContext, { order: ColumnId[]; hidden: ColumnId[] }> = {
   "all-songs": {
-    order: ["index", "title", "type", "duration", "artist", "album", "tags", "actions"],
+    order: ["index", "title", "type", "duration", "artist", "album", "tags"],
     hidden: [],
   },
   playlist: {
     // R13: trimmed — no Artist/Album/Type by default
-    order: ["index", "title", "duration", "tags", "actions"],
+    order: ["index", "title", "duration", "tags"],
     hidden: ["type", "artist", "album"],
   },
   album: {
     // Album redundant inside an album
-    order: ["index", "title", "duration", "tags", "actions"],
+    order: ["index", "title", "duration", "tags"],
     hidden: ["type", "artist", "album"],
   },
   folder: {
-    order: ["index", "title", "type", "duration", "artist", "album", "tags", "actions"],
+    order: ["index", "title", "type", "duration", "artist", "album", "tags"],
     hidden: [],
   },
   tags: {
-    order: ["index", "title", "type", "duration", "artist", "album", "tags", "actions"],
+    order: ["index", "title", "type", "duration", "artist", "album", "tags"],
     hidden: [],
   },
 }

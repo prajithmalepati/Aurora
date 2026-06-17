@@ -112,7 +112,7 @@ function App() {
     let content: ReactNode
     if (view.kind === "all-songs") {
       content = (
-        <div className="p-4 sm:px-10 sm:pt-8 sm:pb-6 max-w-[1800px] mx-auto">
+        <div className="p-4 sm:px-10 sm:pt-8 sm:pb-6 max-w-[1800px] mx-auto h-full flex flex-col min-h-0">
           <div className="flex items-center justify-between mb-6">
             <h1 className="font-display text-[28px] leading-none tracking-tight text-[var(--aurora-text)]">
               All Songs
@@ -155,7 +155,7 @@ function App() {
               className="w-full bg-transparent border-0 outline-none pl-11 pr-5 py-2.5 text-[13px] text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-tertiary)] placeholder:font-display-italic placeholder:text-[14px] focus-visible:shadow-none"
             />
           </div>
-          <SongTable songs={songs} loading={songsLoading} error={songsError} onPlay={handlePlaySong} columnContext="all-songs" />
+          <SongTable songs={songs} loading={songsLoading} error={songsError} onPlay={handlePlaySong} columnContext="all-songs" fillHeight />
         </div>
       )
     } else if (view.kind === "filter") {

@@ -22,7 +22,7 @@ import { api } from "@/lib/api"
 import { EditSongDialog } from "@/components/songs/EditSongDialog"
 import { TagEditor } from "@/components/tags/TagEditor"
 import { ColumnPicker } from "./ColumnPicker"
-import { Music, ChevronUp, ChevronDown, AlertTriangle, RefreshCw, ListPlus, Tag as TagIcon, X, Trash2, Pencil } from "lucide-react"
+import { Music, ChevronUp, ChevronDown, AlertTriangle, RefreshCw, ListPlus, Tag as TagIcon, X, Trash2, Pencil, Scissors } from "lucide-react"
 import {
   DndContext,
   closestCenter,
@@ -51,6 +51,7 @@ interface SongTableProps {
   // Playlist-mode optional props (passed through to SongRow)
   onRemoveFromPlaylist?: (song: Song) => void
   onTrim?: (songId: number) => void
+  fillHeight?: boolean
   // Drag-and-drop (dnd-kit)
   isDraggable?: boolean
   onReorder?: (fromId: number, toId: number) => void
@@ -491,7 +492,7 @@ const OVERSCAN = 10
 
 export function SongTable({
   songs, loading = false, error = null, onPlay, animKey, showSort = true, columnContext: _columnContext, disableInfiniteScroll = false,
-  onRemoveFromPlaylist, onTrim,
+  onRemoveFromPlaylist, onTrim, fillHeight = false,
   isDraggable, onReorder,
 }: SongTableProps) {
   const sortField = useSongStore((state) => state.sortField)
@@ -920,10 +921,10 @@ export function SongTable({
   const isLoadingMore = loading && songs.length > 0
 
   return (
-    <>
+    <div className={fillHeight ? "flex flex-col min-h-0 h-full" : undefined}>
       <div
         ref={tableContainerRef}
-        className="w-full h-[calc(100vh-15rem)] overflow-auto aurora-fade-in"
+        className={fillHeight ? "w-full flex-1 min-h-0 overflow-auto aurora-fade-in" : "w-full h-[calc(100vh-15rem)] overflow-auto aurora-fade-in"}
         onScroll={handleScroll}
       >
         {toolbar}
@@ -1187,6 +1188,15 @@ export function SongTable({
                   <TagIcon className="h-3.5 w-3.5 text-[var(--aurora-text-secondary)]" />
                   Edit Tags
                 </button>
+                {onTrim && (
+                  <button
+                    className="w-full flex items-center gap-2.5 px-3.5 py-2 text-[13px] text-[var(--aurora-text)] hover:bg-[var(--aurora-surface-hover)] transition-colors text-left"
+                    onClick={() => { const song = contextTargets[0]; closeContextMenu(); onTrim(song.id) }}
+                  >
+                    <Scissors className="h-3.5 w-3.5 text-[var(--aurora-text-secondary)]" />
+                    Trim
+                  </button>
+                )}
               </>
             )}
 
@@ -1222,6 +1232,6 @@ export function SongTable({
           onOpenChange={(open) => { if (!open) setContextTagSong(null) }}
         />
       )}
-    </>
+    </div>
   )
 }
