@@ -68,7 +68,7 @@
   --aurora-bg: var(--aurora-obsidian);
   --aurora-bg-surface: var(--aurora-slate);
   --aurora-bg-hover: #111419;
-  --aurora-surface-bar: rgba(6, 7, 9, 0.80);
+  --aurora-surface-bar: rgba(6, 7, 9, 0.92);
   --aurora-surface-inset: rgba(255, 255, 255, 0.02);
   --font-mono: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, monospace;
 
