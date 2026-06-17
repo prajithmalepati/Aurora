@@ -462,9 +462,9 @@ function SortDropdown({ value, onChange }: { value: string; onChange: (v: string
       {open && (
         <div
           ref={panelRef}
-          className="absolute right-0 top-full mt-1 z-50 min-w-[180px] py-1.5 rounded-lg shadow-xl border backdrop-blur-xl"
+          className="absolute right-0 top-full mt-1 z-50 min-w-[180px] py-1.5 rounded-lg shadow-xl border"
           style={{
-            background: "color-mix(in oklch, var(--aurora-surface) 92%, transparent)",
+            background: "var(--aurora-surface-2)",
             borderColor: "var(--aurora-rim)",
             boxShadow: "0 8px 30px rgba(0,0,0,0.5)",
           }}
@@ -1067,11 +1067,11 @@ export function SongTable({
             onContextMenu={(e) => { e.preventDefault(); closeContextMenu() }}
           />
           <div
-            className="fixed z-50 min-w-[200px] max-w-[260px] py-1.5 rounded-lg shadow-xl border backdrop-blur-xl"
+            className="fixed z-50 min-w-[200px] max-w-[260px] py-1.5 rounded-lg shadow-xl border"
             style={{
               left: `${contextMenu.x}px`,
               top: `${contextMenu.y}px`,
-              background: "color-mix(in oklch, var(--aurora-surface) 92%, transparent)",
+              background: "var(--aurora-surface-2)",
               borderColor: "var(--aurora-rim)",
               boxShadow: "0 8px 30px rgba(0,0,0,0.5)",
             }}
