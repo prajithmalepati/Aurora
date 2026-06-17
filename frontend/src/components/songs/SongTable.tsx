@@ -980,7 +980,7 @@ export function SongTable({
                     visibleColumns={visibleColumns}
                     onPlay={onPlay}
                     animIndex={virtualRow.index < 16 ? virtualRow.index : undefined}
-                    isSelected={selectedIds.has(song.id)}
+                    isSelected={selectedIds.has(song.id) || contextMenu?.song.id === song.id}
                     onToggleSelect={(shiftKey, metaKey) => toggleSelectOne(song.id, shiftKey, metaKey)}
                     onContextMenu={(e) => handleContextMenuEvent(e, song, virtualRow.index)}
                     selectMode={selectMode}
