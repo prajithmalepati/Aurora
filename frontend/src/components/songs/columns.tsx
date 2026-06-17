@@ -4,12 +4,10 @@ import { AlbumArt } from "@/components/songs/AlbumArt"
 import { Equalizer } from "@/components/ui/Equalizer"
 import { AuroraPlayButton } from "@/components/player/AuroraPlayButton"
 import { TagList } from "@/components/tags/TagList"
-import { MoreHorizontal, ListPlus, Pencil, Tag as TagIcon, Scissors, X, Trash2 } from "lucide-react"
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import type { SortField } from "./SongTable"
 
 // ── Column ID type ──
-export type ColumnId = "index" | "title" | "type" | "duration" | "artist" | "album" | "tags" | "actions"
+export type ColumnId = "index" | "title" | "type" | "duration" | "artist" | "album" | "tags"
 
 // ── Cell context — everything a cell render function needs ──
 export interface CellCtx {
@@ -200,76 +198,6 @@ export const COLUMN_REGISTRY: ColumnDef[] = [
       <>
         <div className="relative z-10">
           <TagList tags={song.tags} />
-        </div>
-      </>
-    ),
-  },
-  {
-    id: "actions",
-    label: "Actions",
-    fixed: true,
-    defaultWidth: 128,
-    minWidth: 96,
-    headerClassName: "w-32 text-right",
-    cellClassName: "relative px-4 py-2 w-12",
-    render: (_song, ctx) => (
-      <>
-        <div className="relative z-10 flex items-center justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              className="aurora-focus h-7 w-7 rounded-md flex items-center justify-center text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-text)] hover:bg-white/[0.04] transition-colors duration-150"
-              aria-label="More actions"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <MoreHorizontal className="h-4 w-4" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" sideOffset={4}>
-              <DropdownMenuItem onClick={ctx.onPlay}>
-                <span className="w-4 h-4 flex items-center justify-center text-[var(--aurora-accent)]">▶</span>
-                Play Now
-              </DropdownMenuItem>
-              {ctx.onPlayNext && (
-                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); ctx.onPlayNext!() }}>
-                  <span className="w-4 h-4 flex items-center justify-center text-[var(--aurora-text-secondary)]">↳</span>
-                  Play Next
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); ctx.onAddToQueue(e as unknown as React.MouseEvent) }}>
-                <ListPlus className="h-4 w-4" />
-                {ctx.inQueue ? "Already in Queue" : "Add to Queue"}
-              </DropdownMenuItem>
-              {ctx.onAddToPlaylist && (
-                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); ctx.onAddToPlaylist!() }}>
-                  <ListPlus className="h-4 w-4" />
-                  Add to Playlist
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); ctx.onEditTags() }}>
-                <TagIcon className="h-4 w-4" />
-                Edit Tags
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); ctx.onEditSong() }}>
-                <Pencil className="h-4 w-4" />
-                Edit Song
-              </DropdownMenuItem>
-              {ctx.onTrim && (
-                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); ctx.onTrim!() }}>
-                  <Scissors className="h-4 w-4" />
-                  Trim
-                </DropdownMenuItem>
-              )}
-              {ctx.onRemoveFromPlaylist && (
-                <DropdownMenuItem variant="destructive" onClick={(e) => { e.stopPropagation(); ctx.onRemoveFromPlaylist!() }}>
-                  <X className="h-4 w-4" />
-                  Remove from Playlist
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuItem variant="destructive" onClick={(e) => { e.stopPropagation(); ctx.onDelete() }}>
-                <Trash2 className="h-4 w-4" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
       </>
     ),
