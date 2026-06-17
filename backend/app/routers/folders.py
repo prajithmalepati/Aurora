@@ -10,17 +10,12 @@ from app.cache import folder_cache, song_cache
 router = APIRouter(tags=["folders"])
 
 
-def _build_tree(paths: list[str]) -> list[dict]:
-    """Build a nested folder tree from a list of directory paths.
+def _build_tree(dir_counts: dict[str, int]) -> list[dict]:
+    """Build a nested folder tree from a mapping of directory paths to song counts.
 
     Each path is a directory containing songs. Returns a list of top-level
     folder nodes, each with name, path, song_count, and subfolders.
     """
-    # Count songs per directory
-    dir_counts: dict[str, int] = {}
-    for p in paths:
-        dir_counts[p] = dir_counts.get(p, 0) + 1
-
     # Build nested tree structure
     # We use an intermediate dict where keys are path components
     # and leaves carry the aggregate counts
@@ -80,17 +75,18 @@ def get_folder_tree():
         )
         rows = cursor.fetchall()
 
-    # Extract unique directory paths (parent directory of each file)
+    # Count songs per directory (parent directory of each file)
     import os
-    dirs: set[str] = set()
+    from collections import Counter
+    dir_counts: Counter[str] = Counter()
     for row in rows:
-        fp = row["file_path"]
+        fp = row["file_path"].replace("\\", "/")
         d = os.path.dirname(fp)
         if d:
-            dirs.add(d)
+            dir_counts[d] += 1
 
     # Build and return the tree
-    tree = _build_tree(list(dirs))
+    tree = _build_tree(dir_counts)
 
     result = {
         "data": {"folders": tree},
@@ -147,21 +143,28 @@ def get_folder_songs(
         # For non-recursive, exclude files with deeper paths
         deeper_pattern = escaped_path + "/%/%" if not recursive else None
 
-        query = SONG_SELECT_QUERY + " WHERE s.file_path LIKE ?"
+        # Normalize file_path to forward-slash with leading / for cross-platform matching
+        # (Windows stores backslash paths; tree always builds /-prefixed node paths)
+        # char(92) = backslash; REPLACE normalizes to '/', LTRIM+'/' ensures leading slash
+        norm_col = "('/' || LTRIM(REPLACE(s.file_path, char(92), '/'), '/'))"
+        like_clause = norm_col + " LIKE ? ESCAPE char(92)"
+        not_like_clause = norm_col + " NOT LIKE ? ESCAPE char(92)"
+
+        query = SONG_SELECT_QUERY + " WHERE " + like_clause
 
         params: list = [like_pattern]
 
         if not recursive and deeper_pattern is not None:
-            query += " AND s.file_path NOT LIKE ? ESCAPE '\\'"
+            query += " AND " + not_like_clause
             params.append(deeper_pattern)
 
         query += " GROUP BY s.id ORDER BY s.title COLLATE NOCASE, s.id ASC"
 
         # Count query
-        count_query = COUNT_SONG_QUERY + " WHERE s.file_path LIKE ?"
+        count_query = COUNT_SONG_QUERY + " WHERE " + like_clause
         count_params: list = [like_pattern]
         if not recursive and deeper_pattern is not None:
-            count_query += " AND s.file_path NOT LIKE ? ESCAPE '\\'"
+            count_query += " AND " + not_like_clause
             count_params.append(deeper_pattern)
 
         if limit is not None and limit > 0:

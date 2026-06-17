@@ -22,11 +22,9 @@ const shortcutCategories: ShortcutCategory[] = [
     name: "Playback",
     shortcuts: [
       { keys: "Space", action: "Play / Pause" },
-      { keys: "←  →", action: "Seek backward / forward" },
-      { keys: "↑  ↓", action: "Volume up / down" },
-      { keys: "M", action: "Mute / Unmute" },
       { keys: "N", action: "Next song" },
       { keys: "P", action: "Previous song" },
+      { keys: "M", action: "Mute / Unmute" },
       { keys: "[", action: "Volume −5%" },
       { keys: "]", action: "Volume +5%" },
     ],
@@ -42,7 +40,7 @@ const shortcutCategories: ShortcutCategory[] = [
     name: "Navigation",
     shortcuts: [
       { keys: "/", action: "Focus search" },
-      { keys: `${mod} + F`, action: "Focus filter" },
+      { keys: `${mod} + F`, action: "Focus search" },
       { keys: `${mod} + K`, action: "Command palette" },
       { keys: `${mod} + Shift + F`, action: "Toggle fullscreen" },
       { keys: "S", action: "Toggle Settings" },

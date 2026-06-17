@@ -1,0 +1,51 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "Aurora",
+  "version": "0.1.1",
+  "identifier": "app.aurora.music",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [],
+    "security": {
+      "csp": {
+        "default-src": "'self'",
+        "connect-src": "'self' http://127.0.0.1:* ipc: http://ipc.localhost https://api.github.com https://github.com",
+        "img-src": "'self' http://127.0.0.1:* data: blob:",
+        "media-src": "'self' http://127.0.0.1:*",
+        "style-src": "'self' 'unsafe-inline'",
+        "script-src": "'self'"
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["deb", "nsis"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": {
+      "../../backend/dist/aurora-backend/": "backend/"
+    },
+    "createUpdaterArtifacts": true,
+    "android": {
+      "debugApplicationIdSuffix": ".debug"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEE4MUVGNkZBQ0Y4Q0M2NkUKUldSdXhvelArdlllcU5NNGEwUk95SE5zUlA2R0RYdTRNQmJKVWd3QWZwMm1zNnhLV1pBYkREL1QK",
+      "endpoints": [
+        "https://github.com/prajithmalepati/Aurora/releases/latest/download/latest.json"
+      ]
+    }
+  }
+}

@@ -118,6 +118,61 @@ cd frontend
 npm run lint
 ```
 
+## Desktop App (Tauri)
+
+Aurora ships as a native desktop app via Tauri 2. The backend is frozen with PyInstaller and bundled as a sidecar — no Python installation required for end users.
+
+### Features
+
+- **Auto-updater** — on startup, Aurora checks for new releases and shows a toast notification with an Install button. On Linux (deb), the Install button opens the GitHub release page in your system browser. On Windows, updates download and install automatically.
+- **Single-instance** — launching Aurora when it's already running focuses the existing window instead of opening a second instance.
+- **Sidecar backend** — the Python backend spawns automatically on a free port with a random auth token. No manual backend start needed.
+
+### Dev Loop
+
+```bash
+# 1. Freeze the backend (one-time, or after backend changes)
+cd backend
+source venv/bin/activate
+pyinstaller aurora-backend.spec --distpath dist --workpath build -y
+
+# 2. Launch Tauri dev (starts Vite + Rust compile + sidecar)
+cd frontend
+npx tauri dev
+```
+
+The Tauri app spawns the frozen backend on a free port, waits for health, then injects `window.__AURORA_BASE_URL__` via `initialization_script` before creating the window.
+
+### CI Artifacts
+
+Pushing a `v*` tag triggers signed release builds (`.deb` + `.exe` + updater artifacts). `workflow_dispatch` builds unsigned artifacts for testing:
+
+```bash
+gh workflow run "Desktop Build" --ref hermes/phase1-desktop
+```
+
+### Install (Linux)
+
+**From .deb (direct download):**
+
+```bash
+sudo dpkg -i Aurora_0.1.1_amd64.deb
+# Then run: Aurora
+```
+
+**From AUR (Arch Linux):**
+
+```bash
+# Build from source (aurora-git)
+git clone https://aur.archlinux.org/aurora-git.git
+cd aurora-git
+makepkg -si
+```
+
+See [`packaging/aur/README.md`](packaging/aur/README.md) for details.
+
+The backend binds to `127.0.0.1` by default. For LAN/mobile access: `AURORA_HOST=0.0.0.0 Aurora`.
+
 ## Keyboard Shortcuts
 
 | Key | Action |

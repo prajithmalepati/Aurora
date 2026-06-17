@@ -38,6 +38,8 @@ export interface Playlist {
   crossfade_enabled: number | null
   crossfade_duration_s: number | null
   song_count: number
+  dominant_color?: string | null
+  dominant_color_2?: string | null
   created_at: string
   updated_at: string
 }

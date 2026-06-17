@@ -1,8 +1,11 @@
 """SQLite database connection and initialization."""
+import logging
 import sqlite3
 from pathlib import Path
 
 from app.paths import DB_PATH
+
+logger = logging.getLogger(__name__)
 
 # ── Current schema (version 1) ──────────────────────────────────────────
 # All columns that exist today are defined here. Fresh databases create
@@ -56,7 +59,9 @@ CREATE TABLE IF NOT EXISTS playlists (
     created_at          TEXT    NOT NULL,
     updated_at          TEXT    NOT NULL,
     crossfade_enabled   INTEGER DEFAULT NULL,
-    crossfade_duration_s INTEGER DEFAULT NULL
+    crossfade_duration_s INTEGER DEFAULT NULL,
+    dominant_color      TEXT,
+    dominant_color_2    TEXT
 );
 
 CREATE TABLE IF NOT EXISTS tags (
@@ -173,6 +178,11 @@ MIGRATIONS = [
     (2, [
         "CREATE INDEX IF NOT EXISTS idx_songs_title_artist ON songs(title, artist)",
     ]),
+    # Version 3: playlist dominant colors for cover bleed
+    (3, [
+        "ALTER TABLE playlists ADD COLUMN dominant_color TEXT",
+        "ALTER TABLE playlists ADD COLUMN dominant_color_2 TEXT",
+    ]),
 ]
 
 CURRENT_VERSION = len(MIGRATIONS)
@@ -211,7 +221,11 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
         if version <= current:
             continue
         for stmt in stmts:
-            conn.execute(stmt)
+            try:
+                conn.execute(stmt)
+            except sqlite3.OperationalError as e:
+                if "duplicate column" not in str(e):
+                    raise
         conn.execute(f"PRAGMA user_version = {version}")
 
     conn.commit()
@@ -257,8 +271,8 @@ def _backfill_album_art(conn) -> None:
             )
             if filename:
                 updated += 1
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Album art backfill failed for %s: %s", row["file_path"], e)
     if rows:
         conn.commit()
 
@@ -300,7 +314,7 @@ PLAYLIST_SONG_SELECT_COLUMNS = """
     s.replaygain_track_gain, s.replaygain_track_peak,
     s.replaygain_album_gain, s.replaygain_album_peak,
     s.artists, s.featured_artists,
-    GROUP_CONCAT(t.name) as tags,
+    GROUP_CONCAT(DISTINCT t.name) as tags,
     ps.start_time_ms, ps.end_time_ms, ps.position"""
 
 PLAYLIST_SONG_SELECT_FROM = """

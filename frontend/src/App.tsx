@@ -16,6 +16,7 @@ import { AuroraColorBridge } from "@/components/aurora/AuroraColorBridge"
 import { WelcomeOverlay, dismissWelcome, isWelcomeDismissed } from "@/components/welcome/WelcomeOverlay"
 import { Search, Shuffle } from "lucide-react"
 import type { Song } from "@/types"
+import { scheduleStartupUpdateCheck } from "@/lib/updater"
 
 // Lazy-loaded views — only one renders at a time
 const SongTable = lazy(() => import("@/components/songs/SongTable").then(m => ({ default: m.SongTable })))
@@ -44,6 +45,11 @@ function App() {
     fetchPlaylists()
     fetchTags()
   }, [fetchSongs, fetchPlaylists, fetchTags])
+
+  // One-shot update check 10s after mount
+  useEffect(() => {
+    scheduleStartupUpdateCheck()
+  }, [])
 
   // Debounced search handler
   useEffect(() => {
@@ -106,7 +112,7 @@ function App() {
     let content: ReactNode
     if (view.kind === "all-songs") {
       content = (
-        <div className="p-4 sm:px-10 sm:pt-8 sm:pb-6 max-w-[1800px] mx-auto">
+        <div className="p-4 sm:px-10 sm:pt-8 sm:pb-6 max-w-[1800px] mx-auto h-full flex flex-col min-h-0">
           <div className="flex items-center justify-between mb-6">
             <h1 className="font-display text-[28px] leading-none tracking-tight text-[var(--aurora-text)]">
               All Songs
@@ -149,7 +155,7 @@ function App() {
               className="w-full bg-transparent border-0 outline-none pl-11 pr-5 py-2.5 text-[13px] text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-tertiary)] placeholder:font-display-italic placeholder:text-[14px] focus-visible:shadow-none"
             />
           </div>
-          <SongTable songs={songs} loading={songsLoading} error={songsError} onPlay={handlePlaySong} />
+          <SongTable songs={songs} loading={songsLoading} error={songsError} onPlay={handlePlaySong} columnContext="all-songs" fillHeight />
         </div>
       )
     } else if (view.kind === "filter") {
@@ -175,10 +181,10 @@ function App() {
         }>
           <motion.div
             key={view.kind === "playlist" ? `playlist-${view.playlistId}` : view.kind}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={{ type: "spring", stiffness: 280, damping: 30 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15, ease: "easeOut" }}
           >
             {content}
           </motion.div>

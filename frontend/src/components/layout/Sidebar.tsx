@@ -10,17 +10,14 @@ import { motion } from "motion/react"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { useTagStore } from "@/stores/tagStore"
 import { useFilterStore } from "@/stores/filterStore"
-import { api } from "@/lib/api"
 import { PlaylistItem } from "@/components/playlists/PlaylistItem"
 import { BorderGlow } from "@/components/ui/BorderGlow"
 import { CreatePlaylistDialog } from "@/components/playlists/CreatePlaylistDialog"
-import { ScanDialog } from "@/components/scanner/ScanDialog"
+
 import { Skeleton } from "@/components/ui/skeleton"
-import { useRef, useState } from "react"
-import { Library, SlidersHorizontal, Plus, FolderSearch, Music, Settings, Upload, FolderOpen, Info, Disc3 } from "lucide-react"
-import { AddSongDialog } from "@/components/songs/AddSongDialog"
+import { useState } from "react"
+import { Library, SlidersHorizontal, Plus, Settings, FolderOpen, Info, Disc3 } from "lucide-react"
 import { AuroraWordmark } from "@/components/aurora/AuroraWordmark"
-import { toast } from "@/lib/toast"
 
 function hexToGlowHSL(hex: string | null | undefined): string {
   if (!hex || !/^#[0-9a-fA-F]{6}$/.test(hex)) return '185 60 60'
@@ -52,10 +49,6 @@ interface SidebarProps {
 
 export function Sidebar({ currentView, onViewChange }: SidebarProps) {
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
-  const [scanOpen, setScanOpen] = useState(false)
-  const [addSongOpen, setAddSongOpen] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const [importLoading, setImportLoading] = useState(false)
   const playlists = usePlaylistStore((state) => state.playlists)
   const playlistsLoading = usePlaylistStore((state) => state.loading)
   const playlistsError = usePlaylistStore((state) => state.error)
@@ -63,47 +56,18 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
   const tagsLoading = useTagStore((state) => state.loading)
   const tagsError = useTagStore((state) => state.error)
   const setQuery = useFilterStore((state) => state.setQuery)
-  const executeFilter = useFilterStore((state) => state.executeFilter)
   const setIsQuickTagView = useFilterStore((state) => state.setIsQuickTagView)
+  const isQuickTagView = useFilterStore((state) => state.isQuickTagView)
+  const filterQuery = useFilterStore((state) => state.query)
 
   const handleTagClick = (tagName: string) => {
     const term = `"${tagName}"`
     setQuery(term)
     setIsQuickTagView(true)
-    executeFilter()
+    // Don't call executeFilter() here — QueryBuilder's debounced useEffect
+    // watches `query` and fires executeFilter after 280ms. Calling it here
+    // AND in the effect causes a double-refresh.
     onViewChange({ kind: "filter" })
-  }
-
-  const fetchPlaylists = usePlaylistStore((state) => state.fetchPlaylists)
-
-  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setImportLoading(true)
-    try {
-      const formData = new FormData()
-      formData.append('file', file)
-      const res = await api.postUpload<{data: {playlist_id: number, name: string, matched_count: number, unmatched_paths: string[]}, message: string}>('/playlists/import', formData)
-      const { playlist_id, name, matched_count, unmatched_paths } = res.data
-      toast.success(`Imported: ${matched_count} songs matched to "${name}"`)
-      if (unmatched_paths && unmatched_paths.length > 0) {
-        toast(`${unmatched_paths.length} file(s) not found in library`, { duration: 6000 })
-      }
-      await fetchPlaylists()
-      // Navigate to the new playlist
-      if (playlist_id) {
-        onViewChange({ kind: 'playlist', playlistId: playlist_id })
-      }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Import failed'
-      toast.error(message)
-    } finally {
-      setImportLoading(false)
-      // Reset the input so the same file can be picked again
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
-      }
-    }
   }
 
   const isActive = (view: View) => {
@@ -145,7 +109,7 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
           <NavItem
             icon={<SlidersHorizontal className="h-4 w-4" strokeWidth={1.5} />}
             label="Mix"
-            active={isActive({ kind: "filter" })}
+            active={isActive({ kind: "filter" }) && !isQuickTagView}
             onClick={() => {
               setIsQuickTagView(false)
               onViewChange({ kind: "filter" })
@@ -171,11 +135,20 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
         {/* Scrollable middle: Playlists + Tags */}
         <div className="flex-1 overflow-y-auto min-h-0 flex flex-col">
           {/* Playlists section header */}
-          <div className="px-6 mb-2 flex items-center justify-between">
+          <div className="px-6 mb-2 flex items-center justify-between group">
             <span className="label-micro">Playlists</span>
-            <span className="text-[10px] text-[var(--aurora-text-tertiary)] tabular-nums">
-              {playlists.length}
-            </span>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setCreateDialogOpen(true)}
+                className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 h-5 w-5 rounded flex items-center justify-center text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-text)] hover:bg-white/[0.06]"
+                aria-label="New playlist"
+              >
+                <Plus className="h-3 w-3" />
+              </button>
+              <span className="text-[10px] text-[var(--aurora-text-tertiary)] tabular-nums">
+                {playlists.length}
+              </span>
+            </div>
           </div>
 
           <div className="px-3 pb-1">
@@ -262,6 +235,7 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
                     key={tag.id}
                     name={tag.name}
                     count={tag.song_count}
+                    active={isQuickTagView && currentView.kind === "filter" && filterQuery === `"${tag.name}"`}
                     onClick={() => handleTagClick(tag.name)}
                   />
                 ))}
@@ -273,30 +247,6 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
         {/* Footer actions */}
         <div className="px-3 pb-4 pt-2 space-y-0.5 shrink-0">
           <div className="aurora-divider-h mx-3 mb-3" />
-          <FooterAction
-            icon={<Plus className="h-3.5 w-3.5" strokeWidth={1.5} />}
-            label="New Playlist"
-            onClick={() => setCreateDialogOpen(true)}
-          />
-          <FooterAction
-            icon={<FolderSearch className="h-3.5 w-3.5" strokeWidth={1.5} />}
-            label="Scan Folder"
-            onClick={() => setScanOpen(true)}
-          />
-          <FooterAction
-            icon={<Music className="h-3.5 w-3.5" strokeWidth={1.5} />}
-            label="Add Song"
-            onClick={() => setAddSongOpen(true)}
-          />
-          <FooterAction
-            icon={importLoading ? (
-              <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-            ) : (
-              <Upload className="h-3.5 w-3.5" strokeWidth={1.5} />
-            )}
-            label="Import"
-            onClick={() => fileInputRef.current?.click()}
-          />
           <FooterAction
             icon={<Settings className="h-3.5 w-3.5" strokeWidth={1.5} />}
             label="Settings"
@@ -312,21 +262,11 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
         </div>
       </aside>
 
-      {/* Hidden file input for import */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".m3u,.m3u8,.json"
-        className="hidden"
-        onChange={handleImport}
-      />
-
       <CreatePlaylistDialog
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
       />
-      <ScanDialog open={scanOpen} onOpenChange={setScanOpen} />
-      <AddSongDialog open={addSongOpen} onOpenChange={setAddSongOpen} />
+
     </>
   )
 }
@@ -400,24 +340,39 @@ function FooterAction({ icon, label, active, onClick }: FooterActionProps) {
 interface TagSidebarItemProps {
   name: string
   count: number
+  active?: boolean
   onClick: () => void
 }
 
-function TagSidebarItem({ name, count, onClick }: TagSidebarItemProps) {
+function TagSidebarItem({ name, count, active, onClick }: TagSidebarItemProps) {
   return (
     <button
       onClick={onClick}
-      className="group relative w-full flex items-center gap-2 px-3 py-[6px] rounded-md text-left text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] transition-colors duration-150 active:bg-white/[0.03]"
+      className={`group relative w-full flex items-center gap-2 px-3 py-[6px] rounded-md text-left transition-colors duration-150 active:bg-white/[0.03] ${
+        active
+          ? "text-[var(--aurora-text)] bg-white/[0.05]"
+          : "text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)]"
+      }`}
     >
+      {/* Active indicator — matches NavItem's layoutId pattern */}
+      {active && (
+        <span
+          className="absolute inset-0 rounded-md pointer-events-none"
+          style={{ background: "var(--aurora-surface)" }}
+          aria-hidden="true"
+        />
+      )}
       <span
-        className="absolute inset-0 rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none"
+        className={`absolute inset-0 rounded-md transition-opacity duration-150 pointer-events-none ${
+          active ? "opacity-0" : "opacity-0 group-hover:opacity-100"
+        }`}
         style={{ background: "var(--aurora-surface-hover)" }}
         aria-hidden="true"
       />
       <span
         className="relative z-10 w-[4px] h-[4px] rounded-full flex-shrink-0"
         style={{
-          background: "var(--aurora-muted)",
+          background: active ? "var(--aurora-accent-interactive)" : "var(--aurora-muted)",
         }}
         aria-hidden="true"
       />
