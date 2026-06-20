@@ -576,9 +576,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
             <div
               className="search-shell relative flex-1 flex items-center rounded-full transition-[box-shadow] duration-200"
               style={{
-                background: "var(--aurora-surface)",
-                backdropFilter: "blur(12px)",
-                WebkitBackdropFilter: "blur(12px)",
+                background: "rgba(255, 255, 255, 0.06)",
               }}
             >
               <Search
@@ -854,7 +852,6 @@ function CrossfadeChip({ playlist }: CrossfadeChipProps) {
         style={{
           background: "var(--aurora-surface-3)",
           border: "1px solid var(--aurora-rim)",
-          backdropFilter: "blur(12px)",
         }}
         align="end"
       >
