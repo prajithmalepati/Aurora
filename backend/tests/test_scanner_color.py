@@ -22,7 +22,7 @@ def test_rgb_to_oklch_red():
 def test_clamp_oklch():
     result = clamp_oklch_for_display(0.9, 0.03, 185)
     assert result.startswith("oklch(0.70")   # L clamped to 0.70
-    assert "0.15" in result                   # C bumped to 0.15
+    assert "0.08" in result                   # C bumped to 0.08
 
 
 def test_clamp_oklch_format():

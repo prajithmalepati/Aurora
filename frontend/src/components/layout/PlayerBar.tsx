@@ -84,8 +84,6 @@ export function PlayerBar() {
       className="aurora-keyline-top col-span-1 md:col-span-2 relative"
       style={{
         background: "var(--aurora-surface-bar)",
-        backdropFilter: "blur(12px)",
-        WebkitBackdropFilter: "blur(12px)",
       }}
     >
       {/* Bleed glow — album art bright region diffused as ambient light */}

@@ -4,6 +4,8 @@
     "created_at": "2025-06-01T12:00:00Z",
     "crossfade_duration_s": null,
     "crossfade_enabled": null,
+    "dominant_color": null,
+    "dominant_color_2": null,
     "emoji": "🎌",
     "id": 3,
     "image_url": null,
