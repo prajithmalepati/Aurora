@@ -139,9 +139,7 @@ function App() {
           <div
             className="search-shell relative flex items-center rounded-full mb-6 transition-[box-shadow] duration-200"
             style={{
-              background: "var(--aurora-surface)",
-              backdropFilter: "blur(12px)",
-              WebkitBackdropFilter: "blur(12px)",
+              background: "rgba(255, 255, 255, 0.06)",
             }}
           >
             <Search
@@ -245,7 +243,6 @@ function App() {
             background: "rgba(10, 12, 17, 0.95)",
             border: "1px solid var(--aurora-muted)",
             color: "var(--aurora-text)",
-            backdropFilter: "blur(12px)",
           },
         }}
       />

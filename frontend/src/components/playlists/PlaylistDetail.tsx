@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from "react"
+import { useEffect, useState, useMemo, useCallback, useRef } from "react"
 import type { PlaylistSong, PlaylistDetail as PlaylistDetailType } from "@/types"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { useSongStore } from "@/stores/songStore"
@@ -81,6 +81,27 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
   const [sortField] = useState<'position'|'title'|'artist'|'album'|'duration'>('position')
   const [sortOrder] = useState<'asc'|'desc'>('asc')
 
+  // Track hero header rect for position:fixed bleed overlay
+  const heroRef = useRef<HTMLDivElement>(null)
+  const [heroRect, setHeroRect] = useState({ top: 0, height: 240 })
+  useEffect(() => {
+    const el = heroRef.current
+    if (!el) return
+    // Find nearest scrollable ancestor (AppShell's content column)
+    const scrollParent = el.closest('[class*="overflow-y-auto"]') ?? window
+    const update = () => {
+      const r = el.getBoundingClientRect()
+      setHeroRect({ top: r.top, height: r.height })
+    }
+    update()
+    window.addEventListener("resize", update)
+    scrollParent.addEventListener("scroll", update, { passive: true })
+    return () => {
+      window.removeEventListener("resize", update)
+      scrollParent.removeEventListener("scroll", update)
+    }
+  }, [activePlaylist?.id])
+
   // Drag state removed — now handled by dnd-kit in SongTable
 
   useEffect(() => {
@@ -154,9 +175,6 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
 
   // Procedural fallback color (no cover image)
   const heroGlow = fallbackGlow
-
-  // Even ambient wash: dominant color from the cover (backend-computed), else procedural fallback
-  const bleedColor = activePlaylist?.dominant_color ?? fallbackGlow
 
   // Neutral dark gradient for the hero tile — no teal/violet bias.
   // If the playlist has a custom accent colour we let a whisper of it through.
@@ -406,18 +424,57 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
   return (
     <div className="aurora-view-enter">
       {/* ── HERO HEADER ── */}
-      <div className="relative px-4 pt-6 pb-6 sm:px-10 sm:pt-10 sm:pb-8 overflow-hidden">
-        {/* Background bleed: even dominant-color wash, pooled top, fading down */}
-        <div
-          className="absolute inset-0 pointer-events-none"
-          aria-hidden="true"
-          style={{
-            background: `radial-gradient(ellipse 120% 80% at 50% -20%, ${bleedColor} 0%, transparent 72%)`,
-            opacity: 0.4,
-            maskImage: "linear-gradient(to bottom, black 0%, black 40%, transparent 100%)",
-            WebkitMaskImage: "linear-gradient(to bottom, black 0%, black 40%, transparent 100%)",
-          }}
-        />
+      <div ref={heroRef} className="relative px-4 pt-6 pb-6 sm:px-10 sm:pt-10 sm:pb-8 overflow-hidden">
+        {/* Background bleed: zoomed-in blurred cover image, or procedural color fallback */}
+        {heroImage ? (
+          <div
+            className="pointer-events-none overflow-hidden"
+            aria-hidden="true"
+            style={{
+              position: "fixed",
+              left: 0,
+              right: 0,
+              top: heroRect.top,
+              height: heroRect.height,
+              maskImage: "linear-gradient(to bottom, black 0%, black 40%, transparent 100%)",
+              WebkitMaskImage: "linear-gradient(to bottom, black 0%, black 40%, transparent 100%)",
+              zIndex: -1,
+            }}
+          >
+            <img
+              src={heroImage}
+              alt=""
+              className="absolute"
+              style={{
+                top: "-50%",
+                left: "-10%",
+                width: "120%",
+                height: "200%",
+                objectFit: "cover",
+                filter: "blur(60px) saturate(1.4)",
+                opacity: 0.35,
+              }}
+            />
+            {/* Dark scrim: guarantees text contrast over any image */}
+            <div
+              className="absolute inset-0"
+              style={{
+                background: "linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0.8) 100%)",
+              }}
+            />
+          </div>
+        ) : (
+          <div
+            className="absolute inset-0 pointer-events-none"
+            aria-hidden="true"
+            style={{
+              background: `radial-gradient(ellipse 120% 80% at 50% -20%, ${fallbackGlow} 0%, transparent 72%)`,
+              opacity: 0.4,
+              maskImage: "linear-gradient(to bottom, black 0%, black 40%, transparent 100%)",
+              WebkitMaskImage: "linear-gradient(to bottom, black 0%, black 40%, transparent 100%)",
+            }}
+          />
+        )}
         <div className="relative flex flex-wrap items-end gap-4 sm:gap-7">
           {/* Hero art tile */}
           <div
@@ -576,9 +633,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
             <div
               className="search-shell relative flex-1 flex items-center rounded-full transition-[box-shadow] duration-200"
               style={{
-                background: "var(--aurora-surface)",
-                backdropFilter: "blur(12px)",
-                WebkitBackdropFilter: "blur(12px)",
+                background: "rgba(255, 255, 255, 0.06)",
               }}
             >
               <Search
@@ -854,7 +909,6 @@ function CrossfadeChip({ playlist }: CrossfadeChipProps) {
         style={{
           background: "var(--aurora-surface-3)",
           border: "1px solid var(--aurora-rim)",
-          backdropFilter: "blur(12px)",
         }}
         align="end"
       >

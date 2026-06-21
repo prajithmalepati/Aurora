@@ -182,9 +182,9 @@ export function ColumnPicker({ columnContext }: ColumnPickerProps) {
       {open && (
         <div
           ref={panelRef}
-          className="absolute right-0 top-full mt-1 z-50 min-w-[200px] max-w-[260px] py-1.5 rounded-lg shadow-xl border backdrop-blur-xl"
+          className="absolute right-0 top-full mt-1 z-50 min-w-[200px] max-w-[260px] py-1.5 rounded-lg shadow-xl border"
           style={{
-            background: "color-mix(in oklch, var(--aurora-surface) 92%, transparent)",
+            background: "var(--aurora-surface-2)",
             borderColor: "var(--aurora-rim)",
             boxShadow: "0 8px 30px rgba(0,0,0,0.5)",
           }}
