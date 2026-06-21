@@ -114,6 +114,7 @@ export const COLUMN_REGISTRY: ColumnDef[] = [
   {
     id: "type",
     label: "Type",
+    sortable: "file_format",
     defaultWidth: 64,
     minWidth: 48,
     headerClassName: "hidden lg:table-cell",

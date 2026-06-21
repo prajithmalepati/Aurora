@@ -15,7 +15,7 @@ type View =
   | { kind: "settings" }
   | { kind: "about" }
 
-type SortField = "title" | "artist" | "album" | "duration" | "created_at"
+type SortField = "title" | "artist" | "album" | "duration" | "created_at" | "file_format"
 
 const PAGE_SIZE = 100
 

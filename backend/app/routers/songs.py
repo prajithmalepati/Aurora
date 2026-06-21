@@ -23,13 +23,14 @@ def _get_utc_now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-ALLOWED_SORT_FIELDS = {"title", "artist", "album", "duration", "created_at"}
+ALLOWED_SORT_FIELDS = {"title", "artist", "album", "duration", "created_at", "file_format"}
 SORT_COL_MAP = {
     "title": "s.title COLLATE NOCASE",
     "artist": "s.artist COLLATE NOCASE",
     "album": "s.album COLLATE NOCASE",
     "duration": "s.duration",
     "created_at": "s.created_at",
+    "file_format": "s.file_format COLLATE NOCASE",
 }
 
 

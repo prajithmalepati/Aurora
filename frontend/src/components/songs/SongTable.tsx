@@ -63,7 +63,7 @@ interface SongTableProps {
 const HEADER_CLASS =
   "px-4 py-2 text-left label-micro text-[10px] text-[var(--aurora-text-tertiary)] font-medium"
 
-export type SortField = "title" | "artist" | "album" | "duration" | "created_at"
+export type SortField = "title" | "artist" | "album" | "duration" | "created_at" | "file_format"
 
 // ── Checkbox (matches PlaylistDetail pattern) ──
 
@@ -412,6 +412,8 @@ const SORT_OPTIONS: { value: string; label: string }[] = [
   { value: "duration-desc", label: "Duration ↓" },
   { value: "created_at-desc", label: "Newest first" },
   { value: "created_at-asc", label: "Oldest first" },
+  { value: "file_format-asc", label: "Type A–Z" },
+  { value: "file_format-desc", label: "Type Z–A" },
 ]
 
 function SortDropdown({ value, onChange }: { value: string; onChange: (v: string) => void }) {
