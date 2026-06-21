@@ -4,6 +4,8 @@
     "created_at": "2025-06-01T12:00:00Z",
     "crossfade_duration_s": 12,
     "crossfade_enabled": 1,
+    "dominant_color": null,
+    "dominant_color_2": null,
     "emoji": "🎵",
     "id": 1,
     "image_url": null,
