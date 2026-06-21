@@ -311,9 +311,13 @@ export function AuroraCanvas() {
     let rafId: number | null = null
     const applySize = () => {
       rafId = null
-      canvas.width = canvas.offsetWidth * dpr
-      canvas.height = canvas.offsetHeight * dpr
-      // N18 A2: render immediately so the cleared buffer is never shown blank
+      const w = canvas.offsetWidth * dpr
+      const h = canvas.offsetHeight * dpr
+      // Skip if size unchanged — setting width/height clears the WebGL buffer
+      if (canvas.width === w && canvas.height === h) return
+      canvas.width = w
+      canvas.height = h
+      // Render immediately so the cleared buffer is never shown blank
       if (rafRef.current) cancelAnimationFrame(rafRef.current)
       rafRef.current = requestAnimationFrame(drawRef.current)
     }
