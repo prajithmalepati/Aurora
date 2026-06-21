@@ -264,10 +264,27 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
           : "jpg"
         const formData = new FormData()
         formData.append("file", blob, `image.${ext}`)
-        await api.upload(`/playlists/${activePlaylist.id}/image`, formData)
+        const uploadRes = await api.upload<{ data: { image_url: string } }>(`/playlists/${activePlaylist.id}/image`, formData)
+        // Immediately update the store so the hero image refreshes without restart
+        const store = usePlaylistStore.getState()
+        if (store.activePlaylist?.id === activePlaylist.id) {
+          usePlaylistStore.setState({
+            activePlaylist: {
+              ...store.activePlaylist,
+              image_url: uploadRes.data.image_url,
+            },
+          })
+        }
       } else if (editImageDataUrl === null && activePlaylist.image_url) {
         // User removed the existing image
         await api.delete(`/playlists/${activePlaylist.id}/image`)
+        // Immediately clear the image in the store
+        const store = usePlaylistStore.getState()
+        if (store.activePlaylist?.id === activePlaylist.id) {
+          usePlaylistStore.setState({
+            activePlaylist: { ...store.activePlaylist, image_url: null },
+          })
+        }
       }
 
       await playlistStore.updatePlaylist(activePlaylist.id, {
@@ -422,9 +439,9 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
   }
 
   return (
-    <div className="aurora-view-enter">
+    <div className="aurora-view-enter flex flex-col h-full min-h-0">
       {/* ── HERO HEADER ── */}
-      <div ref={heroRef} className="relative px-4 pt-6 pb-6 sm:px-10 sm:pt-10 sm:pb-8 overflow-hidden">
+      <div ref={heroRef} className="relative px-4 pt-6 pb-6 sm:px-10 sm:pt-10 sm:pb-8 overflow-hidden shrink-0">
         {/* Background bleed: zoomed-in blurred cover image, or procedural color fallback */}
         {heroImage ? (
           <div
@@ -655,6 +672,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
           songs={songsForTable}
           loading={false}
           error={null}
+          fillHeight
           disableInfiniteScroll
           showSort
           onPlay={(_song, index) => {
