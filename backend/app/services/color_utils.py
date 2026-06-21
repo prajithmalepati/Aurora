@@ -104,6 +104,6 @@ def extract_bright_region(art_data: bytes) -> tuple[bytes | None, int, int, int,
 
 def clamp_oklch_for_display(L: float, C: float, H: float) -> str:
     """Clamp OKLCH to contrast-safe range, return CSS oklch() string."""
-    L = max(0.40, min(0.70, L))
-    C = max(0.15, min(0.35, C))
+    L = max(0.30, min(0.70, L))
+    C = max(0.08, min(0.35, C))
     return f"oklch({L:.4f} {C:.4f} {H:.1f})"
