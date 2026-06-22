@@ -117,8 +117,8 @@ export const COLUMN_REGISTRY: ColumnDef[] = [
     sortable: "file_format",
     defaultWidth: 64,
     minWidth: 48,
-    headerClassName: "hidden lg:table-cell",
-    cellClassName: "relative px-4 py-2 text-[12px] hidden lg:table-cell",
+    headerClassName: "hidden @xl:table-cell",
+    cellClassName: "relative px-4 py-2 text-[12px] hidden @xl:table-cell",
     render: (song, _ctx) => (
       <>
         <span className="relative z-10">
@@ -146,8 +146,8 @@ export const COLUMN_REGISTRY: ColumnDef[] = [
     sortable: "duration",
     defaultWidth: 80,
     minWidth: 64,
-    headerClassName: "w-20 hidden lg:table-cell",
-    cellClassName: "relative px-4 py-2 w-20 text-[12px] text-[var(--aurora-text-secondary)] tabular-nums hidden lg:table-cell",
+    headerClassName: "w-20 hidden @xl:table-cell",
+    cellClassName: "relative px-4 py-2 w-20 text-[12px] text-[var(--aurora-text-secondary)] tabular-nums hidden @xl:table-cell",
     render: (_song, _ctx) => (
       <>
         <span className="relative z-10 tabular-nums whitespace-nowrap">
@@ -162,8 +162,8 @@ export const COLUMN_REGISTRY: ColumnDef[] = [
     sortable: "artist",
     defaultWidth: 160,
     minWidth: 100,
-    headerClassName: "hidden lg:table-cell",
-    cellClassName: "relative px-4 py-2 text-[13px] hidden lg:table-cell",
+    headerClassName: "hidden @2xl:table-cell",
+    cellClassName: "relative px-4 py-2 text-[13px] hidden @2xl:table-cell",
     render: (song, _ctx) => (
       <>
         <span className="relative z-10 truncate text-[var(--aurora-text-secondary)]">
@@ -178,8 +178,8 @@ export const COLUMN_REGISTRY: ColumnDef[] = [
     sortable: "album",
     defaultWidth: 160,
     minWidth: 100,
-    headerClassName: "hidden lg:table-cell",
-    cellClassName: "relative px-4 py-2 text-[13px] hidden lg:table-cell",
+    headerClassName: "hidden @2xl:table-cell",
+    cellClassName: "relative px-4 py-2 text-[13px] hidden @2xl:table-cell",
     render: (song, _ctx) => (
       <>
         <span className="relative z-10 inline-block truncate max-w-full text-[var(--aurora-text-secondary)]">
@@ -193,8 +193,8 @@ export const COLUMN_REGISTRY: ColumnDef[] = [
     label: "Tags",
     defaultWidth: 200,
     minWidth: 100,
-    headerClassName: "max-w-[200px]",
-    cellClassName: "relative px-4 py-2 max-w-[200px]",
+    headerClassName: "max-w-[200px] hidden @3xl:table-cell",
+    cellClassName: "relative px-4 py-2 max-w-[200px] hidden @3xl:table-cell",
     render: (song, _ctx) => (
       <>
         <div className="relative z-10">

@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback, useRef } from "react"
+import { useEffect, useState, useMemo, useCallback } from "react"
 import type { PlaylistSong, PlaylistDetail as PlaylistDetailType } from "@/types"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { useSongStore } from "@/stores/songStore"
@@ -82,26 +82,6 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
   const [sortOrder] = useState<'asc'|'desc'>('asc')
 
   // Track hero header rect for position:fixed bleed overlay
-  const heroRef = useRef<HTMLDivElement>(null)
-  const [heroRect, setHeroRect] = useState({ top: 0, height: 240 })
-  useEffect(() => {
-    const el = heroRef.current
-    if (!el) return
-    // Find nearest scrollable ancestor (AppShell's content column)
-    const scrollParent = el.closest('[class*="overflow-y-auto"]') ?? window
-    const update = () => {
-      const r = el.getBoundingClientRect()
-      setHeroRect({ top: r.top, height: r.height })
-    }
-    update()
-    window.addEventListener("resize", update)
-    scrollParent.addEventListener("scroll", update, { passive: true })
-    return () => {
-      window.removeEventListener("resize", update)
-      scrollParent.removeEventListener("scroll", update)
-    }
-  }, [activePlaylist?.id])
-
   // Drag state removed — now handled by dnd-kit in SongTable
 
   useEffect(() => {
@@ -171,7 +151,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
   )
 
   // Server-stored image URL (comes back from the API on every fetchPlaylistDetail)
-  const heroImage = activePlaylist?.image_url ? withToken(`${getBaseUrl()}${activePlaylist.image_url}`) : null
+  const heroImage = activePlaylist?.image_url ? withToken(`${getBaseUrl()}${activePlaylist.image_url}?v=${encodeURIComponent(activePlaylist.updated_at || "")}`) : null
 
   // Procedural fallback color (no cover image)
   const heroGlow = fallbackGlow
@@ -231,7 +211,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
       setEditColor(activePlaylist.color || "")
       setEditEmoji(activePlaylist.emoji || "")
       // Seed picker with the current server URL (displays as <img src>)
-      setEditImageDataUrl(activePlaylist.image_url ? withToken(`${getBaseUrl()}${activePlaylist.image_url}`) : null)
+      setEditImageDataUrl(activePlaylist.image_url ? withToken(`${getBaseUrl()}${activePlaylist.image_url}?v=${encodeURIComponent(activePlaylist.updated_at || "")}`) : null)
       // Seed crossfade settings
       setEditCrossfadeEnabled(
         activePlaylist.crossfade_enabled !== null && activePlaylist.crossfade_enabled !== undefined
@@ -441,21 +421,15 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
   return (
     <div className="aurora-view-enter flex flex-col h-full min-h-0">
       {/* ── HERO HEADER ── */}
-      <div ref={heroRef} className="relative px-4 pt-6 pb-6 sm:px-10 sm:pt-10 sm:pb-8 overflow-hidden shrink-0">
+      <div className="relative px-4 pt-6 pb-6 sm:px-10 sm:pt-10 sm:pb-8 overflow-hidden shrink-0">
         {/* Background bleed: zoomed-in blurred cover image, or procedural color fallback */}
         {heroImage ? (
           <div
-            className="pointer-events-none overflow-hidden"
+            className="absolute inset-0 pointer-events-none overflow-hidden"
             aria-hidden="true"
             style={{
-              position: "fixed",
-              left: 0,
-              right: 0,
-              top: heroRect.top,
-              height: heroRect.height,
               maskImage: "linear-gradient(to bottom, black 0%, black 40%, transparent 100%)",
               WebkitMaskImage: "linear-gradient(to bottom, black 0%, black 40%, transparent 100%)",
-              zIndex: -1,
             }}
           >
             <img
