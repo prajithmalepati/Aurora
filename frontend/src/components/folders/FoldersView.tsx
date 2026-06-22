@@ -259,12 +259,12 @@ export function FoldersView({ }: FoldersViewProps) {
       </div>
 
       {/* Main content area */}
-      <div className="flex-1 min-w-0 min-h-0 overflow-y-auto">
-        <div className="p-4 sm:px-10 sm:pt-8 sm:pb-6 max-w-[1400px] mx-auto">
+      <div className="flex-1 min-w-0 min-h-0 flex flex-col">
+        <div className="p-4 sm:px-10 sm:pt-8 sm:pb-6 max-w-[1400px] mx-auto w-full flex flex-col min-h-0 h-full">
           {currentPath ? (
             <>
               {/* Breadcrumbs */}
-              <div className="flex items-center gap-1.5 mb-4 text-[13px]">
+              <div className="flex items-center gap-1.5 mb-4 text-[13px] shrink-0">
                 <button
                   onClick={goToRoot}
                   className="flex items-center gap-1 text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] transition-colors duration-150"
@@ -291,7 +291,7 @@ export function FoldersView({ }: FoldersViewProps) {
               </div>
 
               {/* Header with Play All and Recursive toggle */}
-              <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center justify-between mb-5 shrink-0">
                 <div className="flex items-center gap-3">
                   <h1 className="font-display text-[24px] leading-none tracking-tight text-[var(--aurora-text)]">
                     {breadcrumbs.length > 0
@@ -353,6 +353,7 @@ export function FoldersView({ }: FoldersViewProps) {
                 error={songsError}
                 onPlay={handlePlaySong}
                 disableInfiniteScroll
+                fillHeight
               />
             </>
           ) : (
