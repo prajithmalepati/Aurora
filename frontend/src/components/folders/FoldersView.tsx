@@ -222,9 +222,9 @@ export function FoldersView({ }: FoldersViewProps) {
   }
 
   return (
-    <div className="h-full flex flex-col md:flex-row">
+    <div className="h-full flex flex-col lg:flex-row">
       {/* Folder tree sidebar */}
-      <div className="w-full md:w-64 flex-shrink-0 max-h-[35vh] md:max-h-none border-b md:border-b-0 md:border-r border-[var(--aurora-muted)]/40 flex flex-col md:h-full">
+      <div className="w-full lg:w-64 flex-shrink-0 max-h-[35vh] lg:max-h-none border-b lg:border-b-0 lg:border-r border-[var(--aurora-muted)]/40 flex flex-col lg:h-full">
         <div className="px-4 pt-6 pb-3">
           <h2 className="font-display text-[18px] leading-none tracking-tight text-[var(--aurora-text)]">
             Folders
@@ -291,9 +291,9 @@ export function FoldersView({ }: FoldersViewProps) {
               </div>
 
               {/* Header with Play All and Recursive toggle */}
-              <div className="flex items-center justify-between mb-5 shrink-0">
+              <div className="flex items-center justify-between mb-5 shrink-0 gap-3 min-w-0">
                 <div className="flex items-center gap-3">
-                  <h1 className="font-display text-[24px] leading-none tracking-tight text-[var(--aurora-text)]">
+                  <h1 className="font-display text-[24px] leading-none tracking-tight text-[var(--aurora-text)] truncate">
                     {breadcrumbs.length > 0
                       ? breadcrumbs[breadcrumbs.length - 1].name
                       : currentPath.split("/").filter(Boolean).pop() || "Folder"}
