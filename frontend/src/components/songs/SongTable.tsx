@@ -798,7 +798,7 @@ export function SongTable({
   // ── Loading state ──
   if (loading && songs.length === 0) {
     return (
-      <div className="w-full overflow-auto aurora-fade-in">
+      <div className="w-full overflow-auto aurora-fade-in @container">
         {toolbar}
         <table className="w-full border-separate border-spacing-0">
           <TableHeader
@@ -824,10 +824,10 @@ export function SongTable({
                     <Skeleton className="h-3 w-32" />
                   </div>
                 </td>
-                <td className="px-4 py-3 hidden lg:table-cell">
+                <td className="px-4 py-3 hidden @xl:table-cell">
                   <Skeleton className="h-3 w-10" />
                 </td>
-                <td className="px-4 py-3 hidden lg:table-cell">
+                <td className="px-4 py-3 hidden @xl:table-cell">
                   <Skeleton className="h-3 w-20" />
                 </td>
                 <td className="px-4 py-3">
@@ -931,7 +931,7 @@ export function SongTable({
     <div className={fillHeight ? "flex flex-col min-h-0 h-full" : undefined}>
       <div
         ref={tableContainerRef}
-        className={fillHeight ? "w-full flex-1 min-h-0 overflow-auto aurora-fade-in" : "w-full h-[calc(100vh-15rem)] overflow-auto aurora-fade-in"}
+        className={fillHeight ? "w-full flex-1 min-h-0 overflow-auto aurora-fade-in @container" : "w-full h-[calc(100vh-15rem)] overflow-auto aurora-fade-in @container"}
         onScroll={handleScroll}
       >
         {toolbar}

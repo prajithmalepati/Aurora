@@ -81,7 +81,7 @@ export function PlayerBar() {
 
   return (
     <div
-      className="aurora-keyline-top col-span-1 md:col-span-2 relative"
+      className="aurora-keyline-top col-span-1 md:col-span-2 relative overflow-hidden"
       style={{
         background: "var(--aurora-surface-bar)",
       }}
