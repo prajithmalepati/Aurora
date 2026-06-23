@@ -148,7 +148,7 @@ The Tauri app spawns the frozen backend on a free port, waits for health, then i
 Pushing a `v*` tag triggers signed release builds (`.deb` + `.exe` + updater artifacts). `workflow_dispatch` builds unsigned artifacts for testing:
 
 ```bash
-gh workflow run "Desktop Build" --ref hermes/phase1-desktop
+gh workflow run "Desktop Build" --ref main
 ```
 
 ### Install (Linux)

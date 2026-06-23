@@ -115,8 +115,15 @@ HERMES_*.md
 # AI/process artifacts (local only — zero AI footprint on GitHub)
 
 ONBOARDING.md
+GATE0_REVIEW.md
 docs/*audit*.md
 docs/*backlog*.md
+docs/*checklist*.md
+docs/*matrix*.md
+docs/*cutting-plan*.md
+docs/HEALTH.md
+docs/06-implementation-plan.md
+docs/12-frontend-implementation-plan.md
 docs/Music-Player-Feature-Research.md
 docs/v1.0-release-plan.md
 
