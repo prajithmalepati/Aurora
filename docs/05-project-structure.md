@@ -1,5 +1,5 @@
 # Aurora — Project Structure
-## Document 5 of 6 | 
+## Document 5 of 6
 
 ---
 
@@ -148,7 +148,7 @@ PRAGMA journal_mode = WAL;
 CREATE TABLE IF NOT EXISTS songs ( ... );
 -- (full SQL from 01-data-model.md)
 """
-# ^^^  init SQL from 01-data-model.md here
+# ^^^ paste the complete init SQL from 01-data-model.md here
 
 
 def get_db() -> sqlite3.Connection:

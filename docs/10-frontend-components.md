@@ -1,5 +1,5 @@
 # Aurora — Frontend Components & Layout
-## Document 10 of 12 | 
+## Document 10 of 12
 
 ---
 

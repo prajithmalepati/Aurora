@@ -1,5 +1,5 @@
 # Aurora — Data Model Specification
-## Document 1 of 6 | 
+## Document 1 of 6
 
 ---
 

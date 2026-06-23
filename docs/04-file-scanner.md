@@ -1,5 +1,5 @@
 # Aurora — File Scanner Specification
-## Document 4 of 6 | 
+## Document 4 of 6
 
 ---
 

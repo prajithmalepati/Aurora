@@ -1,5 +1,5 @@
 # Aurora — Boolean Filter Engine Specification
-## Document 3 of 6 | 
+## Document 3 of 6
 
 ---
 

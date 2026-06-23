@@ -1,5 +1,5 @@
 # Aurora — API Contract
-## Document 2 of 6 | 
+## Document 2 of 6
 
 ---
 

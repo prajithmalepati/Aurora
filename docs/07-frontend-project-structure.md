@@ -1,5 +1,5 @@
 # Aurora — Frontend Project Structure & Setup
-## Document 7 of 12 | 
+## Document 7 of 12
 
 ---
 
@@ -20,7 +20,7 @@
 
 ## Why These Choices
 
-**TypeScript over JavaScript:** Aurora has interconnected state (songs reference tags and playlists). TS catches mismatched shapes between API responses and frontend models at build time. . The extra setup is 2 minutes; the bug prevention is permanent.
+**TypeScript over JavaScript:** Aurora has interconnected state (songs reference tags and playlists). TS catches mismatched shapes between API responses and frontend models at build time. The extra setup is 2 minutes; the bug prevention is permanent.
 
 **Zustand over Context:** Aurora has 5 distinct state domains (songs, playlists, tags, filter results, player). React Context would require 5 providers and manual re-render optimization. Zustand is ~3KB, needs zero providers, and uses selectors for granular re-renders. Most popular React state library in 2026 (~20M weekly npm downloads).
 

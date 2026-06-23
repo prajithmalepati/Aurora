@@ -1,5 +1,5 @@
 # Aurora — Frontend Styling & Theme
-## Document 11 of 12 | 
+## Document 11 of 12
 
 ---
 

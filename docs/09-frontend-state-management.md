@@ -1,5 +1,5 @@
 # Aurora — Frontend State Management
-## Document 9 of 12 | 
+## Document 9 of 12
 
 ---
 

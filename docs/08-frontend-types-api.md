@@ -1,5 +1,5 @@
 # Aurora — Frontend Types & API Client
-## Document 8 of 12 | 
+## Document 8 of 12
 
 ---
 
@@ -174,7 +174,7 @@ export const api = {
 
 ### Why this exists
 
-Without it, you end up with `fetch("http://localhost:8000/api/songs")` with inline error handling in every single component. This centralizes:
+Without it, you end up with `fetch("http://localhost:8000/api/songs")` and inline error handling in every single component. This centralizes:
 - Base URL (change once if the port changes)
 - Headers (Content-Type always set)
 - Error parsing (API returns `{ detail: "..." }` for errors)
