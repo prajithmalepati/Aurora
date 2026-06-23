@@ -298,9 +298,7 @@ export function FoldersView({ }: FoldersViewProps) {
                       ? breadcrumbs[breadcrumbs.length - 1].name
                       : currentPath.split("/").filter(Boolean).pop() || "Folder"}
                   </h1>
-                  <span className="label-micro text-[var(--aurora-text-secondary)]">
-                    {songs.length} {songs.length === 1 ? "song" : "songs"}
-                  </span>
+
                 </div>
                 <div className="flex items-center gap-3">
                   {/* Recursive toggle */}
