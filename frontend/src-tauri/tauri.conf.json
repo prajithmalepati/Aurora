@@ -36,6 +36,11 @@
       "../../backend/dist/aurora-backend/": "backend/"
     },
     "createUpdaterArtifacts": true,
+    "windows": {
+      "nsis": {
+        "installerHooks": "installer-hooks.nsh"
+      }
+    },
     "android": {
       "debugApplicationIdSuffix": ".debug"
     }
