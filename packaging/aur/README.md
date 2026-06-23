@@ -4,7 +4,7 @@
 
 ### `aurora-git` (build from source)
 
-Builds the latest commit from the `hermes/phase1-desktop` branch.
+Builds the latest tagged release.
 
 ```bash
 # Clone and install

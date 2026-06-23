@@ -114,6 +114,13 @@ VISUAL_AUDIT.md
 HERMES_*.md
 # AI/process artifacts (local only — zero AI footprint on GitHub)
 
+.ignore
+
+CHALLENGES.md
+DEVIATIONS.md
+
+# AI/process artifacts (local only — zero AI footprint on GitHub)
+
 ONBOARDING.md
 GATE0_REVIEW.md
 docs/*audit*.md
