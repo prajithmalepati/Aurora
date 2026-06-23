@@ -112,6 +112,13 @@ VISUAL_AUDIT.md
 
 # cross-machine process docs (local only, synced outside git)
 HERMES_*.md
+# AI/process artifacts (local only — zero AI footprint on GitHub)
+
+ONBOARDING.md
+docs/*audit*.md
+docs/*backlog*.md
+docs/Music-Player-Feature-Research.md
+docs/v1.0-release-plan.md
 
 SECURITY_HARDENING_PLAN.md
 STRATEGIC_PLAN.md
