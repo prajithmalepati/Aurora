@@ -9,6 +9,7 @@ import type { ApiResponse } from "@/types"
 import { checkForUpdates } from "@/lib/updater"
 import { ScanDialog } from "@/components/scanner/ScanDialog"
 import { AddSongDialog } from "@/components/songs/AddSongDialog"
+import { UpdateCard } from "@/components/settings/UpdateCard"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { FolderSearch, Music, Upload } from "lucide-react"
 
@@ -476,6 +477,7 @@ export function SettingsView() {
 
       {/* About / Updates */}
       <div className="mt-8 flex flex-col items-center gap-3">
+        <UpdateCard />
         <button
           onClick={() => checkForUpdates(true)}
           className="text-[12px] text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-accent-interactive)] transition-colors duration-150"
