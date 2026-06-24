@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react"
 import { usePlayerStore } from "@/stores/playerStore"
 import { useSongStore } from "@/stores/songStore"
 import { usePlaylistStore } from "@/stores/playlistStore"
+import { useSettingsStore } from "@/stores/settingsStore"
 
 export function useKeyboardShortcuts() {
   const [isOverlayOpen, setIsOverlayOpen] = useState(false)
@@ -104,6 +105,27 @@ export function useKeyboardShortcuts() {
         } else {
           document.exitFullscreen().catch(() => {})
         }
+        return
+      }
+
+      // Cmd/Ctrl + Plus/Equal — zoom in
+      if (meta && (e.key === "=" || e.key === "+")) {
+        e.preventDefault()
+        useSettingsStore.getState().zoomIn()
+        return
+      }
+
+      // Cmd/Ctrl + Minus — zoom out
+      if (meta && e.key === "-") {
+        e.preventDefault()
+        useSettingsStore.getState().zoomOut()
+        return
+      }
+
+      // Cmd/Ctrl + 0 — reset zoom
+      if (meta && e.code === "Digit0") {
+        e.preventDefault()
+        useSettingsStore.getState().zoomReset()
         return
       }
 
