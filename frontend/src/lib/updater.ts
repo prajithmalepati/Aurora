@@ -17,14 +17,15 @@ export async function checkForUpdates(manual: boolean): Promise<void> {
     const { check } = await import("@tauri-apps/plugin-updater")
     const update = await check()
     if (update) {
-      store.setAvailable(update.version)
-      showUpdateToast(update.version, async () => {
+      const install = async () => {
         store.setDownloading()
         toast("Downloading update…")
         await update.downloadAndInstall()
         store.setInstalled()
         toast("Update installed — restart Aurora to apply")
-      })
+      }
+      store.setAvailable(update.version, install)
+      showUpdateToast(update.version, install)
       return
     }
     // check() returned null — no update (or already latest)
@@ -62,11 +63,9 @@ async function githubFallbackCheck(manual: boolean): Promise<void> {
 
     if (latestClean && latestClean !== currentClean) {
       const htmlUrl: string = data.html_url ?? ""
-      store.setAvailable(latestClean)
-      showUpdateToast(latestClean, async () => {
-        // Open release page in system browser
-        await openUrl(htmlUrl)
-      })
+      const install = async () => { await openUrl(htmlUrl) }
+      store.setAvailable(latestClean, install)
+      showUpdateToast(latestClean, install)
     } else if (manual) {
       toast("You're on the latest version")
     }

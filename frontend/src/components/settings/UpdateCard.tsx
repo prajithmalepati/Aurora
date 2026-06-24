@@ -1,10 +1,10 @@
 import { useUpdateStore } from "@/stores/updateStore"
-import { checkForUpdates } from "@/lib/updater"
 import { Download, RefreshCw } from "lucide-react"
 
 export function UpdateCard() {
   const status = useUpdateStore((s) => s.status)
   const availableVersion = useUpdateStore((s) => s.availableVersion)
+  const install = useUpdateStore((s) => s.install)
 
   if (status === "idle" || status === "error") return null
 
@@ -47,9 +47,9 @@ export function UpdateCard() {
         </div>
 
         {/* Action button */}
-        {status === "available" && (
+        {status === "available" && install && (
           <button
-            onClick={() => checkForUpdates(false)}
+            onClick={() => install()}
             className="px-4 py-1.5 rounded-lg text-[13px] font-medium transition-colors bg-[var(--aurora-accent-interactive)] text-[var(--aurora-obsidian)] hover:opacity-90 active:opacity-80 flex-shrink-0"
           >
             Install

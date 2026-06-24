@@ -5,21 +5,23 @@ export type UpdateStatus = "idle" | "available" | "downloading" | "installed" | 
 interface UpdateState {
   status: UpdateStatus
   availableVersion: string | null
+  /** Runs the real install for the current update:
+   *  native downloadAndInstall, or open-release-page on the Linux/GitHub path.
+   *  Set when an update is found; null otherwise. */
+  install: (() => Promise<void>) | null
 
-  setAvailable: (version: string) => void
+  setAvailable: (version: string, install: () => Promise<void>) => void
   setDownloading: () => void
   setInstalled: () => void
-  setError: () => void
-  reset: () => void
 }
 
 export const useUpdateStore = create<UpdateState>((set) => ({
   status: "idle",
   availableVersion: null,
+  install: null,
 
-  setAvailable: (version) => set({ status: "available", availableVersion: version }),
+  setAvailable: (version, install) =>
+    set({ status: "available", availableVersion: version, install }),
   setDownloading: () => set({ status: "downloading" }),
-  setInstalled: () => set({ status: "installed" }),
-  setError: () => set({ status: "error", availableVersion: null }),
-  reset: () => set({ status: "idle", availableVersion: null }),
+  setInstalled: () => set({ status: "installed", install: null }),
 }))
