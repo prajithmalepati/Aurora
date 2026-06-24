@@ -1073,6 +1073,22 @@ pre, code {
   animation: aurora-pulse-glow 3.2s ease-in-out infinite;
 }
 
+/* Update dot — subtle breathe (opacity + scale) */
+@keyframes aurora-dot-breathe {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.3); }
+}
+
+.aurora-update-dot {
+  animation: aurora-dot-breathe 2.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aurora-update-dot {
+    animation: none;
+  }
+}
+
 /* ============================================================
    MIX PAGE — command-palette filter bar
    ============================================================ */

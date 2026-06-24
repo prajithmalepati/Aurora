@@ -1,5 +1,6 @@
 import { toast } from "@/lib/toast"
 import { openUrl } from "@tauri-apps/plugin-opener"
+import { useUpdateStore } from "@/stores/updateStore"
 
 let startupCheckDone = false
 
@@ -11,15 +12,20 @@ let startupCheckDone = false
  * @param manual  true when triggered from the Settings button (shows errors)
  */
 export async function checkForUpdates(manual: boolean): Promise<void> {
+  const store = useUpdateStore.getState()
   try {
     const { check } = await import("@tauri-apps/plugin-updater")
     const update = await check()
     if (update) {
-      showUpdateToast(update.version, async () => {
+      const install = async () => {
+        store.setDownloading()
         toast("Downloading update…")
         await update.downloadAndInstall()
+        store.setInstalled()
         toast("Update installed — restart Aurora to apply")
-      })
+      }
+      store.setAvailable(update.version, install)
+      showUpdateToast(update.version, install)
       return
     }
     // check() returned null — no update (or already latest)
@@ -36,6 +42,7 @@ export async function checkForUpdates(manual: boolean): Promise<void> {
  * Linux deb fallback: compare running version against latest GitHub release.
  */
 async function githubFallbackCheck(manual: boolean): Promise<void> {
+  const store = useUpdateStore.getState()
   try {
     const { getVersion } = await import("@tauri-apps/api/app")
     const current = await getVersion()
@@ -56,10 +63,9 @@ async function githubFallbackCheck(manual: boolean): Promise<void> {
 
     if (latestClean && latestClean !== currentClean) {
       const htmlUrl: string = data.html_url ?? ""
-      showUpdateToast(latestClean, async () => {
-        // Open release page in system browser
-        await openUrl(htmlUrl)
-      })
+      const install = async () => { await openUrl(htmlUrl) }
+      store.setAvailable(latestClean, install)
+      showUpdateToast(latestClean, install)
     } else if (manual) {
       toast("You're on the latest version")
     }
@@ -77,12 +83,12 @@ function showUpdateToast(version: string, onInstall: () => void) {
 
 /**
  * One-shot startup check. Call once from App.tsx after mount.
- * Delays 10s to avoid competing with cold-start I/O.
+ * Delays 4s to avoid competing with cold-start I/O.
  */
 export function scheduleStartupUpdateCheck(): void {
   if (startupCheckDone) return
   startupCheckDone = true
   setTimeout(() => {
     checkForUpdates(false)
-  }, 10_000)
+  }, 4_000)
 }

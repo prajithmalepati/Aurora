@@ -10,6 +10,7 @@ import { motion } from "motion/react"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { useTagStore } from "@/stores/tagStore"
 import { useFilterStore } from "@/stores/filterStore"
+import { useUpdateStore } from "@/stores/updateStore"
 import { PlaylistItem } from "@/components/playlists/PlaylistItem"
 import { BorderGlow } from "@/components/ui/BorderGlow"
 import { CreatePlaylistDialog } from "@/components/playlists/CreatePlaylistDialog"
@@ -59,6 +60,8 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
   const setIsQuickTagView = useFilterStore((state) => state.setIsQuickTagView)
   const isQuickTagView = useFilterStore((state) => state.isQuickTagView)
   const filterQuery = useFilterStore((state) => state.query)
+  const updateStatus = useUpdateStore((state) => state.status)
+  const showUpdateDot = updateStatus === "available" || updateStatus === "downloading" || updateStatus === "installed"
 
   const handleTagClick = (tagName: string) => {
     const term = `"${tagName}"`
@@ -252,6 +255,19 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
             label="Settings"
             active={currentView.kind === "settings"}
             onClick={() => onViewChange({ kind: "settings" })}
+            suffix={
+              showUpdateDot ? (
+                <span
+                  className="aurora-update-dot w-1.5 h-1.5 rounded-full flex-shrink-0"
+                  style={{
+                    background: "linear-gradient(135deg, var(--aurora-accent-interactive), var(--aurora-secondary))",
+                    boxShadow: "0 0 6px 1px var(--aurora-accent-interactive-glow)",
+                  }}
+                  aria-label="Update available"
+                  title="Update available"
+                />
+              ) : undefined
+            }
           />
           <FooterAction
             icon={<Info className="h-3.5 w-3.5" strokeWidth={1.5} />}
@@ -319,9 +335,10 @@ interface FooterActionProps {
   label: string
   active?: boolean
   onClick: () => void
+  suffix?: React.ReactNode
 }
 
-function FooterAction({ icon, label, active, onClick }: FooterActionProps) {
+function FooterAction({ icon, label, active, onClick, suffix }: FooterActionProps) {
   return (
     <button
       onClick={onClick}
@@ -333,6 +350,7 @@ function FooterAction({ icon, label, active, onClick }: FooterActionProps) {
     >
       <span className={active ? "" : "opacity-60"}>{icon}</span>
       <span className="font-medium tracking-tight">{label}</span>
+      {suffix && <span className="ml-auto">{suffix}</span>}
     </button>
   )
 }
