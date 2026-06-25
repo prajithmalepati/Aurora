@@ -3,6 +3,7 @@ import { useSongStore } from "@/stores/songStore"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { useTagStore } from "@/stores/tagStore"
 import { usePlayerStore } from "@/stores/playerStore"
+import { useSettingsStore } from "@/stores/settingsStore"
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts"
 import { KeyboardShortcutsOverlay } from "@/components/ui/KeyboardShortcutsOverlay"
 import { AppShell } from "@/components/layout/AppShell"
@@ -47,9 +48,10 @@ function App() {
     fetchTags()
   }, [fetchSongs, fetchPlaylists, fetchTags])
 
-  // One-shot update check 10s after mount
+  // One-shot update check 10s after mount + apply saved zoom
   useEffect(() => {
     scheduleStartupUpdateCheck()
+    useSettingsStore.getState().applyZoom()
   }, [])
 
   // Debounced search handler

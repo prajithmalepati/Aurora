@@ -10,6 +10,7 @@ import { checkForUpdates } from "@/lib/updater"
 import { ScanDialog } from "@/components/scanner/ScanDialog"
 import { AddSongDialog } from "@/components/songs/AddSongDialog"
 import { UpdateCard } from "@/components/settings/UpdateCard"
+import { ZoomControl } from "@/components/settings/ZoomControl"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { FolderSearch, Music, Upload } from "lucide-react"
 
@@ -380,6 +381,29 @@ export function SettingsView() {
         <div className="px-5 py-4 border-t border-[var(--aurora-rim)] flex items-center justify-between">
           <p className="text-[13px] text-[var(--aurora-text-secondary)]">Manual skip fade</p>
           <span className="text-[13px] tabular-nums text-[var(--aurora-text-tertiary)]">1s (fixed)</span>
+        </div>
+      </div>
+
+      {/* Display section */}
+      <div
+        className="rounded-xl overflow-hidden mt-6"
+        style={{
+          background: "var(--aurora-surface)",
+          border: "1px solid var(--aurora-rim)",
+          backdropFilter: "blur(12px)",
+        }}
+      >
+        <div className="px-5 py-3 border-b border-[var(--aurora-rim)]">
+          <p className="label-micro text-[10px] tracking-[0.2em] text-[var(--aurora-text-tertiary)]">Display</p>
+        </div>
+        <div className="px-5 py-4 flex items-center justify-between">
+          <div>
+            <p className="text-[14px] text-[var(--aurora-text)] font-medium">Zoom</p>
+            <p className="text-[12px] text-[var(--aurora-text-secondary)] mt-0.5">
+              Scale the entire interface.
+            </p>
+          </div>
+          <ZoomControl />
         </div>
       </div>
 
