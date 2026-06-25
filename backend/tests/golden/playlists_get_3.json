@@ -19,6 +19,7 @@
         "artists": [
           "TK from Ling Tosite Sigure"
         ],
+        "artwork_url": null,
         "bit_depth": 16,
         "bitrate": 256000,
         "created_at": "",
@@ -40,6 +41,8 @@
         "sample_rate": 44100,
         "source": "local_scan",
         "start_time_ms": 0,
+        "stream_url": null,
+        "stream_url_expires_at": null,
         "tags": [
           "anime",
           "opening"

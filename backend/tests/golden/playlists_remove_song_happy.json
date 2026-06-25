@@ -17,6 +17,7 @@
         "album_art_path": null,
         "artist": "LoFi Girl",
         "artists": null,
+        "artwork_url": null,
         "bit_depth": null,
         "bitrate": null,
         "created_at": "",
@@ -38,6 +39,8 @@
         "sample_rate": null,
         "source": "manual",
         "start_time_ms": 0,
+        "stream_url": null,
+        "stream_url_expires_at": null,
         "tags": [
           "slow",
           "chill"

@@ -50,6 +50,9 @@ class SongResponse(BaseModel):
     replaygain_track_peak: Optional[float] = None
     replaygain_album_gain: Optional[float] = None
     replaygain_album_peak: Optional[float] = None
+    stream_url: Optional[str] = None
+    stream_url_expires_at: Optional[str] = None
+    artwork_url: Optional[str] = None
 
 
 # ---- Tags ----

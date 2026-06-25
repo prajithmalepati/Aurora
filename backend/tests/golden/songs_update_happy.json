@@ -4,6 +4,7 @@
     "album_art_path": null,
     "artist": "Test Artist",
     "artists": null,
+    "artwork_url": null,
     "bit_depth": null,
     "bitrate": null,
     "dominant_color": null,
@@ -24,6 +25,8 @@
     "sample_rate": null,
     "source": "manual",
     "start_time_ms": 0,
+    "stream_url": null,
+    "stream_url_expires_at": null,
     "tags": [],
     "title": "Updated Golden Song",
     "waveform_peaks": null
