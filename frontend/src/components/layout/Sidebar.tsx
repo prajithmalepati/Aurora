@@ -1,5 +1,6 @@
 type View =
   | { kind: "all-songs" }
+  | { kind: "recently-added" }
   | { kind: "filter" }
   | { kind: "playlist"; playlistId: number }
   | { kind: "albums" }
@@ -17,7 +18,7 @@ import { CreatePlaylistDialog } from "@/components/playlists/CreatePlaylistDialo
 
 import { Skeleton } from "@/components/ui/skeleton"
 import { useState } from "react"
-import { Library, SlidersHorizontal, Plus, Settings, FolderOpen, Info, Disc3 } from "lucide-react"
+import { Library, SlidersHorizontal, Plus, Settings, FolderOpen, Info, Disc3, Clock } from "lucide-react"
 import { AuroraWordmark } from "@/components/aurora/AuroraWordmark"
 
 function hexToGlowHSL(hex: string | null | undefined): string {
@@ -87,15 +88,15 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
         <div className="px-6 pt-7 pb-5">
           <button
             onClick={() => onViewChange({ kind: "all-songs" })}
-            className="select-none hover:opacity-80 transition-opacity duration-150"
+            className="select-none hover:opacity-80 transition-opacity duration-150 aurora-wordmark-reveal"
           >
             <AuroraWordmark />
           </button>
-          {/* Thin aurora gradient line beneath logo */}
+          {/* Thin aurora gradient line beneath logo — animated shimmer */}
           <div
-            className="mt-3 h-[1px] w-12"
+            className="mt-3 h-[1px] w-12 aurora-underline-shimmer"
             style={{
-              background: "linear-gradient(to right, var(--aurora-accent-interactive), var(--aurora-secondary))",
+              background: "linear-gradient(to right, var(--aurora-accent-interactive), var(--aurora-violet), var(--aurora-accent-interactive))",
               opacity: 0.4,
             }}
           />
@@ -108,6 +109,12 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
             label="All Songs"
             active={isActive({ kind: "all-songs" })}
             onClick={() => onViewChange({ kind: "all-songs" })}
+          />
+          <NavItem
+            icon={<Clock className="h-4 w-4" strokeWidth={1.5} />}
+            label="Recently Added"
+            active={isActive({ kind: "recently-added" })}
+            onClick={() => onViewChange({ kind: "recently-added" })}
           />
           <NavItem
             icon={<SlidersHorizontal className="h-4 w-4" strokeWidth={1.5} />}
