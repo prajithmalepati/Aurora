@@ -168,6 +168,27 @@ function App() {
           />
         </div>
       )
+    } else if (view.kind === "recently-added") {
+      content = (
+        <div className="p-4 sm:px-10 sm:pt-8 sm:pb-6 max-w-[1800px] mx-auto h-full flex flex-col min-h-0">
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="font-display text-[28px] leading-none tracking-tight text-[var(--aurora-text)]">
+              Recently Added
+            </h1>
+            <span className="label-micro text-[var(--aurora-text-secondary)]">
+              {totalCount} {totalCount === 1 ? "song" : "songs"}
+            </span>
+          </div>
+          <SongTable
+            songs={songs}
+            loading={songsLoading}
+            error={songsError}
+            onPlay={handlePlaySong}
+            columnContext="all-songs"
+            fillHeight
+          />
+        </div>
+      )
     } else if (view.kind === "filter") {
       content = <QueryBuilder />
     } else if (view.kind === "playlist") {

@@ -8,6 +8,7 @@ import { toast } from "@/lib/toast"
 
 type View =
   | { kind: "all-songs" }
+  | { kind: "recently-added" }
   | { kind: "filter" }
   | { kind: "playlist"; playlistId: number }
   | { kind: "albums" }
@@ -243,5 +244,12 @@ export const useSongStore = create<SongState>((set, get) => ({
 
   setView: (view) => {
     set({ view })
+    // Entering Recently Added pins sort to created_at desc
+    if (view.kind === "recently-added") {
+      const { sortField, sortOrder } = get()
+      if (sortField !== "created_at" || sortOrder !== "desc") {
+        get().sortSongs("created_at", "desc")
+      }
+    }
   },
 }))

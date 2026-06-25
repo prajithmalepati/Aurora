@@ -148,7 +148,7 @@ export const SongRow = memo(function SongRow({
         ref={mergedRef}
         onClick={(e) => handlePlay(e)}
         onContextMenu={onContextMenuProp}
-        className={`group relative transition-[opacity,border-color,background-color] duration-100 ${
+        className={`group relative transition-[opacity,border-color,background-color] duration-200 ${
           hasFile ? "cursor-pointer" : "cursor-not-allowed opacity-40"
         } ${isSelected ? "bg-white/[0.04]" : isCurrentSong ? "" : "hover:bg-[var(--aurora-surface-hover)]"} ${shouldStagger ? "song-row-enter" : ""}`}
         style={{

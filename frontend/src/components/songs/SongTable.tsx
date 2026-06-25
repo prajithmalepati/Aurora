@@ -779,6 +779,35 @@ export function SongTable({
     getItemKey: (index) => songs[index]?.id ?? `idx-${index}`,
   })
 
+  // ── Auto-scroll to current song when it changes (G9) ──
+  const currentSongId = usePlayerStore((s) => s.currentSong?.id)
+  const prevCurrentIdRef = useRef<number | undefined>(undefined)
+
+  useEffect(() => {
+    if (currentSongId === prevCurrentIdRef.current) return
+    prevCurrentIdRef.current = currentSongId
+    if (currentSongId === undefined) return
+
+    const index = songs.findIndex((s) => s.id === currentSongId)
+    if (index === -1) return // current song not in this list — no-op
+
+    // Check if row is offscreen
+    const virtualItems = rowVirtualizer.getVirtualItems()
+    const isOnscreen = virtualItems.some((v) => v.index === index)
+    if (isOnscreen) return
+
+    // Respect reduced motion
+    const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    // Small delay to let the view settle
+    const timer = setTimeout(() => {
+      rowVirtualizer.scrollToIndex(index, {
+        align: "center",
+        behavior: prefersReduced ? "auto" : "smooth",
+      })
+    }, 100)
+    return () => clearTimeout(timer)
+  }, [currentSongId, songs, rowVirtualizer])
+
   // ── Infinite scroll via IntersectionObserver (sentinel at content bottom) ──
   const loadMoreSentinelRef = useRef<HTMLDivElement>(null)
 

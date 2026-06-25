@@ -1089,6 +1089,41 @@ pre, code {
   }
 }
 
+/* Brand underline — slow aurora shimmer (teal→violet drift) */
+@keyframes aurora-underline-shimmer {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.aurora-underline-shimmer {
+  background-size: 200% 100%;
+  animation: aurora-underline-shimmer 7s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aurora-underline-shimmer {
+    animation: none;
+    background-position: 0% 50%;
+  }
+}
+
+/* Wordmark mount-reveal (one-shot, not a loop) */
+@keyframes aurora-wordmark-reveal {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.aurora-wordmark-reveal {
+  animation: aurora-wordmark-reveal 400ms cubic-bezier(0.20, 0.70, 0.20, 1.00) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aurora-wordmark-reveal {
+    animation: none;
+  }
+}
+
 /* ============================================================
    MIX PAGE — command-palette filter bar
    ============================================================ */
