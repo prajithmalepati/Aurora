@@ -339,9 +339,11 @@ mod tests {
         conn.execute_batch(INIT_SQL).unwrap();
         let result = run_migrations(&conn);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("schema version 99"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("schema version 99")
+        );
     }
 }
