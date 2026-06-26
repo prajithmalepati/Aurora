@@ -28,6 +28,9 @@ export interface Song {
   replaygain_track_peak?: number | null
   replaygain_album_gain?: number | null
   replaygain_album_peak?: number | null
+  stream_url?: string | null
+  stream_url_expires_at?: string | null
+  artwork_url?: string | null
 }
 export interface Playlist {
   id: number
@@ -178,4 +181,40 @@ export interface WatchedFolder {
   is_active: boolean
   last_scan_at: string | null
   created_at: string
+}
+
+// ── Addon types ─────────────────────────────────────────────────────────
+
+export interface Addon {
+  id: string
+  base_url: string
+  name: string | null
+  version: string | null
+  enabled: boolean
+  fail_count: number
+  last_ok_at: string | null
+  last_fail_at?: string | null
+}
+
+export interface AddonSearchTrack {
+  id: string
+  title: string
+  artist: string
+  album?: string | null
+  duration?: number | null
+  artworkURL?: string | null
+  streamURL?: string | null
+  format?: string | null
+  isrc?: string | null
+}
+
+export interface AddonSearchResponse {
+  data: {
+    tracks: AddonSearchTrack[]
+    albums: unknown[]
+    artists: unknown[]
+    playlists: unknown[]
+  }
+  meta: { addon_id: string }
+  message: string
 }

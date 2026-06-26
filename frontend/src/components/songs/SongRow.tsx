@@ -99,6 +99,10 @@ export const SongRow = memo(function SongRow({
   }, [song, addToQueue])
 
   const handlePlay = (e?: React.MouseEvent) => {
+    if (isAddon && !hasFile) {
+      toast.info("Streaming playback arrives in the next update")
+      return
+    }
     if (!song.file_path) return
     // In select mode or when ctrl/meta held, toggle selection instead of playing
     if (selectMode || e?.metaKey || e?.ctrlKey) {
@@ -113,6 +117,8 @@ export const SongRow = memo(function SongRow({
   }
 
   const hasFile = song.file_path !== null
+  const isAddon = song.source.startsWith("addon:")
+  const canPlay = hasFile || !isAddon // addon tracks without file: deferred, not broken
   const shouldStagger = animIndex !== undefined && animIndex < 16
 
   // Build cell context for registry render functions
@@ -122,6 +128,7 @@ export const SongRow = memo(function SongRow({
     isSelected: !!isSelected,
     index,
     hasFile,
+    isAddon,
     selectMode: !!selectMode,
     inQueue,
     onPlay: handlePlay,
@@ -148,8 +155,8 @@ export const SongRow = memo(function SongRow({
         ref={mergedRef}
         onClick={(e) => handlePlay(e)}
         onContextMenu={onContextMenuProp}
-        className={`group relative transition-[opacity,border-color,background-color] duration-200 ${
-          hasFile ? "cursor-pointer" : "cursor-not-allowed opacity-40"
+        className={`group relative transition-[opacity,border-color,background-color] duration-100 ${
+          canPlay ? "cursor-pointer" : "cursor-not-allowed opacity-40"
         } ${isSelected ? "bg-white/[0.04]" : isCurrentSong ? "" : "hover:bg-[var(--aurora-surface-hover)]"} ${shouldStagger ? "song-row-enter" : ""}`}
         style={{
           ...sortableStyle,

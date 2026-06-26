@@ -20,6 +20,7 @@ import type { Song } from "@/types"
 import { scheduleStartupUpdateCheck } from "@/lib/updater"
 
 // Lazy-loaded views — only one renders at a time
+const OnlineResults = lazy(() => import("@/components/songs/OnlineResults").then(m => ({ default: m.OnlineResults })))
 const SongTable = lazy(() => import("@/components/songs/SongTable").then(m => ({ default: m.SongTable })))
 const PlaylistDetail = lazy(() => import("@/components/playlists/PlaylistDetail").then(m => ({ default: m.PlaylistDetail })))
 const QueryBuilder = lazy(() => import("@/components/filter/QueryBuilder").then(m => ({ default: m.QueryBuilder })))
@@ -156,6 +157,7 @@ function App() {
               className="w-full bg-transparent border-0 outline-none pl-11 pr-5 py-2.5 text-[13px] text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-tertiary)] placeholder:font-display-italic placeholder:text-[14px] focus-visible:shadow-none"
             />
           </div>
+          <OnlineResults searchQuery={searchQuery} />
           <SongTable
             songs={songs}
             loading={songsLoading}
