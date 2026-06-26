@@ -4,8 +4,8 @@ import type { Song } from "@/types"
 const MAX_HISTORY = 100
 
 /** A song is playable if it has a local file OR comes from an addon (stream). */
-export function isPlayable(song: Song): boolean {
-  return !!song.file_path || song.source.startsWith("addon:")
+export function isPlayable(song: { file_path?: string | null; source?: string }): boolean {
+  return !!song.file_path || !!song.source?.startsWith("addon:")
 }
 
 const removeOneById = (list: Song[], id: number) => {

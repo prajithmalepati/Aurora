@@ -377,7 +377,7 @@ export function useAudioPlayer() {
       })
     }
 
-    if (!isPlayable(currentSong)) {
+    if (!currentSong) {
       currentSongRef.current = null
       // Clear stale preloaded engine when queue ends
       if (nextEngineRef.current) {
@@ -386,6 +386,20 @@ export function useAudioPlayer() {
         preloadReadyRef.current = false
       }
       // Clean up the outgoing engine (no new song to transition to)
+      if (prev) {
+        prev.stop()
+        prev.unload()
+      }
+      return
+    }
+
+    if (!isPlayable(currentSong)) {
+      currentSongRef.current = null
+      if (nextEngineRef.current) {
+        nextEngineRef.current.engine.unload()
+        nextEngineRef.current = null
+        preloadReadyRef.current = false
+      }
       if (prev) {
         prev.stop()
         prev.unload()
@@ -424,10 +438,26 @@ export function useAudioPlayer() {
       // Addon songs need async URL resolution; local songs load synchronously
       if (currentSong.file_path) {
         engine.load(streamSource(songId, currentSong.file_path))
+        engineRef.current = engine
       } else {
         // Addon resolve-then-load (§2b: guarded async inside the effect)
         // load() emits buffering:true via the bound handler — reuse it for the resolve gap
         usePlayerStore.getState().setIsBuffering(true)
+        engineRef.current = engine
+
+        // Handle prev SYNCHRONOUSLY — don't defer to startPlayback.
+        // During the resolve gap, the old song must be stopped (non-crossfade)
+        // or kept reachable via fadingOutRef (crossfade) so pause can stop it.
+        if (prev) {
+          if (crossfadeIn) {
+            // Keep prev reachable for the isPlaying effect during the resolve gap.
+            // startPlayback will handle the actual fade once the new engine loads.
+            fadingOutRef.current = prev
+          } else {
+            prev.stop()
+            prev.unload()
+          }
+        }
         const doResolve = async () => {
           try {
             const res = await api.get<{ data: { type: string; url: string; expires_at?: string } }>(
@@ -444,6 +474,8 @@ export function useAudioPlayer() {
               const format = currentSong.file_format ?? undefined
               engine.load({ url, format })
             }
+            // Start playback after load — engine.play() is a no-op before load
+            startPlayback(engine)
           } catch (err) {
             console.error(`Addon resolve failed for song ${songId}:`, err)
             // Re-check staleness before showing error (§0.5)
@@ -462,153 +494,158 @@ export function useAudioPlayer() {
       }
     }
 
-    engineRef.current = engine
+    // --- Start playback / crossfade for the new engine ---
+    // For local songs this runs synchronously; for addon songs it's called
+    // from doResolve() after engine.load() completes (play() is a no-op before load).
+    function startPlayback(engine: PlaybackEngine) {
+      if (usePlayerStore.getState().isPlaying) {
+        unlockAudioOutput()
 
-    // --- Gapless transition: play new engine BEFORE stopping the old one ---
-    // This eliminates the silence gap by starting the new audio source
-    // while the old one is still finishing its final samples.
-    if (usePlayerStore.getState().isPlaying) {
-      unlockAudioOutput()
-
-      // For non-crossfade gapless: reset the audio position to start
-      // so the transition is sample-precise.
-      if (!crossfadeIn) {
-        engine.resetToStart()
-      }
-
-      if (crossfadeIn) {
-        // crossfadeIn guarantees prev is non-null (derived from prev?.isPlaying())
-        const outgoing = prev!
-        const fadeDurationMs = duration * 1000
-        const targetVol = resolveVolume()
-        fadingOutRef.current = outgoing
-        const fadeDone = () => {
-          if (fadingOutRef.current === outgoing) fadingOutRef.current = null
+        // For non-crossfade gapless: reset the audio position to start
+        // so the transition is sample-precise.
+        if (!crossfadeIn) {
+          engine.resetToStart()
         }
 
-        // Howler trap: on an already-loaded engine (promoted preload), play()
-        // holds _playLock until the html5 play() promise resolves. volume()/
-        // fade() calls made during the lock are pushed onto Howler's action
-        // queue with no event that ever releases them — the song plays at
-        // volume 0 forever. So: set volume BEFORE play(), and start fades on
-        // the engine's play event (emitted after the lock clears).
-
-        if (curve === 'overlap') {
-          // Overlap: play both at full volume for the duration, then taper the
-          // old one out over 250ms — a true hard cut sounds like a glitch
-          engine.setVolume(targetVol)
-          engine.play()
-          usePlayerStore.getState().setCrossfading(true, prevTitleRef.current ?? undefined)
-          setTimeout(() => {
-            outgoing.fade(outgoing.getVolume(), 0, 250)
-            setTimeout(() => {
-              outgoing.stop()
-              outgoing.unload()
-              fadeDone()
-              usePlayerStore.getState().setCrossfading(false)
-            }, 250)
-          }, fadeDurationMs)
-        } else if (curve === 'equalpower') {
-          engine.setVolume(0)
-          engine.play()
-          // Equal Power: cosine curve for constant-power transition
-          const prevVol = outgoing.getVolume()
-          const startTime = performance.now()
-          usePlayerStore.getState().setCrossfading(true, prevTitleRef.current ?? undefined)
-
-          const equalPowerInterval = setInterval(() => {
-            const elapsed = performance.now() - startTime
-            const t = Math.min(1, elapsed / fadeDurationMs)
-            // Cosine curves: sin² + cos² = 1 → constant power
-            const fadeInVol = Math.sin(t * Math.PI / 2) * targetVol
-            const fadeOutVol = Math.cos(t * Math.PI / 2) * prevVol
-            engine.setVolume(fadeInVol)
-            if (outgoing.isPlaying()) outgoing.setVolume(fadeOutVol)
-            if (t >= 1) {
-              clearInterval(equalPowerInterval)
-              xfadeIntervalRef.current = null
-              outgoing.stop()
-              outgoing.unload()
-              fadeDone()
-              usePlayerStore.getState().setCrossfading(false)
-            }
-          }, 33) // ~30fps
-          xfadeIntervalRef.current = equalPowerInterval as unknown as number
-        } else if (curve === 'lagged') {
-          // Lagged: outgoing fades to 0 over the full N (handled in the
-          // `if (prev)` block below — it shares the linear fade-out path);
-          // incoming stays parked for N/2, then plays and fades up over
-          // the remaining N/2. See PLAYLOCK TRAP note: volume set before
-          // play, fade started from the play event.
-          engine.setVolume(0)
-          const startFade = () => {
-            engine.off("play", startFade)
-            engine.fade(0, targetVol, fadeDurationMs / 2)
+        if (crossfadeIn) {
+          // crossfadeIn guarantees prev is non-null (derived from prev?.isPlaying())
+          const outgoing = prev!
+          const fadeDurationMs = duration * 1000
+          const targetVol = resolveVolume()
+          fadingOutRef.current = outgoing
+          const fadeDone = () => {
+            if (fadingOutRef.current === outgoing) fadingOutRef.current = null
           }
-          engine.on("play", startFade)
-          laggedStartTimerRef.current = window.setTimeout(() => {
-            laggedStartTimerRef.current = null
-            // A newer transition replaced this engine — do nothing
-            if (engineRef.current !== engine) return
-            // Resume during the delay already started this engine via the
-            // isPlaying effect — a second play() would spawn a second Howler
-            // sound instance of the same file (double audio)
-            if (engine.isPlaying()) return
-            if (!usePlayerStore.getState().isPlaying) {
-              // User paused during the delay: don't start. Park the engine at
-              // target volume so resume (isPlaying effect) comes in audible.
-              engine.off("play", startFade)
-              engine.setVolume(targetVol)
-              return
-            }
+
+          // Howler trap: on an already-loaded engine (promoted preload), play()
+          // holds _playLock until the html5 play() promise resolves. volume()/
+          // fade() calls made during the lock are pushed onto Howler's action
+          // queue with no event that ever releases them — the song plays at
+          // volume 0 forever. So: set volume BEFORE play(), and start fades on
+          // the engine's play event (emitted after the lock clears).
+
+          if (curve === 'overlap') {
+            // Overlap: play both at full volume for the duration, then taper the
+            // old one out over 250ms — a true hard cut sounds like a glitch
+            engine.setVolume(targetVol)
             engine.play()
-          }, fadeDurationMs / 2)
-          usePlayerStore.getState().setCrossfading(true, prevTitleRef.current ?? undefined)
-        } else {
-          // Linear: engine-native fade, deferred to the play event (see Howler
-          // trap note above — fade() during _playLock is silently dropped)
-          engine.setVolume(0)
-          const startFade = () => {
-            engine.off("play", startFade)
-            engine.fade(0, targetVol, fadeDurationMs)
+            usePlayerStore.getState().setCrossfading(true, prevTitleRef.current ?? undefined)
+            setTimeout(() => {
+              outgoing.fade(outgoing.getVolume(), 0, 250)
+              setTimeout(() => {
+                outgoing.stop()
+                outgoing.unload()
+                fadeDone()
+                usePlayerStore.getState().setCrossfading(false)
+              }, 250)
+            }, fadeDurationMs)
+          } else if (curve === 'equalpower') {
+            engine.setVolume(0)
+            engine.play()
+            // Equal Power: cosine curve for constant-power transition
+            const prevVol = outgoing.getVolume()
+            const startTime = performance.now()
+            usePlayerStore.getState().setCrossfading(true, prevTitleRef.current ?? undefined)
+
+            const equalPowerInterval = setInterval(() => {
+              const elapsed = performance.now() - startTime
+              const t = Math.min(1, elapsed / fadeDurationMs)
+              // Cosine curves: sin² + cos² = 1 → constant power
+              const fadeInVol = Math.sin(t * Math.PI / 2) * targetVol
+              const fadeOutVol = Math.cos(t * Math.PI / 2) * prevVol
+              engine.setVolume(fadeInVol)
+              if (outgoing.isPlaying()) outgoing.setVolume(fadeOutVol)
+              if (t >= 1) {
+                clearInterval(equalPowerInterval)
+                xfadeIntervalRef.current = null
+                outgoing.stop()
+                outgoing.unload()
+                fadeDone()
+                usePlayerStore.getState().setCrossfading(false)
+              }
+            }, 33) // ~30fps
+            xfadeIntervalRef.current = equalPowerInterval as unknown as number
+          } else if (curve === 'lagged') {
+            // Lagged: outgoing fades to 0 over the full N (handled in the
+            // `if (prev)` block below — it shares the linear fade-out path);
+            // incoming stays parked for N/2, then plays and fades up over
+            // the remaining N/2. See PLAYLOCK TRAP note: volume set before
+            // play, fade started from the play event.
+            engine.setVolume(0)
+            const startFade = () => {
+              engine.off("play", startFade)
+              engine.fade(0, targetVol, fadeDurationMs / 2)
+            }
+            engine.on("play", startFade)
+            laggedStartTimerRef.current = window.setTimeout(() => {
+              laggedStartTimerRef.current = null
+              // A newer transition replaced this engine — do nothing
+              if (engineRef.current !== engine) return
+              // Resume during the delay already started this engine via the
+              // isPlaying effect — a second play() would spawn a second Howler
+              // sound instance of the same file (double audio)
+              if (engine.isPlaying()) return
+              if (!usePlayerStore.getState().isPlaying) {
+                // User paused during the delay: don't start. Park the engine at
+                // target volume so resume (isPlaying effect) comes in audible.
+                engine.off("play", startFade)
+                engine.setVolume(targetVol)
+                return
+              }
+              engine.play()
+            }, fadeDurationMs / 2)
+            usePlayerStore.getState().setCrossfading(true, prevTitleRef.current ?? undefined)
+          } else {
+            // Linear: engine-native fade, deferred to the play event (see Howler
+            // trap note above — fade() during _playLock is silently dropped)
+            engine.setVolume(0)
+            const startFade = () => {
+              engine.off("play", startFade)
+              engine.fade(0, targetVol, fadeDurationMs)
+            }
+            engine.on("play", startFade)
+            engine.play()
+            usePlayerStore.getState().setCrossfading(true, prevTitleRef.current ?? undefined)
           }
-          engine.on("play", startFade)
+        } else {
+          engine.setVolume(resolveVolume())
           engine.play()
-          usePlayerStore.getState().setCrossfading(true, prevTitleRef.current ?? undefined)
         }
       } else {
         engine.setVolume(resolveVolume())
-        engine.play()
       }
-    } else {
-      engine.setVolume(resolveVolume())
+
+      // NOW handle the outgoing engine — after the new one is already playing.
+      // The momentary overlap of two audio sources produces the gapless transition.
+      if (prev) {
+        if (crossfadeIn) {
+          const fadeDurationMs = duration * 1000
+          if (curve === 'overlap') {
+            // Already handled above via setTimeout
+            // prev continues at full volume until the timeout fires
+          } else if (curve === 'equalpower') {
+            // Already handled above via setInterval
+            // prev volume is being manually ramped down
+          } else {
+            // Linear AND lagged: engine-native fade out over the full duration
+            prev.fade(prev.getVolume(), 0, fadeDurationMs)
+            setTimeout(() => {
+              prev.stop()
+              prev.unload()
+              if (fadingOutRef.current === prev) fadingOutRef.current = null
+              usePlayerStore.getState().setCrossfading(false)
+            }, fadeDurationMs)
+          }
+        } else {
+          prev.stop()
+          prev.unload()
+        }
+      }
     }
 
-    // NOW handle the outgoing engine — after the new one is already playing.
-    // The momentary overlap of two audio sources produces the gapless transition.
-    if (prev) {
-      if (crossfadeIn) {
-        const fadeDurationMs = duration * 1000
-        if (curve === 'overlap') {
-          // Already handled above via setTimeout
-          // prev continues at full volume until the timeout fires
-        } else if (curve === 'equalpower') {
-          // Already handled above via setInterval
-          // prev volume is being manually ramped down
-        } else {
-          // Linear AND lagged: engine-native fade out over the full duration
-          prev.fade(prev.getVolume(), 0, fadeDurationMs)
-          setTimeout(() => {
-            prev.stop()
-            prev.unload()
-            if (fadingOutRef.current === prev) fadingOutRef.current = null
-            usePlayerStore.getState().setCrossfading(false)
-          }, fadeDurationMs)
-        }
-      } else {
-        prev.stop()
-        prev.unload()
-      }
+    // For local songs, start playback synchronously; addon songs call startPlayback from doResolve()
+    if (currentSong.file_path) {
+      startPlayback(engine)
     }
 
     return () => {
@@ -644,7 +681,11 @@ export function useAudioPlayer() {
       // to the user gesture. useAudioAnalyser runs later (App.tsx root) and may
       // miss the browser's activation window.
       unlockAudioOutput()
-      engineRef.current.play()
+      // Guard: don't play an unloaded engine (addon resolve in flight).
+      // Howler queues play-on-load, which conflicts with doResolve's post-load play.
+      if (engineRef.current.isLoaded()) {
+        engineRef.current.play()
+      }
       // Resume a mid-crossfade outgoing engine only if it's still audible —
       // pausing snaps Howler fades to their end value, so a faded-out engine
       // reads 0 here and stays stopped

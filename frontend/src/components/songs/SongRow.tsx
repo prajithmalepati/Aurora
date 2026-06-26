@@ -2,6 +2,7 @@ import type { Song } from "@/types"
 import { GripVertical } from "lucide-react"
 import { useSongStore } from "@/stores/songStore"
 import { usePlayerStore } from "@/stores/playerStore"
+import { isPlayable } from "@/stores/playerStore"
 import { toast } from "@/lib/toast"
 import { useState, useCallback, useRef, memo } from "react"
 import { TagEditor } from "@/components/tags/TagEditor"
@@ -99,11 +100,7 @@ export const SongRow = memo(function SongRow({
   }, [song, addToQueue])
 
   const handlePlay = (e?: React.MouseEvent) => {
-    if (isAddon && !hasFile) {
-      toast.info("Streaming playback arrives in the next update")
-      return
-    }
-    if (!song.file_path) return
+    if (!isPlayable(song)) return
     // In select mode or when ctrl/meta held, toggle selection instead of playing
     if (selectMode || e?.metaKey || e?.ctrlKey) {
       if (onToggleSelect) onToggleSelect(e?.shiftKey ?? false, e?.metaKey || e?.ctrlKey)
@@ -116,9 +113,9 @@ export const SongRow = memo(function SongRow({
     }
   }
 
-  const hasFile = song.file_path !== null
+  const hasFile = !!song.file_path
   const isAddon = song.source.startsWith("addon:")
-  const canPlay = hasFile || isAddon // addon: interactive (deferred toast); missing local: disabled
+  const canPlay = isPlayable(song)
   const shouldStagger = animIndex !== undefined && animIndex < 16
 
   // Build cell context for registry render functions
