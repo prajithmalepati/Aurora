@@ -11,6 +11,7 @@ import { ScanDialog } from "@/components/scanner/ScanDialog"
 import { AddSongDialog } from "@/components/songs/AddSongDialog"
 import { UpdateCard } from "@/components/settings/UpdateCard"
 import { ZoomControl } from "@/components/settings/ZoomControl"
+import { SourcesSection } from "@/components/settings/SourcesSection"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { FolderSearch, Music, Upload } from "lucide-react"
 
@@ -406,6 +407,9 @@ export function SettingsView() {
           <ZoomControl />
         </div>
       </div>
+
+      {/* Sources section */}
+      <SourcesSection />
 
       {/* Watched Folders section */}
       <div

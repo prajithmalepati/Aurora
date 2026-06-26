@@ -4,6 +4,7 @@ import { AlbumArt } from "@/components/songs/AlbumArt"
 import { Equalizer } from "@/components/ui/Equalizer"
 import { AuroraPlayButton } from "@/components/player/AuroraPlayButton"
 import { TagList } from "@/components/tags/TagList"
+import { Cloud } from "lucide-react"
 import type { SortField } from "./SongTable"
 
 // ── Column ID type ──
@@ -16,6 +17,7 @@ export interface CellCtx {
   isSelected: boolean
   index: number
   hasFile: boolean
+  isAddon: boolean
   selectMode: boolean
   inQueue: boolean
   // Callbacks
@@ -91,13 +93,28 @@ export const COLUMN_REGISTRY: ColumnDef[] = [
         <div className="relative z-10 flex items-center gap-3 min-w-0">
           <AlbumArt song={song} size="sm" className="aurora-rim" />
           <div className="flex flex-col min-w-0">
-            <span
-              className={`truncate text-[14px] font-medium leading-tight ${
-                ctx.isCurrentSong ? "text-white/90" : "text-[var(--aurora-text)]"
-              }`}
-            >
-              {song.title || "Untitled"}
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span
+                className={`truncate text-[14px] font-medium leading-tight ${
+                  ctx.isCurrentSong ? "text-white/90" : "text-[var(--aurora-text)]"
+                }`}
+              >
+                {song.title || "Untitled"}
+              </span>
+              {ctx.isAddon && (
+                <span
+                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium tracking-wide flex-shrink-0"
+                  style={{
+                    background: "var(--aurora-surface-inset)",
+                    color: "var(--aurora-text-secondary)",
+                    border: "1px solid var(--aurora-rim)",
+                  }}
+                >
+                  <Cloud className="h-2.5 w-2.5" />
+                  {song.source.replace("addon:", "").split(".").pop() ?? "online"}
+                </span>
+              )}
+            </div>
             <span className="truncate text-[12px] text-[var(--aurora-text-secondary)] mt-0.5">
               {song.artist || "Unknown Artist"}
               {song.featured_artists && song.featured_artists.length > 0 && (
