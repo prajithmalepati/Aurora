@@ -118,7 +118,7 @@ export const SongRow = memo(function SongRow({
 
   const hasFile = song.file_path !== null
   const isAddon = song.source.startsWith("addon:")
-  const canPlay = hasFile || !isAddon // addon tracks without file: deferred, not broken
+  const canPlay = hasFile || isAddon // addon: interactive (deferred toast); missing local: disabled
   const shouldStagger = animIndex !== undefined && animIndex < 16
 
   // Build cell context for registry render functions
