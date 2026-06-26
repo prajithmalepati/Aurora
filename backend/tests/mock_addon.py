@@ -6,11 +6,17 @@ Implements the EclipseMusic/BeatBoss-compatible protocol:
 - GET /stream/{id}
 - GET /lyrics?artist=&title=
 
+Also provides SSRF/security test endpoints:
+- GET /redirect-to-private — 302 → http://169.254.169.254/
+- GET /redirect-chain — chain of redirects ending at private IP
+- GET /oversized — returns a response exceeding size cap
+- GET /lying-content-length — Content-Length says small, body is huge
+
 Runs as a standalone FastAPI app on a random port.
 """
 from datetime import datetime, timezone, timedelta
-from fastapi import FastAPI, Query
-from typing import Optional
+from fastapi import FastAPI, Query, Response
+from fastapi.responses import RedirectResponse
 
 app = FastAPI(title="Mock Music Addon")
 
@@ -105,3 +111,36 @@ def lyrics(artist: str = Query(...), title: str = Query(...)):
     return {
         "lyrics": f"[00:05.00] {title}\n[00:10.00] by {artist}\n[00:15.00] This is a mock lyric line\n[00:20.00] For testing purposes only"
     }
+
+
+# ── SSRF/Security test endpoints ─────────────────────────────────────────
+
+@app.get("/redirect-to-private")
+def redirect_to_private():
+    """302 redirect to a private IP — should be blocked by SSRF."""
+    return RedirectResponse(url="http://169.254.169.254/latest/meta-data/", status_code=302)
+
+
+@app.get("/redirect-chain")
+def redirect_chain():
+    """Chain: public → private → public. The private hop should be blocked."""
+    return RedirectResponse(url="http://169.254.169.254/step2", status_code=302)
+
+
+@app.get("/oversized")
+def oversized():
+    """Returns a response exceeding the 4 MB proxy size cap."""
+    # Generate ~5 MB of JSON
+    big_data = "x" * (5 * 1024 * 1024)
+    return {"data": big_data}
+
+
+@app.get("/lying-content-length")
+def lying_content_length():
+    """Content-Length says 100 bytes, but the actual body is much larger."""
+    big_data = "y" * (1024 * 1024)  # 1 MB actual
+    return Response(
+        content=big_data,
+        media_type="application/json",
+        headers={"Content-Length": "100"},  # lying
+    )

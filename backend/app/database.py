@@ -120,7 +120,8 @@ CREATE TABLE IF NOT EXISTS addons (
     enabled         INTEGER DEFAULT 1,
     added_at        TEXT,
     last_ok_at      TEXT,
-    fail_count      INTEGER DEFAULT 0
+    fail_count      INTEGER DEFAULT 0,
+    last_fail_at    TEXT
 );
 """
 
@@ -209,11 +210,13 @@ MIGRATIONS = [
             enabled         INTEGER DEFAULT 1,
             added_at        TEXT,
             last_ok_at      TEXT,
-            fail_count      INTEGER DEFAULT 0
+            fail_count      INTEGER DEFAULT 0,
+            last_fail_at    TEXT
         )""",
         "ALTER TABLE songs ADD COLUMN stream_url TEXT",
         "ALTER TABLE songs ADD COLUMN stream_url_expires_at TEXT",
         "ALTER TABLE songs ADD COLUMN artwork_url TEXT",
+        "ALTER TABLE addons ADD COLUMN last_fail_at TEXT",
     ]),
 ]
 

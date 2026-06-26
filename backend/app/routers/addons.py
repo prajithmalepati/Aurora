@@ -2,13 +2,13 @@
 import ipaddress
 import json
 import logging
-import re
 import socket
 import time
 from datetime import datetime, timezone
 from typing import Optional
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin
 
+import httpcore
 import httpx
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -40,6 +40,12 @@ _PRIVATE_NETWORKS = [
     ipaddress.ip_network("fe80::/10"),
 ]
 
+_LOCALHOST_HOSTNAMES = {"localhost", "127.0.0.1", "::1"}
+
+# Response size caps (bytes)
+_MAX_BODY_MANIFEST = 1 * 1024 * 1024      # 1 MB for manifest
+_MAX_BODY_PROXY = 4 * 1024 * 1024         # 4 MB for search/lyrics/stream responses
+
 
 def _is_private_ip(ip_str: str) -> bool:
     """Check if an IP address is in a private/reserved range."""
@@ -63,7 +69,6 @@ def _validate_url_for_ssrf(url: str) -> None:
         raise HTTPException(status_code=400, detail="URL has no hostname")
 
     # HTTP only allowed for localhost dev
-    _LOCALHOST_HOSTNAMES = {"localhost", "127.0.0.1", "::1"}
     if parsed.scheme == "http" and hostname not in _LOCALHOST_HOSTNAMES:
         raise HTTPException(
             status_code=400,
@@ -89,11 +94,125 @@ def _validate_url_for_ssrf(url: str) -> None:
             )
 
 
-def _validate_redirects(response: httpx.Response) -> None:
-    """Re-validate SSRF on each redirect hop."""
-    # httpx follows redirects by default; we check the final URL
-    if response.url:
-        _validate_url_for_ssrf(str(response.url))
+# ── F1: Manual redirect loop (no auto-follow) ───────────────────────────
+
+_MAX_REDIRECTS = 3
+
+
+async def _safe_get(
+    client: httpx.AsyncClient,
+    url: str,
+    *,
+    params: Optional[dict] = None,
+    max_body_bytes: int = _MAX_BODY_PROXY,
+) -> httpx.Response:
+    """Fetch a URL with manual redirect following + SSRF validation on every hop.
+
+    Each redirect target is validated BEFORE the request is made.
+    Response body is capped at max_body_bytes.
+    """
+    current_url = url
+    for hop in range(_MAX_REDIRECTS + 1):
+        _validate_url_for_ssrf(current_url)
+
+        resp = await client.get(current_url, params=params)
+        params = None  # params only apply to the first request
+
+        # Check Content-Length pre-flight
+        content_length = resp.headers.get("content-length")
+        if content_length and content_length.isdigit() and int(content_length) > max_body_bytes:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Addon response too large ({int(content_length)} bytes, max {max_body_bytes})"
+            )
+
+        # Read body with size cap (F3)
+        body = b""
+        async for chunk in resp.aiter_bytes(chunk_size=8192):
+            body += chunk
+            if len(body) > max_body_bytes:
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Addon response exceeded size limit ({max_body_bytes} bytes)"
+                )
+
+        # Replace the streamed body so callers can use resp.json() etc.
+        resp._content = body  # noqa: SLF001 — internal but necessary for httpx
+
+        # If not a redirect, return
+        if resp.status_code < 300 or resp.status_code >= 400:
+            return resp
+
+        # Follow redirect: extract Location, validate before next hop
+        location = resp.headers.get("location")
+        if not location:
+            raise HTTPException(status_code=502, detail="Redirect with no Location header")
+
+        # Resolve relative URLs
+        current_url = urljoin(current_url, location)
+
+    raise HTTPException(status_code=502, detail=f"Too many redirects (>{_MAX_REDIRECTS})")
+
+
+# ── F2: DNS rebinding protection via connect-time IP validation ──────────
+
+class _SSRFNetworkBackend(httpcore.AsyncNetworkBackend):
+    """Network backend that validates the resolved IP at connect time.
+
+    Prevents DNS rebinding: even if DNS returns a different (private) IP
+    between our pre-validation and the actual connection, this backend
+    checks the IP that was actually resolved for the connection.
+    """
+
+    def __init__(self, inner: httpcore.AsyncNetworkBackend):
+        self._inner = inner
+
+    async def connect_tcp(self, host, port, timeout=None, local_address=None, socket_options=None):
+        # Skip validation for localhost (already validated at URL level)
+        if host in _LOCALHOST_HOSTNAMES:
+            return await self._inner.connect_tcp(
+                host, port, timeout=timeout, local_address=local_address, socket_options=socket_options
+            )
+
+        # Resolve DNS ourselves and validate ALL resolved IPs
+        try:
+            infos = socket.getaddrinfo(host, port, family=socket.AF_UNSPEC, type=socket.SOCK_STREAM)
+        except socket.gaierror:
+            raise httpcore.ConnectError(f"Cannot resolve hostname: {host}")
+
+        validated_ip = None
+        for _, _, _, _, sockaddr in infos:
+            ip_str = str(sockaddr[0])
+            if _is_private_ip(ip_str):
+                raise httpcore.ConnectError(
+                    f"SSRF blocked: DNS resolved {host} to private IP {ip_str}"
+                )
+            if validated_ip is None:
+                validated_ip = ip_str
+
+        if validated_ip is None:
+            raise httpcore.ConnectError(f"Could not resolve {host}")
+
+        # Connect to the validated IP (prevents rebinding: we control which IP is used)
+        return await self._inner.connect_tcp(
+            validated_ip, port, timeout=timeout, local_address=local_address, socket_options=socket_options
+        )
+
+    async def connect_unix_socket(self, path, timeout=None, socket_options=None):
+        return await self._inner.connect_unix_socket(path, timeout=timeout, socket_options=socket_options)
+
+    async def sleep(self, seconds):
+        await self._inner.sleep(seconds)
+
+
+class _SSRFAsyncTransport(httpx.AsyncHTTPTransport):
+    """httpx transport with SSRF-validating network backend (F2)."""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Wrap the pool's network backend with our SSRF-validating one
+        original = self._pool._network_backend
+        self._pool._network_backend = _SSRFNetworkBackend(original)
 
 
 # ── Rate Limiter (token bucket, per-addon) ────────────────────────────────
@@ -131,26 +250,32 @@ def _get_rate_limiter(addon_id: str, rpm: int = 60) -> _TokenBucket:
     return _rate_limiters[addon_id]
 
 
-# ── Circuit Breaker ──────────────────────────────────────────────────────
+# ── F4: Circuit Breaker (keyed off last failure, not last success) ──────
 
 _COOLDOWN_SECONDS = 300  # 5 min cooldown after 3 failures
 _FAIL_THRESHOLD = 3
 
 
-def _check_circuit(addon_id: str, fail_count: int, last_ok_at: Optional[str]) -> bool:
-    """Returns True if the circuit is OPEN (request should be blocked)."""
+def _check_circuit(addon_id: str, fail_count: int, last_fail_at: Optional[str]) -> bool:
+    """Returns True if the circuit is OPEN (request should be blocked).
+
+    Cooldown is measured from the last FAILURE, not last success.
+    If the addon never succeeded (last_fail_at is None when fail_count >= threshold),
+    the circuit stays open until explicitly reset.
+    """
     if fail_count < _FAIL_THRESHOLD:
         return False
-    # Circuit is open — check if cooldown has elapsed
-    if last_ok_at:
-        try:
-            last_ok = datetime.fromisoformat(last_ok_at.replace("Z", "+00:00"))
-            elapsed = (datetime.now(timezone.utc) - last_ok).total_seconds()
-            if elapsed >= _COOLDOWN_SECONDS:
-                return False  # half-open: allow one trial
-        except (ValueError, TypeError):
-            pass
-    return True
+    if not last_fail_at:
+        # Never succeeded + at threshold → open
+        return True
+    try:
+        last_fail = datetime.fromisoformat(last_fail_at.replace("Z", "+00:00"))
+        elapsed = (datetime.now(timezone.utc) - last_fail).total_seconds()
+        if elapsed < _COOLDOWN_SECONDS:
+            return True  # still in cooldown
+        return False  # cooldown elapsed → half-open (allow trial)
+    except (ValueError, TypeError):
+        return True  # can't parse → stay open
 
 
 def _record_success(addon_id: str) -> None:
@@ -165,11 +290,12 @@ def _record_success(addon_id: str) -> None:
 
 
 def _record_failure(addon_id: str) -> None:
-    """Increment fail count on failure."""
+    """Increment fail count and record failure time."""
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     with get_db_ctx() as conn:
         conn.execute(
-            "UPDATE addons SET fail_count = fail_count + 1 WHERE id = ?",
-            (addon_id,),
+            "UPDATE addons SET fail_count = fail_count + 1, last_fail_at = ? WHERE id = ?",
+            (now, addon_id),
         )
         conn.commit()
 
@@ -180,13 +306,18 @@ _client: Optional[httpx.AsyncClient] = None
 
 
 async def _get_client() -> httpx.AsyncClient:
-    """Get or create the shared httpx async client."""
+    """Get or create the shared httpx async client.
+
+    Uses SSRF-validating transport (F2) and disables auto-redirect (F1).
+    """
     global _client
     if _client is None or _client.is_closed:
         _client = httpx.AsyncClient(
+            transport=_SSRFAsyncTransport(
+                retries=0,
+            ),
             timeout=httpx.Timeout(connect=10.0, read=30.0, write=10.0, pool=10.0),
-            follow_redirects=True,
-            max_redirects=3,
+            follow_redirects=False,  # F1: manual redirect loop
             limits=httpx.Limits(max_connections=20, max_keepalive_connections=5),
         )
     return _client
@@ -220,8 +351,6 @@ def _validate_manifest(data: dict) -> dict:
 
 def _normalize_search_response(raw: dict, addon_id: str) -> dict:
     """Normalize addon search response to Aurora envelope."""
-    # The addon may return tracks/albums/artists/playlists at top level
-    # or nested under "data". Normalize both.
     tracks = raw.get("tracks", [])
     albums = raw.get("albums", [])
     artists = raw.get("artists", [])
@@ -282,7 +411,7 @@ async def add_addon(body: AddonCreate):
     base_url = body.base_url.rstrip("/")
     manifest_url = f"{base_url}/manifest.json"
 
-    # SSRF validation
+    # SSRF validation (pre-flight)
     _validate_url_for_ssrf(base_url)
     _validate_url_for_ssrf(manifest_url)
 
@@ -294,12 +423,11 @@ async def add_addon(body: AddonCreate):
         if existing:
             raise HTTPException(status_code=409, detail="Addon already registered")
 
-    # Fetch manifest
+    # Fetch manifest (F1: manual redirect, F2: SSRF transport, F3: size cap)
     client = await _get_client()
     try:
-        resp = await client.get(manifest_url)
+        resp = await _safe_get(client, manifest_url, max_body_bytes=_MAX_BODY_MANIFEST)
         resp.raise_for_status()
-        _validate_redirects(resp)
         manifest = resp.json()
     except httpx.HTTPStatusError as e:
         raise HTTPException(
@@ -308,6 +436,8 @@ async def add_addon(body: AddonCreate):
         )
     except (httpx.RequestError, httpx.TimeoutException) as e:
         raise HTTPException(status_code=502, detail=f"Cannot reach addon: {e}")
+    except HTTPException:
+        raise  # re-raise our own (SSRF, size cap)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Invalid manifest JSON: {e}")
 
@@ -344,7 +474,7 @@ def list_addons():
     """List all registered addons with health info."""
     with get_db_ctx() as conn:
         rows = conn.execute(
-            "SELECT id, base_url, name, version, enabled, fail_count, last_ok_at FROM addons ORDER BY added_at DESC"
+            "SELECT id, base_url, name, version, enabled, fail_count, last_ok_at, last_fail_at FROM addons ORDER BY added_at DESC"
         ).fetchall()
 
     addons = [
@@ -356,6 +486,7 @@ def list_addons():
             "enabled": bool(r["enabled"]),
             "fail_count": r["fail_count"],
             "last_ok_at": r["last_ok_at"],
+            "last_fail_at": r["last_fail_at"],
         }
         for r in rows
     ]
@@ -411,7 +542,7 @@ def _get_addon_or_404(addon_id: str) -> dict:
         raise HTTPException(status_code=404, detail="Addon not found")
     if not row["enabled"]:
         raise HTTPException(status_code=403, detail="Addon is disabled")
-    if _check_circuit(addon_id, row["fail_count"], row["last_ok_at"]):
+    if _check_circuit(addon_id, row["fail_count"], row["last_fail_at"]):
         raise HTTPException(
             status_code=503,
             detail=f"Addon circuit breaker open (fail_count={row['fail_count']}). Try again later."
@@ -442,7 +573,7 @@ async def _proxy_request(addon: dict, path: str, params: Optional[dict] = None) 
     base_url = addon["base_url"]
     url = f"{base_url}{path}"
 
-    # SSRF validation
+    # SSRF validation (pre-flight)
     _validate_url_for_ssrf(url)
 
     # Rate limit
@@ -454,12 +585,11 @@ async def _proxy_request(addon: dict, path: str, params: Optional[dict] = None) 
             detail=f"Rate limit exceeded for addon {addon_id} ({rpm} rpm)"
         )
 
-    # Make request
+    # Make request (F1: manual redirect, F2: SSRF transport, F3: size cap)
     client = await _get_client()
     try:
-        resp = await client.get(url, params=params)
+        resp = await _safe_get(client, url, params=params, max_body_bytes=_MAX_BODY_PROXY)
         resp.raise_for_status()
-        _validate_redirects(resp)
         _record_success(addon_id)
         return resp.json()
     except httpx.HTTPStatusError as e:
@@ -471,6 +601,10 @@ async def _proxy_request(addon: dict, path: str, params: Optional[dict] = None) 
     except (httpx.RequestError, httpx.TimeoutException) as e:
         _record_failure(addon_id)
         raise HTTPException(status_code=502, detail=f"Addon unreachable: {e}")
+    except HTTPException:
+        # Our own errors (SSRF, size cap) — record as failure too
+        _record_failure(addon_id)
+        raise
 
 
 @router.get("/addons/{addon_id}/search")

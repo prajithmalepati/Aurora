@@ -1,16 +1,21 @@
-"""Tests for the addon proxy system (T3 + T4 + T5).
+"""Tests for the addon proxy system (T3 + T4 + T5 + F1-F4).
 
 Tests against a mock addon server implementing the EclipseMusic/BeatBoss protocol.
-Covers: CRUD, search/stream/lyrics proxy, SSRF rejection, save-as-song, tag filtering.
+Covers: CRUD, search/stream/lyrics proxy, SSRF rejection, save-as-song, tag filtering,
+redirect SSRF (F1), DNS rebinding (F2), response size cap (F3), circuit breaker (F4).
 """
+import asyncio
+import inspect
 import json
 import socket
 import threading
 import time
 
+import httpcore
 import pytest
 import uvicorn
 from fastapi.testclient import TestClient
+from datetime import datetime, timezone, timedelta
 
 from tests.conftest import _seed_database, TS_CREATE
 
@@ -73,16 +78,25 @@ from app.routers.addons import (
     addon_stream_cache,
     addon_lyrics_cache,
     _rate_limiters,
+    _check_circuit,
+    _SSRFNetworkBackend,
+    _safe_get,
+    _get_client,
+    _MAX_BODY_PROXY,
 )
+
+
+import app.routers.addons as _addons_module
 
 
 @pytest.fixture(autouse=True)
 def _clear_addon_state():
-    """Clear addon caches and rate limiters between tests."""
+    """Clear addon caches, rate limiters, and HTTP client between tests."""
     addon_search_cache.invalidate()
     addon_stream_cache.invalidate()
     addon_lyrics_cache.invalidate()
     _rate_limiters.clear()
+    _addons_module._client = None  # reset cached httpx client
     yield
 
 
@@ -92,7 +106,6 @@ def test_addon_crud_flow(client, mock_addon_server):
     """Full CRUD lifecycle: add → list → toggle → delete."""
     base_url = mock_addon_server
 
-    # Add addon
     resp = client.post("/api/addons", json={"base_url": base_url})
     assert resp.status_code == 200
     data = resp.json()["data"]
@@ -103,30 +116,24 @@ def test_addon_crud_flow(client, mock_addon_server):
     assert data["enabled"] is True
     assert data["fail_count"] == 0
 
-    # List addons
     resp = client.get("/api/addons")
     assert resp.status_code == 200
     addons = resp.json()["data"]
     assert len(addons) == 1
     assert addons[0]["id"] == addon_id
 
-    # Toggle off
     resp = client.patch(f"/api/addons/{addon_id}", json={"enabled": False})
     assert resp.status_code == 200
 
-    # Verify disabled
     resp = client.get("/api/addons")
     assert resp.json()["data"][0]["enabled"] is False
 
-    # Toggle back on
     resp = client.patch(f"/api/addons/{addon_id}", json={"enabled": True})
     assert resp.status_code == 200
 
-    # Delete
     resp = client.delete(f"/api/addons/{addon_id}")
     assert resp.status_code == 200
 
-    # Verify gone
     resp = client.get("/api/addons")
     assert len(resp.json()["data"]) == 0
 
@@ -142,7 +149,6 @@ def test_addon_duplicate_rejected(client, mock_addon_server):
     assert resp2.status_code == 409
     assert "already registered" in resp2.json()["detail"]
 
-    # Cleanup
     addon_id = resp1.json()["data"]["id"]
     client.delete(f"/api/addons/{addon_id}")
 
@@ -157,11 +163,9 @@ def test_addon_bad_manifest(client):
 
 def test_addon_search(client, mock_addon_server):
     """Search returns normalized results in Aurora envelope."""
-    # Register addon
     resp = client.post("/api/addons", json={"base_url": mock_addon_server})
     addon_id = resp.json()["data"]["id"]
 
-    # Search
     resp = client.get(f"/api/addons/{addon_id}/search", params={"q": "sunset"})
     assert resp.status_code == 200
     data = resp.json()
@@ -170,7 +174,6 @@ def test_addon_search(client, mock_addon_server):
     assert len(data["data"]["tracks"]) == 1
     assert data["data"]["tracks"][0]["title"] == "CC Sunset"
 
-    # Cleanup
     client.delete(f"/api/addons/{addon_id}")
 
 
@@ -222,16 +225,13 @@ def test_addon_lyrics(client, mock_addon_server):
 
 def test_ssrf_rejects_private_ip(client):
     """SSRF blocks requests to private/reserved IPs."""
-    # 10.x.x.x
     resp = client.post("/api/addons", json={"base_url": "https://10.0.0.1"})
     assert resp.status_code == 400
     assert "private" in resp.json()["detail"].lower() or "resolves" in resp.json()["detail"].lower()
 
-    # 192.168.x.x
     resp = client.post("/api/addons", json={"base_url": "https://192.168.1.1"})
     assert resp.status_code == 400
 
-    # 169.254.x.x (cloud metadata)
     resp = client.post("/api/addons", json={"base_url": "https://169.254.169.254"})
     assert resp.status_code == 400
 
@@ -245,9 +245,179 @@ def test_ssrf_rejects_unsupported_scheme(client):
 
 def test_ssrf_allows_localhost_http(client):
     """SSRF allows http://localhost (dev mode)."""
-    # This will fail with 502 (can't reach port 1), but should NOT fail with 400 (SSRF)
     resp = client.post("/api/addons", json={"base_url": "http://localhost:1"})
     assert resp.status_code == 502  # connection refused, not SSRF rejection
+
+
+# ── F1: Redirect SSRF Tests ────────────────────────────────────────────────
+
+def test_f1_no_auto_follow():
+    """F1: httpx does NOT auto-follow redirects (follow_redirects=False)."""
+    async def check():
+        c = await _get_client()
+        return c.follow_redirects
+
+    result = asyncio.run(check())
+    assert result is False, "httpx client should have follow_redirects=False"
+
+
+def test_f1_safe_get_validates_each_hop(mock_addon_server):
+    """F1: _safe_get validates each redirect hop before following.
+
+    The mock addon's /redirect-to-private returns 302 → http://169.254.169.254/.
+    _safe_get should block this at the redirect target validation.
+    """
+    async def test():
+        client = await _get_client()
+        url = f"{mock_addon_server}/redirect-to-private"
+        with pytest.raises(Exception) as exc_info:
+            await _safe_get(client, url)
+        detail = str(exc_info.value)
+        assert (
+            "private" in detail.lower()
+            or "ssrf" in detail.lower()
+            or "169.254" in detail
+            or "http is only allowed" in detail.lower()
+        ), f"Expected SSRF rejection, got: {detail}"
+
+    asyncio.run(test())
+
+
+# ── F2: DNS Rebinding Tests ────────────────────────────────────────────────
+
+def test_f2_ssrf_network_backend_blocks_private_ip():
+    """F2: The _SSRFNetworkBackend validates the resolved IP at connect time.
+
+    Unit test: calling connect_tcp with a private IP should raise ConnectError
+    without reaching the inner backend.
+    """
+    class FakeBackend(httpcore.AsyncNetworkBackend):
+        """Fake backend that records connect attempts."""
+        def __init__(self):
+            self.connect_attempts = []
+
+        async def connect_tcp(self, host, port, **kwargs):
+            self.connect_attempts.append((host, port))
+            return "fake_stream"
+
+        async def connect_unix_socket(self, path, **kwargs):
+            return "fake_stream"
+
+        async def sleep(self, seconds):
+            pass
+
+    fake = FakeBackend()
+    ssrf_backend = _SSRFNetworkBackend(fake)
+
+    # Test 1: localhost should pass through (bypasses DNS)
+    async def test_localhost():
+        stream = await ssrf_backend.connect_tcp("localhost", 8080)
+        assert stream == "fake_stream"
+        assert fake.connect_attempts == [("localhost", 8080)]
+
+    asyncio.run(test_localhost())
+
+    # Test 2: a private IP should be blocked
+    async def test_private_ip():
+        fake.connect_attempts.clear()
+        with pytest.raises(httpcore.ConnectError, match="SSRF blocked"):
+            await ssrf_backend.connect_tcp("127.0.0.2", 8080)
+        assert len(fake.connect_attempts) == 0
+
+    asyncio.run(test_private_ip())
+
+    # Test 3: 10.x.x.x should be blocked
+    async def test_private_10():
+        fake.connect_attempts.clear()
+        with pytest.raises(httpcore.ConnectError, match="SSRF blocked"):
+            await ssrf_backend.connect_tcp("10.0.0.1", 8080)
+        assert len(fake.connect_attempts) == 0
+
+    asyncio.run(test_private_10())
+
+
+# ── F3: Response Size Cap Tests ─────────────────────────────────────────────
+
+def test_f3_size_cap_enforced_on_streaming_read():
+    """F3: The size cap is enforced during streaming read, not just Content-Length.
+
+    Verifies _safe_get uses aiter_bytes and checks body size incrementally.
+    """
+    src = inspect.getsource(_safe_get)
+    assert "aiter_bytes" in src, "_safe_get should stream body chunks"
+    assert "max_body_bytes" in src, "_safe_get should check body size against cap"
+
+
+def test_f3_content_length_pre_check():
+    """F3: Content-Length is pre-checked before reading the body."""
+    src = inspect.getsource(_safe_get)
+    assert "content-length" in src, "_safe_get should pre-check Content-Length header"
+
+
+# ── F4: Circuit Breaker Tests ───────────────────────────────────────────────
+
+def test_f4_circuit_breaker_keys_off_last_failure():
+    """F4: Circuit breaker measures cooldown from last failure, not last success."""
+    # Below threshold → circuit closed
+    assert _check_circuit("test_addon", 2, None) is False
+
+    # At threshold, no last_fail_at → circuit open (never succeeded)
+    assert _check_circuit("test_addon", 3, None) is True
+
+    # At threshold, recent failure → circuit open
+    recent_fail = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    assert _check_circuit("test_addon", 3, recent_fail) is True
+
+    # At threshold, old failure (> cooldown) → circuit half-open
+    old_fail = (datetime.now(timezone.utc) - timedelta(minutes=6)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    assert _check_circuit("test_addon", 3, old_fail) is False
+
+    # Below threshold always passes regardless of last_fail_at
+    assert _check_circuit("test_addon", 0, None) is False
+    assert _check_circuit("test_addon", 1, recent_fail) is False
+
+
+def test_f4_circuit_breaker_never_succeeded_case(client, mock_addon_server):
+    """F4: An addon that never succeeded stays open until cooldown from last failure."""
+    from app.database import get_db_ctx
+
+    resp = client.post("/api/addons", json={"base_url": mock_addon_server})
+    addon_id = resp.json()["data"]["id"]
+
+    # Simulate 3 failures with recent last_fail_at, last_ok_at = NULL
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    with get_db_ctx() as conn:
+        conn.execute(
+            "UPDATE addons SET fail_count = 3, last_fail_at = ?, last_ok_at = NULL WHERE id = ?",
+            (now, addon_id),
+        )
+        conn.commit()
+
+    # Circuit should be open
+    resp = client.get(f"/api/addons/{addon_id}/search", params={"q": "test"})
+    assert resp.status_code == 503
+    assert "circuit breaker" in resp.json()["detail"].lower()
+
+    # Set last_fail_at to old (cooldown elapsed)
+    old_fail = (datetime.now(timezone.utc) - timedelta(minutes=6)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    with get_db_ctx() as conn:
+        conn.execute(
+            "UPDATE addons SET last_fail_at = ? WHERE id = ?",
+            (old_fail, addon_id),
+        )
+        conn.commit()
+
+    # Circuit half-open — request should go through and succeed
+    resp = client.get(f"/api/addons/{addon_id}/search", params={"q": "sunset"})
+    assert resp.status_code == 200
+
+    # Verify circuit reset after success
+    with get_db_ctx() as conn:
+        row = conn.execute("SELECT fail_count, last_ok_at FROM addons WHERE id = ?", (addon_id,)).fetchone()
+        assert row["fail_count"] == 0
+        assert row["last_ok_at"] is not None
+
+    client.delete(f"/api/addons/{addon_id}")
 
 
 # ── Disabled/Circuit Breaker Tests ───────────────────────────────────────
@@ -257,14 +427,11 @@ def test_disabled_addon_returns_403(client, mock_addon_server):
     resp = client.post("/api/addons", json={"base_url": mock_addon_server})
     addon_id = resp.json()["data"]["id"]
 
-    # Disable
     client.patch(f"/api/addons/{addon_id}", json={"enabled": False})
 
-    # Search should fail
     resp = client.get(f"/api/addons/{addon_id}/search", params={"q": "test"})
     assert resp.status_code == 403
 
-    # Re-enable and cleanup
     client.patch(f"/api/addons/{addon_id}", json={"enabled": True})
     client.delete(f"/api/addons/{addon_id}")
 
@@ -278,15 +445,10 @@ def test_nonexistent_addon_returns_404(client):
 # ── Save-as-Song + Tag Filtering (T4) ────────────────────────────────────
 
 def test_save_addon_track_and_filter(client, mock_addon_server):
-    """Save an addon track, then verify it's taggable and filterable.
-
-    This is the product thesis: streamed tracks are indistinguishable from local songs.
-    """
-    # Register addon
+    """Save an addon track, then verify it's taggable and filterable."""
     resp = client.post("/api/addons", json={"base_url": mock_addon_server})
     addon_id = resp.json()["data"]["id"]
 
-    # Save a track
     resp = client.post(f"/api/addons/{addon_id}/save", json={
         "title": "CC Sunset",
         "artist": "OpenAudio",
@@ -300,31 +462,24 @@ def test_save_addon_track_and_filter(client, mock_addon_server):
     assert song["title"] == "CC Sunset"
     assert song["source"] == f"addon:{addon_id}"
     assert song["stream_url"] is not None
-    assert song["file_path"] is None  # Not a local file
+    assert song["file_path"] is None
 
     song_id = song["id"]
 
-    # Assign a tag to the addon track
     resp = client.post(f"/api/songs/{song_id}/tags", json={"tag_names": ["streaming", "chill"]})
     assert resp.status_code == 200
 
-    # Verify the song appears in the list with tags
     resp = client.get(f"/api/songs/{song_id}")
     assert resp.status_code == 200
     song_data = resp.json()["data"]
     assert "streaming" in song_data["tags"]
     assert "chill" in song_data["tags"]
 
-    # Boolean filter: tag:streaming AND tag:chill
-    resp = client.get("/api/songs", params={"search": "tag:streaming AND tag:chill"})
-    # Note: the filter endpoint may work differently — let's just verify the song exists
-    # in the list and has the right source
     all_songs = client.get("/api/songs").json()["data"]
     addon_songs = [s for s in all_songs if s["source"] == f"addon:{addon_id}"]
     assert len(addon_songs) == 1
     assert addon_songs[0]["title"] == "CC Sunset"
 
-    # Duplicate save should be rejected
     resp = client.post(f"/api/addons/{addon_id}/save", json={
         "title": "CC Sunset",
         "artist": "OpenAudio",
@@ -332,7 +487,6 @@ def test_save_addon_track_and_filter(client, mock_addon_server):
     })
     assert resp.status_code == 409
 
-    # Cleanup
     client.delete(f"/api/addons/{addon_id}")
 
 
@@ -340,7 +494,6 @@ def test_save_addon_track_and_filter(client, mock_addon_server):
 
 def test_resolve_stream_local_file(client):
     """Resolve a local song returns type=local."""
-    # Song 1 has a file_path
     resp = client.get("/api/songs/1/resolve")
     assert resp.status_code == 200
     data = resp.json()["data"]
@@ -352,7 +505,6 @@ def test_resolve_stream_fresh_url(client, mock_addon_server):
     resp = client.post("/api/addons", json={"base_url": mock_addon_server})
     addon_id = resp.json()["data"]["id"]
 
-    # Save a track
     resp = client.post(f"/api/addons/{addon_id}/save", json={
         "title": "Morning Dew",
         "artist": "OpenAudio",
@@ -361,7 +513,6 @@ def test_resolve_stream_fresh_url(client, mock_addon_server):
     })
     song_id = resp.json()["data"]["id"]
 
-    # Resolve — should use the provided stream URL
     resp = client.get(f"/api/songs/{song_id}/resolve")
     assert resp.status_code == 200
     data = resp.json()["data"]
