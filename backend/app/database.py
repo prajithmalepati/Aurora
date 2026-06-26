@@ -47,7 +47,10 @@ CREATE TABLE IF NOT EXISTS songs (
     bit_depth               INTEGER,
     file_size               INTEGER,
     artists                 TEXT,
-    featured_artists        TEXT
+    featured_artists        TEXT,
+    stream_url              TEXT,
+    stream_url_expires_at   TEXT,
+    artwork_url             TEXT
 );
 
 CREATE TABLE IF NOT EXISTS playlists (
@@ -106,6 +109,19 @@ CREATE TABLE IF NOT EXISTS watched_folders (
     is_active INTEGER DEFAULT 1,
     last_scan_at TEXT,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS addons (
+    id              TEXT PRIMARY KEY,
+    base_url        TEXT NOT NULL UNIQUE,
+    name            TEXT,
+    version         TEXT,
+    manifest_json   TEXT NOT NULL,
+    enabled         INTEGER DEFAULT 1,
+    added_at        TEXT,
+    last_ok_at      TEXT,
+    fail_count      INTEGER DEFAULT 0,
+    last_fail_at    TEXT
 );
 """
 
@@ -182,6 +198,25 @@ MIGRATIONS = [
     (3, [
         "ALTER TABLE playlists ADD COLUMN dominant_color TEXT",
         "ALTER TABLE playlists ADD COLUMN dominant_color_2 TEXT",
+    ]),
+    # Version 4: addon proxy — addons table + song stream/artwork columns
+    (4, [
+        """CREATE TABLE IF NOT EXISTS addons (
+            id              TEXT PRIMARY KEY,
+            base_url        TEXT NOT NULL UNIQUE,
+            name            TEXT,
+            version         TEXT,
+            manifest_json   TEXT NOT NULL,
+            enabled         INTEGER DEFAULT 1,
+            added_at        TEXT,
+            last_ok_at      TEXT,
+            fail_count      INTEGER DEFAULT 0,
+            last_fail_at    TEXT
+        )""",
+        "ALTER TABLE songs ADD COLUMN stream_url TEXT",
+        "ALTER TABLE songs ADD COLUMN stream_url_expires_at TEXT",
+        "ALTER TABLE songs ADD COLUMN artwork_url TEXT",
+        "ALTER TABLE addons ADD COLUMN last_fail_at TEXT",
     ]),
 ]
 
@@ -289,6 +324,7 @@ SONG_SELECT_COLUMNS = """
     s.replaygain_track_gain, s.replaygain_track_peak,
     s.replaygain_album_gain, s.replaygain_album_peak,
     s.artists, s.featured_artists,
+    s.stream_url, s.stream_url_expires_at, s.artwork_url,
     GROUP_CONCAT(DISTINCT t.name) as tags,
     GROUP_CONCAT(DISTINCT p.id || ':' || p.name) as playlists,
     s.created_at, s.updated_at"""
@@ -314,6 +350,7 @@ PLAYLIST_SONG_SELECT_COLUMNS = """
     s.replaygain_track_gain, s.replaygain_track_peak,
     s.replaygain_album_gain, s.replaygain_album_peak,
     s.artists, s.featured_artists,
+    s.stream_url, s.stream_url_expires_at, s.artwork_url,
     GROUP_CONCAT(DISTINCT t.name) as tags,
     ps.start_time_ms, ps.end_time_ms, ps.position"""
 

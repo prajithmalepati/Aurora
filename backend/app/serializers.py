@@ -87,6 +87,9 @@ def song_row_to_dict(row: sqlite3.Row, *, include_peaks: bool = True) -> dict:
         "replaygain_track_peak": row["replaygain_track_peak"] if "replaygain_track_peak" in row.keys() else None,
         "replaygain_album_gain": row["replaygain_album_gain"] if "replaygain_album_gain" in row.keys() else None,
         "replaygain_album_peak": row["replaygain_album_peak"] if "replaygain_album_peak" in row.keys() else None,
+        "stream_url": row["stream_url"] if "stream_url" in row.keys() else None,
+        "stream_url_expires_at": row["stream_url_expires_at"] if "stream_url_expires_at" in row.keys() else None,
+        "artwork_url": row["artwork_url"] if "artwork_url" in row.keys() else None,
     }
 
     if include_peaks:

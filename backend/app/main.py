@@ -12,7 +12,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.database import init_db
 from app.paths import DATA_DIR, DB_PATH, ALBUM_ART_DIR, PLAYLIST_IMAGES_DIR
-from app.routers import songs, tags, playlists, filter, scanner, folders, watcher, albums
+from app.routers import songs, tags, playlists, filter, scanner, folders, watcher, albums, addons
 
 logger = logging.getLogger(__name__)
 
@@ -165,6 +165,7 @@ app.include_router(scanner.router, prefix="/api")
 app.include_router(folders.router, prefix="/api")
 app.include_router(watcher.router, prefix="/api")
 app.include_router(albums.router, prefix="/api")
+app.include_router(addons.router, prefix="/api")
 
 
 
