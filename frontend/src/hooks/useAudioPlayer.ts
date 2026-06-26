@@ -1,10 +1,11 @@
 import { useEffect, useRef, useCallback } from "react"
 import { usePlayerStore } from "@/stores/playerStore"
+import { isPlayable } from "@/stores/playerStore"
 import { useSettingsStore } from "@/stores/settingsStore"
 import type { CrossfadeCurve } from "@/stores/settingsStore"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { toast } from "@/lib/toast"
-import { getBaseUrl, withToken } from "@/lib/api"
+import { getBaseUrl, withToken, api } from "@/lib/api"
 import { createPlaybackEngine, unlockAudioOutput } from "@/lib/engines/howlerEngine"
 import type { PlaybackEngine, PlaybackSource } from "@/types/playback"
 
@@ -376,7 +377,7 @@ export function useAudioPlayer() {
       })
     }
 
-    if (!currentSong?.file_path) {
+    if (!isPlayable(currentSong)) {
       currentSongRef.current = null
       // Clear stale preloaded engine when queue ends
       if (nextEngineRef.current) {
@@ -419,8 +420,46 @@ export function useAudioPlayer() {
 
       engine = createPlaybackEngine()
       bindEngineHandlers(engine, songId)
-      // load() emits buffering:true, which the bound handler mirrors to the store
-      engine.load(streamSource(songId, currentSong.file_path))
+
+      // Addon songs need async URL resolution; local songs load synchronously
+      if (currentSong.file_path) {
+        engine.load(streamSource(songId, currentSong.file_path))
+      } else {
+        // Addon resolve-then-load (§2b: guarded async inside the effect)
+        // load() emits buffering:true via the bound handler — reuse it for the resolve gap
+        usePlayerStore.getState().setIsBuffering(true)
+        const doResolve = async () => {
+          try {
+            const res = await api.get<{ data: { type: string; url: string; expires_at?: string } }>(
+              `/songs/${songId}/resolve`
+            )
+            // Staleness guard (§0.5): rapid skip during resolve must not start a ghost engine
+            if (currentSongRef.current !== songId) return
+            const { url, type } = res.data
+            if (type === "local") {
+              // Backend returned a local file path — use the stream endpoint
+              engine.load(streamSource(songId, url))
+            } else {
+              // Stream URL from addon — pass format hint for extensionless URLs (§2b)
+              const format = currentSong.file_format ?? undefined
+              engine.load({ url, format })
+            }
+          } catch (err) {
+            console.error(`Addon resolve failed for song ${songId}:`, err)
+            // Re-check staleness before showing error (§0.5)
+            if (currentSongRef.current !== songId) return
+            const song = usePlayerStore.getState().currentSong
+            toast.error(`Failed to resolve stream for "${song?.title ?? "Unknown"}"`)
+            usePlayerStore.getState().setIsBuffering(false)
+            setTimeout(() => {
+              if (currentSongRef.current === songId) {
+                usePlayerStore.getState().next()
+              }
+            }, 1500)
+          }
+        }
+        doResolve()
+      }
     }
 
     engineRef.current = engine

@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react"
 import type { AlbumInfo, AlbumDetail, ApiResponse, Song } from "@/types"
 import { usePlayerStore } from "@/stores/playerStore"
+import { isPlayable } from "@/stores/playerStore"
 import { api, getBaseUrl, withToken } from "@/lib/api"
 import { SongTable } from "@/components/songs/SongTable"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -69,7 +70,7 @@ export function AlbumsView() {
       api
         .get<ApiResponse<AlbumDetail>>(`/albums/${encoded}`)
         .then((res) => {
-          const playable = res.data.songs.filter((s: Song) => s.file_path)
+          const playable = res.data.songs.filter(isPlayable)
           if (playable.length > 0) {
             playSong(playable[0], playable)
           }
@@ -86,7 +87,7 @@ export function AlbumsView() {
       api
         .get<ApiResponse<AlbumDetail>>(`/albums/${encoded}`)
         .then((res) => {
-          const playable = res.data.songs.filter((s: Song) => s.file_path)
+          const playable = res.data.songs.filter(isPlayable)
           if (playable.length > 0) {
             const shuffled = [...playable].sort(() => Math.random() - 0.5)
             playSong(shuffled[0], shuffled)
@@ -287,7 +288,7 @@ interface AlbumDetailProps {
 }
 
 function AlbumDetail({ album, loading, error, onBack, onPlaySong }: AlbumDetailProps) {
-  const playable = album.songs.filter((s) => s.file_path)
+  const playable = album.songs.filter(isPlayable)
   const totalDuration = album.songs.reduce((acc, s) => acc + (s.duration ?? 0), 0)
 
   return (

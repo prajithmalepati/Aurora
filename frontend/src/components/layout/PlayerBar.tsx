@@ -1,4 +1,5 @@
 import { usePlayerStore } from "@/stores/playerStore"
+import { isPlayable } from "@/stores/playerStore"
 import { useSongStore } from "@/stores/songStore"
 import { useAudioPlayer } from "@/hooks/useAudioPlayer"
 import { AlbumArt } from "@/components/songs/AlbumArt"
@@ -250,7 +251,7 @@ export function PlayerBar() {
             <button
               onClick={() => {
                 const allSongs = useSongStore.getState().songs
-                const playable = allSongs.filter((s) => s.file_path)
+                const playable = allSongs.filter(isPlayable)
                 if (playable.length === 0) return
                 const shuffled = [...playable].sort(() => Math.random() - 0.5)
                 usePlayerStore.getState().playSong(shuffled[0], shuffled)

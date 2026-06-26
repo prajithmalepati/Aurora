@@ -3,6 +3,11 @@ import type { Song } from "@/types"
 
 const MAX_HISTORY = 100
 
+/** A song is playable if it has a local file OR comes from an addon (stream). */
+export function isPlayable(song: Song): boolean {
+  return !!song.file_path || song.source.startsWith("addon:")
+}
+
 const removeOneById = (list: Song[], id: number) => {
   const i = list.findIndex((s) => s.id === id)
   return i === -1 ? list : [...list.slice(0, i), ...list.slice(i + 1)]
@@ -82,8 +87,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   crossfadeFromTitle: null,
 
   playSong: (song, queue, playlistId = null) => {
-    if (!song.file_path) return
-    const newQueue = queue?.filter((s) => s.file_path) ?? [song]
+    if (!isPlayable(song)) return
+    const newQueue = queue?.filter(isPlayable) ?? [song]
     const index = newQueue.findIndex((s) => s.id === song.id)
     const prev = get().currentSong
     const prevHistory = get().queueHistory
@@ -260,7 +265,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   playNext: (song) => {
-    if (!song.file_path) return
+    if (!isPlayable(song)) return
     const { queue, queueIndex, isShuffled, originalQueue } = get()
     // Insert after current song
     const newQueue = [...queue]
@@ -276,7 +281,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   addToQueue: (song) => {
-    if (!song.file_path) return
+    if (!isPlayable(song)) return
     const { isShuffled, originalQueue } = get()
     set({ queue: [...get().queue, song] })
     if (isShuffled && originalQueue.length > 0) {

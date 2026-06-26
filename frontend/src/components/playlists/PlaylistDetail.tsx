@@ -3,6 +3,7 @@ import type { PlaylistSong, PlaylistDetail as PlaylistDetailType } from "@/types
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { useSongStore } from "@/stores/songStore"
 import { usePlayerStore } from "@/stores/playerStore"
+import { isPlayable } from "@/stores/playerStore"
 
 import { albumGradient } from "@/lib/albumGradient"
 
@@ -342,17 +343,16 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
   }, [activePlaylist, isDragEnabled, reorderSongs, fetchPlaylistDetail])
 
   const handlePlaySong = (song: PlaylistSong) => {
-    if (!song.file_path || !activePlaylist) return
+    if (!isPlayable(song) || !activePlaylist) return
     const queue = activePlaylist.songs
-      .filter((s) => s.file_path)
+      .filter(isPlayable)
       .map((s) => ({
         ...s,
-        source: "local" as const,
         playlists: [],
         created_at: "",
         updated_at: "",
       }))
-    const asSong = { ...song, source: "local" as const, playlists: [], created_at: "", updated_at: "" }
+    const asSong = { ...song, playlists: [], created_at: "", updated_at: "" }
     playSong(asSong, queue, activePlaylist.id)
   }
 
