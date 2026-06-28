@@ -1,5 +1,5 @@
-pub mod db;
-pub mod models;
-pub mod filter;
-pub mod scanner;
 pub mod addons;
+pub mod db;
+pub mod filter;
+pub mod models;
+pub mod scanner;
