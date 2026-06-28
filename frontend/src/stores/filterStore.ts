@@ -2,6 +2,7 @@ import { create } from "zustand"
 import { api } from "@/lib/api"
 import type { FilterResult, ApiResponse, Song } from "@/types"
 import { usePlayerStore } from "@/stores/playerStore"
+import { isPlayable } from "@/stores/playerStore"
 import { toast } from "@/lib/toast"
 
 interface FilterState {
@@ -136,7 +137,7 @@ export const useFilterStore = create<FilterState>((set, get) => ({
     try {
       const res = await api.post<ApiResponse<FilterResult[]>>("/filter", { query })
       set({ results: res.data, loading: false, resultsVersion: get().resultsVersion + 1 })
-      const playable = res.data.filter((r) => r.file_path)
+      const playable = res.data.filter(isPlayable)
       if (playable.length === 0) {
         toast.error("No playable songs in this mix")
         return
@@ -159,7 +160,7 @@ export const useFilterStore = create<FilterState>((set, get) => ({
       const res = await api.post<ApiResponse<FilterResult[]>>("/filter", { query })
       const shuffled = shuffleArray(res.data)
       set({ results: shuffled, loading: false, resultsVersion: get().resultsVersion + 1 })
-      const playable = shuffled.filter((r) => r.file_path)
+      const playable = shuffled.filter(isPlayable)
       if (playable.length === 0) {
         toast.error("No playable songs in this mix")
         return

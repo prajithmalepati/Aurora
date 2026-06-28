@@ -65,6 +65,7 @@ export interface PlaylistSong {
   file_path: string | null
   file_format?: string | null
   album_art_path?: string | null
+  source: string
   artists?: string[] | null
   featured_artists?: string[] | null
   start_time_ms?: number

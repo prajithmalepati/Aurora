@@ -12,7 +12,7 @@ const SIZE_CLASSES: Record<string, string> = {
 }
 
 interface AlbumArtProps {
-  song: { id?: number; title?: string; album_art_path?: string | null }
+  song: { id?: number; title?: string; album_art_path?: string | null; artwork_url?: string | null }
   size: "sm" | "md" | "lg" | "fill"
   className?: string
   style?: React.CSSProperties
@@ -24,7 +24,9 @@ export function AlbumArt({ song, size, className = "", style }: AlbumArtProps) {
   const imgRef = useRef<HTMLImageElement>(null)
 
   const art = albumGradient(song.id ?? song.title ?? "void")
-  const src = song.album_art_path ? withToken(`${ALBUM_ART_BASE}/${song.album_art_path}`) : undefined
+  const src = song.album_art_path
+    ? withToken(`${ALBUM_ART_BASE}/${song.album_art_path}`)
+    : song.artwork_url ?? undefined
   const showImg = !!src && !error
 
   useEffect(() => {

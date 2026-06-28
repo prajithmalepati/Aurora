@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { useSongStore } from "@/stores/songStore"
 import { usePlayerStore } from "@/stores/playerStore"
+import { isPlayable } from "@/stores/playerStore"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { useTagStore } from "@/stores/tagStore"
 import { useColumnStore, type ColumnContext } from "@/stores/columnStore"
@@ -662,14 +663,14 @@ export function SongTable({
 
   // Context menu actions (operate on contextTargets)
   const ctxPlayNow = useCallback(() => {
-    const targets = contextTargets.filter((s) => s.file_path)
+    const targets = contextTargets.filter(isPlayable)
     if (targets.length === 0) { toast.error("No playable files"); return }
     playSong(targets[0], targets.length > 1 ? targets : songs)
     closeContextMenu()
   }, [contextTargets, songs, playSong, closeContextMenu])
 
   const ctxPlayNext = useCallback(() => {
-    const targets = contextTargets.filter((s) => s.file_path)
+    const targets = contextTargets.filter(isPlayable)
     if (targets.length === 0) { toast.error("No playable files"); return }
     // Insert in reverse so the first selected song ends up first in queue
     for (const s of [...targets].reverse()) usePlayerStore.getState().playNext(s)
@@ -678,7 +679,7 @@ export function SongTable({
   }, [contextTargets, closeContextMenu])
 
   const ctxAddToQueue = useCallback(() => {
-    const targets = contextTargets.filter((s) => s.file_path)
+    const targets = contextTargets.filter(isPlayable)
     if (targets.length === 0) { toast.error("No playable files"); return }
     for (const s of targets) addToQueue(s)
     toast.success(`${targets.length} song${targets.length === 1 ? "" : "s"} added to queue`)
