@@ -58,35 +58,38 @@ def build_tag_set(tag_names_csv: str | None, playlist_names_csv: str | None) -> 
     return tags
 
 
+def _eval_node(node, quoted_tags: dict, song_tag_set: set[str]) -> bool:
+    """Recursively evaluate a boolean.py AST node to a Python bool.
+
+    Walks the tree directly (Symbol → membership check, NOT/AND/OR → recurse)
+    instead of relying on subs().simplify() which fails on bare NOT(group).
+    """
+    if isinstance(node, boolean.Symbol):
+        name = str(node)
+        tag_name = quoted_tags.get(name, name.strip().lower())
+        return tag_name in song_tag_set
+    elif isinstance(node, boolean.NOT):
+        return not _eval_node(node.args[0], quoted_tags, song_tag_set)
+    elif isinstance(node, boolean.AND):
+        return all(_eval_node(arg, quoted_tags, song_tag_set) for arg in node.args)
+    elif isinstance(node, boolean.OR):
+        return any(_eval_node(arg, quoted_tags, song_tag_set) for arg in node.args)
+    elif node is algebra.TRUE:
+        return True
+    elif node is algebra.FALSE:
+        return False
+    else:
+        raise ValueError(f"Unknown boolean node type: {type(node)}")
+
+
 def evaluate_song(expression, quoted_tags: dict, song_tag_set: set[str]) -> bool:
     """
     Evaluate whether a song's tag set satisfies the boolean expression.
-    
-    Uses boolean.py's subs() method to substitute each symbol with
-    TRUE or FALSE based on whether the tag is in the song's tag set.
+
+    Evaluates the parsed boolean expression directly to a Python bool by
+    walking the AST tree — the same approach the Rust engine uses.
     """
-    TRUE = algebra.TRUE
-    FALSE = algebra.FALSE
-    
-    # Build substitution map: for each symbol in the expression,
-    # check if it's in the song's tag set
-    subs_map = {}
-    for symbol in expression.symbols:
-        symbol_name = str(symbol)
-        # Check if this is a quoted-tag placeholder
-        if symbol_name in quoted_tags:
-            tag_name = quoted_tags[symbol_name]
-        else:
-            tag_name = symbol_name.strip().lower()
-        
-        if tag_name in song_tag_set:
-            subs_map[symbol] = TRUE
-        else:
-            subs_map[symbol] = FALSE
-    
-    # Substitute and simplify
-    result = expression.subs(subs_map).simplify()
-    return result == TRUE
+    return _eval_node(expression, quoted_tags, song_tag_set)
 
 
 def filter_songs(db_connection, query_string: str) -> list[dict]:

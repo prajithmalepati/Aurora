@@ -689,4 +689,25 @@ mod tests {
     fn test_unmatched_opening_paren() {
         assert!(matches!(parse_err("(a"), FilterError::SyntaxError(_)));
     }
+
+    // ── Bare NOT(group) — N29 regression guards ─────────────────────────
+
+    #[test]
+    fn test_bare_not_or_group_matches() {
+        // NOT (rock OR jazz) should match a song tagged only {chill}
+        assert!(matches("NOT (\"rock\" OR \"jazz\")", &["chill"]));
+    }
+
+    #[test]
+    fn test_bare_not_or_group_excludes() {
+        // NOT (rock OR jazz) should NOT match a song tagged {rock}
+        assert!(!matches("NOT (\"rock\" OR \"jazz\")", &["rock"]));
+    }
+
+    #[test]
+    fn test_bare_not_and_group() {
+        // NOT (gym AND anime) should match {gym} (has gym but not both)
+        assert!(matches("NOT (\"gym\" AND \"anime\")", &["gym"]));
+        assert!(!matches("NOT (\"gym\" AND \"anime\")", &["gym", "anime"]));
+    }
 }
