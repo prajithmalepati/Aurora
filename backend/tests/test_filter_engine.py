@@ -199,3 +199,32 @@ def test_multiple_tags_on_song():
     add_song(conn, "Song A", ["fast", "gym", "rock", "hype"])
     result = filter_songs(conn, '"fast" AND "gym" AND "rock"')
     assert titles(result) == ["Song A"]
+
+
+# ── Bare NOT(group) — N29 regression guards ────────────────────────────────
+
+def test_bare_not_group_matches():
+    """NOT (rock OR jazz) should match a song tagged only {chill}."""
+    conn = make_db()
+    add_song(conn, "Chill Vibes", ["chill"])
+    add_song(conn, "Highway Star", ["rock"])
+    result = filter_songs(conn, 'NOT ("rock" OR "jazz")')
+    assert titles(result) == ["Chill Vibes"]
+
+
+def test_bare_not_group_excludes():
+    """NOT (rock OR jazz) should NOT match a song tagged {rock}."""
+    conn = make_db()
+    add_song(conn, "Highway Star", ["rock"])
+    add_song(conn, "Chill Vibes", ["chill"])
+    result = filter_songs(conn, 'NOT ("rock" OR "jazz")')
+    assert "Highway Star" not in [r["title"] for r in result]
+
+
+def test_bare_not_and_group():
+    """NOT (gym AND anime) should match {gym} (has gym but not both)."""
+    conn = make_db()
+    add_song(conn, "Gym Song", ["gym"])
+    add_song(conn, "Both", ["gym", "anime"])
+    result = filter_songs(conn, 'NOT ("gym" AND "anime")')
+    assert titles(result) == ["Gym Song"]
