@@ -70,8 +70,15 @@ fn test_parity_mp3() {
         py_peak
     );
 
-    // Album art
-    assert!(meta.album_art_bytes.is_some(), "MP3 should have album art");
+    // Album art — driven by Python reference
+    let py_has_art = py["has_album_art"].as_bool().unwrap();
+    assert_eq!(
+        meta.album_art_bytes.is_some(),
+        py_has_art,
+        "MP3 art parity mismatch: Rust={}, Python={}",
+        meta.album_art_bytes.is_some(),
+        py_has_art
+    );
 }
 
 #[test]
@@ -101,8 +108,13 @@ fn test_parity_flac() {
     let py_rg = py["replaygain_track_gain"].as_f64().unwrap();
     assert!((rg - py_rg).abs() < 0.01);
 
-    // Album art
-    assert!(meta.album_art_bytes.is_some(), "FLAC should have album art");
+    // Album art — driven by Python reference
+    let py_has_art = py["has_album_art"].as_bool().unwrap();
+    assert_eq!(
+        meta.album_art_bytes.is_some(),
+        py_has_art,
+        "FLAC art parity mismatch"
+    );
 }
 
 #[test]
@@ -143,6 +155,16 @@ fn test_parity_ogg() {
     let rg = meta.replaygain_track_gain.unwrap();
     let py_rg = py["replaygain_track_gain"].as_f64().unwrap();
     assert!((rg - py_rg).abs() < 0.01);
+
+    // Album art (OGG metadata_block_picture) — driven by Python reference
+    let py_has_art = py["has_album_art"].as_bool().unwrap();
+    assert_eq!(
+        meta.album_art_bytes.is_some(),
+        py_has_art,
+        "OGG art parity mismatch: Rust={}, Python={}",
+        meta.album_art_bytes.is_some(),
+        py_has_art
+    );
 }
 
 #[test]
@@ -158,8 +180,13 @@ fn test_parity_m4a() {
     assert_eq!(meta.album.as_deref(), py["album"].as_str());
     assert_eq!(meta.file_format, "m4a_aac", "M4A should be detected as AAC");
 
-    // Album art
-    assert!(meta.album_art_bytes.is_some(), "M4A should have album art");
+    // Album art — driven by Python reference
+    let py_has_art = py["has_album_art"].as_bool().unwrap();
+    assert_eq!(
+        meta.album_art_bytes.is_some(),
+        py_has_art,
+        "M4A art parity mismatch"
+    );
 }
 
 #[test]

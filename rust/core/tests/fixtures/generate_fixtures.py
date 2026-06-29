@@ -111,7 +111,7 @@ def generate_flac(path: Path) -> bool:
 
 
 def generate_ogg(path: Path) -> bool:
-    """Generate a 1-second OGG Vorbis with Vorbis comments + ReplayGain."""
+    """Generate a 1-second OGG Vorbis with Vorbis comments + ReplayGain + art."""
     ok = run_ffmpeg([
         "-f", "lavfi", "-i", "sine=frequency=440:duration=1",
         "-codec:a", "libvorbis", "-q:a", "3",
@@ -120,6 +120,8 @@ def generate_ogg(path: Path) -> bool:
     if not ok:
         return False
 
+    import base64
+    from mutagen.flac import Picture
     from mutagen.oggvorbis import OggVorbis
 
     audio = OggVorbis(str(path))
@@ -128,6 +130,15 @@ def generate_ogg(path: Path) -> bool:
     audio["album"] = ["OGG Album"]
     audio["REPLAYGAIN_TRACK_GAIN"] = ["-3.0 dB"]
     audio["REPLAYGAIN_TRACK_PEAK"] = ["0.98"]
+
+    # Embed cover art via metadata_block_picture (base64-encoded FLAC Picture)
+    pic = Picture()
+    pic.type = 3  # Cover (front)
+    pic.mime = "image/jpeg"
+    pic.desc = "Cover"
+    pic.data = JPEG_1X1_RED
+    audio["metadata_block_picture"] = [base64.b64encode(pic.write()).decode("ascii")]
+
     audio.save()
 
     return True
@@ -166,13 +177,23 @@ def extract_reference_metadata(file_path: str) -> dict:
     if backend_dir not in sys.path:
         sys.path.insert(0, backend_dir)
 
+    import mutagen
     from app.services.file_scanner import (
-        extract_metadata, parse_artists, format_tier as py_format_tier
+        extract_metadata, _get_art_bytes,
     )
 
     meta = extract_metadata(file_path)
     if meta is None:
         return {"error": "extract_metadata returned None"}
+
+    # Real art check: use _get_art_bytes with a full (non-easy) mutagen handle,
+    # since easy-mode hides APIC picture frames on MP3.
+    has_art = False
+    try:
+        audio = mutagen.File(file_path)
+        has_art = _get_art_bytes(audio) is not None
+    except Exception:
+        pass
 
     # Remove fields not in scope for N30 (analysis half)
     in_scope = {
@@ -191,7 +212,7 @@ def extract_reference_metadata(file_path: str) -> dict:
         "replaygain_track_peak": meta.get("replaygain_track_peak"),
         "replaygain_album_gain": meta.get("replaygain_album_gain"),
         "replaygain_album_peak": meta.get("replaygain_album_peak"),
-        "has_album_art": meta.get("dominant_color") is not None or "art" in str(meta).lower(),
+        "has_album_art": has_art,
     }
     return in_scope
 
