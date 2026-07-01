@@ -1,10 +1,14 @@
+mod albums;
 mod envelope;
 mod filter;
+mod folders;
 mod playlists;
 mod songs;
 mod tags;
 
+pub use albums::{get_album, list_albums};
 pub use filter::filter_endpoint;
+pub use folders::{get_folder_tree, get_folder_songs};
 pub use playlists::{
     add_song_to_playlist, create_playlist, delete_playlist, delete_playlist_image,
     export_playlist, get_playlist, import_playlist, list_playlists, remove_song_from_playlist,

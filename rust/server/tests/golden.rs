@@ -750,6 +750,193 @@ async fn golden_playlists() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+// FOLDERS golden tests — fresh DB, no mutations
+// ═══════════════════════════════════════════════════════════════════════
+
+#[tokio::test]
+async fn golden_folders() {
+    let (app, _state) = build_test_app();
+
+    // folders_tree
+    let (s, b) = send(&app, get("/api/folders")).await;
+    assert_eq!(s, 200);
+    assert_body("folders_tree", &b, &load_golden("folders_tree"));
+
+    // folders_songs_rock
+    let (s, b) = send(&app, get("/api/folders/songs?path=/music/rock")).await;
+    assert_eq!(s, 200);
+    assert_body("folders_songs_rock", &b, &load_golden("folders_songs_rock"));
+
+    // folders_songs_anime
+    let (s, b) = send(&app, get("/api/folders/songs?path=/music/anime")).await;
+    assert_eq!(s, 200);
+    assert_body("folders_songs_anime", &b, &load_golden("folders_songs_anime"));
+
+    // folders_songs_nonexistent
+    let (s, b) = send(&app, get("/api/folders/songs?path=/nonexistent")).await;
+    assert_eq!(s, 200);
+    assert_body("folders_songs_nonexistent", &b, &load_golden("folders_songs_nonexistent"));
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// ALBUMS golden tests — fresh DB, no mutations
+// ═══════════════════════════════════════════════════════════════════════
+
+#[tokio::test]
+async fn golden_albums() {
+    let (app, _state) = build_test_app();
+
+    // albums_list
+    let (s, b) = send(&app, get("/api/albums")).await;
+    assert_eq!(s, 200);
+    assert_body("albums_list", &b, &load_golden("albums_list"));
+
+    // albums_get_machine_head (URL-decoded: Machine Head)
+    let (s, b) = send(&app, get("/api/albums/Machine%20Head")).await;
+    assert_eq!(s, 200);
+    assert_body("albums_get_machine_head", &b, &load_golden("albums_get_machine_head"));
+
+    // albums_get_nonexistent → 404
+    let (s, b) = send(&app, get("/api/albums/nonexistent")).await;
+    assert_eq!(s, 404);
+    assert_eq!(b["detail"], "Album not found");
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// STREAM range tests — uses temp file, not golden JSON
+// ═══════════════════════════════════════════════════════════════════════
+
+#[tokio::test]
+async fn stream_range_tests() {
+    // Create a temp audio file with known content
+    let tmp = tempfile::Builder::new().suffix(".mp3").tempfile().unwrap();
+    let test_data: Vec<u8> = (0..=255u8).collect(); // 256 bytes: 0x00..0xFF
+    std::fs::write(tmp.path(), &test_data).unwrap();
+    let file_path = tmp.path().to_string_lossy().to_string();
+
+    // Create a fresh DB with a song pointing to the temp file
+    let conn = aurora_core::db::open_memory().expect("open_memory failed");
+    seed_database(&conn);
+    // Insert a 4th song with the temp file path
+    conn.execute(
+        "INSERT INTO songs (id, title, artist, source, file_path, file_format, created_at, updated_at)          VALUES (100, 'Test Stream', 'Test', 'manual', ?1, 'mp3', '2025-01-01T00:00:00Z', '2025-01-01T00:00:00Z')",
+        aurora_core::rusqlite::params![file_path],
+    ).unwrap();
+
+    let state = Arc::new(AppState { conn: tokio::sync::Mutex::new(conn) });
+    let app = aurora_server::build_router(state);
+
+    // ── Full request (no Range) → 200 ──
+    let req = Request::builder()
+        .uri("/api/songs/100/stream")
+        .body(Body::empty())
+        .unwrap();
+    let response = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(response.status(), 200);
+    assert_eq!(
+        response.headers().get("content-type").unwrap().to_str().unwrap(),
+        "audio/mpeg"
+    );
+    assert_eq!(
+        response.headers().get("accept-ranges").unwrap().to_str().unwrap(),
+        "bytes"
+    );
+    assert_eq!(
+        response.headers().get("content-length").unwrap().to_str().unwrap(),
+        "256"
+    );
+    let body_bytes = response.into_body().collect().await.unwrap().to_bytes();
+    assert_eq!(body_bytes.as_ref(), test_data.as_slice());
+
+    // ── Range: bytes=0-49 → 206 ──
+    let req = Request::builder()
+        .uri("/api/songs/100/stream")
+        .header("range", "bytes=0-49")
+        .body(Body::empty())
+        .unwrap();
+    let response = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(response.status(), 206);
+    assert_eq!(
+        response.headers().get("content-range").unwrap().to_str().unwrap(),
+        "bytes 0-49/256"
+    );
+    assert_eq!(
+        response.headers().get("content-length").unwrap().to_str().unwrap(),
+        "50"
+    );
+    let body_bytes = response.into_body().collect().await.unwrap().to_bytes();
+    assert_eq!(body_bytes.as_ref(), &test_data[0..=49]);
+
+    // ── Range: bytes=100-199 → 206 ──
+    let req = Request::builder()
+        .uri("/api/songs/100/stream")
+        .header("range", "bytes=100-199")
+        .body(Body::empty())
+        .unwrap();
+    let response = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(response.status(), 206);
+    assert_eq!(
+        response.headers().get("content-range").unwrap().to_str().unwrap(),
+        "bytes 100-199/256"
+    );
+    let body_bytes = response.into_body().collect().await.unwrap().to_bytes();
+    assert_eq!(body_bytes.as_ref(), &test_data[100..=199]);
+
+    // ── Range: bytes=200- → 206 (open-ended) ──
+    let req = Request::builder()
+        .uri("/api/songs/100/stream")
+        .header("range", "bytes=200-")
+        .body(Body::empty())
+        .unwrap();
+    let response = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(response.status(), 206);
+    assert_eq!(
+        response.headers().get("content-range").unwrap().to_str().unwrap(),
+        "bytes 200-255/256"
+    );
+    let body_bytes = response.into_body().collect().await.unwrap().to_bytes();
+    assert_eq!(body_bytes.as_ref(), &test_data[200..]);
+
+    // ── Range: bytes=-50 → 206 (suffix) ──
+    let req = Request::builder()
+        .uri("/api/songs/100/stream")
+        .header("range", "bytes=-50")
+        .body(Body::empty())
+        .unwrap();
+    let response = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(response.status(), 206);
+    assert_eq!(
+        response.headers().get("content-range").unwrap().to_str().unwrap(),
+        "bytes 206-255/256"
+    );
+    let body_bytes = response.into_body().collect().await.unwrap().to_bytes();
+    assert_eq!(body_bytes.as_ref(), &test_data[206..]);
+
+    // ── Unsatisfiable range (start >= file_size) → 416 ──
+    let req = Request::builder()
+        .uri("/api/songs/100/stream")
+        .header("range", "bytes=300-400")
+        .body(Body::empty())
+        .unwrap();
+    let response = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(response.status(), 416);
+    assert_eq!(
+        response.headers().get("content-range").unwrap().to_str().unwrap(),
+        "bytes */256"
+    );
+
+    // ── 404: song not found ──
+    let (s, b) = send(&app, get("/api/songs/999/stream")).await;
+    assert_eq!(s, 404);
+    assert_body("stream_404_not_found", &b, &load_golden("songs_stream_404_not_found"));
+
+    // ── 404: no file path ──
+    let (s, b) = send(&app, get("/api/songs/2/stream")).await;
+    assert_eq!(s, 404);
+    assert_body("stream_404_no_file", &b, &load_golden("songs_stream_404_no_file"));
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 // Cross-run proof: flipping a value breaks the test
 // ═══════════════════════════════════════════════════════════════════════
 
