@@ -445,7 +445,7 @@ mod tests {
             .write_image(img_buf.as_raw(), 128, 128, ColorType::Rgb8.into())
             .unwrap();
 
-        let (png, x, y, w, h) = extract_bright_region(&png_buf);
+        let (png, _x, _y, w, h) = extract_bright_region(&png_buf);
         assert!(png.is_some(), "uniform art should still produce output");
         // Should be centered-ish
         assert!(w > 0 && h > 0);

@@ -158,11 +158,9 @@ fn assert_body(name: &str, actual: &Value, golden: &Value) {
 }
 
 fn strip_ts(mut body: Value) -> Value {
-    if let Some(data) = body.get_mut("data") {
-        if let Some(obj) = data.as_object_mut() {
-            obj.remove("created_at");
-            obj.remove("updated_at");
-        }
+    if let Some(obj) = body.get_mut("data").and_then(|d| d.as_object_mut()) {
+        obj.remove("created_at");
+        obj.remove("updated_at");
     }
     body
 }
