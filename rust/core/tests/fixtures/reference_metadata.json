@@ -1,0 +1,87 @@
+{
+  "test_song.mp3": {
+    "title": "Test Song",
+    "artist": "Primary Artist",
+    "album": "Test Album",
+    "artists": [
+      "Primary Artist",
+      "Secondary Artist"
+    ],
+    "featured_artists": null,
+    "duration": 1,
+    "file_format": "mp3",
+    "bitrate": 127,
+    "sample_rate": 44100,
+    "bit_depth": null,
+    "file_size": 18298,
+    "replaygain_track_gain": -6.5,
+    "replaygain_track_peak": 0.95,
+    "replaygain_album_gain": -8.2,
+    "replaygain_album_peak": 0.88,
+    "has_album_art": true
+  },
+  "test_song.flac": {
+    "title": "FLAC Test",
+    "artist": "Artist A",
+    "album": "FLAC Album",
+    "artists": [
+      "Artist A",
+      "Artist B"
+    ],
+    "featured_artists": null,
+    "duration": 1,
+    "file_format": "flac",
+    "bitrate": 96,
+    "sample_rate": 44100,
+    "bit_depth": 16,
+    "file_size": 20324,
+    "replaygain_track_gain": -4.3,
+    "replaygain_track_peak": 0.92,
+    "replaygain_album_gain": -7.1,
+    "replaygain_album_peak": 0.85,
+    "has_album_art": true
+  },
+  "test_song.ogg": {
+    "title": "OGG Test",
+    "artist": "OGG Artist",
+    "album": "OGG Album",
+    "artists": [
+      "OGG Artist",
+      "Guest"
+    ],
+    "featured_artists": [
+      "Guest"
+    ],
+    "duration": 1,
+    "file_format": "ogg",
+    "bitrate": 80,
+    "sample_rate": 44100,
+    "bit_depth": null,
+    "file_size": 6699,
+    "replaygain_track_gain": -3.0,
+    "replaygain_track_peak": 0.98,
+    "replaygain_album_gain": null,
+    "replaygain_album_peak": null,
+    "has_album_art": true
+  },
+  "test_song.m4a": {
+    "title": "M4A Test",
+    "artist": "M4A Artist",
+    "album": "M4A Album",
+    "artists": [
+      "M4A Artist"
+    ],
+    "featured_artists": null,
+    "duration": 1,
+    "file_format": "m4a_aac",
+    "bitrate": 115,
+    "sample_rate": 44100,
+    "bit_depth": 16,
+    "file_size": 17310,
+    "replaygain_track_gain": null,
+    "replaygain_track_peak": null,
+    "replaygain_album_gain": null,
+    "replaygain_album_peak": null,
+    "has_album_art": true
+  }
+}
