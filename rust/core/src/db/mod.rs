@@ -5,6 +5,7 @@
 //! DB created by Python is readable by Rust and vice-versa.
 
 mod migrations;
+pub mod queries;
 
 use anyhow::{Context, Result};
 use rusqlite::Connection;
@@ -41,5 +42,16 @@ pub fn open_readonly(db_path: &Path) -> Result<Connection> {
     conn.execute_batch("PRAGMA foreign_keys = ON;")?;
     conn.execute_batch("PRAGMA busy_timeout = 5000;")?;
 
+    Ok(conn)
+}
+
+/// Open an in-memory DB, run INIT_SQL + migrations, return connection.
+/// Used for golden test harness.
+pub fn open_memory() -> Result<Connection> {
+    let conn = Connection::open_in_memory()?;
+    conn.execute_batch("PRAGMA foreign_keys = ON;")?;
+    conn.execute_batch("PRAGMA busy_timeout = 5000;")?;
+    conn.execute_batch(migrations::INIT_SQL)?;
+    migrations::run_migrations(&conn)?;
     Ok(conn)
 }

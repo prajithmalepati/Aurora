@@ -318,21 +318,23 @@ fn test_parity_mp3_analysis() {
 
     // If art exists AND is a valid image, colors and bleed should be populated.
     // Test fixture art may be corrupt/tiny — that's fine, None is correct.
-    if let Some(ref art) = meta.album_art_bytes {
-        if image::load_from_memory(art).is_ok() {
-            assert!(
-                meta.dominant_color.is_some(),
-                "MP3 has valid art but no dominant_color"
-            );
-            assert!(
-                meta.dominant_color_2.is_some(),
-                "MP3 has valid art but no dominant_color_2"
-            );
-            assert!(
-                meta.bleed_thumb.is_some(),
-                "MP3 has valid art but no bleed_thumb"
-            );
-        }
+    let valid_art = meta
+        .album_art_bytes
+        .as_ref()
+        .is_some_and(|art| image::load_from_memory(art).is_ok());
+    if valid_art {
+        assert!(
+            meta.dominant_color.is_some(),
+            "MP3 has valid art but no dominant_color"
+        );
+        assert!(
+            meta.dominant_color_2.is_some(),
+            "MP3 has valid art but no dominant_color_2"
+        );
+        assert!(
+            meta.bleed_thumb.is_some(),
+            "MP3 has valid art but no bleed_thumb"
+        );
     }
 }
 

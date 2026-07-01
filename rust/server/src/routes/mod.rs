@@ -1,9 +1,14 @@
-use axum::extract::{Query, State};
-use axum::Json;
-use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+mod envelope;
+mod filter;
+mod songs;
+mod tags;
 
-use crate::AppState;
+pub use filter::filter_endpoint;
+pub use songs::{album_art, bleed_thumb, create_song, delete_song, get_song, list_songs, stream_song, update_song};
+pub use tags::{assign_tags, create_tag, delete_tag, list_tags, remove_tag};
+
+use axum::Json;
+use serde::Serialize;
 
 #[derive(Serialize)]
 pub struct HealthResponse {
@@ -13,33 +18,4 @@ pub struct HealthResponse {
 /// GET /api/health — minimal liveness probe.
 pub async fn health() -> Json<HealthResponse> {
     Json(HealthResponse { status: "ok" })
-}
-
-#[derive(Deserialize)]
-pub struct SongsQuery {
-    pub limit: Option<i64>,
-}
-
-/// GET /api/songs?limit=N — read-only proof that core::db works end-to-end.
-/// Reads a real Aurora DB and returns song rows. Full router parity is later.
-pub async fn songs(
-    State(state): State<Arc<AppState>>,
-    Query(params): Query<SongsQuery>,
-) -> Json<serde_json::Value> {
-    // Open a read-only connection for each request
-    let conn = match aurora_core::db::open_readonly(&state.db_path) {
-        Ok(c) => c,
-        Err(e) => {
-            return Json(serde_json::json!({
-                "error": format!("DB open failed: {e}")
-            }));
-        }
-    };
-
-    match aurora_core::models::Song::fetch_all(&conn, params.limit) {
-        Ok(songs) => Json(serde_json::json!({ "songs": songs })),
-        Err(e) => Json(serde_json::json!({
-            "error": format!("query failed: {e}")
-        })),
-    }
 }

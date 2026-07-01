@@ -59,9 +59,11 @@ dependencies = [
  "aurora_core",
  "axum",
  "dirs",
+ "http-body-util",
  "serde",
  "serde_json",
  "tokio",
+ "tower",
  "tower-http",
 ]
 
