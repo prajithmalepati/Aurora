@@ -5,6 +5,7 @@
 
 use anyhow::Result;
 use rusqlite::Connection;
+use rusqlite::OptionalExtension;
 
 use crate::filter;
 use crate::serializer;
@@ -503,6 +504,659 @@ pub fn backfill_file_format(conn: &Connection) -> Result<()> {
         }
     }
     Ok(())
+}
+
+// ── Playlist queries ────────────────────────────────────────────────────
+
+/// Row constants for PLAYLIST_SONG_SELECT columns.
+/// Must match the column order exactly.
+#[allow(dead_code)]
+mod pl_col {
+    pub const ID: usize = 0;
+    pub const TITLE: usize = 1;
+    pub const ARTIST: usize = 2;
+    pub const ALBUM: usize = 3;
+    pub const DURATION: usize = 4;
+    pub const FILE_PATH: usize = 5;
+    pub const FILE_FORMAT: usize = 6;
+    pub const ALBUM_ART_PATH: usize = 7;
+    pub const SOURCE: usize = 8;
+    pub const BITRATE: usize = 9;
+    pub const SAMPLE_RATE: usize = 10;
+    pub const BIT_DEPTH: usize = 11;
+    pub const FILE_SIZE: usize = 12;
+    pub const WAVEFORM_PEAKS: usize = 13;
+    pub const DOMINANT_COLOR: usize = 14;
+    pub const DOMINANT_COLOR_2: usize = 15;
+    pub const REPLAYGAIN_TRACK_GAIN: usize = 16;
+    pub const REPLAYGAIN_TRACK_PEAK: usize = 17;
+    pub const REPLAYGAIN_ALBUM_GAIN: usize = 18;
+    pub const REPLAYGAIN_ALBUM_PEAK: usize = 19;
+    pub const ARTISTS: usize = 20;
+    pub const FEATURED_ARTISTS: usize = 21;
+    pub const STREAM_URL: usize = 22;
+    pub const STREAM_URL_EXPIRES_AT: usize = 23;
+    pub const ARTWORK_URL: usize = 24;
+    pub const TAGS: usize = 25;
+    pub const START_TIME_MS: usize = 26;
+    pub const END_TIME_MS: usize = 27;
+    pub const POSITION: usize = 28;
+}
+
+/// SELECT for songs within a playlist context.
+/// Uses JOIN (not LEFT JOIN) for playlist_songs, no playlist aggregation.
+const PLAYLIST_SONG_SELECT: &str = r#"
+SELECT
+    s.id, s.title, s.artist, s.album, s.duration,
+    s.file_path, s.file_format, s.album_art_path, s.source,
+    s.bitrate, s.sample_rate, s.bit_depth, s.file_size,
+    s.waveform_peaks, s.dominant_color, s.dominant_color_2,
+    s.replaygain_track_gain, s.replaygain_track_peak,
+    s.replaygain_album_gain, s.replaygain_album_peak,
+    s.artists, s.featured_artists,
+    s.stream_url, s.stream_url_expires_at, s.artwork_url,
+    GROUP_CONCAT(DISTINCT t.name) AS tags,
+    ps.start_time_ms, ps.end_time_ms, ps.position
+FROM songs s
+JOIN playlist_songs ps ON s.id = ps.song_id
+LEFT JOIN song_tags st ON s.id = st.song_id
+LEFT JOIN tags t ON st.tag_id = t.id
+"#;
+
+/// Serialize a playlist_songs JOIN row into the song-in-playlist JSON.
+fn row_to_playlist_song(row: &rusqlite::Row) -> rusqlite::Result<serde_json::Value> {
+    Ok(serializer::song_to_playlist_json(
+        row.get(pl_col::ID)?,
+        row.get::<_, String>(pl_col::TITLE)?.as_str(),
+        row.get::<_, String>(pl_col::ARTIST)?.as_str(),
+        row.get::<_, Option<String>>(pl_col::ALBUM)?.as_deref(),
+        row.get(pl_col::DURATION)?,
+        row.get::<_, Option<String>>(pl_col::FILE_PATH)?.as_deref(),
+        row.get::<_, Option<String>>(pl_col::FILE_FORMAT)?.as_deref(),
+        row.get::<_, Option<String>>(pl_col::ALBUM_ART_PATH)?.as_deref(),
+        row.get::<_, String>(pl_col::SOURCE)?.as_str(),
+        row.get(pl_col::BITRATE)?,
+        row.get(pl_col::SAMPLE_RATE)?,
+        row.get(pl_col::BIT_DEPTH)?,
+        row.get(pl_col::FILE_SIZE)?,
+        row.get::<_, Option<String>>(pl_col::DOMINANT_COLOR)?.as_deref(),
+        row.get::<_, Option<String>>(pl_col::DOMINANT_COLOR_2)?.as_deref(),
+        row.get(pl_col::REPLAYGAIN_TRACK_GAIN)?,
+        row.get(pl_col::REPLAYGAIN_TRACK_PEAK)?,
+        row.get(pl_col::REPLAYGAIN_ALBUM_GAIN)?,
+        row.get(pl_col::REPLAYGAIN_ALBUM_PEAK)?,
+        row.get::<_, Option<String>>(pl_col::ARTISTS)?.as_deref(),
+        row.get::<_, Option<String>>(pl_col::FEATURED_ARTISTS)?.as_deref(),
+        row.get::<_, Option<String>>(pl_col::STREAM_URL)?.as_deref(),
+        row.get::<_, Option<String>>(pl_col::STREAM_URL_EXPIRES_AT)?.as_deref(),
+        row.get::<_, Option<String>>(pl_col::ARTWORK_URL)?.as_deref(),
+        row.get::<_, Option<String>>(pl_col::TAGS)?.as_deref(),
+        row.get(pl_col::START_TIME_MS)?,
+        row.get(pl_col::END_TIME_MS)?,
+        row.get(pl_col::POSITION)?,
+    ))
+}
+
+/// List all playlists with song_count, ordered by name ASC.
+pub fn list_playlists(conn: &Connection) -> Result<Vec<serde_json::Value>> {
+    let mut stmt = conn.prepare(
+        "SELECT p.id, p.name, p.color, p.emoji, p.image_url, \
+         p.crossfade_enabled, p.crossfade_duration_s, \
+         COUNT(ps.song_id) AS song_count, \
+         p.dominant_color, p.dominant_color_2, p.created_at, p.updated_at \
+         FROM playlists p LEFT JOIN playlist_songs ps ON p.id = ps.playlist_id \
+         GROUP BY p.id ORDER BY p.name ASC",
+    )?;
+    let rows = stmt.query_map([], |row| {
+        Ok(serializer::playlist_to_json(
+            row.get(0)?,
+            &row.get::<_, String>(1)?,
+            row.get::<_, Option<String>>(2)?.as_deref(),
+            row.get::<_, Option<String>>(3)?.as_deref(),
+            row.get::<_, Option<String>>(4)?.as_deref(),
+            row.get(5)?,
+            row.get(6)?,
+            row.get(7)?,
+            row.get::<_, Option<String>>(8)?.as_deref(),
+            row.get::<_, Option<String>>(9)?.as_deref(),
+            &row.get::<_, String>(10)?,
+            &row.get::<_, String>(11)?,
+        ))
+    })?;
+    let mut data = Vec::new();
+    for r in rows {
+        data.push(r?);
+    }
+    Ok(data)
+}
+
+/// Get a single playlist with its songs ordered by position.
+pub fn get_playlist(conn: &Connection, playlist_id: i64) -> Result<Option<serde_json::Value>> {
+    // Fetch playlist metadata
+    let meta = conn.query_row(
+        "SELECT id, name, color, emoji, image_url, \
+         crossfade_enabled, crossfade_duration_s, \
+         dominant_color, dominant_color_2, created_at, updated_at \
+         FROM playlists WHERE id = ?1",
+        [playlist_id],
+        |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, Option<String>>(2)?,
+                row.get::<_, Option<String>>(3)?,
+                row.get::<_, Option<String>>(4)?,
+                row.get::<_, Option<i64>>(5)?,
+                row.get::<_, Option<i64>>(6)?,
+                row.get::<_, Option<String>>(7)?,
+                row.get::<_, Option<String>>(8)?,
+                row.get::<_, String>(9)?,
+                row.get::<_, String>(10)?,
+            ))
+        },
+    );
+    let (id, name, color, emoji, image_url, ce, cd, dc, dc2, created_at, updated_at) = match meta {
+        Ok(v) => v,
+        Err(rusqlite::Error::QueryReturnedNoRows) => return Ok(None),
+        Err(e) => return Err(e.into()),
+    };
+
+    // Fetch songs
+    let sql = format!("{PLAYLIST_SONG_SELECT} WHERE ps.playlist_id = ?1 GROUP BY s.id ORDER BY ps.position ASC");
+    let mut stmt = conn.prepare(&sql)?;
+    let song_rows = stmt.query_map([playlist_id], row_to_playlist_song)?;
+    let mut songs = Vec::new();
+    for r in song_rows {
+        songs.push(r?);
+    }
+    let song_count = songs.len() as i64;
+
+    // Build detail response
+    let mut map = serde_json::Map::new();
+    map.insert("id".into(), serde_json::json!(id));
+    map.insert("name".into(), serde_json::json!(name));
+    map.insert("color".into(), serde_json::json!(color));
+    map.insert("emoji".into(), serde_json::json!(emoji));
+    map.insert("image_url".into(), serde_json::json!(image_url));
+    map.insert("crossfade_enabled".into(), serde_json::json!(ce));
+    map.insert("crossfade_duration_s".into(), serde_json::json!(cd));
+    map.insert("song_count".into(), serde_json::json!(song_count));
+    map.insert("dominant_color".into(), serde_json::json!(dc));
+    map.insert("dominant_color_2".into(), serde_json::json!(dc2));
+    map.insert("songs".into(), serde_json::Value::Array(songs));
+    map.insert("created_at".into(), serde_json::json!(created_at));
+    map.insert("updated_at".into(), serde_json::json!(updated_at));
+    Ok(Some(serde_json::Value::Object(map)))
+}
+
+/// Create a playlist. Returns Ok(id) or Err("duplicate_name").
+pub fn create_playlist(
+    conn: &Connection,
+    name: &str,
+    color: Option<&str>,
+    emoji: Option<&str>,
+) -> Result<i64> {
+    let name = name.trim();
+    if name.is_empty() {
+        return Err(anyhow::anyhow!("empty_name"));
+    }
+    let now = chrono_now();
+    match conn.execute(
+        "INSERT INTO playlists (name, color, emoji, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+        rusqlite::params![name, color, emoji, now, now],
+    ) {
+        Ok(_) => Ok(conn.last_insert_rowid()),
+        Err(e) => {
+            let msg = e.to_string();
+            if msg.contains("UNIQUE constraint failed") {
+                Err(anyhow::anyhow!("duplicate_name"))
+            } else {
+                Err(e.into())
+            }
+        }
+    }
+}
+
+/// Update a playlist. Returns Ok(true) if updated, Ok(false) if not found.
+#[allow(clippy::too_many_arguments)]
+pub fn update_playlist(
+    conn: &Connection,
+    playlist_id: i64,
+    name: Option<&str>,
+    color: Option<&str>,
+    emoji: Option<&str>,
+    crossfade_enabled: Option<Option<i64>>,
+    crossfade_duration_s: Option<Option<i64>>,
+) -> Result<bool> {
+    // Check existence
+    let exists: bool = conn.query_row(
+        "SELECT COUNT(*) FROM playlists WHERE id = ?1",
+        [playlist_id],
+        |r| r.get::<_, i64>(0),
+    )? > 0;
+    if !exists {
+        return Ok(false);
+    }
+
+    let now = chrono_now();
+    let mut sets = Vec::new();
+    let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+    let mut idx = 1usize;
+
+    if let Some(v) = name {
+        sets.push(format!("name = ?{idx}"));
+        params.push(Box::new(v.trim().to_string()));
+        idx += 1;
+    }
+    if let Some(v) = color {
+        sets.push(format!("color = ?{idx}"));
+        params.push(Box::new(v.to_string()));
+        idx += 1;
+    }
+    if let Some(v) = emoji {
+        sets.push(format!("emoji = ?{idx}"));
+        params.push(Box::new(if v.is_empty() { None::<String> } else { Some(v.to_string()) }));
+        idx += 1;
+    }
+    if let Some(ce) = crossfade_enabled {
+        sets.push(format!("crossfade_enabled = ?{idx}"));
+        params.push(Box::new(ce));
+        idx += 1;
+    }
+    if let Some(cd) = crossfade_duration_s {
+        sets.push(format!("crossfade_duration_s = ?{idx}"));
+        params.push(Box::new(cd));
+        idx += 1;
+    }
+    sets.push(format!("updated_at = ?{idx}"));
+    params.push(Box::new(now));
+    idx += 1;
+
+    let sql = format!("UPDATE playlists SET {} WHERE id = ?{idx}", sets.join(", "));
+    params.push(Box::new(playlist_id));
+    conn.execute(
+        &sql,
+        rusqlite::params_from_iter(params.iter().map(|p| p.as_ref())),
+    )?;
+    Ok(true)
+}
+
+/// Delete a playlist. Returns Ok(true) if deleted, Ok(false) if not found.
+pub fn delete_playlist(conn: &Connection, playlist_id: i64) -> Result<bool> {
+    let affected = conn.execute("DELETE FROM playlists WHERE id = ?1", [playlist_id])?;
+    Ok(affected > 0)
+}
+
+/// Add a song to a playlist.
+/// Returns Ok(new_position), Err("playlist_not_found"), Err("song_not_found"), or Err("duplicate").
+pub fn add_song_to_playlist(
+    conn: &Connection,
+    playlist_id: i64,
+    song_id: i64,
+) -> Result<i64> {
+    // Check playlist exists
+    let pl_exists: bool = conn.query_row(
+        "SELECT COUNT(*) FROM playlists WHERE id = ?1",
+        [playlist_id],
+        |r| r.get::<_, i64>(0),
+    )? > 0;
+    if !pl_exists {
+        return Err(anyhow::anyhow!("playlist_not_found"));
+    }
+    // Check song exists
+    let song_exists: bool = conn.query_row(
+        "SELECT COUNT(*) FROM songs WHERE id = ?1",
+        [song_id],
+        |r| r.get::<_, i64>(0),
+    )? > 0;
+    if !song_exists {
+        return Err(anyhow::anyhow!("song_not_found"));
+    }
+    // Check not already in playlist
+    let dup: bool = conn.query_row(
+        "SELECT COUNT(*) FROM playlist_songs WHERE playlist_id = ?1 AND song_id = ?2",
+        rusqlite::params![playlist_id, song_id],
+        |r| r.get::<_, i64>(0),
+    )? > 0;
+    if dup {
+        return Err(anyhow::anyhow!("duplicate"));
+    }
+    // Get max position
+    let max_pos: i64 = conn.query_row(
+        "SELECT COALESCE(MAX(position), -1) FROM playlist_songs WHERE playlist_id = ?1",
+        [playlist_id],
+        |r| r.get(0),
+    )?;
+    let new_pos = max_pos + 1;
+    let now = chrono_now();
+    conn.execute(
+        "INSERT INTO playlist_songs (playlist_id, song_id, position, added_at, start_time_ms, end_time_ms) \
+         VALUES (?1, ?2, ?3, ?4, 0, 0)",
+        rusqlite::params![playlist_id, song_id, new_pos, now],
+    )?;
+    Ok(new_pos)
+}
+
+/// Remove a song from a playlist and recompact positions.
+/// Returns Ok(()), Err("playlist_not_found"), Err("song_not_found"), or Err("not_in_playlist").
+pub fn remove_song_from_playlist(
+    conn: &Connection,
+    playlist_id: i64,
+    song_id: i64,
+) -> Result<()> {
+    // Check playlist
+    let pl_exists: bool = conn.query_row(
+        "SELECT COUNT(*) FROM playlists WHERE id = ?1",
+        [playlist_id],
+        |r| r.get::<_, i64>(0),
+    )? > 0;
+    if !pl_exists {
+        return Err(anyhow::anyhow!("playlist_not_found"));
+    }
+    // Check song
+    let song_exists: bool = conn.query_row(
+        "SELECT COUNT(*) FROM songs WHERE id = ?1",
+        [song_id],
+        |r| r.get::<_, i64>(0),
+    )? > 0;
+    if !song_exists {
+        return Err(anyhow::anyhow!("song_not_found"));
+    }
+    // Get position
+    let position: Option<i64> = conn.query_row(
+        "SELECT position FROM playlist_songs WHERE playlist_id = ?1 AND song_id = ?2",
+        rusqlite::params![playlist_id, song_id],
+        |r| r.get(0),
+    )
+    .optional()?
+    .flatten();
+    let position = match position {
+        Some(p) => p,
+        None => return Err(anyhow::anyhow!("not_in_playlist")),
+    };
+    // Delete + recompact
+    conn.execute(
+        "DELETE FROM playlist_songs WHERE playlist_id = ?1 AND song_id = ?2",
+        rusqlite::params![playlist_id, song_id],
+    )?;
+    conn.execute(
+        "UPDATE playlist_songs SET position = position - 1 WHERE playlist_id = ?1 AND position > ?2",
+        rusqlite::params![playlist_id, position],
+    )?;
+    Ok(())
+}
+
+/// Reorder songs in a playlist.
+/// Returns Ok(()), Err("playlist_not_found"), or Err("id_mismatch").
+pub fn reorder_playlist_songs(
+    conn: &Connection,
+    playlist_id: i64,
+    song_ids: &[i64],
+) -> Result<()> {
+    // Check playlist
+    let pl_exists: bool = conn.query_row(
+        "SELECT COUNT(*) FROM playlists WHERE id = ?1",
+        [playlist_id],
+        |r| r.get::<_, i64>(0),
+    )? > 0;
+    if !pl_exists {
+        return Err(anyhow::anyhow!("playlist_not_found"));
+    }
+    // Get current song ids
+    let mut stmt = conn.prepare(
+        "SELECT song_id FROM playlist_songs WHERE playlist_id = ?1 ORDER BY position",
+    )?;
+    let current: Vec<i64> = stmt.query_map([playlist_id], |r| r.get(0))?.collect::<std::result::Result<Vec<_>, _>>()?;
+
+    let current_set: std::collections::HashSet<i64> = current.iter().copied().collect();
+    let new_set: std::collections::HashSet<i64> = song_ids.iter().copied().collect();
+    if current_set != new_set {
+        return Err(anyhow::anyhow!("id_mismatch"));
+    }
+
+    for (pos, sid) in song_ids.iter().enumerate() {
+        conn.execute(
+            "UPDATE playlist_songs SET position = ?1 WHERE playlist_id = ?2 AND song_id = ?3",
+            rusqlite::params![pos as i64, playlist_id, sid],
+        )?;
+    }
+    Ok(())
+}
+
+/// Update timing for a song in a playlist.
+/// Returns Ok((start_time_ms, end_time_ms)), Err("not_in_playlist"), or Err("invalid_timing").
+pub fn update_song_timing(
+    conn: &Connection,
+    playlist_id: i64,
+    song_id: i64,
+    start_time_ms: i64,
+    end_time_ms: i64,
+) -> Result<(i64, i64)> {
+    // Validate timing
+    if start_time_ms > 0 && end_time_ms > 0 && start_time_ms >= end_time_ms {
+        return Err(anyhow::anyhow!("invalid_timing"));
+    }
+    // Check link exists
+    let link_exists: bool = conn.query_row(
+        "SELECT COUNT(*) FROM playlist_songs WHERE playlist_id = ?1 AND song_id = ?2",
+        rusqlite::params![playlist_id, song_id],
+        |r| r.get::<_, i64>(0),
+    )? > 0;
+    if !link_exists {
+        return Err(anyhow::anyhow!("not_in_playlist"));
+    }
+    // Clamp end_time_ms to duration
+    let mut final_end = end_time_ms;
+    if final_end > 0 {
+        let duration: Option<i64> = conn.query_row(
+            "SELECT duration FROM songs WHERE id = ?1",
+            [song_id],
+            |r| r.get(0),
+        )?;
+        if let Some(dur) = duration {
+            let max_ms = dur * 1000;
+            if final_end > max_ms {
+                final_end = max_ms;
+            }
+        }
+    }
+    conn.execute(
+        "UPDATE playlist_songs SET start_time_ms = ?1, end_time_ms = ?2 WHERE playlist_id = ?3 AND song_id = ?4",
+        rusqlite::params![start_time_ms, final_end, playlist_id, song_id],
+    )?;
+    Ok((start_time_ms, final_end))
+}
+
+/// Update a playlist's image_url, dominant_color, dominant_color_2.
+pub fn update_playlist_image(
+    conn: &Connection,
+    playlist_id: i64,
+    image_url: Option<&str>,
+    dominant_color: Option<&str>,
+    dominant_color_2: Option<&str>,
+) -> Result<bool> {
+    let now = chrono_now();
+    let affected = conn.execute(
+        "UPDATE playlists SET image_url = ?1, dominant_color = ?2, dominant_color_2 = ?3, updated_at = ?4 WHERE id = ?5",
+        rusqlite::params![image_url, dominant_color, dominant_color_2, now, playlist_id],
+    )?;
+    Ok(affected > 0)
+}
+
+/// Get playlist info for image operations.
+pub fn get_playlist_image_info(conn: &Connection, playlist_id: i64) -> Result<Option<Option<String>>> {
+    // Returns Some(Some(image_url)) if playlist exists and has image,
+    // Some(None) if playlist exists but no image, None if playlist not found.
+    let mut stmt = conn.prepare("SELECT image_url FROM playlists WHERE id = ?1")?;
+    let mut rows = stmt.query_map([playlist_id], |row| row.get::<_, Option<String>>(0))?;
+    match rows.next() {
+        Some(r) => Ok(Some(r?)),
+        None => Ok(None),
+    }
+}
+
+/// Get playlist metadata for export.
+pub fn get_playlist_for_export(conn: &Connection, playlist_id: i64) -> Result<Option<(serde_json::Value, Vec<serde_json::Value>)>> {
+    let meta = conn.query_row(
+        "SELECT id, name, color, emoji, crossfade_enabled, crossfade_duration_s FROM playlists WHERE id = ?1",
+        [playlist_id],
+        |row| {
+            Ok((
+                row.get::<_, String>(1)?,  // name
+                row.get::<_, Option<String>>(2)?,  // color
+                row.get::<_, Option<String>>(3)?,  // emoji
+                row.get::<_, Option<i64>>(4)?,  // crossfade_enabled
+                row.get::<_, Option<i64>>(5)?,  // crossfade_duration_s
+            ))
+        },
+    );
+    let (name, color, emoji, ce, cd) = match meta {
+        Ok(v) => v,
+        Err(rusqlite::Error::QueryReturnedNoRows) => return Ok(None),
+        Err(e) => return Err(e.into()),
+    };
+
+    // Fetch songs
+    let sql = format!("{PLAYLIST_SONG_SELECT} WHERE ps.playlist_id = ?1 GROUP BY s.id ORDER BY ps.position ASC");
+    let mut stmt = conn.prepare(&sql)?;
+    let song_rows = stmt.query_map([playlist_id], |row| {
+        // For export, we need a simplified song shape
+        Ok(serde_json::json!({
+            "title": row.get::<_, String>(pl_col::TITLE)?,
+            "artist": row.get::<_, String>(pl_col::ARTIST)?,
+            "album": row.get::<_, Option<String>>(pl_col::ALBUM)?,
+            "duration": row.get::<_, Option<i64>>(pl_col::DURATION)?,
+            "file_path": row.get::<_, Option<String>>(pl_col::FILE_PATH)?,
+            "file_format": row.get::<_, Option<String>>(pl_col::FILE_FORMAT)?,
+            "tags": serializer::parse_tags(row.get::<_, Option<String>>(pl_col::TAGS)?.as_deref()),
+            "start_time_ms": row.get::<_, i64>(pl_col::START_TIME_MS)?,
+            "end_time_ms": row.get::<_, i64>(pl_col::END_TIME_MS)?,
+        }))
+    })?;
+    let mut songs = Vec::new();
+    for r in song_rows {
+        songs.push(r?);
+    }
+
+    let playlist_meta = serde_json::json!({
+        "name": name,
+        "color": color,
+        "emoji": emoji,
+        "crossfade_enabled": ce,
+        "crossfade_duration_s": cd,
+    });
+    Ok(Some((playlist_meta, songs)))
+}
+
+/// Import: create a playlist with songs matched by file_path.
+pub fn import_playlist(
+    conn: &Connection,
+    name: &str,
+    color: Option<&str>,
+    emoji: Option<&str>,
+    crossfade_enabled: Option<i64>,
+    crossfade_duration_s: Option<i64>,
+    file_paths: &[String],
+) -> Result<(i64, String, usize, Vec<String>)> {
+    // Build path → song_id lookup
+    let mut stmt = conn.prepare("SELECT id, file_path FROM songs WHERE file_path IS NOT NULL AND file_path != ''")?;
+    let db_rows: Vec<(i64, String)> = stmt.query_map([], |row| {
+        Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+    })?.collect::<std::result::Result<Vec<_>, _>>()?;
+
+    let mut path_to_id: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
+    for (id, fp) in &db_rows {
+        let norm = fp.replace('\\', "/").trim().to_string();
+        if !norm.is_empty() {
+            path_to_id.insert(norm, *id);
+        }
+    }
+
+    let mut matched_ids = Vec::new();
+    let mut unmatched_paths = Vec::new();
+
+    for fp in file_paths {
+        let norm = fp.replace('\\', "/").trim().to_string();
+        if let Some(&id) = path_to_id.get(&norm) {
+            matched_ids.push(id);
+        } else {
+            // Try matching by filename only
+            let filename = std::path::Path::new(&norm)
+                .file_name()
+                .and_then(|f| f.to_str())
+                .unwrap_or("");
+            let mut found = false;
+            for (db_fp, &db_id) in &path_to_id {
+                let db_filename = std::path::Path::new(db_fp)
+                    .file_name()
+                    .and_then(|f| f.to_str())
+                    .unwrap_or("");
+                if db_filename == filename && !filename.is_empty() {
+                    matched_ids.push(db_id);
+                    found = true;
+                    break;
+                }
+            }
+            if !found {
+                unmatched_paths.push(fp.clone());
+            }
+        }
+    }
+
+    if matched_ids.is_empty() {
+        return Err(anyhow::anyhow!("no_matches"));
+    }
+
+    // Deduplicate preserving order
+    let mut seen = std::collections::HashSet::new();
+    let unique_ids: Vec<i64> = matched_ids.into_iter().filter(|id| seen.insert(*id)).collect();
+
+    // Handle name collision
+    let mut final_name = name.trim().to_string();
+    let mut suffix = 1i64;
+    loop {
+        let exists: bool = conn.query_row(
+            "SELECT COUNT(*) FROM playlists WHERE name = ?1",
+            [&final_name],
+            |r| r.get::<_, i64>(0),
+        )? > 0;
+        if !exists {
+            break;
+        }
+        final_name = format!("{} ({})", name.trim(), suffix);
+        suffix += 1;
+    }
+
+    let now = chrono_now();
+    conn.execute(
+        "INSERT INTO playlists (name, color, emoji, crossfade_enabled, crossfade_duration_s, created_at, updated_at) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        rusqlite::params![final_name, color, emoji, crossfade_enabled, crossfade_duration_s, now, now],
+    )?;
+    let playlist_id = conn.last_insert_rowid();
+
+    for (pos, sid) in unique_ids.iter().enumerate() {
+        conn.execute(
+            "INSERT INTO playlist_songs (playlist_id, song_id, position, added_at, start_time_ms, end_time_ms) \
+             VALUES (?1, ?2, ?3, ?4, 0, 0)",
+            rusqlite::params![playlist_id, sid, pos as i64, now],
+        )?;
+    }
+
+    let matched_count = unique_ids.len();
+    Ok((playlist_id, final_name, matched_count, unmatched_paths))
+}
+
+/// Get the playlist id + image_url for a given playlist.
+pub fn get_playlist_image_url(conn: &Connection, playlist_id: i64) -> Result<Option<(Option<String>,)>> {
+    let mut stmt = conn.prepare("SELECT image_url FROM playlists WHERE id = ?1")?;
+    let mut rows = stmt.query_map([playlist_id], |row| {
+        Ok((row.get::<_, Option<String>>(0)?,))
+    })?;
+    match rows.next() {
+        Some(r) => Ok(Some(r?)),
+        None => Ok(None),
+    }
 }
 
 /// Current UTC time in ISO format.
