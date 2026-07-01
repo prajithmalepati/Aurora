@@ -1159,6 +1159,215 @@ pub fn get_playlist_image_url(conn: &Connection, playlist_id: i64) -> Result<Opt
     }
 }
 
+// ── Folder queries ─────────────────────────────────────────────────────
+
+/// Build a folder tree entry from accumulated data.
+fn build_folder_json(
+    path: &str,
+    all_paths: &std::collections::BTreeMap<String, i64>,
+    children_of: &std::collections::BTreeMap<String, Vec<String>>,
+) -> serde_json::Value {
+    let name = std::path::Path::new(path)
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| path.to_string());
+    let count = all_paths.get(path).copied().unwrap_or(0);
+
+    let mut item = serde_json::json!({
+        "name": name,
+        "path": path,
+        "song_count": count,
+    });
+
+    if let Some(children) = children_of.get(path) {
+        let mut subs: Vec<serde_json::Value> = children
+            .iter()
+            .map(|c| build_folder_json(c, all_paths, children_of))
+            .collect();
+        subs.sort_by(|a, b| {
+            let na = a["name"].as_str().unwrap_or("").to_lowercase();
+            let nb = b["name"].as_str().unwrap_or("").to_lowercase();
+            na.cmp(&nb)
+        });
+        if !subs.is_empty() {
+            item.as_object_mut()
+                .unwrap()
+                .insert("subfolders".to_string(), serde_json::Value::Array(subs));
+        }
+    }
+
+    item
+}
+
+/// List the folder tree built from songs' file_path directories.
+/// Returns `(tree_array_value, total_folders, total_songs)`.
+/// Songs with `file_path = NULL` are excluded.
+pub fn list_folder_tree(conn: &Connection) -> Result<(serde_json::Value, i64, i64)> {
+    let mut stmt = conn.prepare(
+        "SELECT file_path FROM songs WHERE file_path IS NOT NULL AND file_path != ''",
+    )?;
+    let rows: Vec<String> = stmt
+        .query_map([], |row| row.get::<_, String>(0))?
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+
+    // Count songs per directory
+    let mut dir_counts: std::collections::BTreeMap<String, i64> = std::collections::BTreeMap::new();
+    for fp in &rows {
+        let fp = fp.replace('\\', "/");
+        if let Some(parent) = std::path::Path::new(&fp).parent() {
+            let dir = parent.to_string_lossy().to_string();
+            if !dir.is_empty() {
+                *dir_counts.entry(dir).or_insert(0) += 1;
+            }
+        }
+    }
+
+    // Accumulate counts for all ancestor paths
+    let mut all_paths: std::collections::BTreeMap<String, i64> = std::collections::BTreeMap::new();
+    for (dir_path, &count) in &dir_counts {
+        let mut acc = String::new();
+        for part in dir_path.split('/').filter(|p| !p.is_empty()) {
+            acc = if acc.is_empty() {
+                format!("/{}", part)
+            } else {
+                format!("{}/{}", acc, part)
+            };
+            *all_paths.entry(acc.clone()).or_insert(0) += count;
+        }
+    }
+
+    // Build parent-child relationships
+    let mut children_of: std::collections::BTreeMap<String, Vec<String>> =
+        std::collections::BTreeMap::new();
+    let mut roots: Vec<String> = Vec::new();
+    for path in all_paths.keys() {
+        let parent = std::path::Path::new(path)
+            .parent()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_default();
+        if parent.is_empty() || !all_paths.contains_key(&parent) {
+            roots.push(path.clone());
+        } else {
+            children_of.entry(parent).or_default().push(path.clone());
+        }
+    }
+
+    // Build JSON
+    let mut folders: Vec<serde_json::Value> = roots
+        .iter()
+        .map(|r| build_folder_json(r, &all_paths, &children_of))
+        .collect();
+    folders.sort_by(|a, b| {
+        let na = a["name"].as_str().unwrap_or("").to_lowercase();
+        let nb = b["name"].as_str().unwrap_or("").to_lowercase();
+        na.cmp(&nb)
+    });
+
+    let total_folders = all_paths.len() as i64;
+    let total_songs: i64 = dir_counts.values().sum();
+
+    Ok((serde_json::Value::Array(folders), total_folders, total_songs))
+}
+
+/// List songs within a specific folder path.
+/// Returns `(songs, total)`. Songs serialized with peaks (include_peaks = true).
+pub fn list_folder_songs(
+    conn: &Connection,
+    path: &str,
+    recursive: bool,
+    limit: i64,
+    offset: i64,
+) -> Result<(Vec<serde_json::Value>, i64)> {
+    let normalized_path = path.trim_end_matches('/');
+    let like_pattern = format!("{}/%", normalized_path);
+
+    // Count
+    let total: i64 = if recursive {
+        conn.query_row(
+            "SELECT COUNT(*) FROM songs s WHERE s.file_path LIKE ?1",
+            rusqlite::params![like_pattern],
+            |row| row.get(0),
+        )?
+    } else {
+        let deeper_pattern = format!("{}/%/%", normalized_path);
+        conn.query_row(
+            "SELECT COUNT(*) FROM songs s WHERE s.file_path LIKE ?1 AND s.file_path NOT LIKE ?2",
+            rusqlite::params![like_pattern, deeper_pattern],
+            |row| row.get(0),
+        )?
+    };
+
+    // Data query
+    let songs = if recursive {
+        let sql = format!(
+            "{} WHERE s.file_path LIKE ?1 GROUP BY s.id ORDER BY s.title COLLATE NOCASE ASC, s.id ASC LIMIT ?2 OFFSET ?3",
+            SONG_SELECT
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let rows = stmt.query_map(rusqlite::params![like_pattern, limit, offset], |row| {
+            row_to_song(row, true)
+        })?;
+        rows.collect::<std::result::Result<Vec<_>, _>>()?
+    } else {
+        let deeper_pattern = format!("{}/%/%", normalized_path);
+        let sql = format!(
+            "{} WHERE s.file_path LIKE ?1 AND s.file_path NOT LIKE ?2 GROUP BY s.id ORDER BY s.title COLLATE NOCASE ASC, s.id ASC LIMIT ?3 OFFSET ?4",
+            SONG_SELECT
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        let rows = stmt.query_map(
+            rusqlite::params![like_pattern, deeper_pattern, limit, offset],
+            |row| row_to_song(row, true),
+        )?;
+        rows.collect::<std::result::Result<Vec<_>, _>>()?
+    };
+
+    Ok((songs, total))
+}
+
+// ── Album queries ──────────────────────────────────────────────────────
+
+/// List all albums with aggregated metadata, sorted by album_name ASC.
+pub fn list_albums(conn: &Connection) -> Result<(Vec<serde_json::Value>, i64)> {
+    let mut stmt = conn.prepare(
+        "SELECT COALESCE(album, 'Unknown Album') AS album_name, \
+         artist AS album_artist, COUNT(*) AS song_count, \
+         COALESCE(SUM(duration), 0) AS total_duration, \
+         album_art_path AS cover_art_path, dominant_color \
+         FROM songs GROUP BY COALESCE(album, 'Unknown Album'), artist \
+         ORDER BY album_name COLLATE NOCASE ASC",
+    )?;
+    let rows = stmt.query_map([], |row| {
+        let cover: Option<String> = row.get(4)?;
+        let cover = cover.filter(|c| !c.is_empty());
+        Ok(serde_json::json!({
+            "album_name": row.get::<_, String>(0)?,
+            "album_artist": row.get::<_, String>(1)?,
+            "song_count": row.get::<_, i64>(2)?,
+            "total_duration": row.get::<_, i64>(3)?,
+            "cover_art_path": cover,
+            "dominant_color": row.get::<_, Option<String>>(5)?,
+        }))
+    })?;
+    let data: Vec<serde_json::Value> = rows.collect::<std::result::Result<Vec<_>, _>>()?;
+    let total = data.len() as i64;
+    Ok((data, total))
+}
+
+/// Get songs in an album by name.
+/// Uses COALESCE for NULL album -> "Unknown Album".
+/// Returns songs sorted by title ASC.
+pub fn get_album_songs(conn: &Connection, album_name: &str) -> Result<Vec<serde_json::Value>> {
+    let sql = format!(
+        "{} WHERE COALESCE(s.album, 'Unknown Album') = ?1 GROUP BY s.id ORDER BY s.title COLLATE NOCASE ASC",
+        SONG_SELECT
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = stmt.query_map([album_name], |row| row_to_song(row, true))?;
+    let songs = rows.collect::<std::result::Result<Vec<_>, _>>()?;
+    Ok(songs)
+}
+
 /// Current UTC time in ISO format.
 fn chrono_now() -> String {
     // Use a simple implementation without chrono dependency

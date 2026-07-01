@@ -99,5 +99,23 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
             "/api/playlist-images/{filename}",
             axum::routing::get(routes::serve_playlist_image),
         )
+        // ── Folder routes ──
+        .route(
+            "/api/folders",
+            axum::routing::get(routes::get_folder_tree),
+        )
+        .route(
+            "/api/folders/songs",
+            axum::routing::get(routes::get_folder_songs),
+        )
+        // ── Album routes ──
+        .route(
+            "/api/albums",
+            axum::routing::get(routes::list_albums),
+        )
+        .route(
+            "/api/albums/{album_name}",
+            axum::routing::get(routes::get_album),
+        )
         .with_state(state)
 }
