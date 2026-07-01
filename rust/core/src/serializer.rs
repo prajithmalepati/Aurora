@@ -161,3 +161,110 @@ fn json_opt_f64(v: Option<f64>) -> Value {
         None => Value::Null,
     }
 }
+
+/// Serialize a playlist for the list view (no songs array).
+#[allow(clippy::too_many_arguments)]
+pub fn playlist_to_json(
+    id: i64,
+    name: &str,
+    color: Option<&str>,
+    emoji: Option<&str>,
+    image_url: Option<&str>,
+    crossfade_enabled: Option<i64>,
+    crossfade_duration_s: Option<i64>,
+    song_count: i64,
+    dominant_color: Option<&str>,
+    dominant_color_2: Option<&str>,
+    created_at: &str,
+    updated_at: &str,
+) -> Value {
+    serde_json::json!({
+        "id": id,
+        "name": name,
+        "color": color,
+        "emoji": emoji,
+        "image_url": image_url,
+        "crossfade_enabled": crossfade_enabled,
+        "crossfade_duration_s": crossfade_duration_s,
+        "song_count": song_count,
+        "dominant_color": dominant_color,
+        "dominant_color_2": dominant_color_2,
+        "created_at": created_at,
+        "updated_at": updated_at,
+    })
+}
+
+/// Serialize a song in playlist context.
+///
+/// Like `song_to_json` but:
+/// - `created_at` / `updated_at` are empty strings (PLAYLIST_SONG_SELECT omits them)
+/// - `playlists` is always `[]` (no playlist aggregation in playlist context)
+/// - `position`, `start_time_ms`, `end_time_ms` come from playlist_songs
+/// - No `waveform_peaks` field
+#[allow(clippy::too_many_arguments)]
+pub fn song_to_playlist_json(
+    id: i64,
+    title: &str,
+    artist: &str,
+    album: Option<&str>,
+    duration: Option<i64>,
+    file_path: Option<&str>,
+    file_format: Option<&str>,
+    album_art_path: Option<&str>,
+    source: &str,
+    bitrate: Option<i64>,
+    sample_rate: Option<i64>,
+    bit_depth: Option<i64>,
+    file_size: Option<i64>,
+    dominant_color: Option<&str>,
+    dominant_color_2: Option<&str>,
+    replaygain_track_gain: Option<f64>,
+    replaygain_track_peak: Option<f64>,
+    replaygain_album_gain: Option<f64>,
+    replaygain_album_peak: Option<f64>,
+    artists: Option<&str>,
+    featured_artists: Option<&str>,
+    stream_url: Option<&str>,
+    stream_url_expires_at: Option<&str>,
+    artwork_url: Option<&str>,
+    tags_csv: Option<&str>,
+    start_time_ms: i64,
+    end_time_ms: i64,
+    position: i64,
+) -> Value {
+    let mut map = serde_json::Map::new();
+
+    map.insert("id".into(), Value::Number(id.into()));
+    map.insert("title".into(), Value::String(title.to_string()));
+    map.insert("artist".into(), Value::String(artist.to_string()));
+    map.insert("album".into(), json_opt_str(album));
+    map.insert("artists".into(), safe_json_loads(artists).unwrap_or(Value::Null));
+    map.insert("featured_artists".into(), safe_json_loads(featured_artists).unwrap_or(Value::Null));
+    map.insert("duration".into(), json_opt_i64(duration));
+    map.insert("file_path".into(), json_opt_str(file_path));
+    map.insert("file_format".into(), json_opt_str(file_format));
+    map.insert("album_art_path".into(), json_opt_str(album_art_path));
+    map.insert("source".into(), Value::String(source.to_string()));
+    map.insert("tags".into(), Value::Array(parse_tags(tags_csv).into_iter().map(Value::String).collect()));
+    map.insert("playlists".into(), Value::Array(vec![]));
+    map.insert("created_at".into(), Value::String("".into()));
+    map.insert("updated_at".into(), Value::String("".into()));
+    map.insert("start_time_ms".into(), Value::Number(start_time_ms.into()));
+    map.insert("end_time_ms".into(), Value::Number(end_time_ms.into()));
+    map.insert("position".into(), Value::Number(position.into()));
+    map.insert("bitrate".into(), json_opt_i64(bitrate));
+    map.insert("sample_rate".into(), json_opt_i64(sample_rate));
+    map.insert("bit_depth".into(), json_opt_i64(bit_depth));
+    map.insert("file_size".into(), json_opt_i64(file_size));
+    map.insert("dominant_color".into(), json_opt_str(dominant_color));
+    map.insert("dominant_color_2".into(), json_opt_str(dominant_color_2));
+    map.insert("replaygain_track_gain".into(), json_opt_f64(replaygain_track_gain));
+    map.insert("replaygain_track_peak".into(), json_opt_f64(replaygain_track_peak));
+    map.insert("replaygain_album_gain".into(), json_opt_f64(replaygain_album_gain));
+    map.insert("replaygain_album_peak".into(), json_opt_f64(replaygain_album_peak));
+    map.insert("stream_url".into(), json_opt_str(stream_url));
+    map.insert("stream_url_expires_at".into(), json_opt_str(stream_url_expires_at));
+    map.insert("artwork_url".into(), json_opt_str(artwork_url));
+
+    Value::Object(map)
+}

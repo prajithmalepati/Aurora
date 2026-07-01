@@ -96,16 +96,16 @@ fn seed_database(conn: &aurora_core::rusqlite::Connection) {
         ).unwrap();
     }
 
-    for &(id, name, color, ts, ts2) in &[
-        (1i64, "Rock Classics", "#E63946", TS_CREATE, TS_CREATE),
-        (2, "Lo-Fi Study", "#457B9D", TS_CREATE_2, TS_CREATE_2),
-        (3, "Anime", "#2A9D8F", TS_CREATE, TS_CREATE),
+    for &(id, name, color, emoji, ts, ts2) in &[
+        (1i64, "Rock Classics", "#E63946", "🎸", TS_CREATE, TS_CREATE),
+        (2, "Lo-Fi Study", "#457B9D", "📚", TS_CREATE_2, TS_CREATE_2),
+        (3, "Anime", "#2A9D8F", "🎌", TS_CREATE, TS_CREATE),
     ] {
         let (ce, cd) = if id == 2 { (Some(1i64), Some(8i64)) } else { (None, None) };
         conn.execute(
-            "INSERT INTO playlists (id, name, color, crossfade_enabled, crossfade_duration_s, created_at, updated_at) \
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-            aurora_core::rusqlite::params![id, name, color, ce, cd, ts, ts2],
+            "INSERT INTO playlists (id, name, color, emoji, image_url, crossfade_enabled, crossfade_duration_s, created_at, updated_at) \
+             VALUES (?1, ?2, ?3, ?4, NULL, ?5, ?6, ?7, ?8)",
+            aurora_core::rusqlite::params![id, name, color, emoji, ce, cd, ts, ts2],
         ).unwrap();
     }
 
@@ -365,6 +365,388 @@ async fn golden_filter() {
     // filter_quoted_fast
     let (s, b) = send(&app, post_json("/api/filter", r#"{"query":"\"fast\""}"#)).await;
     assert_eq!(s, 200); assert_body("filter_quoted_fast", &b, &load_golden("filter_quoted_fast"));
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// PLAYLISTS golden tests — cumulative mutations
+// ═══════════════════════════════════════════════════════════════════════
+
+/// Build a multipart/form-data body with a single file field.
+fn multipart_file_body(field_name: &str, filename: &str, content_type: &str, data: &[u8]) -> (String, Vec<u8>) {
+    let boundary = "----TestBoundary123456";
+    let mut body = Vec::new();
+    body.extend_from_slice(format!("--{}\r\n", boundary).as_bytes());
+    body.extend_from_slice(format!(
+        "Content-Disposition: form-data; name=\"{}\"; filename=\"{}\"\r\n",
+        field_name, filename
+    ).as_bytes());
+    body.extend_from_slice(format!("Content-Type: {}\r\n\r\n", content_type).as_bytes());
+    body.extend_from_slice(data);
+    body.extend_from_slice(b"\r\n");
+    body.extend_from_slice(format!("--{}--\r\n", boundary).as_bytes());
+    (boundary.to_string(), body)
+}
+
+/// Build a multipart body with file + text field.
+#[allow(dead_code)]
+fn multipart_file_and_text(
+    file_field: &str, filename: &str, content_type: &str, file_data: &[u8],
+    text_field: &str, text_value: &str,
+) -> (String, Vec<u8>) {
+    let boundary = "----TestBoundary123456";
+    let mut body = Vec::new();
+    // File part
+    body.extend_from_slice(format!("--{}\r\n", boundary).as_bytes());
+    body.extend_from_slice(format!(
+        "Content-Disposition: form-data; name=\"{}\"; filename=\"{}\"\r\n",
+        file_field, filename
+    ).as_bytes());
+    body.extend_from_slice(format!("Content-Type: {}\r\n\r\n", content_type).as_bytes());
+    body.extend_from_slice(file_data);
+    body.extend_from_slice(b"\r\n");
+    // Text part
+    body.extend_from_slice(format!("--{}\r\n", boundary).as_bytes());
+    body.extend_from_slice(format!(
+        "Content-Disposition: form-data; name=\"{}\"\r\n\r\n",
+        text_field
+    ).as_bytes());
+    body.extend_from_slice(text_value.as_bytes());
+    body.extend_from_slice(b"\r\n");
+    body.extend_from_slice(format!("--{}--\r\n", boundary).as_bytes());
+    (boundary.to_string(), body)
+}
+
+fn post_multipart(uri: &str, boundary: &str, body: Vec<u8>) -> Request<Body> {
+    Request::builder()
+        .method("POST")
+        .uri(uri)
+        .header("content-type", format!("multipart/form-data; boundary={}", boundary))
+        .body(Body::from(body))
+        .unwrap()
+}
+
+fn put_multipart(uri: &str, boundary: &str, body: Vec<u8>) -> Request<Body> {
+    Request::builder()
+        .method("PUT")
+        .uri(uri)
+        .header("content-type", format!("multipart/form-data; boundary={}", boundary))
+        .body(Body::from(body))
+        .unwrap()
+}
+
+/// A minimal valid 1x1 red PNG (67 bytes).
+fn minimal_png() -> Vec<u8> {
+    vec![
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // PNG signature
+        // IHDR chunk
+        0x00, 0x00, 0x00, 0x0D, // length = 13
+        0x49, 0x48, 0x44, 0x52, // "IHDR"
+        0x00, 0x00, 0x00, 0x01, // width = 1
+        0x00, 0x00, 0x00, 0x01, // height = 1
+        0x08, 0x02,             // bit depth = 8, color type = 2 (RGB)
+        0x00, 0x00, 0x00,       // compression, filter, interlace
+        0x90, 0x77, 0x53, 0xDE, // CRC
+        // IDAT chunk
+        0x00, 0x00, 0x00, 0x0C, // length = 12
+        0x49, 0x44, 0x41, 0x54, // "IDAT"
+        0x08, 0xD7, 0x63, 0xF8, 0xCF, 0xC0, 0x00, 0x00,
+        0x01, 0x01, 0x01, 0x00, // compressed data
+        0x18, 0xDD, 0x8D, 0xB4, // CRC
+        // IEND chunk
+        0x00, 0x00, 0x00, 0x00, // length = 0
+        0x49, 0x45, 0x4E, 0x44, // "IEND"
+        0xAE, 0x42, 0x60, 0x82, // CRC
+    ]
+}
+
+// Strip created_at/updated_at from playlist list items (they change with mutations)
+fn strip_playlist_list_ts(mut body: Value) -> Value {
+    if let Some(arr) = body.get_mut("data").and_then(|d| d.as_array_mut()) {
+        for item in arr.iter_mut() {
+            if let Some(obj) = item.as_object_mut() {
+                obj.remove("created_at");
+                obj.remove("updated_at");
+            }
+        }
+    }
+    body
+}
+
+// Strip created_at/updated_at from playlist detail (but not from songs — those are "")
+fn strip_playlist_detail_ts(mut body: Value) -> Value {
+    if let Some(obj) = body.get_mut("data").and_then(|d| d.as_object_mut()) {
+        obj.remove("created_at");
+        obj.remove("updated_at");
+    }
+    body
+}
+
+#[tokio::test]
+async fn golden_playlists() {
+    // Set temp dir for playlist images
+    let tmp = tempfile::tempdir().unwrap();
+    // SAFETY: single-threaded test, no concurrent env access
+    unsafe { std::env::set_var("AURORA_PLAYLIST_IMAGES_DIR", tmp.path().to_str().unwrap()); }
+
+    let (app, _state) = build_test_app();
+
+    // ── list (initial: 3 playlists, alphabetical: Anime, Lo-Fi Study, Rock Classics) ──
+    let (s, b) = send(&app, get("/api/playlists")).await;
+    assert_eq!(s, 200);
+    // Strip timestamps since they vary
+    let golden = load_golden("playlists_list");
+    assert_eq!(
+        serde_json::to_string_pretty(&strip_playlist_list_ts(b)).unwrap(),
+        serde_json::to_string_pretty(&strip_playlist_list_ts(golden)).unwrap(),
+        "playlists_list mismatch"
+    );
+
+    // ── get_1, get_2, get_3 ──
+    for id in [1, 2, 3] {
+        let (s, b) = send(&app, get(&format!("/api/playlists/{}", id))).await;
+        assert_eq!(s, 200);
+        let golden = load_golden(&format!("playlists_get_{}", id));
+        assert_eq!(
+            serde_json::to_string_pretty(&strip_playlist_detail_ts(b)).unwrap(),
+            serde_json::to_string_pretty(&strip_playlist_detail_ts(golden)).unwrap(),
+            "playlists_get_{} mismatch", id
+        );
+    }
+
+    // ── get_404 ──
+    let (s, b) = send(&app, get("/api/playlists/999")).await;
+    assert_eq!(s, 404);
+    assert_body("playlists_get_404", &b, &load_golden("playlists_get_404"));
+
+    // ── create_happy (creates playlist 4) ──
+    let (s, b) = send(&app, post_json("/api/playlists",
+        r##"{"name":"Golden Test Create","color":"#FF5500","emoji":"🧪"}"##)).await;
+    assert_eq!(s, 201);
+    // Strip timestamps from response
+    let mut b_stripped = b.clone();
+    if let Some(obj) = b_stripped.get_mut("data").and_then(|d| d.as_object_mut()) {
+        obj.remove("created_at");
+        obj.remove("updated_at");
+    }
+    let mut golden = load_golden("playlists_create_happy");
+    if let Some(obj) = golden.get_mut("data").and_then(|d| d.as_object_mut()) {
+        obj.remove("created_at");
+        obj.remove("updated_at");
+    }
+    assert_body("playlists_create_happy (no ts)", &b_stripped, &golden);
+
+    // ── create_400 (empty name) ──
+    let (s, b) = send(&app, post_json("/api/playlists", r#"{"name":""}"#)).await;
+    assert_eq!(s, 400);
+    assert_body("playlists_create_400", &b, &load_golden("playlists_create_400"));
+
+    // ── create_409 (duplicate name) ──
+    let (s, b) = send(&app, post_json("/api/playlists",
+        r##"{"name":"Rock Classics","color":"#000"}"##)).await;
+    assert_eq!(s, 409);
+    assert_body("playlists_create_409", &b, &load_golden("playlists_create_409"));
+
+    // ── update_happy (updates playlist 1) ──
+    let (s, b) = send(&app, put_json("/api/playlists/1",
+        r##"{"name":"Rock Classics Updated","color":"#111111","emoji":"🎵"}"##)).await;
+    assert_eq!(s, 200);
+    let b_stripped = strip_playlist_detail_ts(b);
+    let golden = strip_playlist_detail_ts(load_golden("playlists_update_happy"));
+    assert_body("playlists_update_happy (no ts)", &b_stripped, &golden);
+
+    // ── update_crossfade (updates playlist 1 with crossfade) ──
+    let (s, b) = send(&app, put_json("/api/playlists/1",
+        r#"{"crossfade_enabled":1,"crossfade_duration_s":12}"#)).await;
+    assert_eq!(s, 200);
+    let b_stripped = strip_playlist_detail_ts(b);
+    let golden = strip_playlist_detail_ts(load_golden("playlists_update_crossfade"));
+    assert_body("playlists_update_crossfade (no ts)", &b_stripped, &golden);
+
+    // ── update_404 ──
+    let (s, b) = send(&app, put_json("/api/playlists/999", r#"{"name":"Nope"}"#)).await;
+    assert_eq!(s, 404);
+    assert_body("playlists_update_404", &b, &load_golden("playlists_update_404"));
+
+    // ── add_song_happy (add song 1 to playlist 2) ──
+    let (s, b) = send(&app, post_json("/api/playlists/2/songs", r#"{"song_id":1}"#)).await;
+    assert_eq!(s, 200);
+    let b_stripped = strip_playlist_detail_ts(b);
+    let golden = strip_playlist_detail_ts(load_golden("playlists_add_song_happy"));
+    assert_body("playlists_add_song_happy (no ts)", &b_stripped, &golden);
+
+    // ── add_song_409 (song 1 already in playlist 2) ──
+    let (s, b) = send(&app, post_json("/api/playlists/2/songs", r#"{"song_id":1}"#)).await;
+    assert_eq!(s, 409);
+    assert_body("playlists_add_song_409", &b, &load_golden("playlists_add_song_409"));
+
+    // ── add_song_404_playlist ──
+    let (s, b) = send(&app, post_json("/api/playlists/999/songs", r#"{"song_id":1}"#)).await;
+    assert_eq!(s, 404);
+    assert_body("playlists_add_song_404_playlist", &b, &load_golden("playlists_add_song_404_playlist"));
+
+    // ── add_song_404_song ──
+    let (s, b) = send(&app, post_json("/api/playlists/1/songs", r#"{"song_id":999}"#)).await;
+    assert_eq!(s, 404);
+    assert_body("playlists_add_song_404_song", &b, &load_golden("playlists_add_song_404_song"));
+
+    // ── remove_song_happy (remove song 1 from playlist 2) ──
+    let (s, b) = send(&app, delete("/api/playlists/2/songs/1")).await;
+    assert_eq!(s, 200);
+    let b_stripped = strip_playlist_detail_ts(b);
+    let golden = strip_playlist_detail_ts(load_golden("playlists_remove_song_happy"));
+    assert_body("playlists_remove_song_happy (no ts)", &b_stripped, &golden);
+
+    // ── remove_song_404_playlist ──
+    let (s, b) = send(&app, delete("/api/playlists/999/songs/1")).await;
+    assert_eq!(s, 404);
+    assert_body("playlists_remove_song_404_playlist", &b, &load_golden("playlists_remove_song_404_playlist"));
+
+    // ── remove_song_404_song ──
+    let (s, b) = send(&app, delete("/api/playlists/1/songs/999")).await;
+    assert_eq!(s, 404);
+    assert_body("playlists_remove_song_404_song", &b, &load_golden("playlists_remove_song_404_song"));
+
+    // ── remove_song_404_not_in_playlist ──
+    let (s, b) = send(&app, delete("/api/playlists/1/songs/2")).await;
+    assert_eq!(s, 404);
+    assert_body("playlists_remove_song_404_not_in_playlist", &b, &load_golden("playlists_remove_song_404_not_in_playlist"));
+
+    // ── timing_happy (set timing on playlist 1, song 1) ──
+    let (s, b) = send(&app, Request::builder().method("PATCH").uri("/api/playlists/1/songs/1/timing")
+        .header("content-type", "application/json")
+        .body(Body::from(r#"{"start_time_ms":1000,"end_time_ms":300000}"#.to_string())).unwrap()).await;
+    assert_eq!(s, 200);
+    assert_body("playlists_timing_happy", &b, &load_golden("playlists_timing_happy"));
+
+    // ── timing_404 (song not in playlist) ──
+    let (s, b) = send(&app, Request::builder().method("PATCH").uri("/api/playlists/1/songs/2/timing")
+        .header("content-type", "application/json")
+        .body(Body::from(r#"{"start_time_ms":0,"end_time_ms":0}"#.to_string())).unwrap()).await;
+    assert_eq!(s, 404);
+    assert_body("playlists_timing_404", &b, &load_golden("playlists_timing_404"));
+
+    // ── timing_422 (invalid timing) ──
+    let (s, b) = send(&app, Request::builder().method("PATCH").uri("/api/playlists/1/songs/1/timing")
+        .header("content-type", "application/json")
+        .body(Body::from(r#"{"start_time_ms":5000,"end_time_ms":1000}"#.to_string())).unwrap()).await;
+    assert_eq!(s, 422);
+    assert_body("playlists_timing_422", &b, &load_golden("playlists_timing_422"));
+
+    // ── Setup for reorder: add songs 2,1 to playlist 3 (which has song 3 at pos 0) ──
+    let (s, _) = send(&app, post_json("/api/playlists/3/songs", r#"{"song_id":2}"#)).await;
+    assert_eq!(s, 200);
+    let (s, _) = send(&app, post_json("/api/playlists/3/songs", r#"{"song_id":1}"#)).await;
+    assert_eq!(s, 200);
+    // Now playlist 3 has: pos0=song3, pos1=song2, pos2=song1
+
+    // ── reorder_happy (reorder to: song2, song3, song1) ──
+    let (s, b) = send(&app, put_json("/api/playlists/3/songs/reorder",
+        r#"{"song_ids":[2,3,1]}"#)).await;
+    assert_eq!(s, 200);
+    let b_stripped = strip_playlist_detail_ts(b);
+    let golden = strip_playlist_detail_ts(load_golden("playlists_reorder_happy"));
+    assert_body("playlists_reorder_happy (no ts)", &b_stripped, &golden);
+
+    // ── reorder_400 (id set mismatch) ──
+    let (s, b) = send(&app, put_json("/api/playlists/3/songs/reorder",
+        r#"{"song_ids":[1,2]}"#)).await;
+    assert_eq!(s, 400);
+    assert_body("playlists_reorder_400", &b, &load_golden("playlists_reorder_400"));
+
+    // ── reorder_404 ──
+    let (s, b) = send(&app, put_json("/api/playlists/999/songs/reorder",
+        r#"{"song_ids":[1]}"#)).await;
+    assert_eq!(s, 404);
+    assert_body("playlists_reorder_404", &b, &load_golden("playlists_reorder_404"));
+
+    // ── upload_image_happy ──
+    let png = minimal_png();
+    let (boundary, body) = multipart_file_body("file", "cover.png", "image/png", &png);
+    let (s, b) = send(&app, put_multipart("/api/playlists/1/image", &boundary, body)).await;
+    assert_eq!(s, 200);
+    assert_body("playlists_upload_image_happy", &b, &load_golden("playlists_upload_image_happy"));
+
+    // ── serve_image_404 ──
+    let (s, b) = send(&app, get("/api/playlist-images/nonexistent.png")).await;
+    assert_eq!(s, 404);
+    assert_body("playlists_serve_image_404", &b, &load_golden("playlists_serve_image_404"));
+
+    // ── upload_image_400 (not an image) ──
+    let (boundary, body) = multipart_file_body("file", "test.txt", "text/plain", b"hello");
+    let (s, b) = send(&app, put_multipart("/api/playlists/1/image", &boundary, body)).await;
+    assert_eq!(s, 400);
+    assert_body("playlists_upload_image_400", &b, &load_golden("playlists_upload_image_400"));
+
+    // ── upload_image_404 ──
+    let (boundary, body) = multipart_file_body("file", "cover.png", "image/png", &png);
+    let (s, b) = send(&app, put_multipart("/api/playlists/999/image", &boundary, body)).await;
+    assert_eq!(s, 404);
+    assert_body("playlists_upload_image_404", &b, &load_golden("playlists_upload_image_404"));
+
+    // ── delete_image_happy ──
+    let (s, b) = send(&app, delete("/api/playlists/1/image")).await;
+    assert_eq!(s, 200);
+    assert_body("playlists_delete_image_happy", &b, &load_golden("playlists_delete_image_happy"));
+
+    // ── Create and delete a dummy playlist to match Python's autoincrement counter ──
+    // Python's delete test creates "To Be Deleted" (id 5), then deletes it.
+    // We do this before export/import so import gets id 6.
+    let (s, _) = send(&app, post_json("/api/playlists",
+        r##"{"name":"To Be Deleted"}"##)).await;
+    assert_eq!(s, 201);
+    // Now delete it — this is our "delete_happy" test
+    let (s, b) = send(&app, delete("/api/playlists/5")).await;
+    assert_eq!(s, 200);
+    assert_body("playlists_delete_happy", &b, &load_golden("playlists_delete_happy"));
+
+    // ── delete_image_404 ──
+    let (s, b) = send(&app, delete("/api/playlists/999/image")).await;
+    assert_eq!(s, 404);
+    assert_body("playlists_delete_image_404", &b, &load_golden("playlists_delete_image_404"));
+
+    // ── export_json (playlist 2 = Lo-Fi Study) ──
+    let (s, b) = send(&app, get("/api/playlists/2/export?format=json")).await;
+    assert_eq!(s, 200);
+    assert_body("playlists_export_json", &b, &load_golden("playlists_export_json"));
+
+    // ── export_m3u8 (playlist 1 = Rock Classics Updated, has song 1) ──
+    let (s, b) = send(&app, get("/api/playlists/1/export?format=m3u8")).await;
+    assert_eq!(s, 200);
+    assert_body("playlists_export_m3u8", &b, &load_golden("playlists_export_m3u8"));
+
+    // ── export_404 ──
+    let (s, b) = send(&app, get("/api/playlists/999/export?format=json")).await;
+    assert_eq!(s, 404);
+    assert_body("playlists_export_404", &b, &load_golden("playlists_export_404"));
+
+    // ── import_json_happy ──
+    let import_json = serde_json::json!({
+        "playlist": {
+            "name": "Imported Golden Playlist",
+            "color": "#FF0000",
+            "emoji": "📥"
+        },
+        "songs": [
+            {"title": "Highway Star", "artist": "Deep Purple", "file_path": "/music/rock/Deep Purple - Highway Star.mp3"},
+            {"title": "Unravel", "artist": "TK", "file_path": "/music/anime/TK - Unravel.mp3"}
+        ]
+    });
+    let json_bytes = serde_json::to_vec(&import_json).unwrap();
+    let (boundary, body) = multipart_file_body("file", "playlist.json", "application/json", &json_bytes);
+    let (s, b) = send(&app, post_multipart("/api/playlists/import", &boundary, body)).await;
+    assert_eq!(s, 200);
+    assert_body("playlists_import_json_happy", &b, &load_golden("playlists_import_json_happy"));
+
+    // ── import_400 (invalid JSON) ──
+    let (boundary, body) = multipart_file_body("file", "bad.json", "application/json", b"not json");
+    let (s, b) = send(&app, post_multipart("/api/playlists/import", &boundary, body)).await;
+    assert_eq!(s, 400);
+    assert_body("playlists_import_400", &b, &load_golden("playlists_import_400"));
+
+    // ── delete_404 ──
+    let (s, b) = send(&app, delete("/api/playlists/999")).await;
+    assert_eq!(s, 404);
+    assert_body("playlists_delete_404", &b, &load_golden("playlists_delete_404"));
 }
 
 // ═══════════════════════════════════════════════════════════════════════

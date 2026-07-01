@@ -55,5 +55,49 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
             axum::routing::delete(routes::remove_tag),
         )
         .route("/api/filter", axum::routing::post(routes::filter_endpoint))
+        // ── Playlist routes ──
+        .route(
+            "/api/playlists",
+            axum::routing::get(routes::list_playlists).post(routes::create_playlist),
+        )
+        .route(
+            "/api/playlists/import",
+            axum::routing::post(routes::import_playlist),
+        )
+        .route(
+            "/api/playlists/{playlist_id}",
+            axum::routing::get(routes::get_playlist)
+                .put(routes::update_playlist)
+                .delete(routes::delete_playlist),
+        )
+        .route(
+            "/api/playlists/{playlist_id}/songs",
+            axum::routing::post(routes::add_song_to_playlist),
+        )
+        .route(
+            "/api/playlists/{playlist_id}/songs/reorder",
+            axum::routing::put(routes::reorder_playlist_songs),
+        )
+        .route(
+            "/api/playlists/{playlist_id}/songs/{song_id}",
+            axum::routing::delete(routes::remove_song_from_playlist),
+        )
+        .route(
+            "/api/playlists/{playlist_id}/songs/{song_id}/timing",
+            axum::routing::patch(routes::update_song_timing),
+        )
+        .route(
+            "/api/playlists/{playlist_id}/image",
+            axum::routing::put(routes::upload_playlist_image)
+                .delete(routes::delete_playlist_image),
+        )
+        .route(
+            "/api/playlists/{playlist_id}/export",
+            axum::routing::get(routes::export_playlist),
+        )
+        .route(
+            "/api/playlist-images/{filename}",
+            axum::routing::get(routes::serve_playlist_image),
+        )
         .with_state(state)
 }
