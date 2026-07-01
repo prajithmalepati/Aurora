@@ -139,8 +139,9 @@ fn tokenize(processed: &str) -> Result<Vec<Token>, FilterError> {
 /// Extract quoted strings, replace with QTAG placeholders, normalize
 /// word operators to symbols.
 ///
-/// Returns `(processed_string, quoted_tags_map)`.
-fn preprocess(query: &str) -> (String, HashMap<String, String>) {
+/// Returns `Ok((processed_string, quoted_tags_map))` on success.
+/// Returns `Err(FilterError::SyntaxError)` if an unterminated quote is found.
+fn preprocess(query: &str) -> Result<(String, HashMap<String, String>), FilterError> {
     let mut quoted_tags: HashMap<String, String> = HashMap::new();
     let mut placeholder_counter: usize = 0;
     let mut result = String::with_capacity(query.len());
@@ -155,10 +156,14 @@ fn preprocess(query: &str) -> (String, HashMap<String, String>) {
             while i < bytes.len() && bytes[i] != quote {
                 i += 1;
             }
-            let inner = query[start..i].trim().to_lowercase();
-            if i < bytes.len() {
-                i += 1; // skip closing quote
+            if i >= bytes.len() {
+                return Err(FilterError::SyntaxError(format!(
+                    "Unterminated quote: expected closing '{}'",
+                    quote as char
+                )));
             }
+            let inner = query[start..i].trim().to_lowercase();
+            i += 1; // skip closing quote
             let placeholder = format!("QTAG{}", placeholder_counter);
             quoted_tags.insert(placeholder.clone(), inner);
             result.push_str(&placeholder);
@@ -171,7 +176,7 @@ fn preprocess(query: &str) -> (String, HashMap<String, String>) {
 
     // Normalize word operators (case-insensitive, word-boundary)
     let processed = normalize_word_operators(&result);
-    (processed, quoted_tags)
+    Ok((processed, quoted_tags))
 }
 
 /// Replace AND/OR/NOT word operators with `&`/`|`/`~`, respecting word boundaries.
@@ -343,7 +348,7 @@ pub fn parse(query: &str) -> Result<(Expr, HashMap<String, String>), FilterError
     }
 
     // Preprocess: extract quotes, normalize operators
-    let (processed, quoted_tags) = preprocess(query);
+    let (processed, quoted_tags) = preprocess(query)?;
 
     // Tokenize
     let tokens = tokenize(&processed)?;
@@ -709,5 +714,41 @@ mod tests {
         // NOT (gym AND anime) should match {gym} (has gym but not both)
         assert!(matches("NOT (\"gym\" AND \"anime\")", &["gym"]));
         assert!(!matches("NOT (\"gym\" AND \"anime\")", &["gym", "anime"]));
+    }
+
+    // ── Unterminated quotes — N32 parity guards ─────────────────────────────
+
+    #[test]
+    fn test_unterminated_double_quote_errors() {
+        // An unclosed double quote must be rejected (not silently accepted)
+        assert!(matches!(
+            parse_err("\"fast"),
+            FilterError::SyntaxError(_)
+        ));
+    }
+
+    #[test]
+    fn test_unterminated_single_quote_errors() {
+        // An unclosed single quote must be rejected
+        assert!(matches!(
+            parse_err("'chill"),
+            FilterError::SyntaxError(_)
+        ));
+    }
+
+    #[test]
+    fn test_unterminated_quote_with_and_errors() {
+        // Unclosed quote in compound query must be rejected
+        assert!(matches!(
+            parse_err("rock AND \"fast"),
+            FilterError::SyntaxError(_)
+        ));
+    }
+
+    #[test]
+    fn test_valid_closed_quotes_still_work() {
+        // Closed quotes must still parse correctly (no regression)
+        assert!(matches("\"multi word tag\"", &["multi word tag"]));
+        assert!(matches("'chill'", &["chill"]));
     }
 }

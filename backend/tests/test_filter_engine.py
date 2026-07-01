@@ -228,3 +228,29 @@ def test_bare_not_and_group():
     add_song(conn, "Both", ["gym", "anime"])
     result = filter_songs(conn, 'NOT ("gym" AND "anime")')
     assert titles(result) == ["Gym Song"]
+
+
+# ── Unterminated quotes — N32 parity guards ─────────────────────────────────
+
+def test_unterminated_double_quote_raises():
+    """An unclosed double quote must be rejected (not silently accepted)."""
+    conn = make_db()
+    add_song(conn, "Song A", ["fast"])
+    with pytest.raises(ValueError):
+        filter_songs(conn, '"fast')
+
+
+def test_unterminated_single_quote_raises():
+    """An unclosed single quote must be rejected."""
+    conn = make_db()
+    add_song(conn, "Song A", ["chill"])
+    with pytest.raises(ValueError):
+        filter_songs(conn, "'chill")
+
+
+def test_unterminated_quote_with_and_raises():
+    """Unclosed quote in compound query must be rejected."""
+    conn = make_db()
+    add_song(conn, "Song A", ["rock", "fast"])
+    with pytest.raises(ValueError):
+        filter_songs(conn, 'rock AND "fast')
