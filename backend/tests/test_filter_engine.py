@@ -254,3 +254,29 @@ def test_unterminated_quote_with_and_raises():
     add_song(conn, "Song A", ["rock", "fast"])
     with pytest.raises(ValueError):
         filter_songs(conn, 'rock AND "fast')
+
+
+# ── Empty quotes — N32-FIX parity guards ───────────────────────────────────
+
+def test_empty_double_quote_raises():
+    """Zero-length inner span: "" must be rejected (Python parity)."""
+    conn = make_db()
+    add_song(conn, "Song A", ["rock"])
+    with pytest.raises(ValueError):
+        filter_songs(conn, '""')
+
+
+def test_empty_single_quote_raises():
+    """Zero-length inner span: '' must be rejected (Python parity)."""
+    conn = make_db()
+    add_song(conn, "Song A", ["rock"])
+    with pytest.raises(ValueError):
+        filter_songs(conn, "''")
+
+
+def test_whitespace_only_quoted_ok():
+    """Whitespace-only inner (≥1 raw char) must NOT be rejected — no over-reject."""
+    conn = make_db()
+    add_song(conn, "Song A", [""])
+    # Should not raise — whitespace-only is ≥1 raw char
+    filter_songs(conn, '"   "')

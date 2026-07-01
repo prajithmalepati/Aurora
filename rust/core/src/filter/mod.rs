@@ -162,6 +162,11 @@ fn preprocess(query: &str) -> Result<(String, HashMap<String, String>), FilterEr
                     quote as char
                 )));
             }
+            if i == start {
+                return Err(FilterError::SyntaxError(
+                    "Empty quoted string".to_string(),
+                ));
+            }
             let inner = query[start..i].trim().to_lowercase();
             i += 1; // skip closing quote
             let placeholder = format!("QTAG{}", placeholder_counter);
@@ -750,5 +755,32 @@ mod tests {
         // Closed quotes must still parse correctly (no regression)
         assert!(matches("\"multi word tag\"", &["multi word tag"]));
         assert!(matches("'chill'", &["chill"]));
+    }
+
+    // ── Empty quotes — N32-FIX parity guards ─────────────────────────────────
+
+    #[test]
+    fn test_empty_double_quote_errors() {
+        // Zero-length inner span: "" must be rejected (Python parity)
+        assert!(matches!(
+            parse_err("\"\""),
+            FilterError::SyntaxError(_)
+        ));
+    }
+
+    #[test]
+    fn test_empty_single_quote_errors() {
+        // Zero-length inner span: '' must be rejected (Python parity)
+        assert!(matches!(
+            parse_err("''"),
+            FilterError::SyntaxError(_)
+        ));
+    }
+
+    #[test]
+    fn test_whitespace_only_quoted_still_ok() {
+        // Whitespace-only inner (≥1 raw char) must still parse — no over-reject
+        assert!(matches("\"   \"", &[""]));
+        assert!(matches("\" \"", &[""]));
     }
 }
