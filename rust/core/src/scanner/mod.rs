@@ -1,7 +1,11 @@
 //! File scanner — metadata extraction ported from Python `file_scanner.py`.
 //!
-//! This is the **metadata half** (tags, format, ReplayGain, artist parsing).
-//! The analysis half (peaks, colors, bleed) is deferred to N31.
+//! Metadata half: tags, format, ReplayGain, artist parsing (N30).
+//! Analysis half: peaks, colors, bleed (N31).
+
+pub mod analysis;
+pub mod color_utils;
+pub mod peaks;
 
 use regex::Regex;
 use std::path::Path;
@@ -11,10 +15,12 @@ use std::sync::LazyLock;
 // Data types
 // ---------------------------------------------------------------------------
 
-/// The in-scope metadata fields extracted from an audio file.
-/// Analysis fields (peaks, colors, bleed) are absent — filled in N31.
+/// The metadata fields extracted from an audio file.
+/// N30: tags, format, ReplayGain, artist parsing.
+/// N31: peaks, dominant colors, bleed thumb.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ScannedMetadata {
+    // --- N30 metadata fields ---
     pub title: String,
     pub artist: String,
     pub album: Option<String>,
@@ -33,6 +39,15 @@ pub struct ScannedMetadata {
     pub replaygain_album_gain: Option<f64>,
     pub replaygain_album_peak: Option<f64>,
     pub album_art_bytes: Option<Vec<u8>>,
+    // --- N31 analysis fields ---
+    pub waveform_peaks: Option<Vec<f32>>,
+    pub dominant_color: Option<String>,
+    pub dominant_color_2: Option<String>,
+    pub bleed_thumb: Option<Vec<u8>>,
+    pub bleed_region_x: i64,
+    pub bleed_region_y: i64,
+    pub bleed_region_w: i64,
+    pub bleed_region_h: i64,
 }
 
 // ---------------------------------------------------------------------------
@@ -321,6 +336,28 @@ pub fn extract_metadata(file_path: &str) -> Option<ScannedMetadata> {
     // Album art bytes
     let album_art_bytes = tag.and_then(|t| t.pictures().first().map(|pic| pic.data().to_vec()));
 
+    // --- N31 analysis fields ---
+
+    // Waveform peaks (from file path, independent of art)
+    let waveform_peaks = peaks::extract_peaks(file_path, 1000);
+
+    // Dominant colors + bleed from album art
+    let (
+        dominant_color,
+        dominant_color_2,
+        bleed_thumb,
+        bleed_region_x,
+        bleed_region_y,
+        bleed_region_w,
+        bleed_region_h,
+    ) = if let Some(ref art) = album_art_bytes {
+        let (c1, c2) = analysis::extract_dominant_colors(art);
+        let (thumb, bx, by, bw, bh) = analysis::extract_bright_region(art);
+        (c1, c2, thumb, bx, by, bw, bh)
+    } else {
+        (None, None, None, 0, 0, 0, 0)
+    };
+
     Some(ScannedMetadata {
         title: title.trim().to_string(),
         artist: artist.trim().to_string(),
@@ -340,6 +377,15 @@ pub fn extract_metadata(file_path: &str) -> Option<ScannedMetadata> {
         replaygain_album_gain: rg_album_gain,
         replaygain_album_peak: rg_album_peak,
         album_art_bytes,
+        // N31 analysis fields
+        waveform_peaks,
+        dominant_color,
+        dominant_color_2,
+        bleed_thumb,
+        bleed_region_x,
+        bleed_region_y,
+        bleed_region_w,
+        bleed_region_h,
     })
 }
 
