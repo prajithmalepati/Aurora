@@ -23,15 +23,27 @@ fn load_reference() -> serde_json::Value {
 #[test]
 fn test_parity_mp3() {
     let path = fixtures_dir().join("test_song.mp3");
-    let meta = extract_metadata(path.to_str().unwrap())
-        .expect("Rust scanner returned None for MP3");
+    let meta =
+        extract_metadata(path.to_str().unwrap()).expect("Rust scanner returned None for MP3");
     let ref_data = load_reference();
     let py = &ref_data["test_song.mp3"];
 
     assert_eq!(meta.title, py["title"].as_str().unwrap(), "title mismatch");
-    assert_eq!(meta.artist, py["artist"].as_str().unwrap(), "artist mismatch");
-    assert_eq!(meta.album.as_deref(), py["album"].as_str(), "album mismatch");
-    assert_eq!(meta.file_format, py["file_format"].as_str().unwrap(), "format mismatch");
+    assert_eq!(
+        meta.artist,
+        py["artist"].as_str().unwrap(),
+        "artist mismatch"
+    );
+    assert_eq!(
+        meta.album.as_deref(),
+        py["album"].as_str(),
+        "album mismatch"
+    );
+    assert_eq!(
+        meta.file_format,
+        py["file_format"].as_str().unwrap(),
+        "format mismatch"
+    );
 
     // Artists list
     let py_artists: Vec<String> = py["artists"]
@@ -84,8 +96,8 @@ fn test_parity_mp3() {
 #[test]
 fn test_parity_flac() {
     let path = fixtures_dir().join("test_song.flac");
-    let meta = extract_metadata(path.to_str().unwrap())
-        .expect("Rust scanner returned None for FLAC");
+    let meta =
+        extract_metadata(path.to_str().unwrap()).expect("Rust scanner returned None for FLAC");
     let ref_data = load_reference();
     let py = &ref_data["test_song.flac"];
 
@@ -120,8 +132,8 @@ fn test_parity_flac() {
 #[test]
 fn test_parity_ogg() {
     let path = fixtures_dir().join("test_song.ogg");
-    let meta = extract_metadata(path.to_str().unwrap())
-        .expect("Rust scanner returned None for OGG");
+    let meta =
+        extract_metadata(path.to_str().unwrap()).expect("Rust scanner returned None for OGG");
     let ref_data = load_reference();
     let py = &ref_data["test_song.ogg"];
 
@@ -170,8 +182,8 @@ fn test_parity_ogg() {
 #[test]
 fn test_parity_m4a() {
     let path = fixtures_dir().join("test_song.m4a");
-    let meta = extract_metadata(path.to_str().unwrap())
-        .expect("Rust scanner returned None for M4A");
+    let meta =
+        extract_metadata(path.to_str().unwrap()).expect("Rust scanner returned None for M4A");
     let ref_data = load_reference();
     let py = &ref_data["test_song.m4a"];
 
@@ -192,7 +204,10 @@ fn test_parity_m4a() {
 #[test]
 fn test_unreadable_file_returns_none() {
     let result = extract_metadata("/nonexistent/path/fake.mp3");
-    assert!(result.is_none(), "Unreadable file should return None, not panic");
+    assert!(
+        result.is_none(),
+        "Unreadable file should return None, not panic"
+    );
 }
 
 #[test]
@@ -213,4 +228,189 @@ fn test_format_tier_values() {
     assert_eq!(format_tier("ape"), 1);
     assert_eq!(format_tier("wv"), 1);
     assert_eq!(format_tier("xyz"), 0);
+}
+
+// ===========================================================================
+// N31 analysis field parity — structural checks
+// ===========================================================================
+
+/// Helper: assert peaks are None or exactly 1000 bins in [0,1].
+fn assert_peaks_structural(peaks: &Option<Vec<f32>>, label: &str) {
+    match peaks {
+        None => {} // acceptable — bad/empty/unreadable audio
+        Some(p) => {
+            assert_eq!(
+                p.len(),
+                1000,
+                "{}: expected 1000 bins, got {}",
+                label,
+                p.len()
+            );
+            for (i, v) in p.iter().enumerate() {
+                assert!(
+                    (0.0..=1.0).contains(v),
+                    "{}: bin {} out of range: {}",
+                    label,
+                    i,
+                    v
+                );
+            }
+        }
+    }
+}
+
+/// Helper: assert dominant color is None or a valid oklch() string.
+fn assert_color_structural(color: &Option<String>, label: &str) {
+    match color {
+        None => {} // no art or decode failure
+        Some(s) => {
+            assert!(
+                s.starts_with("oklch(") && s.ends_with(')'),
+                "{}: invalid oklch format: {}",
+                label,
+                s
+            );
+        }
+    }
+}
+
+/// Helper: assert bleed is None or a valid PNG with in-bounds coords.
+fn assert_bleed_structural(thumb: &Option<Vec<u8>>, x: i64, y: i64, w: i64, h: i64, label: &str) {
+    match thumb {
+        None => {
+            assert_eq!(
+                (x, y, w, h),
+                (0, 0, 0, 0),
+                "{}: no thumb but non-zero coords",
+                label
+            );
+        }
+        Some(png) => {
+            assert!(
+                png.starts_with(b"\x89PNG"),
+                "{}: bleed thumb not valid PNG",
+                label
+            );
+            assert!(x >= 0 && y >= 0, "{}: negative coords", label);
+            assert!(w > 0 && h > 0, "{}: zero dimensions", label);
+        }
+    }
+}
+
+/// Structural parity: MP3 analysis fields
+#[test]
+fn test_parity_mp3_analysis() {
+    let path = fixtures_dir().join("test_song.mp3");
+    let meta =
+        extract_metadata(path.to_str().unwrap()).expect("Rust scanner returned None for MP3");
+
+    assert_peaks_structural(&meta.waveform_peaks, "MP3 peaks");
+    assert_color_structural(&meta.dominant_color, "MP3 color1");
+    assert_color_structural(&meta.dominant_color_2, "MP3 color2");
+    assert_bleed_structural(
+        &meta.bleed_thumb,
+        meta.bleed_region_x,
+        meta.bleed_region_y,
+        meta.bleed_region_w,
+        meta.bleed_region_h,
+        "MP3 bleed",
+    );
+
+    // If art exists AND is a valid image, colors and bleed should be populated.
+    // Test fixture art may be corrupt/tiny — that's fine, None is correct.
+    if let Some(ref art) = meta.album_art_bytes {
+        if image::load_from_memory(art).is_ok() {
+            assert!(
+                meta.dominant_color.is_some(),
+                "MP3 has valid art but no dominant_color"
+            );
+            assert!(
+                meta.dominant_color_2.is_some(),
+                "MP3 has valid art but no dominant_color_2"
+            );
+            assert!(
+                meta.bleed_thumb.is_some(),
+                "MP3 has valid art but no bleed_thumb"
+            );
+        }
+    }
+}
+
+/// Structural parity: FLAC analysis fields
+#[test]
+fn test_parity_flac_analysis() {
+    let path = fixtures_dir().join("test_song.flac");
+    let meta =
+        extract_metadata(path.to_str().unwrap()).expect("Rust scanner returned None for FLAC");
+
+    assert_peaks_structural(&meta.waveform_peaks, "FLAC peaks");
+    assert_color_structural(&meta.dominant_color, "FLAC color1");
+    assert_color_structural(&meta.dominant_color_2, "FLAC color2");
+    assert_bleed_structural(
+        &meta.bleed_thumb,
+        meta.bleed_region_x,
+        meta.bleed_region_y,
+        meta.bleed_region_w,
+        meta.bleed_region_h,
+        "FLAC bleed",
+    );
+}
+
+/// Structural parity: OGG analysis fields
+#[test]
+fn test_parity_ogg_analysis() {
+    let path = fixtures_dir().join("test_song.ogg");
+    let meta =
+        extract_metadata(path.to_str().unwrap()).expect("Rust scanner returned None for OGG");
+
+    assert_peaks_structural(&meta.waveform_peaks, "OGG peaks");
+    assert_color_structural(&meta.dominant_color, "OGG color1");
+    assert_color_structural(&meta.dominant_color_2, "OGG color2");
+    assert_bleed_structural(
+        &meta.bleed_thumb,
+        meta.bleed_region_x,
+        meta.bleed_region_y,
+        meta.bleed_region_w,
+        meta.bleed_region_h,
+        "OGG bleed",
+    );
+}
+
+/// Structural parity: M4A analysis fields
+#[test]
+fn test_parity_m4a_analysis() {
+    let path = fixtures_dir().join("test_song.m4a");
+    let meta =
+        extract_metadata(path.to_str().unwrap()).expect("Rust scanner returned None for M4A");
+
+    assert_peaks_structural(&meta.waveform_peaks, "M4A peaks");
+    assert_color_structural(&meta.dominant_color, "M4A color1");
+    assert_color_structural(&meta.dominant_color_2, "M4A color2");
+    assert_bleed_structural(
+        &meta.bleed_thumb,
+        meta.bleed_region_x,
+        meta.bleed_region_y,
+        meta.bleed_region_w,
+        meta.bleed_region_h,
+        "M4A bleed",
+    );
+}
+
+/// N30 metadata fields are still green after N31 changes
+#[test]
+fn test_parity_n30_still_green() {
+    // Re-run the MP3 N30 check — analysis fields added, metadata unchanged
+    let path = fixtures_dir().join("test_song.mp3");
+    let meta = extract_metadata(path.to_str().unwrap()).expect("Rust scanner returned None");
+    let ref_data = load_reference();
+    let py = &ref_data["test_song.mp3"];
+
+    assert_eq!(meta.title, py["title"].as_str().unwrap());
+    assert_eq!(meta.artist, py["artist"].as_str().unwrap());
+    assert_eq!(meta.file_format, py["file_format"].as_str().unwrap());
+    // Album art gate — lofty finds art, that's fine
+    assert!(
+        meta.album_art_bytes.is_some(),
+        "MP3 should have art via lofty"
+    );
 }
