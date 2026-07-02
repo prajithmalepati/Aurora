@@ -9,8 +9,7 @@ use axum::http::{header, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde::Deserialize;
-use serde_json::Value;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use crate::AppState;
@@ -41,9 +40,34 @@ pub async fn scan_folder_endpoint(
         return envelope::not_found("folder_path does not exist or is not a directory").into_response();
     }
 
-    let conn = state.conn.lock().await;
+    // F1: Open a dedicated scan connection so the main AppState.conn is not
+    // held during audio decode. For in-memory test harness (db_path = None),
+    // fall back to the shared connection.
+    let scan_conn = if let Some(ref db_path) = state.db_path {
+        match aurora_core::db::open_and_migrate(db_path) {
+            Ok(c) => c,
+            Err(e) => {
+                return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"detail": e.to_string()}))).into_response();
+            }
+        }
+    } else {
+        // Test harness: use shared in-memory connection
+        let conn = state.conn.lock().await;
+        // Safety: we need to clone the connection handle for the scan.
+        // For in-memory DBs this is the same physical DB via shared cache.
+        drop(conn);
+        let conn = state.conn.lock().await;
+        // We can't easily clone a rusqlite Connection; for test harness
+        // we'll open a second in-memory connection — but in-memory DBs
+        // don't share state unless using shared cache. For golden tests,
+        // the harness should use a temp file DB. Fall back to shared conn.
+        drop(conn);
+        return scan_with_shared_conn(&state, &req).await;
+    };
+
+    // F1 req 2: AppState.conn mutex is NOT held — /api/health stays responsive
     match aurora_core::scanner::db::import_scanned_songs(
-        &conn,
+        &scan_conn,
         &req.folder_path,
         req.playlist_name.as_deref(),
         None,
@@ -70,9 +94,59 @@ pub async fn scan_folder_endpoint(
                 format!("Scan complete: {}.", parts.join(". "))
             };
 
-            // Strip bleed_thumb from songs for JSON serialization
-            let songs_json: Vec<Value> = result.songs.iter().map(strip_bleed_thumb).collect();
-            let replaced_json: Vec<Value> = result.replaced_songs.iter().map(strip_bleed_thumb).collect();
+            // F5: errors is already a list, songs/replaced_songs already full — no strip needed
+            envelope::ok(
+                serde_json::json!({
+                    "scanned": result.scanned,
+                    "imported": result.imported,
+                    "replaced": result.replaced,
+                    "skipped": result.skipped,
+                    "skipped_exact": result.skipped_exact,
+                    "skipped_same_format": result.skipped_same_format,
+                    "skipped_lower_quality": result.skipped_lower_quality,
+                    "errors": result.errors.iter().map(|e| serde_json::json!({"file": e.file, "error": e.error})).collect::<Vec<_>>(),
+                    "songs": result.songs,
+                    "replaced_songs": result.replaced_songs,
+                    "art_extracted": result.art_extracted,
+                }),
+                &message,
+            ).into_response()
+        }
+        Err(e) => {
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"detail": e.to_string()}))).into_response()
+        }
+    }
+}
+
+/// Fallback for in-memory test harness: scan using the shared AppState connection.
+async fn scan_with_shared_conn(state: &AppState, req: &ScanRequest) -> Response {
+    let conn = state.conn.lock().await;
+    match aurora_core::scanner::db::import_scanned_songs(
+        &conn,
+        &req.folder_path,
+        req.playlist_name.as_deref(),
+        None,
+        None,
+    ) {
+        Ok(result) => {
+            let mut parts = Vec::new();
+            if result.imported > 0 {
+                parts.push(format!("Imported {} new songs", result.imported));
+            }
+            if result.replaced > 0 {
+                parts.push(format!("replaced {} lower-quality songs with higher-quality versions", result.replaced));
+            }
+            if result.skipped > 0 {
+                parts.push(format!("skipped {} already in library", result.skipped));
+            }
+            if result.art_extracted > 0 {
+                parts.push(format!("extracted art for {} songs", result.art_extracted));
+            }
+            let message = if parts.is_empty() {
+                "Scan complete: nothing new found.".to_string()
+            } else {
+                format!("Scan complete: {}.", parts.join(". "))
+            };
 
             envelope::ok(
                 serde_json::json!({
@@ -84,8 +158,8 @@ pub async fn scan_folder_endpoint(
                     "skipped_same_format": result.skipped_same_format,
                     "skipped_lower_quality": result.skipped_lower_quality,
                     "errors": result.errors.iter().map(|e| serde_json::json!({"file": e.file, "error": e.error})).collect::<Vec<_>>(),
-                    "songs": songs_json,
-                    "replaced_songs": replaced_json,
+                    "songs": result.songs,
+                    "replaced_songs": result.replaced_songs,
                     "art_extracted": result.art_extracted,
                 }),
                 &message,
@@ -99,7 +173,7 @@ pub async fn scan_folder_endpoint(
 
 /// POST /api/scan/stream — SSE streaming scan progress.
 pub async fn scan_folder_stream(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Json(req): Json<ScanRequest>,
 ) -> Response {
     // Validate
@@ -115,24 +189,41 @@ pub async fn scan_folder_stream(
     let cancel_clone = cancel.clone();
     let folder_path = req.folder_path.clone();
     let playlist_name = req.playlist_name.clone();
+    let db_path = state.db_path.clone();
 
     // Use tokio::sync::mpsc for SSE event channel
     let (tx, mut rx) = tokio::sync::mpsc::channel::<String>(256);
 
     // Spawn blocking task for the scan
     tokio::task::spawn_blocking(move || {
-        let conn = match aurora_core::db::open_memory() {
-            Ok(c) => c,
-            Err(e) => {
-                let _ = tx.blocking_send(format!("data: {}\n\n", serde_json::json!({"type": "error", "message": e.to_string()})));
-                return;
-            }
+        // F1: Open a dedicated connection to the real DB file.
+        // Falls back to in-memory for test harness (no file path).
+        let conn = match db_path {
+            Some(ref path) => match aurora_core::db::open_and_migrate(path) {
+                Ok(c) => c,
+                Err(e) => {
+                    let _ = tx.blocking_send(format!("data: {}\n\n", serde_json::json!({"type": "error", "message": e.to_string()})));
+                    return;
+                }
+            },
+            None => match aurora_core::db::open_memory() {
+                Ok(c) => c,
+                Err(e) => {
+                    let _ = tx.blocking_send(format!("data: {}\n\n", serde_json::json!({"type": "error", "message": e.to_string()})));
+                    return;
+                }
+            },
         };
 
+        let cancel_for_cb = cancel_clone.clone();
         let tx_cb = tx.clone();
         let progress_cb = |evt: aurora_core::scanner::db::ScanProgress| {
             let json = serde_json::to_string(&evt).unwrap_or_default();
-            let _ = tx_cb.blocking_send(format!("data: {}\n\n", json));
+            let result = tx_cb.blocking_send(format!("data: {}\n\n", json));
+            // F8: If the receiver is gone (client disconnected), set cancel flag
+            if result.is_err() {
+                cancel_for_cb.store(true, Ordering::Relaxed);
+            }
         };
 
         let result = aurora_core::scanner::db::import_scanned_songs(
@@ -177,13 +268,4 @@ pub async fn scan_folder_stream(
         .header("x-accel-buffering", "no")
         .body(Body::from_stream(stream))
         .unwrap_or_else(|_| Response::builder().status(StatusCode::INTERNAL_SERVER_ERROR).body(Body::empty()).expect("fallback"))
-}
-
-/// Strip bleed_thumb from a song JSON value (raw bytes, not serializable).
-fn strip_bleed_thumb(v: &Value) -> Value {
-    let mut obj = v.clone();
-    if let Some(map) = obj.as_object_mut() {
-        map.remove("bleed_thumb");
-    }
-    obj
 }

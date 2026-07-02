@@ -288,16 +288,7 @@ pub async fn update_song_timing(
 
 /// Helper to get the playlist images directory.
 fn playlist_images_dir() -> PathBuf {
-    // Use a configurable path; for tests this will be set via tempdir
-    // Default: ~/.aurora/playlist-images or current dir
-    std::env::var("AURORA_PLAYLIST_IMAGES_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| {
-            dirs::home_dir()
-                .unwrap_or_else(|| PathBuf::from("."))
-                .join(".aurora")
-                .join("playlist-images")
-        })
+    aurora_core::paths::PLAYLIST_IMAGES_DIR.clone()
 }
 
 /// PUT /api/playlists/{id}/image — upload a cover image.

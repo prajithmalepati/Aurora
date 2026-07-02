@@ -1,16 +1,20 @@
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use tokio::sync::Mutex;
 
 mod routes;
 
-/// Shared application state — holds a single rusqlite Connection.
+/// Shared application state — holds a single rusqlite Connection
+/// plus the DB file path (for opening scan-dedicated connections).
 ///
 /// Wrapped in `Arc<Mutex<>>` so axum handlers can share it.
 /// rusqlite's Connection is `!Send`, but `Mutex` makes it usable
 /// across async tasks (lock is held only during synchronous DB calls).
 pub struct AppState {
     pub conn: Mutex<aurora_core::rusqlite::Connection>,
+    /// Path to the SQLite DB file. None for in-memory test harness.
+    pub db_path: Option<PathBuf>,
 }
 
 /// Build the axum Router with all API routes mounted.

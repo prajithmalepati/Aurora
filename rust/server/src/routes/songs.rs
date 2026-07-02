@@ -348,15 +348,10 @@ pub async fn album_art(
         return envelope::not_found("Album art not found").into_response();
     }
 
-    // Resolve art directory (matches Python paths.py layout)
-    let art_dir = std::env::var("AURORA_ALBUM_ART_DIR").unwrap_or_else(|_| {
-        let data_dir = dirs::data_dir()
-            .unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
-            .join("aurora");
-        data_dir.join("album_art").to_string_lossy().to_string()
-    });
+    // F3: Resolve art directory via central paths module (matches Python paths.py)
+    let art_dir = aurora_core::paths::ALBUM_ART_DIR.clone();
 
-    let art_path = std::path::Path::new(&art_dir).join(safe_name);
+    let art_path = art_dir.join(safe_name);
     match tokio::fs::read(&art_path).await {
         Ok(bytes) => {
             // Detect content-type from extension

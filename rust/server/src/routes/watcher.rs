@@ -15,6 +15,7 @@ use std::sync::Arc;
 
 use crate::AppState;
 use super::envelope;
+use rusqlite::OptionalExtension;
 
 #[derive(Deserialize)]
 pub struct WatchFolderRequest {
@@ -134,38 +135,85 @@ pub async fn remove_watched_folder(
 }
 
 /// POST /api/watch/{id}/scan — trigger scan of a specific watched folder.
+///
+/// F1: Opens a dedicated scan connection so the main AppState.conn mutex
+/// is not held during the scan. Other routes (including /api/health) remain
+/// responsive while the scan runs.
 pub async fn trigger_scan(
     State(state): State<Arc<AppState>>,
     Path(folder_id): Path<i64>,
 ) -> Response {
-    let conn = state.conn.lock().await;
+    // Phase 1: Get folder path while holding the lock, then release
+    let folder_path: String = {
+        let conn = state.conn.lock().await;
+        match conn.query_row(
+            "SELECT folder_path FROM watched_folders WHERE id = ?1",
+            [folder_id],
+            |row| row.get(0),
+        ).optional() {
+            Ok(Some(p)) => p,
+            Ok(None) => return envelope::not_found("Watched folder not found").into_response(),
+            Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"detail": e.to_string()}))).into_response(),
+        }
+    };
+    // Lock released — other routes can proceed
 
-    // Check folder exists
-    let folder_path: String = match conn.query_row(
-        "SELECT folder_path FROM watched_folders WHERE id = ?1",
-        [folder_id],
-        |row| row.get(0),
-    ).optional() {
-        Ok(Some(p)) => p,
-        Ok(None) => return envelope::not_found("Watched folder not found").into_response(),
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"detail": e.to_string()}))).into_response(),
+    // Phase 2: Open dedicated scan connection and run scan
+    let scan_conn = if let Some(ref db_path) = state.db_path {
+        match aurora_core::db::open_and_migrate(db_path) {
+            Ok(c) => c,
+            Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"detail": e.to_string()}))).into_response(),
+        }
+    } else {
+        // Test harness: use shared connection (lock briefly)
+        let conn = state.conn.lock().await;
+        // For in-memory test, we need to scan while holding the lock
+        let result = aurora_core::scanner::db::import_scanned_songs(
+            &conn,
+            &folder_path,
+            None,
+            None,
+            None,
+        );
+        let now = aurora_core::db::queries::chrono_now();
+        let _ = conn.execute(
+            "UPDATE watched_folders SET last_scan_at = ?1 WHERE id = ?2",
+            rusqlite::params![now, folder_id],
+        );
+        return match result {
+            Ok(scan_result) => envelope::ok(
+                serde_json::json!({
+                    "folders_scanned": 1,
+                    "imported": scan_result.imported,
+                    "replaced": scan_result.replaced,
+                    "skipped": scan_result.skipped,
+                    "deleted": 0,
+                    "errors": scan_result.errors.len(),
+                }),
+                "ok",
+            ).into_response(),
+            Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"detail": e.to_string()}))).into_response(),
+        };
     };
 
-    // Run scan
+    // Scan using dedicated connection (AppState.conn NOT held)
     let result = aurora_core::scanner::db::import_scanned_songs(
-        &conn,
+        &scan_conn,
         &folder_path,
         None,
         None,
         None,
     );
 
-    // Update last_scan_at
+    // Phase 3: Update last_scan_at (re-acquire lock briefly)
     let now = aurora_core::db::queries::chrono_now();
-    let _ = conn.execute(
-        "UPDATE watched_folders SET last_scan_at = ?1 WHERE id = ?2",
-        rusqlite::params![now, folder_id],
-    );
+    {
+        let conn = state.conn.lock().await;
+        let _ = conn.execute(
+            "UPDATE watched_folders SET last_scan_at = ?1 WHERE id = ?2",
+            rusqlite::params![now, folder_id],
+        );
+    }
 
     match result {
         Ok(scan_result) => {
@@ -184,5 +232,3 @@ pub async fn trigger_scan(
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"detail": e.to_string()}))).into_response(),
     }
 }
-
-use rusqlite::OptionalExtension;

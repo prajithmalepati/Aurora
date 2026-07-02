@@ -16,6 +16,7 @@ async-stream = "0.3"
 rusqlite = { version = "0.35", features = ["bundled"] }
 
 [dev-dependencies]
+aurora_core = { path = "../core", features = ["test-utils"] }
 tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"
 tempfile = "3"

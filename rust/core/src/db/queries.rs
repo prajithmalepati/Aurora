@@ -1407,8 +1407,10 @@ pub fn chrono_now() -> String {
     let m = if mp < 10 { mp + 3 } else { mp - 9 };
     let y = if m <= 2 { y + 1 } else { y };
 
+    let subsec_micros = now.subsec_micros();
+
     format!(
-        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
-        y, m, d, hours, minutes, seconds
+        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:06}+00:00",
+        y, m, d, hours, minutes, seconds, subsec_micros
     )
 }

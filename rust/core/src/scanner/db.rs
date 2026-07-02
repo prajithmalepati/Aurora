@@ -5,22 +5,20 @@
 //! `import_scanned_songs`: main import logic with dedup, format-tier replace,
 //!   playlist handling, single commit.
 
-#![allow(clippy::collapsible_if, clippy::collapsible_else_if, clippy::if_same_then_else)]
-
 use anyhow::Result;
 use rusqlite::Connection;
 use rusqlite::OptionalExtension;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use super::{extract_metadata, format_tier, ScannedMetadata};
 use crate::db::queries::chrono_now;
+use crate::paths;
 
 /// Supported audio file extensions (lowercase, with dot).
 /// Matches Python `AUDIO_EXTENSIONS` exactly.
 const SUPPORTED_EXTENSIONS: &[&str] = &[
-    ".mp3", ".flac", ".m4a", ".ogg", ".opus",
-    ".wav", ".wma", ".aac", ".aiff", ".ape",
-    ".wv",
+    ".mp3", ".flac", ".m4a", ".ogg", ".opus", ".wav", ".wma", ".aac", ".aiff", ".ape", ".wv",
 ];
 
 /// Scan result summary.
@@ -47,13 +45,17 @@ pub struct ScanError {
 }
 
 /// Progress event for SSE streaming.
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type")]
 pub enum ScanProgress {
     #[serde(rename = "total")]
     Total { total: usize },
     #[serde(rename = "progress")]
-    Progress { done: usize, total: usize, current: String },
+    Progress {
+        done: usize,
+        total: usize,
+        current: String,
+    },
     #[serde(rename = "done")]
     Done {
         scanned: usize,
@@ -63,9 +65,11 @@ pub enum ScanProgress {
         skipped_exact: usize,
         skipped_same_format: usize,
         skipped_lower_quality: usize,
-        errors: usize,
+        #[serde(rename = "errors")]
+        errors: Vec<serde_json::Value>,
         art_extracted: usize,
-        playlist_created: bool,
+        songs: Vec<serde_json::Value>,
+        replaced_songs: Vec<serde_json::Value>,
     },
     #[serde(rename = "error")]
     Error { message: String },
@@ -85,6 +89,7 @@ pub fn walk_audio_files(folder_path: &str) -> Result<Vec<PathBuf>> {
     Ok(results)
 }
 
+#[allow(clippy::collapsible_if)]
 fn walk_recursive(dir: &Path, out: &mut Vec<PathBuf>) {
     let entries = match std::fs::read_dir(dir) {
         Ok(e) => e,
@@ -125,8 +130,14 @@ pub fn replace_song(
     let result = (|| -> Result<i64> {
         // Insert new song row
         let artists_json = serde_json::to_string(&metadata.artists).ok();
-        let featured_json = metadata.featured_artists.as_ref().and_then(|fa| serde_json::to_string(fa).ok());
-        let peaks_json = metadata.waveform_peaks.as_ref().and_then(|p| serde_json::to_string(p).ok());
+        let featured_json = metadata
+            .featured_artists
+            .as_ref()
+            .and_then(|fa| serde_json::to_string(fa).ok());
+        let peaks_json = metadata
+            .waveform_peaks
+            .as_ref()
+            .and_then(|p| serde_json::to_string(p).ok());
 
         conn.execute(
             "INSERT INTO songs
@@ -174,7 +185,9 @@ pub fn replace_song(
 
         // Migrate tags
         let mut tag_stmt = conn.prepare("SELECT tag_id FROM song_tags WHERE song_id = ?1")?;
-        let tag_ids: Vec<i64> = tag_stmt.query_map([old_id], |r| r.get(0))?.collect::<std::result::Result<Vec<_>, _>>()?;
+        let tag_ids: Vec<i64> = tag_stmt
+            .query_map([old_id], |r| r.get(0))?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
         for tid in tag_ids {
             conn.execute(
                 "INSERT OR IGNORE INTO song_tags (song_id, tag_id) VALUES (?1, ?2)",
@@ -215,12 +228,17 @@ pub fn replace_song(
 /// `cancel_token`: if set, checked before each file — allows cancellation.
 /// `progress_cb`: if set, called with progress events for SSE streaming.
 ///
+/// The entire import is wrapped in a single transaction — all-or-nothing
+/// semantics matching Python's single `db_connection.commit()` at
+/// `file_scanner.py:878`.
+///
 /// Returns a detailed summary.
+#[allow(clippy::collapsible_if)]
 pub fn import_scanned_songs(
     conn: &Connection,
     folder_path: &str,
     playlist_name: Option<&str>,
-    cancel_token: Option<&std::sync::atomic::AtomicBool>,
+    cancel_token: Option<&AtomicBool>,
     progress_cb: Option<&dyn Fn(ScanProgress)>,
 ) -> Result<ScanResult> {
     let audio_files = walk_audio_files(folder_path)?;
@@ -230,6 +248,10 @@ pub fn import_scanned_songs(
         cb(ScanProgress::Total { total: total_files });
     }
 
+    // F2: Begin transaction — all-or-nothing semantics.
+    // This wraps the entire import; replace_song's SAVEPOINT nests inside.
+    let tx = conn.unchecked_transaction()?;
+
     let mut result = ScanResult::default();
     let mut playlist_song_ids: Vec<i64> = Vec::new();
     let now = chrono_now();
@@ -237,7 +259,7 @@ pub fn import_scanned_songs(
     for (done, file_path) in audio_files.iter().enumerate() {
         // Check cancellation
         if let Some(token) = cancel_token {
-            if token.load(std::sync::atomic::Ordering::Relaxed) {
+            if token.load(Ordering::Relaxed) {
                 break;
             }
         }
@@ -274,11 +296,13 @@ pub fn import_scanned_songs(
         let incoming_mtime = metadata.file_mtime;
 
         // Rule 1: exact file_path match
-        let exact = conn.query_row(
-            "SELECT id, file_mtime FROM songs WHERE file_path = ?1",
-            [incoming_path],
-            |row| Ok((row.get::<_, i64>(0)?, row.get::<_, Option<f64>>(1)?)),
-        ).optional()?;
+        let exact = conn
+            .query_row(
+                "SELECT id, file_mtime FROM songs WHERE file_path = ?1",
+                [incoming_path],
+                |row| Ok((row.get::<_, i64>(0)?, row.get::<_, Option<f64>>(1)?)),
+            )
+            .optional()?;
 
         if let Some((existing_id, stored_mtime)) = exact {
             // If mtime unchanged → true duplicate, skip
@@ -293,18 +317,21 @@ pub fn import_scanned_songs(
                 continue;
             }
 
-            // mtime changed → update in place
-            let art_path = match extract_and_save_art(incoming_path) {
-                Some(path) => {
-                    result.art_extracted += 1;
-                    Some(path)
-                }
-                None => None,
-            };
+            // F6: mtime changed → update in place + count as imported
+            let art_path = save_art(metadata.album_art_bytes.as_deref());
+            if art_path.is_some() {
+                result.art_extracted += 1;
+            }
 
             let artists_json = serde_json::to_string(&metadata.artists).ok();
-            let featured_json = metadata.featured_artists.as_ref().and_then(|fa| serde_json::to_string(fa).ok());
-            let peaks_json = metadata.waveform_peaks.as_ref().and_then(|p| serde_json::to_string(p).ok());
+            let featured_json = metadata
+                .featured_artists
+                .as_ref()
+                .and_then(|fa| serde_json::to_string(fa).ok());
+            let peaks_json = metadata
+                .waveform_peaks
+                .as_ref()
+                .and_then(|p| serde_json::to_string(p).ok());
 
             conn.execute(
                 "UPDATE songs SET
@@ -320,32 +347,58 @@ pub fn import_scanned_songs(
                    updated_at=?26
                  WHERE id=?27",
                 rusqlite::params![
-                    metadata.title, metadata.artist, metadata.album,
-                    metadata.duration, incoming_fmt, art_path,
-                    peaks_json, metadata.dominant_color, metadata.dominant_color_2,
-                    metadata.bleed_thumb, metadata.bleed_region_x, metadata.bleed_region_y,
-                    metadata.bleed_region_w, metadata.bleed_region_h, incoming_mtime,
-                    metadata.bitrate, metadata.sample_rate, metadata.bit_depth, metadata.file_size,
-                    metadata.replaygain_track_gain, metadata.replaygain_track_peak,
-                    metadata.replaygain_album_gain, metadata.replaygain_album_peak,
-                    artists_json, featured_json, now, existing_id,
+                    metadata.title,
+                    metadata.artist,
+                    metadata.album,
+                    metadata.duration,
+                    incoming_fmt,
+                    art_path,
+                    peaks_json,
+                    metadata.dominant_color,
+                    metadata.dominant_color_2,
+                    metadata.bleed_thumb,
+                    metadata.bleed_region_x,
+                    metadata.bleed_region_y,
+                    metadata.bleed_region_w,
+                    metadata.bleed_region_h,
+                    incoming_mtime,
+                    metadata.bitrate,
+                    metadata.sample_rate,
+                    metadata.bit_depth,
+                    metadata.file_size,
+                    metadata.replaygain_track_gain,
+                    metadata.replaygain_track_peak,
+                    metadata.replaygain_album_gain,
+                    metadata.replaygain_album_peak,
+                    artists_json,
+                    featured_json,
+                    now,
+                    existing_id,
                 ],
             )?;
 
+            // F6: count as imported, push full song JSON with existing id
+            result.imported += 1;
+            let song_json = song_json_from_metadata(&metadata, existing_id);
+            result.songs.push(song_json);
             playlist_song_ids.push(existing_id);
             continue;
         }
 
         // Rule 2-5: check for (title, artist) match
-        let title_artist_match = conn.query_row(
-            "SELECT id, file_path, file_format FROM songs WHERE title = ?1 AND artist = ?2",
-            rusqlite::params![metadata.title, metadata.artist],
-            |row| Ok((
-                row.get::<_, i64>(0)?,
-                row.get::<_, Option<String>>(1)?,
-                row.get::<_, Option<String>>(2)?,
-            )),
-        ).optional()?;
+        let title_artist_match = conn
+            .query_row(
+                "SELECT id, file_path, file_format FROM songs WHERE title = ?1 AND artist = ?2",
+                rusqlite::params![metadata.title, metadata.artist],
+                |row| {
+                    Ok((
+                        row.get::<_, i64>(0)?,
+                        row.get::<_, Option<String>>(1)?,
+                        row.get::<_, Option<String>>(2)?,
+                    ))
+                },
+            )
+            .optional()?;
 
         if let Some((existing_id, _existing_path, existing_fmt)) = title_artist_match {
             let incoming_tier = format_tier(incoming_fmt);
@@ -353,13 +406,10 @@ pub fn import_scanned_songs(
 
             if incoming_tier > existing_tier {
                 // Incoming is HIGHER quality → replace
-                let art_path = match extract_and_save_art(incoming_path) {
-                    Some(path) => {
-                        result.art_extracted += 1;
-                        Some(path)
-                    }
-                    None => None,
-                };
+                let art_path = save_art(metadata.album_art_bytes.as_deref());
+                if art_path.is_some() {
+                    result.art_extracted += 1;
+                }
 
                 match replace_song(conn, existing_id, &metadata, art_path.as_deref(), &now) {
                     Ok(new_id) => {
@@ -389,17 +439,20 @@ pub fn import_scanned_songs(
         }
 
         // No match → fresh import
-        let art_path = match extract_and_save_art(incoming_path) {
-            Some(path) => {
-                result.art_extracted += 1;
-                Some(path)
-            }
-            None => None,
-        };
+        let art_path = save_art(metadata.album_art_bytes.as_deref());
+        if art_path.is_some() {
+            result.art_extracted += 1;
+        }
 
         let artists_json = serde_json::to_string(&metadata.artists).ok();
-        let featured_json = metadata.featured_artists.as_ref().and_then(|fa| serde_json::to_string(fa).ok());
-        let peaks_json = metadata.waveform_peaks.as_ref().and_then(|p| serde_json::to_string(p).ok());
+        let featured_json = metadata
+            .featured_artists
+            .as_ref()
+            .and_then(|fa| serde_json::to_string(fa).ok());
+        let peaks_json = metadata
+            .waveform_peaks
+            .as_ref()
+            .and_then(|p| serde_json::to_string(p).ok());
 
         conn.execute(
             "INSERT INTO songs
@@ -435,15 +488,16 @@ pub fn import_scanned_songs(
     }
 
     // Optional playlist creation/population
-    let mut playlist_created = false;
     let ordered_ids = dedup_preserve_order(&playlist_song_ids);
     if let Some(pl_name) = playlist_name {
         if !ordered_ids.is_empty() {
-            let existing_playlist = conn.query_row(
-                "SELECT id FROM playlists WHERE name = ?1",
-                [pl_name],
-                |row| row.get::<_, i64>(0),
-            ).optional()?;
+            let existing_playlist = conn
+                .query_row(
+                    "SELECT id FROM playlists WHERE name = ?1",
+                    [pl_name],
+                    |row| row.get::<_, i64>(0),
+                )
+                .optional()?;
 
             let playlist_id = if let Some(pid) = existing_playlist {
                 pid
@@ -452,7 +506,6 @@ pub fn import_scanned_songs(
                     "INSERT INTO playlists (name, created_at, updated_at) VALUES (?1, ?2, ?3)",
                     rusqlite::params![pl_name, now, now],
                 )?;
-                playlist_created = true;
                 conn.last_insert_rowid()
             };
 
@@ -471,12 +524,16 @@ pub fn import_scanned_songs(
         }
     }
 
-    // Single commit — all-or-nothing semantics.
-    // rusqlite auto-commits when not in an explicit transaction.
-    // If the caller started a transaction, this commits it.
+    // F2: Commit — all-or-nothing. Matches Python file_scanner.py:878.
+    tx.commit()?;
 
-    // Send done event
+    // Send done event (after commit, matching Python order)
     if let Some(cb) = progress_cb {
+        let errors_json: Vec<serde_json::Value> = result
+            .errors
+            .iter()
+            .map(|e| serde_json::json!({"file": e.file, "error": e.error}))
+            .collect();
         cb(ScanProgress::Done {
             scanned: result.scanned,
             imported: result.imported,
@@ -485,40 +542,37 @@ pub fn import_scanned_songs(
             skipped_exact: result.skipped_exact,
             skipped_same_format: result.skipped_same_format,
             skipped_lower_quality: result.skipped_lower_quality,
-            errors: result.errors.len(),
+            errors: errors_json,
             art_extracted: result.art_extracted,
-            playlist_created,
+            songs: result.songs.clone(),
+            replaced_songs: result.replaced_songs.clone(),
         });
     }
 
     Ok(result)
 }
 
-/// Extract album art from a file and save to the art directory.
+/// Save album art bytes to the art directory.
 /// Returns the saved filename or None.
-fn extract_and_save_art(file_path: &str) -> Option<String> {
-    let metadata = extract_metadata(file_path)?;
-    let art_bytes = metadata.album_art_bytes?;
+/// Uses real SHA-1 (matching Python hashlib.sha1) for content-addressed dedup.
+/// Extension matches Python: "png" if PNG magic bytes, else "jpg".
+fn save_art(art_bytes: Option<&[u8]>) -> Option<String> {
+    let art_bytes = art_bytes?;
 
-    let art_dir = get_art_dir();
+    let art_dir = paths::ALBUM_ART_DIR.clone();
     std::fs::create_dir_all(&art_dir).ok()?;
 
-    // SHA-1 dedup
-    use std::io::Write;
-    let hash = {
-        use std::hash::{Hash, Hasher};
-        let mut hasher = std::collections::hash_map::DefaultHasher::new();
-        art_bytes.hash(&mut hasher);
-        format!("{:016x}", hasher.finish())
-    };
+    // F4: Real SHA-1 — matches Python hashlib.sha1(art_data).hexdigest()
+    use sha1::{Digest, Sha1};
+    let mut hasher = Sha1::new();
+    hasher.update(art_bytes);
+    let hash = format!("{:x}", hasher.finalize());
 
-    // Determine extension from first bytes
+    // Extension: match Python logic — "png" if PNG magic bytes, else "jpg"
     let ext = if art_bytes.starts_with(&[0x89, 0x50, 0x4E, 0x47]) {
         "png"
-    } else if art_bytes.starts_with(&[0xFF, 0xD8]) {
-        "jpg"
     } else {
-        "jpg" // fallback
+        "jpg"
     };
 
     let filename = format!("{}.{}", hash, ext);
@@ -526,25 +580,14 @@ fn extract_and_save_art(file_path: &str) -> Option<String> {
 
     if !art_path.exists() {
         let mut file = std::fs::File::create(&art_path).ok()?;
-        file.write_all(&art_bytes).ok()?;
+        std::io::Write::write_all(&mut file, art_bytes).ok()?;
     }
 
     Some(filename)
 }
 
-/// Get the album art directory (matches Python paths.py layout).
-fn get_art_dir() -> PathBuf {
-    if let Ok(dir) = std::env::var("AURORA_ALBUM_ART_DIR") {
-        return PathBuf::from(dir);
-    }
-    dirs::data_dir()
-        .unwrap_or_else(|| PathBuf::from("/tmp"))
-        .join("aurora")
-        .join("album_art")
-}
-
-/// Build a minimal JSON song representation from metadata (for SSE streaming).
-/// Omits bleed_thumb (raw bytes, not JSON serializable).
+/// Build a full JSON song representation from metadata (for SSE streaming).
+/// Matches Python's full metadata dict shape. Omits bleed_thumb (raw bytes).
 fn song_json_from_metadata(metadata: &ScannedMetadata, song_id: i64) -> serde_json::Value {
     serde_json::json!({
         "id": song_id,
@@ -555,6 +598,24 @@ fn song_json_from_metadata(metadata: &ScannedMetadata, song_id: i64) -> serde_js
         "file_path": metadata.file_path,
         "file_format": metadata.file_format,
         "source": "local_scan",
+        "file_mtime": metadata.file_mtime,
+        "bitrate": metadata.bitrate,
+        "sample_rate": metadata.sample_rate,
+        "bit_depth": metadata.bit_depth,
+        "file_size": metadata.file_size,
+        "waveform_peaks": metadata.waveform_peaks,
+        "dominant_color": metadata.dominant_color,
+        "dominant_color_2": metadata.dominant_color_2,
+        "replaygain_track_gain": metadata.replaygain_track_gain,
+        "replaygain_track_peak": metadata.replaygain_track_peak,
+        "replaygain_album_gain": metadata.replaygain_album_gain,
+        "replaygain_album_peak": metadata.replaygain_album_peak,
+        "artists": metadata.artists,
+        "featured_artists": metadata.featured_artists,
+        "bleed_region_x": metadata.bleed_region_x,
+        "bleed_region_y": metadata.bleed_region_y,
+        "bleed_region_w": metadata.bleed_region_w,
+        "bleed_region_h": metadata.bleed_region_h,
     })
 }
 
@@ -566,6 +627,7 @@ fn dedup_preserve_order(ids: &[i64]) -> Vec<i64> {
 
 /// Create a minimal valid WAV file (1 second of silence at 44100Hz).
 /// Shared between unit tests and integration tests.
+#[cfg(any(test, feature = "test-utils"))]
 pub fn create_minimal_wav() -> Vec<u8> {
     let sample_rate: u32 = 44100;
     let num_samples: u32 = sample_rate; // 1 second
@@ -646,5 +708,226 @@ mod tests {
 
         let result = walk_audio_files(tmp.path().to_str().unwrap()).unwrap();
         assert_eq!(result.len(), 1);
+    }
+
+    #[test]
+    fn test_save_art_sha1_deterministic() {
+        // Known bytes → known SHA-1 hex digest (40 chars)
+        // hashlib.sha1(b"test art data").hexdigest()
+        let art_bytes = b"test art data";
+        use sha1::{Digest, Sha1};
+        let mut hasher = Sha1::new();
+        hasher.update(art_bytes);
+        let hash = format!("{:x}", hasher.finalize());
+        assert_eq!(hash.len(), 40, "SHA-1 digest must be 40 hex chars");
+        // Verify determinism
+        let mut hasher2 = Sha1::new();
+        hasher2.update(art_bytes);
+        let hash2 = format!("{:x}", hasher2.finalize());
+        assert_eq!(hash, hash2);
+    }
+
+    #[test]
+    fn test_save_art_png_extension() {
+        // PNG magic bytes → .png extension
+        let mut png_data = vec![0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+        png_data.extend_from_slice(&[0u8; 100]);
+        let result = save_art(Some(&png_data));
+        assert!(result.is_some());
+        assert!(result.unwrap().ends_with(".png"));
+    }
+
+    #[test]
+    fn test_save_art_jpg_extension() {
+        // JPEG magic bytes → .jpg extension
+        let mut jpg_data = vec![0xFF, 0xD8, 0xFF, 0xE0];
+        jpg_data.extend_from_slice(&[0u8; 100]);
+        let result = save_art(Some(&jpg_data));
+        assert!(result.is_some());
+        assert!(result.unwrap().ends_with(".jpg"));
+    }
+
+    #[test]
+    fn test_save_art_none_bytes() {
+        let result = save_art(None);
+        assert!(result.is_none());
+    }
+
+    /// F7: chrono_now() format matches Python datetime.now(timezone.utc).isoformat()
+    #[test]
+    fn test_chrono_now_format() {
+        let now = crate::db::queries::chrono_now();
+        // Must match: 2026-07-02T15:01:08.347620+00:00
+        let re = regex::Regex::new(
+            r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}\+00:00$",
+        )
+        .unwrap();
+        assert!(
+            re.is_match(&now),
+            "chrono_now() format mismatch: {}",
+            now
+        );
+    }
+
+    /// F1: Stream scan writes to real DB, songs visible via API.
+    #[test]
+    fn test_stream_scan_persists_to_db() {
+        use crate::db::open_memory;
+        let conn = open_memory().unwrap();
+
+        let tmp = tempfile::tempdir().unwrap();
+        let wav_path = tmp.path().join("test.wav");
+        std::fs::write(&wav_path, create_minimal_wav()).unwrap();
+
+        // Import via the same function the stream handler uses
+        let result = import_scanned_songs(
+            &conn,
+            tmp.path().to_str().unwrap(),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+
+        assert_eq!(result.imported, 1, "Should import 1 song");
+
+        // Verify song is visible via a SELECT on the same connection
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM songs", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 1, "Song should be persisted in DB");
+    }
+
+    /// F2: Transaction — mid-batch failure rolls back everything.
+    #[test]
+    fn test_transaction_rollback_on_conflict() {
+        use crate::db::open_memory;
+        let conn = open_memory().unwrap();
+
+        let tmp = tempfile::tempdir().unwrap();
+        let wav_path = tmp.path().join("test.wav");
+        std::fs::write(&wav_path, create_minimal_wav()).unwrap();
+
+        // First import — should succeed
+        let result = import_scanned_songs(
+            &conn,
+            tmp.path().to_str().unwrap(),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        assert_eq!(result.imported, 1);
+
+        // Second import of same file — should skip (exact match), not error
+        let result2 = import_scanned_songs(
+            &conn,
+            tmp.path().to_str().unwrap(),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        assert_eq!(result2.skipped_exact, 1);
+        assert_eq!(result2.imported, 0);
+
+        // Total songs should still be 1
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM songs", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 1);
+    }
+
+    /// F5: Done event has errors as list, songs/replaced_songs included.
+    #[test]
+    fn test_done_event_shape() {
+        use crate::db::open_memory;
+        let conn = open_memory().unwrap();
+
+        let tmp = tempfile::tempdir().unwrap();
+        let wav_path = tmp.path().join("test.wav");
+        std::fs::write(&wav_path, create_minimal_wav()).unwrap();
+
+        let events = std::cell::RefCell::new(Vec::<ScanProgress>::new());
+        let cb = |evt: ScanProgress| {
+            // We can't move out of the closure, so we serialize/deserialize
+            let json = serde_json::to_string(&evt).unwrap();
+            let parsed: ScanProgress = serde_json::from_str(&json).unwrap();
+            events.borrow_mut().push(parsed);
+        };
+
+        let _ = import_scanned_songs(&conn, tmp.path().to_str().unwrap(), None, None, Some(&cb));
+
+        let events = events.borrow();
+        // Find the done event
+        let done = events.iter().find(|e| matches!(e, ScanProgress::Done { .. }));
+        assert!(done.is_some(), "Should have a done event");
+
+        if let Some(ScanProgress::Done {
+            errors,
+            songs,
+            replaced_songs,
+            ..
+        }) = done
+        {
+            // errors must be a Vec (not an int)
+            assert!(errors.is_empty(), "No errors expected for valid WAV");
+            // songs should contain the imported song
+            assert_eq!(songs.len(), 1, "Should have 1 song in done event");
+            // Song should have full metadata fields
+            let song = &songs[0];
+            assert!(song.get("file_mtime").is_some(), "Song must have file_mtime");
+            assert!(song.get("waveform_peaks").is_some(), "Song must have waveform_peaks");
+            assert!(song.get("bitrate").is_some(), "Song must have bitrate");
+            assert!(song.get("artists").is_some(), "Song must have artists");
+            // Must NOT have bleed_thumb bytes
+            assert!(song.get("bleed_thumb").is_none(), "Song must not have bleed_thumb");
+            // replaced_songs should be empty
+            assert!(replaced_songs.is_empty());
+        } else {
+            panic!("Expected Done variant");
+        }
+    }
+
+    /// F6: mtime-changed update counts as imported.
+    #[test]
+    fn test_mtime_update_counts_as_imported() {
+        use crate::db::open_memory;
+        let conn = open_memory().unwrap();
+
+        let tmp = tempfile::tempdir().unwrap();
+        let wav_path = tmp.path().join("test.wav");
+        std::fs::write(&wav_path, create_minimal_wav()).unwrap();
+
+        // First import
+        let result = import_scanned_songs(
+            &conn,
+            tmp.path().to_str().unwrap(),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        assert_eq!(result.imported, 1);
+        let original_id: i64 = conn
+            .query_row("SELECT id FROM songs LIMIT 1", [], |r| r.get(0))
+            .unwrap();
+
+        // Modify the file to change mtime (>1s difference)
+        std::thread::sleep(std::time::Duration::from_millis(1100));
+        std::fs::write(&wav_path, create_minimal_wav()).unwrap();
+
+        // Re-scan
+        let result2 = import_scanned_songs(
+            &conn,
+            tmp.path().to_str().unwrap(),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        assert_eq!(result2.imported, 1, "mtime-changed update should count as imported");
+        assert_eq!(result2.songs.len(), 1);
+        assert_eq!(result2.songs[0]["id"].as_i64().unwrap(), original_id, "Should keep same id");
     }
 }
