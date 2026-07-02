@@ -18,15 +18,39 @@ pub use playlists::{
 pub use songs::{album_art, bleed_thumb, create_song, delete_song, get_song, list_songs, stream_song, update_song};
 pub use tags::{assign_tags, create_tag, delete_tag, list_tags, remove_tag};
 
+use axum::extract::State;
 use axum::Json;
 use serde::Serialize;
+use std::sync::Arc;
 
 #[derive(Serialize)]
 pub struct HealthResponse {
     pub status: &'static str,
+    pub database: &'static str,
+    pub song_count: i64,
+    pub tag_count: i64,
+    pub playlist_count: i64,
 }
 
-/// GET /api/health — minimal liveness probe.
-pub async fn health() -> Json<HealthResponse> {
-    Json(HealthResponse { status: "ok" })
+/// GET /api/health — full health probe matching Python parity (5-key body).
+pub async fn health(
+    State(state): State<Arc<crate::AppState>>,
+) -> Json<HealthResponse> {
+    let conn = state.conn.lock().await;
+    let song_count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM songs", [], |r| r.get(0))
+        .unwrap_or(0);
+    let tag_count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM tags", [], |r| r.get(0))
+        .unwrap_or(0);
+    let playlist_count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM playlists", [], |r| r.get(0))
+        .unwrap_or(0);
+    Json(HealthResponse {
+        status: "ok",
+        database: "connected",
+        song_count,
+        tag_count,
+        playlist_count,
+    })
 }

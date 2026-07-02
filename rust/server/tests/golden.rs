@@ -343,6 +343,25 @@ async fn golden_tags() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+// HEALTH golden test — fresh DB, no mutations
+// ═══════════════════════════════════════════════════════════════════════
+
+#[tokio::test]
+async fn golden_health() {
+    let (app, _state) = build_test_app();
+
+    let (s, b) = send(&app, get("/api/health")).await;
+    assert_eq!(s, 200);
+    assert_eq!(b["status"], "ok");
+    assert_eq!(b["database"], "connected");
+    assert_eq!(b["song_count"], 3);
+    assert_eq!(b["tag_count"], 6);
+    assert_eq!(b["playlist_count"], 3);
+    // Also assert golden parity
+    assert_body("health_golden", &b, &load_golden("health_golden"));
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 // FILTER golden tests — fresh DB, no mutations
 // ═══════════════════════════════════════════════════════════════════════
 
