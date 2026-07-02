@@ -117,5 +117,28 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
             "/api/albums/{album_name}",
             axum::routing::get(routes::get_album),
         )
+        // ── Scanner routes ──
+        .route(
+            "/api/scan",
+            axum::routing::post(routes::scanner::scan_folder_endpoint),
+        )
+        .route(
+            "/api/scan/stream",
+            axum::routing::post(routes::scanner::scan_folder_stream),
+        )
+        // ── Watcher routes ──
+        .route(
+            "/api/watch",
+            axum::routing::get(routes::watcher::list_watched_folders)
+                .post(routes::watcher::add_watched_folder),
+        )
+        .route(
+            "/api/watch/{folder_id}",
+            axum::routing::delete(routes::watcher::remove_watched_folder),
+        )
+        .route(
+            "/api/watch/{folder_id}/scan",
+            axum::routing::post(routes::watcher::trigger_scan),
+        )
         .with_state(state)
 }

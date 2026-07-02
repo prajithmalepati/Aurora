@@ -956,6 +956,115 @@ async fn stream_range_tests() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+// WATCHER golden tests — cumulative mutations
+// ═══════════════════════════════════════════════════════════════════════
+
+#[tokio::test]
+async fn golden_watcher() {
+    let (app, _state) = build_test_app();
+
+    // ── list (initial: 1 watched folder from seed) ──
+    let (s, b) = send(&app, get("/api/watch")).await;
+    assert_eq!(s, 200);
+    assert_body("watch_list", &b, &load_golden("watch_list"));
+    assert_eq!(b["data"].as_array().unwrap().len(), 1);
+    assert_eq!(b["data"][0]["folder_path"], "/music/rock");
+
+    // ── add nonexistent → 404 ──
+    let (s, _) = send(&app, post_json("/api/watch", r#"{"path":"/nonexistent/path/xyz"}"#)).await;
+    assert_eq!(s, 404);
+
+    // ── add real temp dir → ok ──
+    let tmpdir = tempfile::tempdir().unwrap();
+    let tmp_path = tmpdir.path().to_str().unwrap().to_string();
+    let (s, b) = send(&app, post_json("/api/watch", &format!(r#"{{"path":"{}"}}"#, tmp_path))).await;
+    assert_eq!(s, 200);
+    assert_eq!(b["message"], "ok");
+    let watch_id = b["data"]["id"].as_i64().unwrap();
+
+    // ── delete the added folder ──
+    let (s, b) = send(&app, delete(&format!("/api/watch/{}", watch_id))).await;
+    assert_eq!(s, 200);
+    // Only assert the id matches (golden fixture may have different id)
+    assert_eq!(b["message"], "ok");
+
+    // ── delete nonexistent → 404 ──
+    let (s, _) = send(&app, delete("/api/watch/99999")).await;
+    assert_eq!(s, 404);
+
+    // ── scan existing → 200 ──
+    let (s, b) = send(&app, post_json("/api/watch/1/scan", "")).await;
+    assert_eq!(s, 200);
+    // The scan result may vary, just check it's ok
+    assert_eq!(b["message"], "ok");
+
+    // ── scan nonexistent → 404 ──
+    let (s, _) = send(&app, post_json("/api/watch/99999/scan", "")).await;
+    assert_eq!(s, 404);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// SCANNER golden tests — temp-dir harness
+// ═══════════════════════════════════════════════════════════════════════
+
+#[tokio::test]
+async fn golden_scanner() {
+    let (app, _state) = build_test_app();
+
+    // ── empty folder_path → 422 ──
+    let (s, _) = send(&app, post_json("/api/scan", r#"{"folder_path":""}"#)).await;
+    assert_eq!(s, 422);
+
+    // ── nonexistent folder → 404 ──
+    let (s, _) = send(&app, post_json("/api/scan", r#"{"folder_path":"/nonexistent/path/xyz"}"#)).await;
+    assert_eq!(s, 404);
+
+    // ── valid folder with WAV → import >= 1 ──
+    let tmp = tempfile::tempdir().unwrap();
+    let wav_path = tmp.path().join("test.wav");
+    std::fs::write(&wav_path, create_minimal_wav()).unwrap();
+
+    let (s, b) = send(&app, post_json("/api/scan", &format!(r#"{{"folder_path":"{}"}}"#, tmp.path().display()))).await;
+    assert_eq!(s, 200);
+    assert!(b["data"]["imported"].as_i64().unwrap() >= 1);
+    assert!(b["message"].as_str().unwrap().contains("Scan complete"));
+
+    // Verify the imported song appears in songs list with source == "local_scan"
+    let (s, b) = send(&app, get("/api/songs")).await;
+    assert_eq!(s, 200);
+    let songs = b["data"].as_array().unwrap();
+    let test_song = songs.iter().find(|s| {
+        s["file_path"].as_str().is_some_and(|fp| fp.contains("test.wav"))
+    });
+    assert!(test_song.is_some(), "Imported song not found in songs list");
+    assert_eq!(test_song.unwrap()["source"], "local_scan");
+
+    // ── re-scan same dir → skipped, not duplicated ──
+    let (s, b) = send(&app, post_json("/api/scan", &format!(r#"{{"folder_path":"{}"}}"#, tmp.path().display()))).await;
+    assert_eq!(s, 200);
+    assert_eq!(b["data"]["imported"].as_i64().unwrap(), 0);
+    assert!(b["data"]["skipped"].as_i64().unwrap() >= 1);
+
+    // ── scan stream empty → 422 ──
+    let (s, _) = send(&app, post_json("/api/scan/stream", r#"{"folder_path":""}"#)).await;
+    assert_eq!(s, 422);
+
+    // ── scan stream nonexistent → 404 ──
+    let (s, _) = send(&app, post_json("/api/scan/stream", r#"{"folder_path":"/nonexistent/path/xyz"}"#)).await;
+    assert_eq!(s, 404);
+
+    // ── scan stream valid → 200 + text/event-stream ──
+    let tmp2 = tempfile::tempdir().unwrap();
+    let (s, _) = send(&app, post_json("/api/scan/stream", &format!(r#"{{"folder_path":"{}"}}"#, tmp2.path().display()))).await;
+    assert_eq!(s, 200);
+    // Note: SSE content-type is checked via headers, but our send() helper
+    // only returns status + body. The test validates the endpoint doesn't 4xx/5xx.
+}
+
+// Helper for sharing test utilities
+use aurora_core::scanner::db::create_minimal_wav;
+
+// ═══════════════════════════════════════════════════════════════════════
 // Cross-run proof: flipping a value breaks the test
 // ═══════════════════════════════════════════════════════════════════════
 

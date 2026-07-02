@@ -13,6 +13,7 @@ lofty = "0.22"
 regex = "1"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 symphonia = { version = "0.5", features = ["mp3", "flac", "ogg", "vorbis", "wav", "aac", "isomp4", "alac"] }
+dirs = "6"
 
 [dev-dependencies]
 tempfile = "3"

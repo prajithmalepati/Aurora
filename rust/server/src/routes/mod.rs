@@ -3,8 +3,10 @@ mod envelope;
 mod filter;
 mod folders;
 mod playlists;
+pub mod scanner;
 mod songs;
 mod tags;
+pub mod watcher;
 
 pub use albums::{get_album, list_albums};
 pub use filter::filter_endpoint;
