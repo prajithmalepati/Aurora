@@ -288,16 +288,7 @@ pub async fn update_song_timing(
 
 /// Helper to get the playlist images directory.
 fn playlist_images_dir() -> PathBuf {
-    // Use a configurable path; for tests this will be set via tempdir
-    // Default: ~/.aurora/playlist-images or current dir
-    std::env::var("AURORA_PLAYLIST_IMAGES_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| {
-            dirs::home_dir()
-                .unwrap_or_else(|| PathBuf::from("."))
-                .join(".aurora")
-                .join("playlist-images")
-        })
+    aurora_core::paths::PLAYLIST_IMAGES_DIR.clone()
 }
 
 /// PUT /api/playlists/{id}/image — upload a cover image.
@@ -437,7 +428,9 @@ pub async fn export_playlist(
     match aurora_core::db::queries::get_playlist_for_export(&conn, playlist_id) {
         Ok(Some((playlist_meta, songs))) => {
             let name = playlist_meta.get("name").and_then(|v| v.as_str()).unwrap_or("Playlist");
-            let safe_name = name.replace(|c: char| "\\/*?:\"<>|".contains(c), "_");
+            let safe_name: String = name.chars()
+                .map(|c| if c.is_control() || "\\/*?:\"<>|".contains(c) { '_' } else { c })
+                .collect();
 
             if format == "json" {
                 let export = serde_json::json!({
@@ -451,7 +444,7 @@ pub async fn export_playlist(
                     .header("content-type", "application/json")
                     .header("content-disposition", format!("attachment; filename=\"{}.aurora.json\"", safe_name))
                     .body(Body::from(body))
-                    .unwrap()
+                    .unwrap_or_else(|_| Response::builder().status(StatusCode::INTERNAL_SERVER_ERROR).body(Body::empty()).expect("fallback"))
             } else {
                 // M3U / M3U8
                 let mut lines = vec!["#EXTM3U".to_string()];
@@ -479,14 +472,14 @@ pub async fn export_playlist(
                         .status(StatusCode::OK)
                         .header("content-type", "application/json")
                         .body(Body::from(serde_json::to_string(&wrapped).unwrap_or_default()))
-                        .unwrap()
+                        .unwrap_or_else(|_| Response::builder().status(StatusCode::INTERNAL_SERVER_ERROR).body(Body::empty()).expect("fallback"))
                 } else {
                     Response::builder()
                         .status(StatusCode::OK)
                         .header("content-type", mime)
                         .header("content-disposition", format!("attachment; filename=\"{}.{}\"", safe_name, ext))
                         .body(Body::from(content))
-                        .unwrap()
+                        .unwrap_or_else(|_| Response::builder().status(StatusCode::INTERNAL_SERVER_ERROR).body(Body::empty()).expect("fallback"))
                 }
             }
         }

@@ -11,10 +11,7 @@ async fn main() -> anyhow::Result<()> {
     let db_path = std::env::var("AURORA_DB_PATH")
         .map(PathBuf::from)
         .unwrap_or_else(|_| {
-            let data_dir = dirs::data_dir()
-                .unwrap_or_else(|| PathBuf::from("."))
-                .join("Aurora");
-            data_dir.join("aurora.db")
+            aurora_core::paths::DB_PATH.clone()
         });
 
     let port: u16 = std::env::var("AURORA_PORT")
@@ -33,6 +30,7 @@ async fn main() -> anyhow::Result<()> {
 
     let state = Arc::new(AppState {
         conn: Mutex::new(conn),
+        db_path: Some(db_path),
     });
 
     let app = aurora_server::build_router(state);
