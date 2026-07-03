@@ -5,9 +5,14 @@ use axum::extract::{Path, Query, State};
 use axum::http::{header, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
+use chrono::{DateTime, Utc};
+use md5::{Digest, Md5};
 use serde::Deserialize;
 use serde_json::Value;
+use std::io::SeekFrom;
 use std::sync::Arc;
+use tokio::io::{AsyncReadExt, AsyncSeekExt};
+use tokio_util::io::ReaderStream;
 
 use crate::AppState;
 use super::envelope;
@@ -232,10 +237,35 @@ fn parse_range(range_str: &str, file_size: u64) -> Option<(u64, u64)> {
     }
 }
 
+/// Compute ETag and Last-Modified headers from file metadata.
+/// ETag mirrors Python/Starlette: `"{md5(str(st_mtime) + '-' + str(st_size))}"`.
+/// Last-Modified: RFC 1123 from file mtime.
+fn etag_and_lm(metadata: &std::fs::Metadata) -> (String, String) {
+    let mtime = metadata.modified().unwrap_or(std::time::UNIX_EPOCH);
+    let mtime_epoch = mtime
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs_f64();
+    let file_size = metadata.len();
+
+    // ETag: md5(str(st_mtime) + "-" + str(st_size))
+    let etag_base = format!("{}-{}", mtime_epoch, file_size);
+    let mut hasher = Md5::new();
+    hasher.update(etag_base.as_bytes());
+    let etag = format!("\"{:x}\"", hasher.finalize());
+
+    // Last-Modified: RFC 1123
+    let datetime: DateTime<Utc> = mtime.into();
+    let last_modified = datetime.format("%a, %d %b %Y %H:%M:%S GMT").to_string();
+
+    (etag, last_modified)
+}
+
 /// GET /api/songs/{song_id}/stream — stream audio file with HTTP-range support.
 ///
 /// - No Range header → 200 full body with Content-Type, Content-Length, Accept-Ranges
 /// - Range: bytes=start-end → 206 Partial Content with Content-Range
+/// - Multi-range → 416 (documented exception — Starlette multipart is non-RFC)
 /// - Unsatisfiable range → 416 Range Not Satisfiable
 /// - Missing file/song → 404
 pub async fn stream_song(
@@ -258,54 +288,88 @@ pub async fn stream_song(
     };
     drop(conn);
 
-    // Read the file
     let path = std::path::Path::new(&file_path);
-    let file_data = match tokio::fs::read(path).await {
-        Ok(data) => data,
+    let metadata = match tokio::fs::metadata(path).await {
+        Ok(m) => m,
         Err(_) => return envelope::not_found("Audio file not found on disk").into_response(),
     };
 
-    let file_size = file_data.len() as u64;
+    let file_size = metadata.len();
     let ext = path
         .extension()
         .and_then(|e| e.to_str())
         .unwrap_or("");
     let content_type = mime_from_extension(ext);
+    let (etag, last_modified) = etag_and_lm(&metadata);
+
+    // Helper: build a base Response::builder with common headers.
+    let base_headers = |status: StatusCode, content_len: u64| {
+        Response::builder()
+            .status(status)
+            .header(header::CONTENT_TYPE, content_type)
+            .header(header::CONTENT_LENGTH, content_len.to_string())
+            .header(header::ACCEPT_RANGES, "bytes")
+            .header(header::ETAG, &etag)
+            .header(header::LAST_MODIFIED, &last_modified)
+    };
 
     // Check for Range header
     if let Some(range_value) = headers.get(header::RANGE) {
         let range_str = range_value.to_str().unwrap_or("");
-        if let Some((start, end)) = parse_range(range_str, file_size) {
-            let slice = &file_data[start as usize..=end as usize];
-            let content_range = format!("bytes {}-{}/{}", start, end, file_size);
-            let content_length = slice.len();
 
-            return Response::builder()
-                .status(StatusCode::PARTIAL_CONTENT)
-                .header(header::CONTENT_TYPE, content_type)
+        // Multi-range (contains comma after "bytes=") → 416
+        // Documented exception: Starlette multipart is non-RFC-7233;
+        // no real audio client sends multi-range.
+        #[allow(clippy::collapsible_if)]
+        if let Some(spec) = range_str.strip_prefix("bytes=") {
+            if spec.contains(',') {
+                return base_headers(StatusCode::RANGE_NOT_SATISFIABLE, 0)
+                    .header(header::CONTENT_RANGE, format!("bytes */{}", file_size))
+                    .body(Body::empty())
+                    .unwrap();
+            }
+        }
+
+        if let Some((start, end)) = parse_range(range_str, file_size) {
+            let len = end - start + 1;
+            let content_range = format!("bytes {}-{}/{}", start, end, file_size);
+
+            // Open file, seek, take, stream
+            let mut file = match tokio::fs::File::open(path).await {
+                Ok(f) => f,
+                Err(_) => return envelope::not_found("Audio file not found on disk").into_response(),
+            };
+            if file.seek(SeekFrom::Start(start)).await.is_err() {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({"detail": "seek failed"})),
+                )
+                    .into_response();
+            }
+            let limited = file.take(len);
+            let stream = ReaderStream::new(limited);
+
+            return base_headers(StatusCode::PARTIAL_CONTENT, len)
                 .header(header::CONTENT_RANGE, content_range)
-                .header(header::CONTENT_LENGTH, content_length.to_string())
-                .header(header::ACCEPT_RANGES, "bytes")
-                .body(axum::body::Body::from(slice.to_vec()))
+                .body(Body::from_stream(stream))
                 .unwrap();
         } else {
             // Unsatisfiable range
-            return Response::builder()
-                .status(StatusCode::RANGE_NOT_SATISFIABLE)
+            return base_headers(StatusCode::RANGE_NOT_SATISFIABLE, 0)
                 .header(header::CONTENT_RANGE, format!("bytes */{}", file_size))
-                .header(header::CONTENT_LENGTH, "0")
-                .body(axum::body::Body::empty())
+                .body(Body::empty())
                 .unwrap();
         }
     }
 
     // Full response (no Range header)
-    Response::builder()
-        .status(StatusCode::OK)
-        .header(header::CONTENT_TYPE, content_type)
-        .header(header::CONTENT_LENGTH, file_size.to_string())
-        .header(header::ACCEPT_RANGES, "bytes")
-        .body(axum::body::Body::from(file_data))
+    let file = match tokio::fs::File::open(path).await {
+        Ok(f) => f,
+        Err(_) => return envelope::not_found("Audio file not found on disk").into_response(),
+    };
+    let stream = ReaderStream::new(file);
+    base_headers(StatusCode::OK, file_size)
+        .body(Body::from_stream(stream))
         .unwrap()
 }
 
