@@ -181,6 +181,6 @@ def get_folder_songs(
         cursor.execute(count_query, count_params)
         total = cursor.fetchone()["total"]
 
-    data = [song_row_to_dict(row) for row in rows]
+    data = [song_row_to_dict(row, include_peaks=False) for row in rows]
 
     return {"data": data, "meta": {"total": total, "path": path, "recursive": recursive}, "message": "ok"}

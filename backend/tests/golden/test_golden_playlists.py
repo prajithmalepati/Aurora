@@ -5,8 +5,9 @@ Uses conftest API for golden fixture comparison.
 
 Naming scheme: playlists_{endpoint}_{scenario}
 
-Tests run sequentially. Groups are separated by _seed_database() calls
-so each mutation group starts from a known seed state. Timestamps are
+Tests run sequentially. Groups are separated by module-level _seed_database()
+calls (run at collection time — provides intra-group separation).
+Timestamps are
 mocked via unittest.mock.patch for deterministic golden output.
 
 Seed state (from conftest):
@@ -18,6 +19,7 @@ import io
 import json
 import struct
 import zlib
+import pytest
 from unittest.mock import patch
 
 from tests.conftest import (
@@ -28,6 +30,12 @@ from tests.conftest import (
 )
 
 MOCK_NOW = "2025-06-01T13:00:00Z"
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _reset_db():
+    """Re-seed DB before this module's tests execute (not at import time)."""
+    _seed_database()
 
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
@@ -142,14 +150,13 @@ def test_serve_image_404(client):
     check_golden_status("playlists_serve_image_404", resp, 404)
 
 
-# ── Reset for mutation tests ─────────────────────────────────────────────────
-
-_seed_database()
-
-
 # ═══════════════════════════════════════════════════════════════════════════════
 # Group B — Create & Delete (seed state)
 # ═══════════════════════════════════════════════════════════════════════════════
+
+# ── Reset for mutation tests ─────────────────────────────────────────────────
+
+_seed_database()
 
 # 2. POST /api/playlists — create
 
@@ -195,15 +202,14 @@ def test_delete_playlist_404(client):
     check_golden_status("playlists_delete_404", resp, 404)
 
 
-# ── Reset ────────────────────────────────────────────────────────────────────
-
-_seed_database()
-
-
 # ═══════════════════════════════════════════════════════════════════════════════
 # Group C — Update metadata (seed state)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+# ── Reset ────────────────────────────────────────────────────────────────────
+
+_seed_database()
+# ═══════════════════════════════════════════════════════════════════════════════
 # 4. PUT /api/playlists/{id} — update name/color/emoji
 
 def test_update_playlist_happy(client):
@@ -235,15 +241,14 @@ def test_update_playlist_crossfade(client):
     check_golden_status("playlists_update_crossfade", resp)
 
 
-# ── Reset ────────────────────────────────────────────────────────────────────
-
-_seed_database()
-
-
 # ═══════════════════════════════════════════════════════════════════════════════
 # Group D — Add / Remove songs (seed state)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+# ── Reset ────────────────────────────────────────────────────────────────────
+
+_seed_database()
+# ═══════════════════════════════════════════════════════════════════════════════
 # 7. POST /api/playlists/{id}/songs — add song
 
 def test_add_song_happy(client):
@@ -300,15 +305,14 @@ def test_remove_song_404_not_in_playlist(client):
     check_golden_status("playlists_remove_song_404_not_in_playlist", resp, 404)
 
 
-# ── Reset ────────────────────────────────────────────────────────────────────
-
-_seed_database()
-
-
 # ═══════════════════════════════════════════════════════════════════════════════
 # Group E — Reorder songs (seed state, needs multiple songs → built in-test)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+# ── Reset ────────────────────────────────────────────────────────────────────
+
+_seed_database()
+# ═══════════════════════════════════════════════════════════════════════════════
 # 9. PUT /api/playlists/{id}/songs/reorder — reorder
 
 def test_reorder_happy(client):
@@ -341,15 +345,14 @@ def test_reorder_404_playlist(client):
     check_golden_status("playlists_reorder_404", resp, 404)
 
 
-# ── Reset ────────────────────────────────────────────────────────────────────
-
-_seed_database()
-
-
 # ═══════════════════════════════════════════════════════════════════════════════
 # Group F — Playlist image upload / delete (seed state)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+# ── Reset ────────────────────────────────────────────────────────────────────
+
+_seed_database()
+# ═══════════════════════════════════════════════════════════════════════════════
 # 10. PUT /api/playlists/{id}/image — upload image
 
 def test_upload_image_happy(client):
@@ -397,15 +400,14 @@ def test_delete_image_404_playlist(client):
     check_golden_status("playlists_delete_image_404", resp, 404)
 
 
-# ── Reset ────────────────────────────────────────────────────────────────────
-
-_seed_database()
-
-
 # ═══════════════════════════════════════════════════════════════════════════════
 # Group G — Song timing (seed state)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+# ── Reset ────────────────────────────────────────────────────────────────────
+
+_seed_database()
+# ═══════════════════════════════════════════════════════════════════════════════
 # 17 (16). PATCH /api/playlists/{id}/songs/{song_id}/timing — set trim
 
 def test_timing_happy(client):
@@ -436,15 +438,14 @@ def test_timing_404_not_in_playlist(client):
     check_golden_status("playlists_timing_404", resp, 404)
 
 
-# ── Reset ────────────────────────────────────────────────────────────────────
-
-_seed_database()
-
-
 # ═══════════════════════════════════════════════════════════════════════════════
 # Group H — Import (seed state)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+# ── Reset ────────────────────────────────────────────────────────────────────
+
+_seed_database()
+# ═══════════════════════════════════════════════════════════════════════════════
 # 15 (16). POST /api/playlists/import — import JSON
 
 def test_import_json_happy(client):

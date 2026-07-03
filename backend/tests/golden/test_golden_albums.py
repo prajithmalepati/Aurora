@@ -1,6 +1,12 @@
 """Golden parity tests for /api/albums endpoints."""
 import pytest
-from tests.conftest import check_golden, check_golden_status
+from tests.conftest import check_golden, check_golden_status, _seed_database
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _reset_db():
+    """Re-seed DB before this module's tests execute (not at import time)."""
+    _seed_database()
 
 
 def test_albums_list(client):
