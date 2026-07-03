@@ -1646,3 +1646,109 @@ pub fn update_song_stream_url(
     )?;
     Ok(())
 }
+
+// ── Watched folder queries ──────────────────────────────────────────────
+
+/// List all watched folders ordered by created_at DESC.
+pub fn list_watched_folders(conn: &Connection) -> Result<Vec<serde_json::Value>> {
+    let mut stmt = conn.prepare_cached(
+        "SELECT id, folder_path, is_active, last_scan_at, created_at FROM watched_folders ORDER BY created_at DESC",
+    )?;
+    let rows = stmt.query_map([], |row| {
+        Ok(serde_json::json!({
+            "id": row.get::<_, i64>(0)?,
+            "folder_path": row.get::<_, String>(1)?,
+            "is_active": row.get::<_, i64>(2)? != 0,
+            "last_scan_at": row.get::<_, Option<String>>(3)?,
+            "created_at": row.get::<_, String>(4)?,
+        }))
+    })?;
+    let mut data = Vec::new();
+    for r in rows {
+        data.push(r?);
+    }
+    Ok(data)
+}
+
+/// Get a watched folder by path. Returns (id, is_active) or None.
+pub fn get_watched_folder_by_path(
+    conn: &Connection,
+    path: &str,
+) -> Result<Option<(i64, bool)>> {
+    conn.query_row(
+        "SELECT id, is_active FROM watched_folders WHERE folder_path = ?1",
+        [path],
+        |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)? != 0)),
+    )
+    .optional()
+    .map_err(Into::into)
+}
+
+/// Reactivate a watched folder (set is_active = 1).
+pub fn reactivate_watched_folder(conn: &Connection, folder_id: i64) -> Result<()> {
+    conn.execute(
+        "UPDATE watched_folders SET is_active = 1 WHERE id = ?1",
+        [folder_id],
+    )?;
+    Ok(())
+}
+
+/// Insert a new watched folder. Returns the new row ID.
+pub fn insert_watched_folder(conn: &Connection, path: &str) -> Result<i64> {
+    conn.execute(
+        "INSERT INTO watched_folders (folder_path) VALUES (?1)",
+        [path],
+    )?;
+    Ok(conn.last_insert_rowid())
+}
+
+/// Check if a watched folder exists by ID.
+pub fn watched_folder_exists(conn: &Connection, folder_id: i64) -> Result<bool> {
+    let count: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM watched_folders WHERE id = ?1",
+        [folder_id],
+        |row| row.get(0),
+    )?;
+    Ok(count > 0)
+}
+
+/// Delete a watched folder by ID.
+pub fn delete_watched_folder(conn: &Connection, folder_id: i64) -> Result<()> {
+    conn.execute("DELETE FROM watched_folders WHERE id = ?1", [folder_id])?;
+    Ok(())
+}
+
+/// Get the folder path for a watched folder by ID.
+pub fn get_watched_folder_path(conn: &Connection, folder_id: i64) -> Result<Option<String>> {
+    conn.query_row(
+        "SELECT folder_path FROM watched_folders WHERE id = ?1",
+        [folder_id],
+        |row| row.get(0),
+    )
+    .optional()
+    .map_err(Into::into)
+}
+
+/// Update last_scan_at for a watched folder to now.
+pub fn update_watched_folder_last_scan(conn: &Connection, folder_id: i64) -> Result<()> {
+    let now = chrono_now();
+    conn.execute(
+        "UPDATE watched_folders SET last_scan_at = ?1 WHERE id = ?2",
+        rusqlite::params![now, folder_id],
+    )?;
+    Ok(())
+}
+
+/// List active watched folders for the background watcher.
+/// Returns (id, folder_path) pairs.
+pub fn list_active_watched_folders(conn: &Connection) -> Result<Vec<(i64, String)>> {
+    let mut stmt = conn.prepare_cached(
+        "SELECT id, folder_path FROM watched_folders WHERE is_active = 1",
+    )?;
+    let rows = stmt.query_map([], |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)))?;
+    let mut data = Vec::new();
+    for r in rows {
+        data.push(r?);
+    }
+    Ok(data)
+}

@@ -21,7 +21,47 @@ pub struct ScanRequest {
     pub playlist_name: Option<String>,
 }
 
+/// Build the scan result JSON + human message (shared by all scan paths).
+fn build_scan_envelope(result: aurora_core::scanner::db::ScanResult) -> (serde_json::Value, String) {
+    let mut parts = Vec::new();
+    if result.imported > 0 {
+        parts.push(format!("Imported {} new songs", result.imported));
+    }
+    if result.replaced > 0 {
+        parts.push(format!("replaced {} lower-quality songs with higher-quality versions", result.replaced));
+    }
+    if result.skipped > 0 {
+        parts.push(format!("skipped {} already in library", result.skipped));
+    }
+    if result.art_extracted > 0 {
+        parts.push(format!("extracted art for {} songs", result.art_extracted));
+    }
+    let message = if parts.is_empty() {
+        "Scan complete: nothing new found.".to_string()
+    } else {
+        format!("Scan complete: {}.", parts.join(". "))
+    };
+
+    let data = serde_json::json!({
+        "scanned": result.scanned,
+        "imported": result.imported,
+        "replaced": result.replaced,
+        "skipped": result.skipped,
+        "skipped_exact": result.skipped_exact,
+        "skipped_same_format": result.skipped_same_format,
+        "skipped_lower_quality": result.skipped_lower_quality,
+        "errors": result.errors.iter().map(|e| serde_json::json!({"file": e.file, "error": e.error})).collect::<Vec<_>>(),
+        "songs": result.songs,
+        "replaced_songs": result.replaced_songs,
+        "art_extracted": result.art_extracted,
+    });
+    (data, message)
+}
+
 /// POST /api/scan — scan a folder for music files and import them.
+///
+/// F1: Uses spawn_blocking so audio decode doesn't pin a tokio worker.
+/// Opens a dedicated DB connection inside the blocking task.
 pub async fn scan_folder_endpoint(
     State(state): State<Arc<AppState>>,
     Json(req): Json<ScanRequest>,
@@ -33,84 +73,44 @@ pub async fn scan_folder_endpoint(
 
     // Check if folder exists
     let path = std::path::Path::new(&req.folder_path);
-    if !path.exists() {
-        return envelope::not_found("folder_path does not exist or is not a directory").into_response();
-    }
-    if !path.is_dir() {
+    if !path.exists() || !path.is_dir() {
         return envelope::not_found("folder_path does not exist or is not a directory").into_response();
     }
 
     // F1: Open a dedicated scan connection so the main AppState.conn is not
     // held during audio decode. For in-memory test harness (db_path = None),
     // fall back to the shared connection.
-    let scan_conn = if let Some(ref db_path) = state.db_path {
-        match aurora_core::db::open_and_migrate(db_path) {
-            Ok(c) => c,
-            Err(e) => {
-                return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"detail": e.to_string()}))).into_response();
-            }
+    let db_path = match state.db_path.clone() {
+        Some(p) => p,
+        None => {
+            // Test harness: use shared in-memory connection
+            return scan_with_shared_conn(&state, &req).await;
         }
-    } else {
-        // Test harness: use shared in-memory connection
-        let conn = state.conn.lock().await;
-        // Safety: we need to clone the connection handle for the scan.
-        // For in-memory DBs this is the same physical DB via shared cache.
-        drop(conn);
-        let conn = state.conn.lock().await;
-        // We can't easily clone a rusqlite Connection; for test harness
-        // we'll open a second in-memory connection — but in-memory DBs
-        // don't share state unless using shared cache. For golden tests,
-        // the harness should use a temp file DB. Fall back to shared conn.
-        drop(conn);
-        return scan_with_shared_conn(&state, &req).await;
     };
 
-    // F1 req 2: AppState.conn mutex is NOT held — /api/health stays responsive
-    match aurora_core::scanner::db::import_scanned_songs(
-        &scan_conn,
-        &req.folder_path,
-        req.playlist_name.as_deref(),
-        None,
-        None,
-    ) {
-        Ok(result) => {
-            // Build message (matches Python scanner.py:41-51)
-            let mut parts = Vec::new();
-            if result.imported > 0 {
-                parts.push(format!("Imported {} new songs", result.imported));
-            }
-            if result.replaced > 0 {
-                parts.push(format!("replaced {} lower-quality songs with higher-quality versions", result.replaced));
-            }
-            if result.skipped > 0 {
-                parts.push(format!("skipped {} already in library", result.skipped));
-            }
-            if result.art_extracted > 0 {
-                parts.push(format!("extracted art for {} songs", result.art_extracted));
-            }
-            let message = if parts.is_empty() {
-                "Scan complete: nothing new found.".to_string()
-            } else {
-                format!("Scan complete: {}.", parts.join(". "))
-            };
+    let folder_path = req.folder_path.clone();
+    let playlist_name = req.playlist_name.clone();
 
-            // F5: errors is already a list, songs/replaced_songs already full — no strip needed
-            envelope::ok(
-                serde_json::json!({
-                    "scanned": result.scanned,
-                    "imported": result.imported,
-                    "replaced": result.replaced,
-                    "skipped": result.skipped,
-                    "skipped_exact": result.skipped_exact,
-                    "skipped_same_format": result.skipped_same_format,
-                    "skipped_lower_quality": result.skipped_lower_quality,
-                    "errors": result.errors.iter().map(|e| serde_json::json!({"file": e.file, "error": e.error})).collect::<Vec<_>>(),
-                    "songs": result.songs,
-                    "replaced_songs": result.replaced_songs,
-                    "art_extracted": result.art_extracted,
-                }),
-                &message,
-            ).into_response()
+    // F1 req 2: AppState.conn mutex is NOT held — /api/health stays responsive
+    let result = tokio::task::spawn_blocking(move || {
+        let conn = aurora_core::db::open_and_migrate(&db_path)?;
+        aurora_core::scanner::db::import_scanned_songs(
+            &conn,
+            &folder_path,
+            playlist_name.as_deref(),
+            None,
+            None,
+        )
+    })
+    .await;
+
+    match result {
+        Ok(Ok(scan_result)) => {
+            let (data, message) = build_scan_envelope(scan_result);
+            envelope::ok(data, &message).into_response()
+        }
+        Ok(Err(e)) => {
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"detail": e.to_string()}))).into_response()
         }
         Err(e) => {
             (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"detail": e.to_string()}))).into_response()
@@ -129,41 +129,8 @@ async fn scan_with_shared_conn(state: &AppState, req: &ScanRequest) -> Response 
         None,
     ) {
         Ok(result) => {
-            let mut parts = Vec::new();
-            if result.imported > 0 {
-                parts.push(format!("Imported {} new songs", result.imported));
-            }
-            if result.replaced > 0 {
-                parts.push(format!("replaced {} lower-quality songs with higher-quality versions", result.replaced));
-            }
-            if result.skipped > 0 {
-                parts.push(format!("skipped {} already in library", result.skipped));
-            }
-            if result.art_extracted > 0 {
-                parts.push(format!("extracted art for {} songs", result.art_extracted));
-            }
-            let message = if parts.is_empty() {
-                "Scan complete: nothing new found.".to_string()
-            } else {
-                format!("Scan complete: {}.", parts.join(". "))
-            };
-
-            envelope::ok(
-                serde_json::json!({
-                    "scanned": result.scanned,
-                    "imported": result.imported,
-                    "replaced": result.replaced,
-                    "skipped": result.skipped,
-                    "skipped_exact": result.skipped_exact,
-                    "skipped_same_format": result.skipped_same_format,
-                    "skipped_lower_quality": result.skipped_lower_quality,
-                    "errors": result.errors.iter().map(|e| serde_json::json!({"file": e.file, "error": e.error})).collect::<Vec<_>>(),
-                    "songs": result.songs,
-                    "replaced_songs": result.replaced_songs,
-                    "art_extracted": result.art_extracted,
-                }),
-                &message,
-            ).into_response()
+            let (data, message) = build_scan_envelope(result);
+            envelope::ok(data, &message).into_response()
         }
         Err(e) => {
             (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"detail": e.to_string()}))).into_response()
