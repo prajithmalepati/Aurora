@@ -1271,6 +1271,8 @@ pub fn list_folder_tree(conn: &Connection) -> Result<(serde_json::Value, i64, i6
 
 /// List songs within a specific folder path.
 /// Returns `(songs, total)`. Songs serialized with peaks (include_peaks = true).
+/// LIKE hygiene: escapes `%`/`_` in path, uses `ESCAPE`, normalizes column
+/// so backslash-stored and leading-slash-less paths match (Python parity).
 pub fn list_folder_songs(
     conn: &Connection,
     path: &str,
@@ -1279,19 +1281,28 @@ pub fn list_folder_songs(
     offset: i64,
 ) -> Result<(Vec<serde_json::Value>, i64)> {
     let normalized_path = path.trim_end_matches('/');
-    let like_pattern = format!("{}/%", normalized_path);
+
+    // Escape % and _ in the path for LIKE patterns (backslash escape)
+    let escaped_path = normalized_path
+        .replace('%', "\\%")
+        .replace('_', "\\_");
+    let like_pattern = format!("{}/%", escaped_path);
+
+    // Normalize column: convert backslash to '/', ensure leading '/'
+    // char(92) = backslash in SQLite
+    let norm_col = "('/' || LTRIM(REPLACE(s.file_path, char(92), '/'), '/'))";
 
     // Count
     let total: i64 = if recursive {
         conn.query_row(
-            "SELECT COUNT(*) FROM songs s WHERE s.file_path LIKE ?1",
+            &format!("SELECT COUNT(*) FROM songs s WHERE {} LIKE ?1 ESCAPE '\\'", norm_col),
             rusqlite::params![like_pattern],
             |row| row.get(0),
         )?
     } else {
-        let deeper_pattern = format!("{}/%/%", normalized_path);
+        let deeper_pattern = format!("{}/%/%", escaped_path);
         conn.query_row(
-            "SELECT COUNT(*) FROM songs s WHERE s.file_path LIKE ?1 AND s.file_path NOT LIKE ?2",
+            &format!("SELECT COUNT(*) FROM songs s WHERE {} LIKE ?1 ESCAPE '\\' AND {} NOT LIKE ?2 ESCAPE '\\'", norm_col, norm_col),
             rusqlite::params![like_pattern, deeper_pattern],
             |row| row.get(0),
         )?
@@ -1300,8 +1311,8 @@ pub fn list_folder_songs(
     // Data query
     let songs = if recursive {
         let sql = format!(
-            "{} WHERE s.file_path LIKE ?1 GROUP BY s.id ORDER BY s.title COLLATE NOCASE ASC, s.id ASC LIMIT ?2 OFFSET ?3",
-            SONG_SELECT
+            "{} WHERE {} LIKE ?1 ESCAPE '\\' GROUP BY s.id ORDER BY s.title COLLATE NOCASE ASC, s.id ASC LIMIT ?2 OFFSET ?3",
+            SONG_SELECT, norm_col
         );
         let mut stmt = conn.prepare(&sql)?;
         let rows = stmt.query_map(rusqlite::params![like_pattern, limit, offset], |row| {
@@ -1309,10 +1320,10 @@ pub fn list_folder_songs(
         })?;
         rows.collect::<std::result::Result<Vec<_>, _>>()?
     } else {
-        let deeper_pattern = format!("{}/%/%", normalized_path);
+        let deeper_pattern = format!("{}/%/%", escaped_path);
         let sql = format!(
-            "{} WHERE s.file_path LIKE ?1 AND s.file_path NOT LIKE ?2 GROUP BY s.id ORDER BY s.title COLLATE NOCASE ASC, s.id ASC LIMIT ?3 OFFSET ?4",
-            SONG_SELECT
+            "{} WHERE {} LIKE ?1 ESCAPE '\\' AND {} NOT LIKE ?2 ESCAPE '\\' GROUP BY s.id ORDER BY s.title COLLATE NOCASE ASC, s.id ASC LIMIT ?3 OFFSET ?4",
+            SONG_SELECT, norm_col, norm_col
         );
         let mut stmt = conn.prepare(&sql)?;
         let rows = stmt.query_map(
@@ -1369,27 +1380,37 @@ pub fn get_album_songs(conn: &Connection, album_name: &str) -> Result<Vec<serde_
 }
 
 /// Current UTC time in ISO format.
-fn chrono_now() -> String {
-    // Use a simple implementation without chrono dependency
-    // For golden tests this doesn't matter (we strip timestamps)
+/// Uses Howard Hinnant's `days_from_civil` inverse algorithm for correct
+/// year/month/day conversion from epoch days. Matches Python's
+/// `datetime.now(timezone.utc).isoformat()` shape.
+pub fn chrono_now() -> String {
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap();
     let secs = now.as_secs();
-    let days = secs / 86400;
+    let days = (secs / 86400) as i64;
     let time_of_day = secs % 86400;
     let hours = time_of_day / 3600;
     let minutes = (time_of_day % 3600) / 60;
     let seconds = time_of_day % 60;
 
-    // Days since epoch to Y-M-D (simplified — good enough for created_at)
-    let y = 1970 + (days / 365);
-    let remaining = days % 365;
-    let m = (remaining / 30) + 1;
-    let d = (remaining % 30) + 1;
+    // Hinnant's civil_from_days inverse (~15 lines, no dependency)
+    // https://howardhinnant.github.io/date_algorithms.html
+    let z = days + 719468;
+    let era = if z >= 0 { z } else { z - 146096 } / 146097;
+    let doe = (z - era * 146097) as u32;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let y = yoe as i64 + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = if m <= 2 { y + 1 } else { y };
+
+    let subsec_micros = now.subsec_micros();
 
     format!(
-        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
-        y, m, d, hours, minutes, seconds
+        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:06}+00:00",
+        y, m, d, hours, minutes, seconds, subsec_micros
     )
 }

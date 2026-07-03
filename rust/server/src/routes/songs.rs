@@ -1,5 +1,6 @@
 //! Songs router — ported from backend/app/routers/songs.py.
 
+use axum::body::Body;
 use axum::extract::{Path, Query, State};
 use axum::http::{header, StatusCode};
 use axum::response::{IntoResponse, Response};
@@ -314,26 +315,59 @@ pub async fn bleed_thumb(
     Path(song_id): Path<i64>,
 ) -> Response {
     let conn = state.conn.lock().await;
-    // Check if song has a bleed_thumb blob
     let result: Result<Option<Vec<u8>>, _> = conn.query_row(
         "SELECT bleed_thumb FROM songs WHERE id = ?1",
         [song_id],
         |row| row.get(0),
     );
     match result {
-        Ok(Some(_blob)) => {
-            // Would serve the blob — for golden test, this won't be hit
-            // (no seed song has bleed_thumb)
-            (StatusCode::OK, [("content-type", "image/png")]).into_response()
+        Ok(Some(blob)) if !blob.is_empty() => {
+            Response::builder()
+                .status(StatusCode::OK)
+                .header("content-type", "image/png")
+                .header("cache-control", "public, max-age=31536000, immutable")
+                .body(Body::from(blob))
+                .unwrap_or_else(|_| Response::builder().status(StatusCode::INTERNAL_SERVER_ERROR).body(Body::empty()).expect("fallback"))
         }
         _ => envelope::not_found("No bleed thumb available").into_response(),
     }
 }
 
-/// GET /api/album-art/{filename} — serve album art.
+/// GET /api/album-art/{filename} — serve album art from disk.
+/// Traversal guard: strips to file name (matches Python's Path(filename).name).
 pub async fn album_art(
-    Path(_filename): Path<String>,
+    Path(filename): Path<String>,
 ) -> Response {
-    // For golden parity: album art files don't exist in test env
-    envelope::not_found("Album art not found").into_response()
+    // Traversal guard — only use the bare filename
+    let safe_name = std::path::Path::new(&filename)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("");
+
+    if safe_name.is_empty() {
+        return envelope::not_found("Album art not found").into_response();
+    }
+
+    // F3: Resolve art directory via central paths module (matches Python paths.py)
+    let art_dir = aurora_core::paths::ALBUM_ART_DIR.clone();
+
+    let art_path = art_dir.join(safe_name);
+    match tokio::fs::read(&art_path).await {
+        Ok(bytes) => {
+            // Detect content-type from extension
+            let content_type = match art_path.extension().and_then(|e| e.to_str()) {
+                Some("png") => "image/png",
+                Some("jpg") | Some("jpeg") => "image/jpeg",
+                Some("webp") => "image/webp",
+                _ => "application/octet-stream",
+            };
+            Response::builder()
+                .status(StatusCode::OK)
+                .header("content-type", content_type)
+                .header("cache-control", "public, max-age=31536000, immutable")
+                .body(Body::from(bytes))
+                .unwrap_or_else(|_| Response::builder().status(StatusCode::INTERNAL_SERVER_ERROR).body(Body::empty()).expect("fallback"))
+        }
+        Err(_) => envelope::not_found("Album art not found").into_response(),
+    }
 }

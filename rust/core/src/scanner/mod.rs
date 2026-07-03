@@ -2,9 +2,11 @@
 //!
 //! Metadata half: tags, format, ReplayGain, artist parsing (N30).
 //! Analysis half: peaks, colors, bleed (N31).
+//! DB half: scan_folder, import_scanned_songs, replace_song (N36).
 
 pub mod analysis;
 pub mod color_utils;
+pub mod db;
 pub mod peaks;
 
 use regex::Regex;

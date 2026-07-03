@@ -1,16 +1,20 @@
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use tokio::sync::Mutex;
 
 mod routes;
 
-/// Shared application state — holds a single rusqlite Connection.
+/// Shared application state — holds a single rusqlite Connection
+/// plus the DB file path (for opening scan-dedicated connections).
 ///
 /// Wrapped in `Arc<Mutex<>>` so axum handlers can share it.
 /// rusqlite's Connection is `!Send`, but `Mutex` makes it usable
 /// across async tasks (lock is held only during synchronous DB calls).
 pub struct AppState {
     pub conn: Mutex<aurora_core::rusqlite::Connection>,
+    /// Path to the SQLite DB file. None for in-memory test harness.
+    pub db_path: Option<PathBuf>,
 }
 
 /// Build the axum Router with all API routes mounted.
@@ -116,6 +120,29 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
         .route(
             "/api/albums/{album_name}",
             axum::routing::get(routes::get_album),
+        )
+        // ── Scanner routes ──
+        .route(
+            "/api/scan",
+            axum::routing::post(routes::scanner::scan_folder_endpoint),
+        )
+        .route(
+            "/api/scan/stream",
+            axum::routing::post(routes::scanner::scan_folder_stream),
+        )
+        // ── Watcher routes ──
+        .route(
+            "/api/watch",
+            axum::routing::get(routes::watcher::list_watched_folders)
+                .post(routes::watcher::add_watched_folder),
+        )
+        .route(
+            "/api/watch/{folder_id}",
+            axum::routing::delete(routes::watcher::remove_watched_folder),
+        )
+        .route(
+            "/api/watch/{folder_id}/scan",
+            axum::routing::post(routes::watcher::trigger_scan),
         )
         .with_state(state)
 }

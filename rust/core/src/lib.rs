@@ -2,6 +2,7 @@ pub mod addons;
 pub mod db;
 pub mod filter;
 pub mod models;
+pub mod paths;
 pub mod scanner;
 pub mod serializer;
 
