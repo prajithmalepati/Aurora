@@ -33,6 +33,13 @@ fn build_scan_response(result: aurora_core::scanner::db::ScanResult) -> Value {
     })
 }
 
+/// Signal the background watcher to reconfigure (if handle exists).
+async fn signal_reconfigure(state: &AppState) {
+    if let Some(ref handle) = state.watcher_handle {
+        let _ = handle.reconfigure_tx.try_send(());
+    }
+}
+
 /// GET /api/watch — list all watched folders.
 pub async fn list_watched_folders(
     State(state): State<Arc<AppState>>,
@@ -70,6 +77,8 @@ pub async fn add_watched_folder(
                 let _ = aurora_core::db::queries::reactivate_watched_folder(&conn, id);
             }
             let message = if is_active { "Folder already watched" } else { "Folder reactivated" };
+            drop(conn);
+            signal_reconfigure(&state).await;
             envelope::ok(
                 serde_json::json!({"id": id, "folder_path": path_str, "is_active": true}),
                 message,
@@ -77,10 +86,14 @@ pub async fn add_watched_folder(
         }
         Ok(None) => {
             match aurora_core::db::queries::insert_watched_folder(&conn, &path_str) {
-                Ok(id) => envelope::ok(
-                    serde_json::json!({"id": id, "folder_path": path_str, "is_active": true}),
-                    "ok",
-                ).into_response(),
+                Ok(id) => {
+                    drop(conn);
+                    signal_reconfigure(&state).await;
+                    envelope::ok(
+                        serde_json::json!({"id": id, "folder_path": path_str, "is_active": true}),
+                        "ok",
+                    ).into_response()
+                }
                 Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"detail": e.to_string()}))).into_response(),
             }
         }
@@ -101,6 +114,8 @@ pub async fn remove_watched_folder(
     }
 
     let _ = aurora_core::db::queries::delete_watched_folder(&conn, folder_id);
+    drop(conn);
+    signal_reconfigure(&state).await;
     envelope::ok(serde_json::json!({"id": folder_id}), "ok").into_response()
 }
 

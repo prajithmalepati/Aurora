@@ -28,10 +28,15 @@ async fn main() -> anyhow::Result<()> {
         conn.pragma_query_value(None, "user_version", |row| row.get(0))?;
     println!("  user_version: {user_version}");
 
+    // Start background file watcher (native FS events, debounced)
+    let (watcher_handle, _shutdown) = aurora_server::background_watcher::start_background_watcher(db_path.clone());
+    println!("  Background watcher: started");
+
     let state = Arc::new(AppState {
         conn: Mutex::new(conn),
         db_path: Some(db_path),
         addon_state: Arc::new(aurora_server::routes::addons::AddonState::new()),
+        watcher_handle: Some(watcher_handle),
     });
 
     let app = aurora_server::build_router(state);

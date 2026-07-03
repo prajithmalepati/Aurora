@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use tokio::sync::Mutex;
 
+pub mod background_watcher;
 pub mod routes;
 
 /// Shared application state — holds a single rusqlite Connection
@@ -17,6 +18,8 @@ pub struct AppState {
     pub db_path: Option<PathBuf>,
     /// Addon proxy state (HTTP client, rate limiters).
     pub addon_state: Arc<routes::addons::AddonState>,
+    /// Background file watcher handle — endpoints signal reconfiguration.
+    pub watcher_handle: Option<background_watcher::WatcherHandle>,
 }
 
 /// Build the axum Router with all API routes mounted.
