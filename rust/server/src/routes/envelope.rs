@@ -49,6 +49,17 @@ pub fn bad_request(detail: &str) -> (StatusCode, Json<Value>) {
     (StatusCode::BAD_REQUEST, Json(serde_json::json!({"detail": detail})))
 }
 
+/// 403 JSON response.
+pub fn forbidden(detail: &str) -> (StatusCode, Json<Value>) {
+    (StatusCode::FORBIDDEN, Json(serde_json::json!({"detail": detail})))
+}
+
+/// 502 JSON response.
+#[allow(dead_code)]
+pub fn bad_gateway(detail: &str) -> (StatusCode, Json<Value>) {
+    (StatusCode::BAD_GATEWAY, Json(serde_json::json!({"detail": detail})))
+}
+
 /// Generic error response — maps anyhow errors to 500.
 #[allow(dead_code)]
 pub struct AppError(pub anyhow::Error);

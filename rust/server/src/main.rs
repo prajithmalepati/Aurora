@@ -31,6 +31,7 @@ async fn main() -> anyhow::Result<()> {
     let state = Arc::new(AppState {
         conn: Mutex::new(conn),
         db_path: Some(db_path),
+        addon_state: Arc::new(aurora_server::routes::addons::AddonState::new()),
     });
 
     let app = aurora_server::build_router(state);

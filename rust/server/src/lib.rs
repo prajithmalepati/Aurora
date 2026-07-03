@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use tokio::sync::Mutex;
 
-mod routes;
+pub mod routes;
 
 /// Shared application state — holds a single rusqlite Connection
 /// plus the DB file path (for opening scan-dedicated connections).
@@ -15,6 +15,8 @@ pub struct AppState {
     pub conn: Mutex<aurora_core::rusqlite::Connection>,
     /// Path to the SQLite DB file. None for in-memory test harness.
     pub db_path: Option<PathBuf>,
+    /// Addon proxy state (HTTP client, rate limiters).
+    pub addon_state: Arc<routes::addons::AddonState>,
 }
 
 /// Build the axum Router with all API routes mounted.
@@ -143,6 +145,36 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
         .route(
             "/api/watch/{folder_id}/scan",
             axum::routing::post(routes::watcher::trigger_scan),
+        )
+        // ── Addon routes (N37) ──
+        .route(
+            "/api/addons",
+            axum::routing::get(routes::addons::list_addons).post(routes::addons::add_addon),
+        )
+        .route(
+            "/api/addons/{addon_id}",
+            axum::routing::patch(routes::addons::toggle_addon)
+                .delete(routes::addons::delete_addon),
+        )
+        .route(
+            "/api/addons/{addon_id}/search",
+            axum::routing::get(routes::addons::addon_search),
+        )
+        .route(
+            "/api/addons/{addon_id}/stream/{external_id}",
+            axum::routing::get(routes::addons::addon_stream),
+        )
+        .route(
+            "/api/addons/{addon_id}/lyrics",
+            axum::routing::get(routes::addons::addon_lyrics),
+        )
+        .route(
+            "/api/addons/{addon_id}/save",
+            axum::routing::post(routes::addons::save_addon_track),
+        )
+        .route(
+            "/api/songs/{song_id}/resolve",
+            axum::routing::get(routes::addons::resolve_stream),
         )
         .with_state(state)
 }
