@@ -1415,6 +1415,35 @@ pub fn chrono_now() -> String {
     )
 }
 
+/// Addon-specific timestamp: second-precision with Z suffix.
+/// Matches Python's datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ").
+/// Used by addon queries (insert_addon, update_addon_success/failure, expires_at).
+/// Do NOT use for song timestamps — those use chrono_now() (micros+offset).
+pub fn chrono_now_z() -> String {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap();
+    let secs = now.as_secs();
+    let days = (secs / 86400) as i64;
+    let time_of_day = secs % 86400;
+    let hours = time_of_day / 3600;
+    let minutes = (time_of_day % 3600) / 60;
+    let seconds = time_of_day % 60;
+
+    let z = days + 719468;
+    let era = if z >= 0 { z } else { z - 146096 } / 146097;
+    let doe = (z - era * 146097) as u32;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let y = yoe as i64 + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = if m <= 2 { y + 1 } else { y };
+
+    format!("{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z", y, m, d, hours, minutes, seconds)
+}
+
 // ── Addon queries ────────────────────────────────────────────────────────
 
 /// Serialize a rusqlite Row into addon JSON.
@@ -1440,7 +1469,7 @@ pub fn insert_addon(
     version: Option<&str>,
     manifest_json: &str,
 ) -> Result<()> {
-    let now = chrono_now();
+    let now = chrono_now_z();
     conn.execute(
         "INSERT INTO addons (id, base_url, name, version, manifest_json, enabled, added_at, last_ok_at, fail_count) \
          VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6, ?7, 0)",
@@ -1523,7 +1552,7 @@ pub fn delete_addon(conn: &Connection, addon_id: &str) -> Result<bool> {
 
 /// Record a successful proxy request — reset fail_count, update last_ok_at.
 pub fn update_addon_success(conn: &Connection, addon_id: &str) -> Result<()> {
-    let now = chrono_now();
+    let now = chrono_now_z();
     conn.execute(
         "UPDATE addons SET fail_count = 0, last_ok_at = ?1 WHERE id = ?2",
         rusqlite::params![now, addon_id],
@@ -1533,7 +1562,7 @@ pub fn update_addon_success(conn: &Connection, addon_id: &str) -> Result<()> {
 
 /// Record a failed proxy request — increment fail_count, update last_fail_at.
 pub fn update_addon_failure(conn: &Connection, addon_id: &str) -> Result<()> {
-    let now = chrono_now();
+    let now = chrono_now_z();
     conn.execute(
         "UPDATE addons SET fail_count = fail_count + 1, last_fail_at = ?1 WHERE id = ?2",
         rusqlite::params![now, addon_id],
@@ -1592,7 +1621,7 @@ pub fn save_addon_track(
         let d = doy - (153 * mp + 2) / 5 + 1;
         let m = if mp < 10 { mp + 3 } else { mp - 9 };
         let y = if m <= 2 { y + 1 } else { y };
-        format!("{:04}-{:02}-{:02}T{:02}:{:02}:{:02}+00:00", y, m, d, hours, minutes, seconds)
+        format!("{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z", y, m, d, hours, minutes, seconds)
     });
 
     conn.execute(
