@@ -545,10 +545,21 @@ from app.routers.addons import _is_private_ip, _validate_url_for_ssrf
     ("::1", True),                               # IPv6 loopback
     ("224.0.0.1", True),                        # multicast
     ("255.255.255.255", True),                  # reserved broadcast
+    # F2: v6-compatible embedding (::/8)
+    ("::127.0.0.1", True),
+    ("::10.0.0.1", True),
+    # F2: NAT64 (64:ff9b::/96)
+    ("64:ff9b::7f00:1", True),
+    ("64:ff9b::10.0.0.1", True),
+    # F2: documentation range (2001:db8::/32)
+    ("2001:db8::1", True),
+    ("2001:db8:abcd::1", True),
     # --- Must PASS (public addresses) ---
     ("8.8.8.8", False),                          # public IPv4
     ("::ffff:8.8.8.8", False),                  # IPv4-mapped PUBLIC → must not over-reject
     ("2606:4700::1111", False),                 # public IPv6 (Cloudflare)
+    # F2: public-adjacent neighbors must PASS
+    ("64:ff9c::1", False),
 ])
 def test_n37_is_private_ip_gaps(ip, expected_reject):
     """N37: _is_private_ip must reject all private/reserved/unspecified IPs.

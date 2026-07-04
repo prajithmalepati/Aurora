@@ -44,6 +44,9 @@ pub fn is_private_ip(ip: IpAddr) -> bool {
                 || v6.is_multicast()
                 || is_ipv6_link_local(v6)
                 || is_ipv6_unique_local(v6)
+                || is_ipv6_v4_compat(v6)     // ::/8 — v6-compatible embedding
+                || is_ipv6_nat64(v6)         // 64:ff9b::/96
+                || is_ipv6_doc_range(v6)     // 2001:db8::/32
         }
     }
 }
@@ -63,6 +66,27 @@ fn is_ipv6_link_local(ip: Ipv6Addr) -> bool {
 /// fc00::/7 — IPv6 unique local (ULA).
 fn is_ipv6_unique_local(ip: Ipv6Addr) -> bool {
     (ip.segments()[0] & 0xFE00) == 0xFC00
+}
+
+/// ::/8 — IPv6-compatible IPv4 embedding (e.g. ::127.0.0.1).
+/// First segment must be 0; covers all of ::x.x.x.x.
+/// Note: ::1 (loopback) and :: (unspecified) are already caught earlier.
+fn is_ipv6_v4_compat(ip: Ipv6Addr) -> bool {
+    ip.segments()[0] == 0
+}
+
+/// 64:ff9b::/96 — NAT64 well-known prefix.
+/// Embedded IPv4 can target loopback/private via a NAT64 gateway.
+fn is_ipv6_nat64(ip: Ipv6Addr) -> bool {
+    // 64:ff9b::/96 — first 96 bits (6 segments) fixed, last 32 bits free
+    ip.segments()[0] == 0x64 && ip.segments()[1] == 0xff9b
+        && ip.segments()[2] == 0 && ip.segments()[3] == 0
+        && ip.segments()[4] == 0 && ip.segments()[5] == 0
+}
+
+/// 2001:db8::/32 — documentation range (RFC 3849).
+fn is_ipv6_doc_range(ip: Ipv6Addr) -> bool {
+    ip.segments()[0] == 0x2001 && (ip.segments()[1] & 0xFFF0) == 0x0DB0
 }
 
 #[cfg(test)]
@@ -88,6 +112,15 @@ mod tests {
             "::1",
             "224.0.0.1",
             "255.255.255.255",
+            // F2: v6-compatible embedding (::/8)
+            "::127.0.0.1",
+            "::10.0.0.1",
+            // F2: NAT64 (64:ff9b::/96)
+            "64:ff9b::7f00:1",
+            "64:ff9b::10.0.0.1",
+            // F2: documentation range (2001:db8::/32)
+            "2001:db8::1",
+            "2001:db8:abcd::1",
         ];
         for ip_str in reject_cases {
             let ip: IpAddr = ip_str.parse().unwrap();
@@ -103,6 +136,8 @@ mod tests {
             "2606:4700::1111",
             "1.1.1.1",
             "93.184.216.34",
+            // F2: public-adjacent neighbors must PASS
+            "64:ff9c::1",
         ];
         for ip_str in pass_cases {
             let ip: IpAddr = ip_str.parse().unwrap();

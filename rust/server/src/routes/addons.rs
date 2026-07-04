@@ -190,6 +190,27 @@ fn validate_url_for_ssrf(url: &str) -> Result<(), (StatusCode, String)> {
 
 // ── Safe Fetch with Redirect + Size Cap ───────────────────────────────
 
+/// Read the response body with a running byte count, aborting past max_bytes.
+/// Mirrors Python's chunked read + abort (addons.py:140-147).
+async fn read_body_capped(
+    mut resp: reqwest::Response,
+    max_bytes: u64,
+) -> Result<Vec<u8>, (StatusCode, String)> {
+    let mut body = Vec::new();
+    while let Some(chunk) = resp.chunk().await.map_err(|e| {
+        (StatusCode::BAD_GATEWAY, format!("Read error: {}", e))
+    })? {
+        if (body.len() as u64) + (chunk.len() as u64) > max_bytes {
+            return Err((
+                StatusCode::BAD_GATEWAY,
+                format!("Addon response exceeded size limit ({max_bytes} bytes)"),
+            ));
+        }
+        body.extend_from_slice(&chunk);
+    }
+    Ok(body)
+}
+
 /// Fetch a URL with manual redirect following + SSRF validation on every hop.
 async fn safe_get(
     client: &reqwest::Client,
@@ -425,8 +446,12 @@ async fn proxy_request(
                 let conn = state.conn.lock().await;
                 let _ = aurora_core::db::queries::update_addon_success(&conn, addon_id);
 
-                let body = resp.text().await.map_err(|e| {
-                    (StatusCode::BAD_GATEWAY, Json(serde_json::json!({"detail": format!("Read error: {}", e)}))).into_response()
+                // F1: read body with running byte cap — chunked responses bypass Content-Length check.
+                let body_bytes = read_body_capped(resp, _MAX_BODY_PROXY).await.map_err(|(s, m)| {
+                    (s, Json(serde_json::json!({"detail": m}))).into_response()
+                })?;
+                let body = String::from_utf8(body_bytes).map_err(|e| {
+                    (StatusCode::BAD_GATEWAY, Json(serde_json::json!({"detail": format!("Invalid UTF-8: {}", e)}))).into_response()
                 })?;
                 serde_json::from_str(&body).map_err(|e| {
                     (StatusCode::BAD_GATEWAY, Json(serde_json::json!({"detail": format!("Invalid JSON: {}", e)}))).into_response()
