@@ -249,7 +249,15 @@ fn etag_and_lm(metadata: &std::fs::Metadata) -> (String, String) {
     let file_size = metadata.len();
 
     // ETag: md5(str(st_mtime) + "-" + str(st_size))
-    let etag_base = format!("{}-{}", mtime_epoch, file_size);
+    // Python str() on a float always includes at least one decimal digit
+    // (e.g. str(1783152000.0) → "1783152000.0", str(1783152000.5) → "1783152000.5").
+    // Rust's default f64 Display omits the decimal for whole numbers.
+    // Mirror Python's repr rule: if no '.' in the rendered string, append ".0".
+    let mut mtime_str = format!("{}", mtime_epoch);
+    if !mtime_str.contains('.') {
+        mtime_str.push_str(".0");
+    }
+    let etag_base = format!("{}-{}", mtime_str, file_size);
     let mut hasher = Md5::new();
     hasher.update(etag_base.as_bytes());
     let etag = format!("\"{:x}\"", hasher.finalize());
@@ -303,14 +311,19 @@ pub async fn stream_song(
     let (etag, last_modified) = etag_and_lm(&metadata);
 
     // Helper: build a base Response::builder with common headers.
-    let base_headers = |status: StatusCode, content_len: u64| {
-        Response::builder()
+    // 200/206 include ETag + Last-Modified; 416 omits them (Starlette parity).
+    let base_headers = |status: StatusCode, content_len: u64, include_validators: bool| {
+        let mut builder = Response::builder()
             .status(status)
             .header(header::CONTENT_TYPE, content_type)
             .header(header::CONTENT_LENGTH, content_len.to_string())
-            .header(header::ACCEPT_RANGES, "bytes")
-            .header(header::ETAG, &etag)
-            .header(header::LAST_MODIFIED, &last_modified)
+            .header(header::ACCEPT_RANGES, "bytes");
+        if include_validators {
+            builder = builder
+                .header(header::ETAG, &etag)
+                .header(header::LAST_MODIFIED, &last_modified);
+        }
+        builder
     };
 
     // Check for Range header
@@ -320,11 +333,12 @@ pub async fn stream_song(
         // Multi-range (contains comma after "bytes=") → 416
         // Documented exception: Starlette multipart is non-RFC-7233;
         // no real audio client sends multi-range.
+        // Starlette quirk: 416 Content-Range omits "bytes " prefix.
         #[allow(clippy::collapsible_if)]
         if let Some(spec) = range_str.strip_prefix("bytes=") {
             if spec.contains(',') {
-                return base_headers(StatusCode::RANGE_NOT_SATISFIABLE, 0)
-                    .header(header::CONTENT_RANGE, format!("bytes */{}", file_size))
+                return base_headers(StatusCode::RANGE_NOT_SATISFIABLE, 0, false)
+                    .header(header::CONTENT_RANGE, format!("*/{}", file_size))
                     .body(Body::empty())
                     .unwrap();
             }
@@ -349,14 +363,14 @@ pub async fn stream_song(
             let limited = file.take(len);
             let stream = ReaderStream::new(limited);
 
-            return base_headers(StatusCode::PARTIAL_CONTENT, len)
+            return base_headers(StatusCode::PARTIAL_CONTENT, len, true)
                 .header(header::CONTENT_RANGE, content_range)
                 .body(Body::from_stream(stream))
                 .unwrap();
         } else {
-            // Unsatisfiable range
-            return base_headers(StatusCode::RANGE_NOT_SATISFIABLE, 0)
-                .header(header::CONTENT_RANGE, format!("bytes */{}", file_size))
+            // Unsatisfiable range — Starlette quirk: no "bytes " prefix, no validators
+            return base_headers(StatusCode::RANGE_NOT_SATISFIABLE, 0, false)
+                .header(header::CONTENT_RANGE, format!("*/{}", file_size))
                 .body(Body::empty())
                 .unwrap();
         }
@@ -368,7 +382,7 @@ pub async fn stream_song(
         Err(_) => return envelope::not_found("Audio file not found on disk").into_response(),
     };
     let stream = ReaderStream::new(file);
-    base_headers(StatusCode::OK, file_size)
+    base_headers(StatusCode::OK, file_size, true)
         .body(Body::from_stream(stream))
         .unwrap()
 }
@@ -433,5 +447,36 @@ pub async fn album_art(
                 .unwrap_or_else(|_| Response::builder().status(StatusCode::INTERNAL_SERVER_ERROR).body(Body::empty()).expect("fallback"))
         }
         Err(_) => envelope::not_found("Album art not found").into_response(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// F4: Verify that mtime formatting mirrors Python's str() for floats.
+    /// Python str(1783152000.0) → "1783152000.0" (includes .0 for whole seconds).
+    /// Rust's format!("{}", 1783152000.0_f64) → "1783152000" (no decimal).
+    /// Our fix appends ".0" when no dot is present.
+    #[test]
+    fn etag_mtime_format_whole_second() {
+        let mtime_epoch: f64 = 1783152000.0;
+        let mut mtime_str = format!("{}", mtime_epoch);
+        if !mtime_str.contains('.') {
+            mtime_str.push_str(".0");
+        }
+        assert_eq!(mtime_str, "1783152000.0");
+    }
+
+    #[test]
+    fn etag_mtime_format_fractional() {
+        let mtime_epoch: f64 = 1751513151.1234567;
+        let mut mtime_str = format!("{}", mtime_epoch);
+        if !mtime_str.contains('.') {
+            mtime_str.push_str(".0");
+        }
+        // Python str() gives "1751513151.1234567" — Rust may differ in precision.
+        // The key invariant: it must contain a dot.
+        assert!(mtime_str.contains('.'), "fractional mtime must contain '.': {}", mtime_str);
     }
 }

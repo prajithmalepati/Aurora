@@ -920,6 +920,7 @@ async fn stream_range_tests() {
     assert_eq!(body_bytes.as_ref(), &test_data[206..]);
 
     // ── Unsatisfiable range (start >= file_size) → 416 ──
+    // Starlette parity: 416 omits ETag/Last-Modified, Content-Range has no "bytes " prefix.
     let req = Request::builder()
         .uri("/api/songs/100/stream")
         .header("range", "bytes=300-400")
@@ -929,8 +930,10 @@ async fn stream_range_tests() {
     assert_eq!(response.status(), 416);
     assert_eq!(
         response.headers().get("content-range").unwrap().to_str().unwrap(),
-        "bytes */256"
+        "*/256"
     );
+    assert!(response.headers().get("etag").is_none(), "416 must not include ETag");
+    assert!(response.headers().get("last-modified").is_none(), "416 must not include Last-Modified");
 
     // ── 404: song not found ──
     let (s, b) = send(&app, get("/api/songs/999/stream")).await;
@@ -954,8 +957,10 @@ async fn stream_range_tests() {
     assert_eq!(response.status(), 416, "multi-range should return 416");
     assert_eq!(
         response.headers().get("content-range").unwrap().to_str().unwrap(),
-        "bytes */256"
+        "*/256"
     );
+    assert!(response.headers().get("etag").is_none(), "multi-range 416 must not include ETag");
+    assert!(response.headers().get("last-modified").is_none(), "multi-range 416 must not include Last-Modified");
 
     // ── T2: ETag + Last-Modified headers present on 200 ──
     let req = Request::builder()
@@ -984,7 +989,7 @@ async fn stream_range_tests() {
     assert_eq!(lm_200, lm_206, "Last-Modified must be identical on 200 and 206");
     let _ = response.into_body().collect().await.unwrap();
 
-    // ── T2: ETag + Last-Modified headers present on 416 ──
+    // ── T2: ETag + Last-Modified headers ABSENT on 416 (Starlette parity) ──
     let req = Request::builder()
         .uri("/api/songs/100/stream")
         .header("range", "bytes=300-400")
@@ -992,8 +997,8 @@ async fn stream_range_tests() {
         .unwrap();
     let response = app.clone().oneshot(req).await.unwrap();
     assert_eq!(response.status(), 416);
-    assert!(response.headers().get("etag").is_some(), "ETag must be present on 416");
-    assert!(response.headers().get("last-modified").is_some(), "Last-Modified must be present on 416");
+    assert!(response.headers().get("etag").is_none(), "ETag must be absent on 416");
+    assert!(response.headers().get("last-modified").is_none(), "Last-Modified must be absent on 416");
 }
 
 // ═══════════════════════════════════════════════════════════════════════
