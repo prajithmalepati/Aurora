@@ -455,27 +455,15 @@ fn put_multipart(uri: &str, boundary: &str, body: Vec<u8>) -> Request<Body> {
 
 /// A minimal valid 1x1 red PNG (67 bytes).
 fn minimal_png() -> Vec<u8> {
-    vec![
-        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // PNG signature
-        // IHDR chunk
-        0x00, 0x00, 0x00, 0x0D, // length = 13
-        0x49, 0x48, 0x44, 0x52, // "IHDR"
-        0x00, 0x00, 0x00, 0x01, // width = 1
-        0x00, 0x00, 0x00, 0x01, // height = 1
-        0x08, 0x02,             // bit depth = 8, color type = 2 (RGB)
-        0x00, 0x00, 0x00,       // compression, filter, interlace
-        0x90, 0x77, 0x53, 0xDE, // CRC
-        // IDAT chunk
-        0x00, 0x00, 0x00, 0x0C, // length = 12
-        0x49, 0x44, 0x41, 0x54, // "IDAT"
-        0x08, 0xD7, 0x63, 0xF8, 0xCF, 0xC0, 0x00, 0x00,
-        0x01, 0x01, 0x01, 0x00, // compressed data
-        0x18, 0xDD, 0x8D, 0xB4, // CRC
-        // IEND chunk
-        0x00, 0x00, 0x00, 0x00, // length = 0
-        0x49, 0x45, 0x4E, 0x44, // "IEND"
-        0xAE, 0x42, 0x60, 0x82, // CRC
-    ]
+    // Generate a valid 1x1 red PNG using the image crate (avoids decoder quirks
+    // with hand-crafted byte sequences).
+    use image::{ImageBuffer, Rgb, RgbImage, ImageEncoder};
+    use image::codecs::png::PngEncoder;
+    let img: RgbImage = ImageBuffer::from_pixel(1, 1, Rgb([255u8, 0, 0]));
+    let mut buf = std::io::Cursor::new(Vec::new());
+    let encoder = PngEncoder::new(&mut buf);
+    encoder.write_image(img.as_raw(), 1, 1, image::ColorType::Rgb8.into()).unwrap();
+    buf.into_inner()
 }
 
 // Strip created_at/updated_at from playlist list items (they change with mutations)
@@ -932,6 +920,7 @@ async fn stream_range_tests() {
     assert_eq!(body_bytes.as_ref(), &test_data[206..]);
 
     // ── Unsatisfiable range (start >= file_size) → 416 ──
+    // Starlette parity: 416 omits ETag/Last-Modified, Content-Range has no "bytes " prefix.
     let req = Request::builder()
         .uri("/api/songs/100/stream")
         .header("range", "bytes=300-400")
@@ -941,8 +930,10 @@ async fn stream_range_tests() {
     assert_eq!(response.status(), 416);
     assert_eq!(
         response.headers().get("content-range").unwrap().to_str().unwrap(),
-        "bytes */256"
+        "*/256"
     );
+    assert!(response.headers().get("etag").is_none(), "416 must not include ETag");
+    assert!(response.headers().get("last-modified").is_none(), "416 must not include Last-Modified");
 
     // ── 404: song not found ──
     let (s, b) = send(&app, get("/api/songs/999/stream")).await;
@@ -953,6 +944,61 @@ async fn stream_range_tests() {
     let (s, b) = send(&app, get("/api/songs/2/stream")).await;
     assert_eq!(s, 404);
     assert_body("stream_404_no_file", &b, &load_golden("songs_stream_404_no_file"));
+
+    // ── T3: Multi-range → 416 (documented exception, HERMES_N39_BRIEF.md §T3) ──
+    // Starlette multipart is non-RFC-7233; no real audio client sends multi-range.
+    // Rust returns 416 for multi-range instead of replicating the bug.
+    let req = Request::builder()
+        .uri("/api/songs/100/stream")
+        .header("range", "bytes=0-99,200-299")
+        .body(Body::empty())
+        .unwrap();
+    let response = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(response.status(), 416, "multi-range should return 416");
+    assert_eq!(
+        response.headers().get("content-range").unwrap().to_str().unwrap(),
+        "*/256"
+    );
+    assert!(response.headers().get("etag").is_none(), "multi-range 416 must not include ETag");
+    assert!(response.headers().get("last-modified").is_none(), "multi-range 416 must not include Last-Modified");
+
+    // ── T2: ETag + Last-Modified headers present on 200 ──
+    let req = Request::builder()
+        .uri("/api/songs/100/stream")
+        .body(Body::empty())
+        .unwrap();
+    let response = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(response.status(), 200);
+    let etag_200 = response.headers().get("etag").unwrap().to_str().unwrap().to_string();
+    let lm_200 = response.headers().get("last-modified").unwrap().to_str().unwrap().to_string();
+    assert!(etag_200.starts_with('"') && etag_200.ends_with('"'), "ETag must be quoted: {}", etag_200);
+    assert!(lm_200.ends_with(" GMT"), "Last-Modified must be RFC 1123: {}", lm_200);
+    let _ = response.into_body().collect().await.unwrap();
+
+    // ── T2: ETag + Last-Modified headers present on 206 ──
+    let req = Request::builder()
+        .uri("/api/songs/100/stream")
+        .header("range", "bytes=0-99")
+        .body(Body::empty())
+        .unwrap();
+    let response = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(response.status(), 206);
+    let etag_206 = response.headers().get("etag").unwrap().to_str().unwrap().to_string();
+    let lm_206 = response.headers().get("last-modified").unwrap().to_str().unwrap().to_string();
+    assert_eq!(etag_200, etag_206, "ETag must be identical on 200 and 206 for same file");
+    assert_eq!(lm_200, lm_206, "Last-Modified must be identical on 200 and 206");
+    let _ = response.into_body().collect().await.unwrap();
+
+    // ── T2: ETag + Last-Modified headers ABSENT on 416 (Starlette parity) ──
+    let req = Request::builder()
+        .uri("/api/songs/100/stream")
+        .header("range", "bytes=300-400")
+        .body(Body::empty())
+        .unwrap();
+    let response = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(response.status(), 416);
+    assert!(response.headers().get("etag").is_none(), "ETag must be absent on 416");
+    assert!(response.headers().get("last-modified").is_none(), "Last-Modified must be absent on 416");
 }
 
 // ═══════════════════════════════════════════════════════════════════════

@@ -9,6 +9,7 @@ use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde::Deserialize;
 use serde_json::Value;
+use image::ImageFormat;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -18,25 +19,80 @@ use super::envelope;
 // ── Playlist CRUD ─────────────────────────────────────────────────────
 
 /// GET /api/playlists — list all with song_count.
+/// Includes lazy backfill: if a playlist has image_url but NULL dominant_color,
+/// reads the stored file, extracts colors, persists, and returns filled values.
 pub async fn list_playlists(
     State(state): State<Arc<AppState>>,
 ) -> Json<Value> {
     let conn = state.conn.lock().await;
-    let playlists = aurora_core::db::queries::list_playlists(&conn).unwrap_or_default();
+    let mut playlists = aurora_core::db::queries::list_playlists(&conn).unwrap_or_default();
+    // T4b — lazy backfill per playlist
+    for pl in playlists.iter_mut() {
+        backfill_dominant_color_from_json(&conn, pl);
+    }
     let total = playlists.len() as i64;
     envelope::ok_meta(Value::Array(playlists), "ok", serde_json::json!({ "total": total }))
 }
 
 /// GET /api/playlists/{id} — single playlist with songs.
+/// Includes lazy backfill for dominant colors.
 pub async fn get_playlist(
     State(state): State<Arc<AppState>>,
     Path(playlist_id): Path<i64>,
 ) -> Response {
     let conn = state.conn.lock().await;
     match aurora_core::db::queries::get_playlist(&conn, playlist_id) {
-        Ok(Some(pl)) => envelope::ok(pl, "ok").into_response(),
+        Ok(Some(mut pl)) => {
+            // T4b — lazy backfill
+            backfill_dominant_color_from_json(&conn, &mut pl);
+            envelope::ok(pl, "ok").into_response()
+        }
         Ok(None) => envelope::not_found("Playlist not found").into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"detail": e.to_string()}))).into_response(),
+    }
+}
+
+/// T4b — lazy backfill: if a playlist JSON has image_url but NULL dominant_color,
+/// read the stored file, extract colors, persist, and fill the JSON in-place.
+/// Errors are silently swallowed (matches Python behavior — :49).
+fn backfill_dominant_color_from_json(conn: &aurora_core::rusqlite::Connection, pl: &mut serde_json::Value) {
+    // Only backfill if image_url exists and dominant_color is NULL
+    let image_url = match pl.get("image_url").and_then(|v| v.as_str()) {
+        Some(u) if !u.is_empty() => u,
+        _ => return,
+    };
+    let dc = pl.get("dominant_color");
+    if dc.is_some() && !dc.unwrap().is_null() {
+        return; // already has color
+    }
+
+    let playlist_id = match pl.get("id").and_then(|v| v.as_i64()) {
+        Some(id) => id,
+        None => return,
+    };
+
+    // Resolve file path from image_url (/api/playlist-images/123.jpg → PLAYLIST_IMAGES_DIR/123.jpg)
+    let filename = image_url.rsplit('/').next().unwrap_or(image_url);
+    let file_path = aurora_core::paths::PLAYLIST_IMAGES_DIR.join(filename);
+    let data = match std::fs::read(&file_path) {
+        Ok(d) => d,
+        Err(_) => return,
+    };
+
+    let (new_dc, new_dc2) = aurora_core::scanner::analysis::extract_dominant_colors(&data);
+    if new_dc.is_none() {
+        return;
+    }
+
+    // Persist to DB (best-effort)
+    let _ = aurora_core::db::queries::update_playlist_dominant_colors(
+        conn, playlist_id, new_dc.as_deref(), new_dc2.as_deref(),
+    );
+
+    // Update the JSON in-place
+    if let Some(obj) = pl.as_object_mut() {
+        obj.insert("dominant_color".into(), serde_json::json!(new_dc));
+        obj.insert("dominant_color_2".into(), serde_json::json!(new_dc2));
     }
 }
 
@@ -292,6 +348,15 @@ fn playlist_images_dir() -> PathBuf {
 }
 
 /// PUT /api/playlists/{id}/image — upload a cover image.
+///
+/// Parity with Python (playlists.py:58-129):
+/// 1. content-type must start with `image/` → 400
+/// 2. body > 10 MB → 413
+/// 3. structure validation via image crate decode → 400
+/// 4. extension from MIME map (png/gif/webp explicit, else jpg)
+/// 5. stale-file cleanup: delete `{id}.*` before writing
+/// 6. re-encode through decoder (polyglot defense)
+/// 7. dominant colors: extract + persist
 pub async fn upload_playlist_image(
     State(state): State<Arc<AppState>>,
     Path(playlist_id): Path<i64>,
@@ -328,13 +393,26 @@ pub async fn upload_playlist_image(
         }
     };
 
-    // Validate content type
+    // T4.1 — content-type must start with image/
     let ct = content_type.unwrap_or_default();
     if !ct.starts_with("image/") {
         return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"detail": "File must be an image"}))).into_response();
     }
 
-    // Determine extension
+    // T4.2 — body > 10 MB → 413
+    if data.len() > 10 * 1024 * 1024 {
+        return (StatusCode::PAYLOAD_TOO_LARGE, Json(serde_json::json!({"detail": "Image too large (max 10 MB)"}))).into_response();
+    }
+
+    // T4.3 — structure validation: decode with image crate
+    let img = match image::load_from_memory(&data) {
+        Ok(img) => img,
+        Err(_) => {
+            return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"detail": "Invalid or corrupt image file"}))).into_response();
+        }
+    };
+
+    // T4.4 — extension from MIME map
     let ext = match ct.as_str() {
         "image/png" => "png",
         "image/gif" => "gif",
@@ -342,24 +420,73 @@ pub async fn upload_playlist_image(
         _ => "jpg",
     };
 
-    // Save file
+    // T4.5 — stale-file cleanup: delete {id}.* before writing
     let images_dir = playlist_images_dir();
     std::fs::create_dir_all(&images_dir).ok();
+    if let Ok(entries) = std::fs::read_dir(&images_dir) {
+        for entry in entries.flatten() {
+            let fname = entry.file_name();
+            let fname_str = fname.to_string_lossy();
+            if fname_str.starts_with(&format!("{}.", playlist_id)) {
+                let _ = std::fs::remove_file(entry.path());
+            }
+        }
+    }
+
+    // T4.6 — re-encode through decoder (polyglot defense)
     let filename = format!("{}.{}", playlist_id, ext);
     let filepath = images_dir.join(&filename);
-    std::fs::write(&filepath, &data).ok();
+    let re_encoded = reencode_image(&img, ext);
+    if std::fs::write(&filepath, &re_encoded).is_err() {
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"detail": "Failed to save image"}))).into_response();
+    }
+
+    // T4.7 — dominant colors
+    let (dominant_color, dominant_color_2) = aurora_core::scanner::analysis::extract_dominant_colors(&data);
 
     let image_url = format!("/api/playlist-images/{}", filename);
 
-    // Update DB
+    // Update DB with image_url + colors
     {
         let conn = state.conn.lock().await;
         aurora_core::db::queries::update_playlist_image(
-            &conn, playlist_id, Some(&image_url), None, None,
+            &conn, playlist_id, Some(&image_url), dominant_color.as_deref(), dominant_color_2.as_deref(),
         ).ok();
     }
 
     envelope::ok(serde_json::json!({"image_url": image_url}), "ok").into_response()
+}
+
+/// Re-encode a decoded image for the target extension (polyglot defense).
+/// Converts RGBA/P → RGB for JPEG. Returns raw bytes to write.
+fn reencode_image(img: &image::DynamicImage, ext: &str) -> Vec<u8> {
+    use image::codecs::jpeg::JpegEncoder;
+    use image::codecs::png::PngEncoder;
+    use image::ImageEncoder;
+
+    let mut buf = std::io::Cursor::new(Vec::new());
+    match ext {
+        "jpg" => {
+            let rgb = img.to_rgb8();
+            let encoder = JpegEncoder::new_with_quality(&mut buf, 90);
+            let _ = encoder.write_image(rgb.as_raw(), rgb.width(), rgb.height(), image::ColorType::Rgb8.into());
+        }
+        "png" => {
+            let encoder = PngEncoder::new(&mut buf);
+            let rgba = img.to_rgba8();
+            let _ = encoder.write_image(rgba.as_raw(), rgba.width(), rgba.height(), image::ColorType::Rgba8.into());
+        }
+        "gif" => {
+            let _ = img.write_to(&mut buf, ImageFormat::Gif);
+        }
+        "webp" => {
+            let _ = img.write_to(&mut buf, ImageFormat::WebP);
+        }
+        _ => {
+            let _ = img.write_to(&mut buf, ImageFormat::Jpeg);
+        }
+    }
+    buf.into_inner()
 }
 
 /// DELETE /api/playlists/{id}/image — remove cover image.

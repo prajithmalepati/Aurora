@@ -1159,6 +1159,20 @@ pub fn get_playlist_image_url(conn: &Connection, playlist_id: i64) -> Result<Opt
     }
 }
 
+/// Update only dominant_color + dominant_color_2 for a playlist (backfill helper).
+pub fn update_playlist_dominant_colors(
+    conn: &Connection,
+    playlist_id: i64,
+    dominant_color: Option<&str>,
+    dominant_color_2: Option<&str>,
+) -> Result<()> {
+    conn.execute(
+        "UPDATE playlists SET dominant_color = ?1, dominant_color_2 = ?2 WHERE id = ?3",
+        rusqlite::params![dominant_color, dominant_color_2, playlist_id],
+    )?;
+    Ok(())
+}
+
 // ── Folder queries ─────────────────────────────────────────────────────
 
 /// Build a folder tree entry from accumulated data.

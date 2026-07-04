@@ -98,7 +98,10 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
         .route(
             "/api/playlists/{playlist_id}/image",
             axum::routing::put(routes::upload_playlist_image)
-                .delete(routes::delete_playlist_image),
+                .delete(routes::delete_playlist_image)
+                // F6: axum default is 2MB; raise to 12MB (10MB payload + multipart overhead).
+                // Handler's own 10MB → 413 check remains the enforcing boundary.
+                .layer(axum::extract::DefaultBodyLimit::max(12 * 1024 * 1024)),
         )
         .route(
             "/api/playlists/{playlist_id}/export",
