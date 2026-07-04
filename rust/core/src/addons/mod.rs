@@ -44,9 +44,8 @@ pub fn is_private_ip(ip: IpAddr) -> bool {
                 || v6.is_multicast()
                 || is_ipv6_link_local(v6)
                 || is_ipv6_unique_local(v6)
-                || is_ipv6_v4_compat(v6)     // ::/8 — v6-compatible embedding
-                || is_ipv6_nat64(v6)         // 64:ff9b::/96
-                || is_ipv6_doc_range(v6)     // 2001:db8::/32
+                || is_ipv6_reserved(v6)
+                || is_ipv6_private_special(v6)
         }
     }
 }
@@ -68,25 +67,46 @@ fn is_ipv6_unique_local(ip: Ipv6Addr) -> bool {
     (ip.segments()[0] & 0xFE00) == 0xFC00
 }
 
-/// ::/8 — IPv6-compatible IPv4 embedding (e.g. ::127.0.0.1).
-/// First segment must be 0; covers all of ::x.x.x.x.
-/// Note: ::1 (loopback) and :: (unspecified) are already caught earlier.
-fn is_ipv6_v4_compat(ip: Ipv6Addr) -> bool {
-    ip.segments()[0] == 0
+/// IPv6 reserved address ranges — mirrors Python's `ipaddress.IPv6Address.is_reserved`.
+///
+/// Parity target: Python `_is_private_ip` rejects when ANY of these is true:
+///   is_loopback | is_private | is_link_local | is_reserved | is_unspecified | is_multicast
+///
+/// Python's `is_reserved` covers the IANA IPv6 Special-Purpose Address Registry:
+///   - 0000::/8    (loopback, unspecified, v4-compat — already caught by earlier checks)
+///   - 0100::/8    (RFC 6666 discard prefix, e.g. 100::1)
+///   - 0200::/7    (formerly NSAP, deprecated — Python marks as reserved)
+///   - 4000::/2    (IETF reserved, covers 4000::-7fff:ffff:...)
+///   - 8000::/1    (IETF reserved, covers 8000::-ffff:ffff:... — includes multicast/link-local
+///     but those are caught by earlier checks)
+///
+/// Python's is_reserved returns True for all IPv6 addresses outside 2000::/3
+/// (the global unicast range). This covers:
+///   - 0000::/8 (loopback, unspecified, v4-compatible)
+///   - 0100::/8 (RFC 6666 discard)
+///   - NAT64 (64:ff9b::/32), and everything >= 4000:: (IANA reserved)
+///
+/// In practice: first_segment < 0x2000. Addresses within 2000::/3 that
+/// Python rejects (doc range, ORCHID, Teredo) are caught by is_private.
+fn is_ipv6_reserved(ip: Ipv6Addr) -> bool {
+    let s0 = ip.segments()[0];
+    // Everything outside 2000::/3 is reserved per Python's is_reserved
+    !(0x2000..0x4000).contains(&s0)
 }
 
-/// 64:ff9b::/96 — NAT64 well-known prefix.
-/// Embedded IPv4 can target loopback/private via a NAT64 gateway.
-fn is_ipv6_nat64(ip: Ipv6Addr) -> bool {
-    // 64:ff9b::/96 — first 96 bits (6 segments) fixed, last 32 bits free
-    ip.segments()[0] == 0x64 && ip.segments()[1] == 0xff9b
-        && ip.segments()[2] == 0 && ip.segments()[3] == 0
-        && ip.segments()[4] == 0 && ip.segments()[5] == 0
-}
-
-/// 2001:db8::/32 — documentation range (RFC 3849).
-fn is_ipv6_doc_range(ip: Ipv6Addr) -> bool {
-    ip.segments()[0] == 0x2001 && (ip.segments()[1] & 0xFFF0) == 0x0DB0
+/// Addresses within 2000::/3 that Python's `is_private` considers private.
+/// These are NOT covered by is_reserved (which only checks < 0x2000).
+fn is_ipv6_private_special(ip: Ipv6Addr) -> bool {
+    let s0 = ip.segments()[0];
+    let s1 = ip.segments()[1];
+    // 2001:db8::/32 — documentation range (RFC 3849)
+    (s0 == 0x2001 && s1 == 0x0DB8)
+    // 2002::/16 — 6to4 tunneling (RFC 3056)
+    || s0 == 0x2002
+    // 2001:10::/28 — ORCHID (RFC 4843)
+    || (s0 == 0x2001 && (s1 & 0xFFF0) == 0x0010)
+    // 2001::/32 — Teredo tunneling (RFC 4380)
+    || (s0 == 0x2001 && s1 == 0)
 }
 
 #[cfg(test)]
@@ -112,15 +132,29 @@ mod tests {
             "::1",
             "224.0.0.1",
             "255.255.255.255",
-            // F2: v6-compatible embedding (::/8)
+            // F2/R2-B: v6-compatible embedding (::/8)
             "::127.0.0.1",
             "::10.0.0.1",
-            // F2: NAT64 (64:ff9b::/96)
+            // F2/R2-B: NAT64 (64:ff9b::/96)
             "64:ff9b::7f00:1",
             "64:ff9b::10.0.0.1",
-            // F2: documentation range (2001:db8::/32)
+            // F2/R2-B: NAT64 neighbor — Python is_reserved rejects
+            "64:ff9c::1",
+            // F2/R2-B: documentation range (2001:db8::/32, Python is_private)
             "2001:db8::1",
             "2001:db8:abcd::1",
+            // R2-B: 6to4 (2002::/16, Python is_private)
+            "2002::1",
+            // R2-B: RFC 6666 discard (100::/64, Python is_reserved + is_private)
+            "100::1",
+            // R2-B: ORCHID (2001:10::/28, Python is_private)
+            "2001:10::1",
+            // R2-B: Teredo (2001::/32, Python is_private)
+            "2001::1",
+            // R2-B: IANA reserved (>=4000::, Python is_reserved)
+            "4000::1",
+            "5f00::1",
+            "a000::1",
         ];
         for ip_str in reject_cases {
             let ip: IpAddr = ip_str.parse().unwrap();
@@ -136,6 +170,8 @@ mod tests {
             "2606:4700::1111",
             "1.1.1.1",
             "93.184.216.34",
+            // R2-B: 6bone (3ffe::/16, Python treats as global)
+            "3ffe::1",
         ];
         for ip_str in pass_cases {
             let ip: IpAddr = ip_str.parse().unwrap();

@@ -545,19 +545,35 @@ from app.routers.addons import _is_private_ip, _validate_url_for_ssrf
     ("::1", True),                               # IPv6 loopback
     ("224.0.0.1", True),                        # multicast
     ("255.255.255.255", True),                  # reserved broadcast
-    # F2: v6-compatible embedding (::/8)
+    # F2/R2-B: v6-compatible embedding (::/8)
     ("::127.0.0.1", True),
     ("::10.0.0.1", True),
-    # F2: NAT64 (64:ff9b::/96)
+    # F2/R2-B: NAT64 (64:ff9b::/96)
     ("64:ff9b::7f00:1", True),
     ("64:ff9b::10.0.0.1", True),
-    # F2: documentation range (2001:db8::/32)
+    # R2-B: NAT64 neighbor (Python is_reserved)
+    ("64:ff9c::1", True),
+    # F2/R2-B: documentation range (2001:db8::/32)
     ("2001:db8::1", True),
     ("2001:db8:abcd::1", True),
+    # R2-B: 6to4 (2002::/16, Python is_private)
+    ("2002::1", True),
+    # R2-B: RFC 6666 discard (100::/64, Python is_reserved + is_private)
+    ("100::1", True),
+    # R2-B: ORCHID (2001:10::/28, Python is_private)
+    ("2001:10::1", True),
+    # R2-B: Teredo (2001::/32, Python is_private)
+    ("2001::1", True),
+    # R2-B: IANA reserved (>=4000::, Python is_reserved)
+    ("4000::1", True),
+    ("5f00::1", True),
+    ("a000::1", True),
     # --- Must PASS (public addresses) ---
     ("8.8.8.8", False),                          # public IPv4
     ("::ffff:8.8.8.8", False),                  # IPv4-mapped PUBLIC → must not over-reject
     ("2606:4700::1111", False),                 # public IPv6 (Cloudflare)
+    # R2-B: 6bone (3ffe::/16, Python treats as global)
+    ("3ffe::1", False),
 ])
 def test_n37_is_private_ip_gaps(ip, expected_reject):
     """N37: _is_private_ip must reject all private/reserved/unspecified IPs.
