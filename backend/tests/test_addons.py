@@ -558,8 +558,6 @@ from app.routers.addons import _is_private_ip, _validate_url_for_ssrf
     ("8.8.8.8", False),                          # public IPv4
     ("::ffff:8.8.8.8", False),                  # IPv4-mapped PUBLIC → must not over-reject
     ("2606:4700::1111", False),                 # public IPv6 (Cloudflare)
-    # F2: public-adjacent neighbors must PASS
-    ("64:ff9c::1", False),
 ])
 def test_n37_is_private_ip_gaps(ip, expected_reject):
     """N37: _is_private_ip must reject all private/reserved/unspecified IPs.

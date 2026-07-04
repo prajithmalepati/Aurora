@@ -1082,3 +1082,214 @@ async fn cross_run_proof() {
     assert_eq!(status, StatusCode::OK);
     assert_body("songs_get_1 (corrupted)", &body, &load_golden("songs_get_1"));
 }
+
+// F3: ADDON integration tests -- mock addon server + CRUD + circuit breaker
+// =============================================================================
+
+use std::sync::atomic::{AtomicU32, Ordering};
+
+/// Start a mock addon server on a random port.
+/// GET /manifest.json -> valid manifest (always succeeds)
+/// GET /search -> returns 500 for first `fail_until` calls, then 200
+async fn start_mock_addon_server(search_counter: Arc<AtomicU32>, fail_until: u32) -> (String, tokio::sync::oneshot::Sender<()>) {
+    use axum::routing::get;
+    use axum::extract::Query;
+    use std::collections::HashMap;
+
+    let counter = search_counter.clone();
+
+    let manifest = get(|| async {
+        axum::Json(serde_json::json!({
+            "id": "test-addon",
+            "name": "Test Addon",
+            "version": "1.0.0",
+            "resources": ["tracks"],
+            "types": ["track"]
+        }))
+    });
+
+    let search = get(move |Query(_params): Query<HashMap<String, String>>| {
+        let counter = counter.clone();
+        async move {
+            let n = counter.fetch_add(1, Ordering::SeqCst);
+            if n < fail_until {
+                (StatusCode::INTERNAL_SERVER_ERROR, axum::Json(serde_json::json!({"error": "fail"})))
+            } else {
+                (StatusCode::OK, axum::Json(serde_json::json!({
+                    "tracks": [{"title": "Test Song", "artist": "Test Artist", "external_id": "ext-1"}]
+                })))
+            }
+        }
+    });
+
+    let app = axum::Router::new()
+        .route("/manifest.json", manifest)
+        .route("/search", search);
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let base_url = format!("http://127.0.0.1:{}", addr.port());
+
+    let (tx, rx) = tokio::sync::oneshot::channel::<()>();
+    tokio::spawn(async move {
+        axum::serve(listener, app)
+            .with_graceful_shutdown(async { rx.await.ok(); })
+            .await
+            .unwrap();
+    });
+
+    (base_url, tx)
+}
+
+#[tokio::test]
+async fn golden_addons() {
+    // fail_until=0 means /search always succeeds
+    let counter = Arc::new(AtomicU32::new(0));
+    let (mock_url, _shutdown) = start_mock_addon_server(counter.clone(), 0).await;
+    let (app, _state) = build_test_app();
+
+    // Add addon (CRUD: create)
+    let (s, b) = send(&app, post_json("/api/addons", &format!(r#"{{"base_url": "{}"}}"#, mock_url))).await;
+    assert_eq!(s, 200, "add addon failed: {:?}", b);
+    assert_eq!(b["data"]["id"], "test-addon");
+    assert_eq!(b["data"]["enabled"], true);
+
+    // List addons (CRUD: read)
+    let (s, b) = send(&app, get("/api/addons")).await;
+    assert_eq!(s, 200);
+    let addons = b["data"].as_array().unwrap();
+    assert_eq!(addons.len(), 1);
+    assert_eq!(addons[0]["id"], "test-addon");
+
+    // Duplicate -> 409
+    let (s, _) = send(&app, post_json("/api/addons", &format!(r#"{{"base_url": "{}"}}"#, mock_url))).await;
+    assert_eq!(s, 409);
+
+    // Toggle disable
+    let (s, b) = send(&app, Request::builder()
+        .method("PATCH")
+        .uri("/api/addons/test-addon")
+        .header("content-type", "application/json")
+        .body(Body::from(r#"{"enabled": false}"#.to_string()))
+        .unwrap()).await;
+    assert_eq!(s, 200, "toggle disable failed: {:?}", b);
+    assert_eq!(b["message"], "ok");
+
+    // Toggle re-enable
+    let (s, b) = send(&app, Request::builder()
+        .method("PATCH")
+        .uri("/api/addons/test-addon")
+        .header("content-type", "application/json")
+        .body(Body::from(r#"{"enabled": true}"#.to_string()))
+        .unwrap()).await;
+    assert_eq!(s, 200, "toggle enable failed: {:?}", b);
+    assert_eq!(b["message"], "ok");
+
+    // Search addon (proxies to mock /search)
+    let (s, b) = send(&app, get("/api/addons/test-addon/search?q=test")).await;
+    assert_eq!(s, 200, "search failed: {:?}", b);
+
+    // Delete addon (CRUD: delete)
+    let (s, _) = send(&app, delete("/api/addons/test-addon")).await;
+    assert_eq!(s, 200);
+
+    // List after delete -> empty
+    let (s, b) = send(&app, get("/api/addons")).await;
+    assert_eq!(s, 200);
+    assert_eq!(b["data"].as_array().unwrap().len(), 0);
+
+    // Delete nonexistent -> 404
+    let (s, _) = send(&app, delete("/api/addons/nonexistent")).await;
+    assert_eq!(s, 404);
+}
+
+#[tokio::test]
+async fn golden_addons_circuit_breaker() {
+    // fail_until=3: first 3 search calls return 500, then 200
+    let counter = Arc::new(AtomicU32::new(0));
+    let (mock_url, _shutdown) = start_mock_addon_server(counter.clone(), 3).await;
+    let (app, _state) = build_test_app();
+
+    // Add addon
+    let (s, _) = send(&app, post_json("/api/addons", &format!(r#"{{"base_url": "{}"}}"#, mock_url))).await;
+    assert_eq!(s, 200);
+
+    // Trigger 3 failures via search (mock returns 500)
+    for _ in 0..3 {
+        let (s, _) = send(&app, get("/api/addons/test-addon/search?q=test")).await;
+        assert_eq!(s, 502, "search should return 502 on addon error");
+    }
+
+    // 4th request: circuit breaker should be open -> 503
+    let (s, b) = send(&app, get("/api/addons/test-addon/search?q=test")).await;
+    assert_eq!(s, 503, "circuit breaker should be open: {:?}", b);
+    assert!(b["detail"].as_str().unwrap().contains("circuit breaker"), "unexpected detail: {:?}", b);
+}
+
+// =============================================================================
+// F3: WATCHER auto-import integration test
+// =============================================================================
+
+#[tokio::test]
+async fn golden_watcher_auto_import() {
+    let (app, state) = build_test_app();
+
+    // Create a temp directory for the watcher
+    let tmpdir = tempfile::tempdir().unwrap();
+    let tmp_path = tmpdir.path().to_str().unwrap().to_string();
+
+    // Add watched folder
+    let (s, b) = send(&app, post_json("/api/watch", &format!(r#"{{"path": "{}"}}"#, tmp_path))).await;
+    assert_eq!(s, 200, "add watched folder failed: {:?}", b);
+    let watch_id = b["data"]["id"].as_i64().unwrap();
+
+    // Copy test file into watched directory
+    let fixture_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent().unwrap()
+        .join("core/tests/fixtures/test_song.ogg");
+    let dest_path = tmpdir.path().join("test_song.ogg");
+    std::fs::copy(&fixture_path, &dest_path).expect("failed to copy test file");
+
+    // Trigger manual scan
+    let (s, b) = send(&app, post_json(&format!("/api/watch/{}/scan", watch_id), "")).await;
+    assert_eq!(s, 200, "scan failed: {:?}", b);
+
+    // Poll DB for imported song (generous timeout)
+    let mut found = false;
+    for _ in 0..50 {
+        let conn = state.conn.lock().await;
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM songs WHERE file_path LIKE '%test_song.ogg'",
+            [],
+            |r| r.get(0),
+        ).unwrap_or(0);
+        drop(conn);
+        if count > 0 {
+            found = true;
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+    assert!(found, "test_song.ogg should have been imported into songs table");
+
+    // Remove watched folder
+    let (s, _) = send(&app, delete(&format!("/api/watch/{}", watch_id))).await;
+    assert_eq!(s, 200);
+
+    // Drop another file -- should NOT be imported
+    let dest2 = tmpdir.path().join("test_song_2.ogg");
+    std::fs::copy(&fixture_path, &dest2).expect("failed to copy second test file");
+
+    // Wait a bit to let any background watcher process
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
+    // Verify second file was NOT imported
+    let conn = state.conn.lock().await;
+    let count: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM songs WHERE file_path LIKE '%test_song_2.ogg'",
+        [],
+        |r| r.get(0),
+    ).unwrap_or(0);
+    drop(conn);
+    assert_eq!(count, 0, "test_song_2.ogg should NOT be imported after folder removal");
+}

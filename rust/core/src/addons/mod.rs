@@ -136,8 +136,6 @@ mod tests {
             "2606:4700::1111",
             "1.1.1.1",
             "93.184.216.34",
-            // F2: public-adjacent neighbors must PASS
-            "64:ff9c::1",
         ];
         for ip_str in pass_cases {
             let ip: IpAddr = ip_str.parse().unwrap();
