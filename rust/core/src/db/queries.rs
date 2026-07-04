@@ -1414,3 +1414,370 @@ pub fn chrono_now() -> String {
         y, m, d, hours, minutes, seconds, subsec_micros
     )
 }
+
+/// Addon-specific timestamp: second-precision with Z suffix.
+/// Matches Python's datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ").
+/// Used by addon queries (insert_addon, update_addon_success/failure, expires_at).
+/// Do NOT use for song timestamps — those use chrono_now() (micros+offset).
+pub fn chrono_now_z() -> String {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap();
+    let secs = now.as_secs();
+    let days = (secs / 86400) as i64;
+    let time_of_day = secs % 86400;
+    let hours = time_of_day / 3600;
+    let minutes = (time_of_day % 3600) / 60;
+    let seconds = time_of_day % 60;
+
+    let z = days + 719468;
+    let era = if z >= 0 { z } else { z - 146096 } / 146097;
+    let doe = (z - era * 146097) as u32;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let y = yoe as i64 + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = if m <= 2 { y + 1 } else { y };
+
+    format!("{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z", y, m, d, hours, minutes, seconds)
+}
+
+// ── Addon queries ────────────────────────────────────────────────────────
+
+/// Serialize a rusqlite Row into addon JSON.
+fn row_to_addon(row: &rusqlite::Row) -> rusqlite::Result<serde_json::Value> {
+    Ok(serde_json::json!({
+        "id": row.get::<_, String>(0)?,
+        "base_url": row.get::<_, String>(1)?,
+        "name": row.get::<_, Option<String>>(2)?,
+        "version": row.get::<_, Option<String>>(3)?,
+        "enabled": row.get::<_, i64>(4)? != 0,
+        "fail_count": row.get::<_, i64>(5)?,
+        "last_ok_at": row.get::<_, Option<String>>(6)?,
+        "last_fail_at": row.get::<_, Option<String>>(7)?,
+    }))
+}
+
+/// Insert a new addon. Returns Ok(()) or Err on duplicate.
+pub fn insert_addon(
+    conn: &Connection,
+    id: &str,
+    base_url: &str,
+    name: Option<&str>,
+    version: Option<&str>,
+    manifest_json: &str,
+) -> Result<()> {
+    let now = chrono_now_z();
+    conn.execute(
+        "INSERT INTO addons (id, base_url, name, version, manifest_json, enabled, added_at, last_ok_at, fail_count) \
+         VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6, ?7, 0)",
+        rusqlite::params![id, base_url, name, version, manifest_json, now, now],
+    )?;
+    Ok(())
+}
+
+/// List all addons. Returns JSON array.
+pub fn list_addons(conn: &Connection) -> Result<Vec<serde_json::Value>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, base_url, name, version, enabled, fail_count, last_ok_at, last_fail_at \
+         FROM addons ORDER BY added_at DESC",
+    )?;
+    let rows = stmt.query_map([], row_to_addon)?;
+    let mut addons = Vec::new();
+    for r in rows {
+        addons.push(r?);
+    }
+    Ok(addons)
+}
+
+/// Get a single addon by ID.
+pub fn get_addon(conn: &Connection, addon_id: &str) -> Result<Option<serde_json::Value>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, base_url, name, version, enabled, fail_count, last_ok_at, last_fail_at \
+         FROM addons WHERE id = ?1",
+    )?;
+    let mut rows = stmt.query_map([addon_id], row_to_addon)?;
+    match rows.next() {
+        Some(r) => Ok(Some(r?)),
+        None => Ok(None),
+    }
+}
+
+/// Get a single addon by base_url (for duplicate checking).
+pub fn get_addon_by_base_url(conn: &Connection, base_url: &str) -> Result<Option<serde_json::Value>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, base_url, name, version, enabled, fail_count, last_ok_at, last_fail_at \
+         FROM addons WHERE base_url = ?1",
+    )?;
+    let mut rows = stmt.query_map([base_url], row_to_addon)?;
+    match rows.next() {
+        Some(r) => Ok(Some(r?)),
+        None => Ok(None),
+    }
+}
+
+/// Get full addon row (including manifest_json) for proxy operations.
+pub fn get_addon_full(conn: &Connection, addon_id: &str) -> Result<Option<(serde_json::Value, String)>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, base_url, name, version, enabled, fail_count, last_ok_at, last_fail_at, manifest_json \
+         FROM addons WHERE id = ?1",
+    )?;
+    let mut rows = stmt.query_map([addon_id], |row| {
+        let addon = row_to_addon(row)?;
+        let manifest: String = row.get(8)?;
+        Ok((addon, manifest))
+    })?;
+    match rows.next() {
+        Some(r) => Ok(Some(r?)),
+        None => Ok(None),
+    }
+}
+
+/// Toggle addon enabled state. Returns Ok(false) if not found.
+pub fn toggle_addon(conn: &Connection, addon_id: &str, enabled: bool) -> Result<bool> {
+    let affected = conn.execute(
+        "UPDATE addons SET enabled = ?1 WHERE id = ?2",
+        rusqlite::params![if enabled { 1i32 } else { 0i32 }, addon_id],
+    )?;
+    Ok(affected > 0)
+}
+
+/// Delete an addon. Returns Ok(false) if not found.
+pub fn delete_addon(conn: &Connection, addon_id: &str) -> Result<bool> {
+    let affected = conn.execute("DELETE FROM addons WHERE id = ?1", [addon_id])?;
+    Ok(affected > 0)
+}
+
+/// Record a successful proxy request — reset fail_count, update last_ok_at.
+pub fn update_addon_success(conn: &Connection, addon_id: &str) -> Result<()> {
+    let now = chrono_now_z();
+    conn.execute(
+        "UPDATE addons SET fail_count = 0, last_ok_at = ?1 WHERE id = ?2",
+        rusqlite::params![now, addon_id],
+    )?;
+    Ok(())
+}
+
+/// Record a failed proxy request — increment fail_count, update last_fail_at.
+pub fn update_addon_failure(conn: &Connection, addon_id: &str) -> Result<()> {
+    let now = chrono_now_z();
+    conn.execute(
+        "UPDATE addons SET fail_count = fail_count + 1, last_fail_at = ?1 WHERE id = ?2",
+        rusqlite::params![now, addon_id],
+    )?;
+    Ok(())
+}
+
+/// Save an addon track as a song. Returns Ok(song_id) or Err on duplicate.
+#[allow(clippy::too_many_arguments)]
+pub fn save_addon_track(
+    conn: &Connection,
+    addon_id: &str,
+    title: &str,
+    artist: &str,
+    album: Option<&str>,
+    duration: Option<i64>,
+    external_id: &str,
+    stream_url: &str,
+    stream_url_expires_at: Option<&str>,
+    artwork_url: Option<&str>,
+) -> Result<i64> {
+    let now = chrono_now();
+    let source = format!("addon:{addon_id}");
+
+    // Check duplicate
+    let exists: bool = conn.query_row(
+        "SELECT COUNT(*) FROM songs WHERE source = ?1 AND external_id = ?2",
+        rusqlite::params![source, external_id],
+        |r| r.get::<_, i64>(0),
+    )? > 0;
+    if exists {
+        return Err(anyhow::anyhow!("duplicate_addon_track"));
+    }
+
+    // Default expiry: 1 hour from now if not provided
+    let expires_at = stream_url_expires_at.map(|s| s.to_string()).unwrap_or_else(|| {
+        // Parse stream_url_expires_at or use now + 3600s
+        // For simplicity, compute from now
+        let ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+            + 3600;
+        let days = (ts / 86400) as i64;
+        let time_of_day = ts % 86400;
+        let hours = time_of_day / 3600;
+        let minutes = (time_of_day % 3600) / 60;
+        let seconds = time_of_day % 60;
+        let z = days + 719468;
+        let era = if z >= 0 { z } else { z - 146096 } / 146097;
+        let doe = (z - era * 146097) as u32;
+        let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+        let y = yoe as i64 + era * 400;
+        let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+        let mp = (5 * doy + 2) / 153;
+        let d = doy - (153 * mp + 2) / 5 + 1;
+        let m = if mp < 10 { mp + 3 } else { mp - 9 };
+        let y = if m <= 2 { y + 1 } else { y };
+        format!("{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z", y, m, d, hours, minutes, seconds)
+    });
+
+    conn.execute(
+        "INSERT INTO songs (title, artist, album, duration, source, external_id, \
+         stream_url, stream_url_expires_at, artwork_url, created_at, updated_at) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+        rusqlite::params![
+            title, artist, album, duration, source, external_id,
+            stream_url, expires_at, artwork_url, now, now
+        ],
+    )?;
+    Ok(conn.last_insert_rowid())
+}
+
+/// Get song info needed for stream resolution.
+/// Returns (file_path, stream_url, stream_url_expires_at, source, external_id).
+#[allow(clippy::type_complexity)]
+pub fn get_song_resolve_info(
+    conn: &Connection,
+    song_id: i64,
+) -> Result<Option<(Option<String>, Option<String>, Option<String>, String, Option<String>)>> {
+    let mut stmt = conn.prepare(
+        "SELECT file_path, stream_url, stream_url_expires_at, source, external_id \
+         FROM songs WHERE id = ?1",
+    )?;
+    let mut rows = stmt.query_map([song_id], |row| {
+        Ok((
+            row.get::<_, Option<String>>(0)?,
+            row.get::<_, Option<String>>(1)?,
+            row.get::<_, Option<String>>(2)?,
+            row.get::<_, String>(3)?,
+            row.get::<_, Option<String>>(4)?,
+        ))
+    })?;
+    match rows.next() {
+        Some(r) => Ok(Some(r?)),
+        None => Ok(None),
+    }
+}
+
+/// Update a song's stream URL and expiry.
+pub fn update_song_stream_url(
+    conn: &Connection,
+    song_id: i64,
+    stream_url: &str,
+    expires_at: &str,
+) -> Result<()> {
+    conn.execute(
+        "UPDATE songs SET stream_url = ?1, stream_url_expires_at = ?2 WHERE id = ?3",
+        rusqlite::params![stream_url, expires_at, song_id],
+    )?;
+    Ok(())
+}
+
+// ── Watched folder queries ──────────────────────────────────────────────
+
+/// List all watched folders ordered by created_at DESC.
+pub fn list_watched_folders(conn: &Connection) -> Result<Vec<serde_json::Value>> {
+    let mut stmt = conn.prepare_cached(
+        "SELECT id, folder_path, is_active, last_scan_at, created_at FROM watched_folders ORDER BY created_at DESC",
+    )?;
+    let rows = stmt.query_map([], |row| {
+        Ok(serde_json::json!({
+            "id": row.get::<_, i64>(0)?,
+            "folder_path": row.get::<_, String>(1)?,
+            "is_active": row.get::<_, i64>(2)? != 0,
+            "last_scan_at": row.get::<_, Option<String>>(3)?,
+            "created_at": row.get::<_, String>(4)?,
+        }))
+    })?;
+    let mut data = Vec::new();
+    for r in rows {
+        data.push(r?);
+    }
+    Ok(data)
+}
+
+/// Get a watched folder by path. Returns (id, is_active) or None.
+pub fn get_watched_folder_by_path(
+    conn: &Connection,
+    path: &str,
+) -> Result<Option<(i64, bool)>> {
+    conn.query_row(
+        "SELECT id, is_active FROM watched_folders WHERE folder_path = ?1",
+        [path],
+        |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)? != 0)),
+    )
+    .optional()
+    .map_err(Into::into)
+}
+
+/// Reactivate a watched folder (set is_active = 1).
+pub fn reactivate_watched_folder(conn: &Connection, folder_id: i64) -> Result<()> {
+    conn.execute(
+        "UPDATE watched_folders SET is_active = 1 WHERE id = ?1",
+        [folder_id],
+    )?;
+    Ok(())
+}
+
+/// Insert a new watched folder. Returns the new row ID.
+pub fn insert_watched_folder(conn: &Connection, path: &str) -> Result<i64> {
+    conn.execute(
+        "INSERT INTO watched_folders (folder_path) VALUES (?1)",
+        [path],
+    )?;
+    Ok(conn.last_insert_rowid())
+}
+
+/// Check if a watched folder exists by ID.
+pub fn watched_folder_exists(conn: &Connection, folder_id: i64) -> Result<bool> {
+    let count: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM watched_folders WHERE id = ?1",
+        [folder_id],
+        |row| row.get(0),
+    )?;
+    Ok(count > 0)
+}
+
+/// Delete a watched folder by ID.
+pub fn delete_watched_folder(conn: &Connection, folder_id: i64) -> Result<()> {
+    conn.execute("DELETE FROM watched_folders WHERE id = ?1", [folder_id])?;
+    Ok(())
+}
+
+/// Get the folder path for a watched folder by ID.
+pub fn get_watched_folder_path(conn: &Connection, folder_id: i64) -> Result<Option<String>> {
+    conn.query_row(
+        "SELECT folder_path FROM watched_folders WHERE id = ?1",
+        [folder_id],
+        |row| row.get(0),
+    )
+    .optional()
+    .map_err(Into::into)
+}
+
+/// Update last_scan_at for a watched folder to now.
+pub fn update_watched_folder_last_scan(conn: &Connection, folder_id: i64) -> Result<()> {
+    let now = chrono_now();
+    conn.execute(
+        "UPDATE watched_folders SET last_scan_at = ?1 WHERE id = ?2",
+        rusqlite::params![now, folder_id],
+    )?;
+    Ok(())
+}
+
+/// List active watched folders for the background watcher.
+/// Returns (id, folder_path) pairs.
+pub fn list_active_watched_folders(conn: &Connection) -> Result<Vec<(i64, String)>> {
+    let mut stmt = conn.prepare_cached(
+        "SELECT id, folder_path FROM watched_folders WHERE is_active = 1",
+    )?;
+    let rows = stmt.query_map([], |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)))?;
+    let mut data = Vec::new();
+    for r in rows {
+        data.push(r?);
+    }
+    Ok(data)
+}

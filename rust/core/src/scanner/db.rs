@@ -17,7 +17,7 @@ use crate::paths;
 
 /// Supported audio file extensions (lowercase, with dot).
 /// Matches Python `AUDIO_EXTENSIONS` exactly.
-const SUPPORTED_EXTENSIONS: &[&str] = &[
+pub const SUPPORTED_EXTENSIONS: &[&str] = &[
     ".mp3", ".flac", ".m4a", ".ogg", ".opus", ".wav", ".wma", ".aac", ".aiff", ".ape", ".wv",
 ];
 

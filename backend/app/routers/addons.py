@@ -27,18 +27,11 @@ addon_stream_cache = TTLCache(default_ttl=3600.0)   # 1 hr (overridden per-addon
 addon_lyrics_cache = TTLCache(default_ttl=86400.0)  # 24 hr
 
 
-# ── SSRF Defense ──────────────────────────────────────────────────────────
+# SSRF Defense ──────────────────────────────────────────────────────────────
 
-_PRIVATE_NETWORKS = [
-    ipaddress.ip_network("127.0.0.0/8"),
-    ipaddress.ip_network("10.0.0.0/8"),
-    ipaddress.ip_network("172.16.0.0/12"),
-    ipaddress.ip_network("192.168.0.0/16"),
-    ipaddress.ip_network("169.254.0.0/16"),
-    ipaddress.ip_network("::1/128"),
-    ipaddress.ip_network("fc00::/7"),
-    ipaddress.ip_network("fe80::/10"),
-]
+# CGNAT range — NOT covered by is_private on all Python versions.
+# Explicit regardless of Python version, per N37 brief.
+_CGNAT_NETWORK = ipaddress.ip_network("100.64.0.0/10")
 
 _LOCALHOST_HOSTNAMES = {"localhost", "127.0.0.1", "::1"}
 
@@ -48,12 +41,30 @@ _MAX_BODY_PROXY = 4 * 1024 * 1024         # 4 MB for search/lyrics/stream respon
 
 
 def _is_private_ip(ip_str: str) -> bool:
-    """Check if an IP address is in a private/reserved range."""
+    """Check if an IP address is private/reserved/unspecified/multicast.
+
+    Uses ipaddress module properties instead of a hand-kept network list.
+    Handles IPv4-mapped IPv6 addresses (e.g. ::ffff:127.0.0.1) by unwrapping
+    to the mapped IPv4 and evaluating that.
+    """
     try:
         addr = ipaddress.ip_address(ip_str)
-        return any(addr in net for net in _PRIVATE_NETWORKS)
     except ValueError:
         return True  # reject unparseable IPs
+
+    # Unwrap IPv4-mapped IPv6 → evaluate the mapped IPv4
+    if isinstance(addr, ipaddress.IPv6Address) and addr.ipv4_mapped is not None:
+        addr = addr.ipv4_mapped
+
+    return (
+        addr.is_loopback
+        or addr.is_private
+        or addr.is_link_local
+        or addr.is_reserved
+        or addr.is_unspecified
+        or addr.is_multicast
+        or addr in _CGNAT_NETWORK
+    )
 
 
 def _validate_url_for_ssrf(url: str) -> None:

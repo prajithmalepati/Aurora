@@ -1,3 +1,4 @@
+pub mod addons;
 mod albums;
 mod envelope;
 mod filter;

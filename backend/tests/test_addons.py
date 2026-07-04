@@ -520,3 +520,128 @@ def test_resolve_stream_fresh_url(client, mock_addon_server):
     assert "cdn.example.com" in data["url"]
 
     client.delete(f"/api/addons/{addon_id}")
+
+
+# ── N37: SSRF Private-IP Gap Tests ─────────────────────────────────────
+
+from app.routers.addons import _is_private_ip, _validate_url_for_ssrf
+
+@pytest.mark.parametrize("ip,expected_reject", [
+    # --- Gaps that currently PASS but should REJECT ---
+    ("0.0.0.0", True),                          # unspecified → local
+    ("::ffff:127.0.0.1", True),                 # IPv4-mapped loopback
+    ("::ffff:169.254.169.254", True),           # IPv4-mapped link-local (cloud metadata)
+    ("::", True),                                # IPv6 unspecified
+    ("100.64.0.1", True),                       # CGNAT (Tailscale range)
+    ("100.100.100.100", True),                  # CGNAT (Tailscale range)
+    # --- Already-correct cases (must stay correct) ---
+    ("127.0.0.1", True),                        # loopback
+    ("10.1.2.3", True),                         # private 10.x
+    ("192.168.1.1", True),                      # private 192.168.x
+    ("169.254.0.1", True),                      # link-local
+    ("172.16.0.1", True),                       # private 172.16.x
+    ("fc00::1", True),                           # IPv6 ULA
+    ("fe80::1", True),                           # IPv6 link-local
+    ("::1", True),                               # IPv6 loopback
+    ("224.0.0.1", True),                        # multicast
+    ("255.255.255.255", True),                  # reserved broadcast
+    # F2/R2-B: v6-compatible embedding (::/8)
+    ("::127.0.0.1", True),
+    ("::10.0.0.1", True),
+    # F2/R2-B: NAT64 (64:ff9b::/96)
+    ("64:ff9b::7f00:1", True),
+    ("64:ff9b::10.0.0.1", True),
+    # R2-B: NAT64 neighbor (Python is_reserved)
+    ("64:ff9c::1", True),
+    # F2/R2-B: documentation range (2001:db8::/32)
+    ("2001:db8::1", True),
+    ("2001:db8:abcd::1", True),
+    # R2-B: 6to4 (2002::/16, Python is_private)
+    ("2002::1", True),
+    # R2-B: RFC 6666 discard (100::/64, Python is_reserved + is_private)
+    ("100::1", True),
+    # R2-B: ORCHID (2001:10::/28, Python is_private)
+    ("2001:10::1", True),
+    # R2-B: Teredo (2001::/32, Python is_private)
+    ("2001::1", True),
+    # R2-B: IANA reserved (>=4000::, Python is_reserved)
+    ("4000::1", True),
+    ("5f00::1", True),
+    ("a000::1", True),
+    # --- Must PASS (public addresses) ---
+    ("8.8.8.8", False),                          # public IPv4
+    ("::ffff:8.8.8.8", False),                  # IPv4-mapped PUBLIC → must not over-reject
+    ("2606:4700::1111", False),                 # public IPv6 (Cloudflare)
+    # R2-B: 6bone (3ffe::/16, Python treats as global)
+    ("3ffe::1", False),
+])
+def test_n37_is_private_ip_gaps(ip, expected_reject):
+    """N37: _is_private_ip must reject all private/reserved/unspecified IPs.
+
+    Parametrized battery covering gaps found in the hand-kept _PRIVATE_NETWORKS list.
+    """
+    result = _is_private_ip(ip)
+    assert result is expected_reject, (
+        f"_is_private_ip({ip!r}) returned {result}, expected {expected_reject}"
+    )
+
+
+def test_n37_validate_url_ssrf_gap_resolves(client, monkeypatch):
+    """N37: Integration — POST /addons with URL resolving to a gap IP → 400.
+
+    Monkeypatches socket.getaddrinfo so the hostname resolves to a gap value.
+    """
+    original_getaddrinfo = socket.getaddrinfo
+
+    def patched_getaddrinfo(host, port, *args, **kwargs):
+        if host == "addon-with-gap.example.com":
+            return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("100.64.0.1", port or 443))]
+        return original_getaddrinfo(host, port, *args, **kwargs)
+
+    monkeypatch.setattr(socket, "getaddrinfo", patched_getaddrinfo)
+
+    resp = client.post("/api/addons", json={"base_url": "https://addon-with-gap.example.com"})
+    assert resp.status_code == 400
+    assert "private" in resp.json()["detail"].lower() or "reserves" in resp.json()["detail"].lower()
+
+
+def test_n37_ssrf_backend_blocks_gap_ips():
+    """N37: _SSRFNetworkBackend.connect_tcp rejects gap IPs at connect time.
+
+    Drives the SSRF backend directly with a FakeBackend to verify connect-time blocking.
+    """
+    class FakeBackend(httpcore.AsyncNetworkBackend):
+        def __init__(self):
+            self.connect_attempts = []
+
+        async def connect_tcp(self, host, port, **kwargs):
+            self.connect_attempts.append((host, port))
+            return "fake_stream"
+
+        async def connect_unix_socket(self, path, **kwargs):
+            return "fake_stream"
+
+        async def sleep(self, seconds):
+            pass
+
+    fake = FakeBackend()
+    ssrf_backend = _SSRFNetworkBackend(fake)
+
+    gap_ips = [
+        "0.0.0.0",
+        "::ffff:127.0.0.1",
+        "::ffff:169.254.169.254",
+        "::",
+        "100.64.0.1",
+        "100.100.100.100",
+    ]
+
+    for ip in gap_ips:
+        fake.connect_attempts.clear()
+
+        async def test_gap(ip=ip):
+            with pytest.raises(httpcore.ConnectError, match="SSRF blocked"):
+                await ssrf_backend.connect_tcp(ip, 443)
+            assert len(fake.connect_attempts) == 0
+
+        asyncio.run(test_gap())

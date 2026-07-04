@@ -15,11 +15,29 @@ use std::sync::Arc;
 
 use crate::AppState;
 use super::envelope;
-use rusqlite::OptionalExtension;
 
 #[derive(Deserialize)]
 pub struct WatchFolderRequest {
     pub path: String,
+}
+
+/// Build the scan result JSON envelope (shared by trigger_scan paths).
+fn build_scan_response(result: aurora_core::scanner::db::ScanResult) -> Value {
+    serde_json::json!({
+        "folders_scanned": 1,
+        "imported": result.imported,
+        "replaced": result.replaced,
+        "skipped": result.skipped,
+        "deleted": 0,
+        "errors": result.errors.len(),
+    })
+}
+
+/// Signal the background watcher to reconfigure (if handle exists).
+async fn signal_reconfigure(state: &AppState) {
+    if let Some(ref handle) = state.watcher_handle {
+        let _ = handle.reconfigure_tx.try_send(());
+    }
 }
 
 /// GET /api/watch — list all watched folders.
@@ -27,32 +45,10 @@ pub async fn list_watched_folders(
     State(state): State<Arc<AppState>>,
 ) -> Response {
     let conn = state.conn.lock().await;
-    let mut stmt = match conn.prepare(
-        "SELECT id, folder_path, is_active, last_scan_at, created_at FROM watched_folders ORDER BY created_at DESC"
-    ) {
-        Ok(s) => s,
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"detail": e.to_string()}))).into_response(),
-    };
-
-    let rows = match stmt.query_map([], |row| {
-        Ok(serde_json::json!({
-            "id": row.get::<_, i64>(0)?,
-            "folder_path": row.get::<_, String>(1)?,
-            "is_active": row.get::<_, i64>(2)? != 0,
-            "last_scan_at": row.get::<_, Option<String>>(3)?,
-            "created_at": row.get::<_, String>(4)?,
-        }))
-    }) {
-        Ok(rows) => rows,
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"detail": e.to_string()}))).into_response(),
-    };
-
-    let data: Vec<Value> = match rows.collect::<std::result::Result<Vec<_>, _>>() {
-        Ok(v) => v,
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"detail": e.to_string()}))).into_response(),
-    };
-
-    envelope::ok(Value::Array(data), "ok").into_response()
+    match aurora_core::db::queries::list_watched_folders(&conn) {
+        Ok(data) => envelope::ok(Value::Array(data), "ok").into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"detail": e.to_string()}))).into_response(),
+    }
 }
 
 /// POST /api/watch — add a folder to the watch list.
@@ -73,35 +69,26 @@ pub async fn add_watched_folder(
     let path_str = folder_path.to_string_lossy().to_string();
     let conn = state.conn.lock().await;
 
-    // Check if already exists
-    let existing = conn.query_row(
-        "SELECT id, is_active FROM watched_folders WHERE folder_path = ?1",
-        [&path_str],
-        |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)? != 0)),
-    ).optional();
+    let existing = aurora_core::db::queries::get_watched_folder_by_path(&conn, &path_str);
 
     match existing {
         Ok(Some((id, is_active))) => {
             if !is_active {
-                let _ = conn.execute(
-                    "UPDATE watched_folders SET is_active = 1 WHERE id = ?1",
-                    [id],
-                );
+                let _ = aurora_core::db::queries::reactivate_watched_folder(&conn, id);
             }
             let message = if is_active { "Folder already watched" } else { "Folder reactivated" };
+            drop(conn);
+            signal_reconfigure(&state).await;
             envelope::ok(
                 serde_json::json!({"id": id, "folder_path": path_str, "is_active": true}),
                 message,
             ).into_response()
         }
         Ok(None) => {
-            let result = conn.execute(
-                "INSERT INTO watched_folders (folder_path) VALUES (?1)",
-                [&path_str],
-            );
-            match result {
-                Ok(_) => {
-                    let id = conn.last_insert_rowid();
+            match aurora_core::db::queries::insert_watched_folder(&conn, &path_str) {
+                Ok(id) => {
+                    drop(conn);
+                    signal_reconfigure(&state).await;
                     envelope::ok(
                         serde_json::json!({"id": id, "folder_path": path_str, "is_active": true}),
                         "ok",
@@ -120,25 +107,23 @@ pub async fn remove_watched_folder(
     Path(folder_id): Path<i64>,
 ) -> Response {
     let conn = state.conn.lock().await;
-    let exists: bool = conn.query_row(
-        "SELECT COUNT(*) FROM watched_folders WHERE id = ?1",
-        [folder_id],
-        |row| row.get::<_, i64>(0),
-    ).map(|c| c > 0).unwrap_or(false);
-
-    if !exists {
-        return envelope::not_found("Watched folder not found").into_response();
+    match aurora_core::db::queries::watched_folder_exists(&conn, folder_id) {
+        Ok(true) => {}
+        Ok(false) => return envelope::not_found("Watched folder not found").into_response(),
+        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"detail": e.to_string()}))).into_response(),
     }
 
-    let _ = conn.execute("DELETE FROM watched_folders WHERE id = ?1", [folder_id]);
+    let _ = aurora_core::db::queries::delete_watched_folder(&conn, folder_id);
+    drop(conn);
+    signal_reconfigure(&state).await;
     envelope::ok(serde_json::json!({"id": folder_id}), "ok").into_response()
 }
 
 /// POST /api/watch/{id}/scan — trigger scan of a specific watched folder.
 ///
-/// F1: Opens a dedicated scan connection so the main AppState.conn mutex
-/// is not held during the scan. Other routes (including /api/health) remain
-/// responsive while the scan runs.
+/// Uses spawn_blocking for the scan+decode work so the tokio worker is not
+/// pinned. Opens a dedicated DB connection inside the blocking task (same
+/// pattern as the SSE scan path).
 pub async fn trigger_scan(
     State(state): State<Arc<AppState>>,
     Path(folder_id): Path<i64>,
@@ -146,11 +131,7 @@ pub async fn trigger_scan(
     // Phase 1: Get folder path while holding the lock, then release
     let folder_path: String = {
         let conn = state.conn.lock().await;
-        match conn.query_row(
-            "SELECT folder_path FROM watched_folders WHERE id = ?1",
-            [folder_id],
-            |row| row.get(0),
-        ).optional() {
+        match aurora_core::db::queries::get_watched_folder_path(&conn, folder_id) {
             Ok(Some(p)) => p,
             Ok(None) => return envelope::not_found("Watched folder not found").into_response(),
             Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"detail": e.to_string()}))).into_response(),
@@ -158,77 +139,49 @@ pub async fn trigger_scan(
     };
     // Lock released — other routes can proceed
 
-    // Phase 2: Open dedicated scan connection and run scan
-    let scan_conn = if let Some(ref db_path) = state.db_path {
-        match aurora_core::db::open_and_migrate(db_path) {
-            Ok(c) => c,
-            Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"detail": e.to_string()}))).into_response(),
+    // Phase 2: Open dedicated scan connection and run scan on blocking thread
+    let db_path = match state.db_path.clone() {
+        Some(p) => p,
+        None => {
+            // Test harness: use shared connection (lock briefly)
+            let conn = state.conn.lock().await;
+            let result = aurora_core::scanner::db::import_scanned_songs(
+                &conn,
+                &folder_path,
+                None,
+                None,
+                None,
+            );
+            let _ = aurora_core::db::queries::update_watched_folder_last_scan(&conn, folder_id);
+            return match result {
+                Ok(scan_result) => envelope::ok(build_scan_response(scan_result), "ok").into_response(),
+                Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"detail": e.to_string()}))).into_response(),
+            };
         }
-    } else {
-        // Test harness: use shared connection (lock briefly)
-        let conn = state.conn.lock().await;
-        // For in-memory test, we need to scan while holding the lock
-        let result = aurora_core::scanner::db::import_scanned_songs(
+    };
+
+    // Scan using dedicated connection on blocking thread (AppState.conn NOT held)
+    let scan_result = tokio::task::spawn_blocking(move || {
+        let conn = aurora_core::db::open_and_migrate(&db_path)?;
+        aurora_core::scanner::db::import_scanned_songs(
             &conn,
             &folder_path,
             None,
             None,
             None,
-        );
-        let now = aurora_core::db::queries::chrono_now();
-        let _ = conn.execute(
-            "UPDATE watched_folders SET last_scan_at = ?1 WHERE id = ?2",
-            rusqlite::params![now, folder_id],
-        );
-        return match result {
-            Ok(scan_result) => envelope::ok(
-                serde_json::json!({
-                    "folders_scanned": 1,
-                    "imported": scan_result.imported,
-                    "replaced": scan_result.replaced,
-                    "skipped": scan_result.skipped,
-                    "deleted": 0,
-                    "errors": scan_result.errors.len(),
-                }),
-                "ok",
-            ).into_response(),
-            Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"detail": e.to_string()}))).into_response(),
-        };
-    };
-
-    // Scan using dedicated connection (AppState.conn NOT held)
-    let result = aurora_core::scanner::db::import_scanned_songs(
-        &scan_conn,
-        &folder_path,
-        None,
-        None,
-        None,
-    );
+        )
+    })
+    .await;
 
     // Phase 3: Update last_scan_at (re-acquire lock briefly)
-    let now = aurora_core::db::queries::chrono_now();
     {
         let conn = state.conn.lock().await;
-        let _ = conn.execute(
-            "UPDATE watched_folders SET last_scan_at = ?1 WHERE id = ?2",
-            rusqlite::params![now, folder_id],
-        );
+        let _ = aurora_core::db::queries::update_watched_folder_last_scan(&conn, folder_id);
     }
 
-    match result {
-        Ok(scan_result) => {
-            envelope::ok(
-                serde_json::json!({
-                    "folders_scanned": 1,
-                    "imported": scan_result.imported,
-                    "replaced": scan_result.replaced,
-                    "skipped": scan_result.skipped,
-                    "deleted": 0,
-                    "errors": scan_result.errors.len(),
-                }),
-                "ok",
-            ).into_response()
-        }
+    match scan_result {
+        Ok(Ok(result)) => envelope::ok(build_scan_response(result), "ok").into_response(),
+        Ok(Err(e)) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"detail": e.to_string()}))).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"detail": e.to_string()}))).into_response(),
     }
 }
