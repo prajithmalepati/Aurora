@@ -1270,7 +1270,7 @@ pub fn list_folder_tree(conn: &Connection) -> Result<(serde_json::Value, i64, i6
 }
 
 /// List songs within a specific folder path.
-/// Returns `(songs, total)`. Songs serialized with peaks (include_peaks = true).
+/// Returns `(songs, total)`. Songs serialized WITHOUT peaks (list payload).
 /// LIKE hygiene: escapes `%`/`_` in path, uses `ESCAPE`, normalizes column
 /// so backslash-stored and leading-slash-less paths match (Python parity).
 pub fn list_folder_songs(
@@ -1316,7 +1316,7 @@ pub fn list_folder_songs(
         );
         let mut stmt = conn.prepare(&sql)?;
         let rows = stmt.query_map(rusqlite::params![like_pattern, limit, offset], |row| {
-            row_to_song(row, true)
+            row_to_song(row, false)
         })?;
         rows.collect::<std::result::Result<Vec<_>, _>>()?
     } else {
@@ -1328,10 +1328,10 @@ pub fn list_folder_songs(
         let mut stmt = conn.prepare(&sql)?;
         let rows = stmt.query_map(
             rusqlite::params![like_pattern, deeper_pattern, limit, offset],
-            |row| row_to_song(row, true),
-        )?;
-        rows.collect::<std::result::Result<Vec<_>, _>>()?
-    };
+            |row| row_to_song(row, false),
+ )?;
+ rows.collect::<std::result::Result<Vec<_>, _>>()?
+ };
 
     Ok((songs, total))
 }

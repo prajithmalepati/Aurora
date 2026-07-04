@@ -4,6 +4,13 @@ import tempfile
 import wave
 
 import pytest
+from tests.conftest import _seed_database
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _reset_db():
+    """Re-seed DB before this module's tests execute (not at import time)."""
+    _seed_database()
 
 
 def test_scan_empty_path_422(client):

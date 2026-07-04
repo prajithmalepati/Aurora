@@ -60,18 +60,25 @@ def _migrate_to_data_dir() -> None:
             pass
         logger.info("Migrated playlist-images → %s", PLAYLIST_IMAGES_DIR)
 
-    # Update image_url paths in DB from /playlist-images/ to /api/playlist-images/
-    if DB_PATH.exists():
-        import sqlite3
-        conn = sqlite3.connect(str(DB_PATH))
-        try:
-            conn.execute(
-                "UPDATE playlists SET image_url = REPLACE(image_url, '/playlist-images/', '/api/playlist-images/')"
-                " WHERE image_url LIKE '/playlist-images/%'"
-            )
-            conn.commit()
-        finally:
-            conn.close()
+
+def _migrate_image_urls() -> None:
+    """Update image_url paths in DB from /playlist-images/ to /api/playlist-images/.
+
+    Called AFTER init_db() so the playlists table is guaranteed to exist.
+    Idempotent — only touches rows matching the old prefix.
+    """
+    if not DB_PATH.exists():
+        return
+    import sqlite3
+    conn = sqlite3.connect(str(DB_PATH))
+    try:
+        conn.execute(
+            "UPDATE playlists SET image_url = REPLACE(image_url, '/playlist-images/', '/api/playlist-images/')"
+            " WHERE image_url LIKE '/playlist-images/%'"
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 @asynccontextmanager
@@ -79,6 +86,7 @@ async def lifespan(app: FastAPI):
     """Startup and shutdown lifecycle."""
     _migrate_to_data_dir()
     init_db()
+    _migrate_image_urls()
     # Start the background file watcher
     from app.services.file_watcher import FileWatcher, set_watcher
     fw = FileWatcher(interval=30)
