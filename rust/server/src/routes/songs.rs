@@ -454,10 +454,27 @@ pub async fn album_art(
 mod tests {
     use super::*;
 
-    /// F4: Verify that mtime formatting mirrors Python's str() for floats.
-    /// Python str(1783152000.0) → "1783152000.0" (includes .0 for whole seconds).
-    /// Rust's format!("{}", 1783152000.0_f64) → "1783152000" (no decimal).
-    /// Our fix appends ".0" when no dot is present.
+    /// F4: Verify etag_and_lm produces correct ETag format on a real file.
+    #[test]
+    fn etag_and_lm_format_real_file() {
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(tmp.path(), b"test content").unwrap();
+        let metadata = std::fs::metadata(tmp.path()).unwrap();
+        let (etag, lm) = etag_and_lm(&metadata);
+
+        // ETag must be quoted hex
+        assert!(etag.starts_with('"') && etag.ends_with('"'), "ETag must be quoted: {}", etag);
+        let hex = &etag[1..etag.len()-1];
+        assert!(hex.chars().all(|c| c.is_ascii_hexdigit()), "ETag must be hex: {}", etag);
+        assert_eq!(hex.len(), 32, "MD5 hex must be 32 chars: {}", etag);
+
+        // Last-Modified must be RFC 1123 ending in GMT
+        assert!(lm.ends_with(" GMT"), "Last-Modified must end with GMT: {}", lm);
+    }
+
+    /// F4: Verify whole-second mtime renders as "X.0" (Python str() parity).
+    /// We test the formatting logic directly since setting arbitrary mtimes
+    /// requires platform-specific code not worth adding a dependency for.
     #[test]
     fn etag_mtime_format_whole_second() {
         let mtime_epoch: f64 = 1783152000.0;
@@ -475,8 +492,6 @@ mod tests {
         if !mtime_str.contains('.') {
             mtime_str.push_str(".0");
         }
-        // Python str() gives "1751513151.1234567" — Rust may differ in precision.
-        // The key invariant: it must contain a dot.
         assert!(mtime_str.contains('.'), "fractional mtime must contain '.': {}", mtime_str);
     }
 }
