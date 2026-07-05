@@ -290,8 +290,8 @@ pub fn delete_song(conn: &Connection, song_id: i64) -> Result<bool> {
 
 // ── Tag queries ───────────────────────────────────────────────────────────
 
-/// Create a tag. Returns Ok(id) or Err("duplicate").
-pub fn create_tag(conn: &Connection, name: &str) -> Result<i64> {
+/// Create a tag. Returns Ok((id, created_at)) or Err("duplicate").
+pub fn create_tag(conn: &Connection, name: &str) -> Result<(i64, String)> {
     let name = name.to_lowercase().trim().to_string();
     if name.is_empty() {
         return Err(anyhow::anyhow!("empty_name"));
@@ -301,7 +301,7 @@ pub fn create_tag(conn: &Connection, name: &str) -> Result<i64> {
         "INSERT INTO tags (name, created_at) VALUES (?1, ?2)",
         rusqlite::params![name, now],
     ) {
-        Ok(_) => Ok(conn.last_insert_rowid()),
+        Ok(_) => Ok((conn.last_insert_rowid(), now.to_string())),
         Err(e) => {
             let msg = e.to_string();
             if msg.contains("UNIQUE constraint failed") {

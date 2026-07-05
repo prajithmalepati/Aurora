@@ -568,12 +568,16 @@ from app.routers.addons import _is_private_ip, _validate_url_for_ssrf
     ("4000::1", True),
     ("5f00::1", True),
     ("a000::1", True),
+    # RFC 9637: 3fff::/20 documentation range (Python 3.13+ is_private)
+    ("3fff::1", True),
     # --- Must PASS (public addresses) ---
     ("8.8.8.8", False),                          # public IPv4
     ("::ffff:8.8.8.8", False),                  # IPv4-mapped PUBLIC → must not over-reject
     ("2606:4700::1111", False),                 # public IPv6 (Cloudflare)
     # R2-B: 6bone (3ffe::/16, Python treats as global)
     ("3ffe::1", False),
+    # RFC 9637: outside 3fff::/20 (first nibble of s1 > 0)
+    ("3fff:1000::1", False),
 ])
 def test_n37_is_private_ip_gaps(ip, expected_reject):
     """N37: _is_private_ip must reject all private/reserved/unspecified IPs.

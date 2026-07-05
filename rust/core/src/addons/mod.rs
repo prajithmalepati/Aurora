@@ -107,6 +107,8 @@ fn is_ipv6_private_special(ip: Ipv6Addr) -> bool {
     || (s0 == 0x2001 && (s1 & 0xFFF0) == 0x0010)
     // 2001::/32 — Teredo tunneling (RFC 4380)
     || (s0 == 0x2001 && s1 == 0)
+    // 3fff::/20 — documentation range (RFC 9637, Python 3.13+ is_private)
+    || (s0 == 0x3fff && (s1 & 0xF000) == 0)
 }
 
 #[cfg(test)]
@@ -155,6 +157,8 @@ mod tests {
             "4000::1",
             "5f00::1",
             "a000::1",
+            // RFC 9637: 3fff::/20 documentation range
+            "3fff::1",
         ];
         for ip_str in reject_cases {
             let ip: IpAddr = ip_str.parse().unwrap();
@@ -172,6 +176,8 @@ mod tests {
             "93.184.216.34",
             // R2-B: 6bone (3ffe::/16, Python treats as global)
             "3ffe::1",
+            // RFC 9637: outside 3fff::/20 (first nibble of s1 > 0)
+            "3fff:1000::1",
         ];
         for ip_str in pass_cases {
             let ip: IpAddr = ip_str.parse().unwrap();

@@ -1,0 +1,399 @@
+{
+  "date": "2026-07-05T16:40:50.087109+00:00",
+  "total": 53,
+  "pass": 48,
+  "diff": 0,
+  "whitelisted": 5,
+  "error": 0,
+  "results": [
+    {
+      "endpoint": "GET /api/health",
+      "method": "GET",
+      "status": "PASS",
+      "python_status": 200,
+      "rust_status": 200
+    },
+    {
+      "endpoint": "GET /api/songs",
+      "method": "GET",
+      "status": "PASS",
+      "python_status": 200,
+      "rust_status": 200
+    },
+    {
+      "endpoint": "GET /api/songs/1",
+      "method": "GET",
+      "status": "PASS",
+      "python_status": 200,
+      "rust_status": 200
+    },
+    {
+      "endpoint": "GET /api/tags",
+      "method": "GET",
+      "status": "PASS",
+      "python_status": 200,
+      "rust_status": 200
+    },
+    {
+      "endpoint": "GET /api/playlists",
+      "method": "GET",
+      "status": "PASS",
+      "python_status": 200,
+      "rust_status": 200
+    },
+    {
+      "endpoint": "GET /api/playlists/1",
+      "method": "GET",
+      "status": "PASS",
+      "python_status": 200,
+      "rust_status": 200
+    },
+    {
+      "endpoint": "GET /api/folders",
+      "method": "GET",
+      "status": "PASS",
+      "python_status": 200,
+      "rust_status": 200
+    },
+    {
+      "endpoint": "GET /api/albums",
+      "method": "GET",
+      "status": "PASS",
+      "python_status": 200,
+      "rust_status": 200
+    },
+    {
+      "endpoint": "GET /api/albums/Machine Head",
+      "method": "GET",
+      "status": "PASS",
+      "python_status": 404,
+      "rust_status": 404
+    },
+    {
+      "endpoint": "GET /api/addons",
+      "method": "GET",
+      "status": "PASS",
+      "python_status": 200,
+      "rust_status": 200
+    },
+    {
+      "endpoint": "GET /api/watch",
+      "method": "GET",
+      "status": "PASS",
+      "python_status": 200,
+      "rust_status": 200
+    },
+    {
+      "endpoint": "GET /api/songs/1/stream (full)",
+      "method": "GET",
+      "status": "PASS",
+      "python_status": 200,
+      "rust_status": 200
+    },
+    {
+      "endpoint": "GET /api/songs/1/stream (bytes=0-99)",
+      "method": "GET",
+      "status": "PASS",
+      "python_status": 206,
+      "rust_status": 206
+    },
+    {
+      "endpoint": "GET /api/songs/1/stream (multi-range)",
+      "method": "GET",
+      "status": "WHITELISTED",
+      "whitelist_rule": "W4",
+      "notes": [
+        "W4: multi-range \u2192 Python read failed (non-RFC body), asserted W4"
+      ]
+    },
+    {
+      "endpoint": "GET /api/songs/1/stream (unsat)",
+      "method": "GET",
+      "status": "PASS",
+      "python_status": 416,
+      "rust_status": 416
+    },
+    {
+      "endpoint": "GET /api/album-art/abc123def456.jpg",
+      "method": "GET",
+      "status": "PASS",
+      "python_status": 404,
+      "rust_status": 404
+    },
+    {
+      "endpoint": "GET /api/songs/1/bleed-thumb",
+      "method": "GET",
+      "status": "PASS",
+      "python_status": 404,
+      "rust_status": 404
+    },
+    {
+      "endpoint": "POST /api/filter (rock)",
+      "method": "POST",
+      "status": "PASS",
+      "python_status": 200,
+      "rust_status": 200
+    },
+    {
+      "endpoint": "POST /api/filter (slow AND chill)",
+      "method": "POST",
+      "status": "PASS",
+      "python_status": 200,
+      "rust_status": 200
+    },
+    {
+      "endpoint": "POST /api/filter (rock OR anime)",
+      "method": "POST",
+      "status": "PASS",
+      "python_status": 200,
+      "rust_status": 200
+    },
+    {
+      "endpoint": "POST /api/filter (NOT rock)",
+      "method": "POST",
+      "status": "PASS",
+      "python_status": 200,
+      "rust_status": 200
+    },
+    {
+      "endpoint": "POST /api/filter (\"fast\")",
+      "method": "POST",
+      "status": "PASS",
+      "python_status": 200,
+      "rust_status": 200
+    },
+    {
+      "endpoint": "POST /api/filter (id:1)",
+      "method": "POST",
+      "status": "PASS",
+      "python_status": 200,
+      "rust_status": 200
+    },
+    {
+      "endpoint": "POST /api/filter (AND only)",
+      "method": "POST",
+      "status": "WHITELISTED",
+      "whitelist_rule": "W9",
+      "python_status": 400,
+      "rust_status": 400,
+      "notes": [
+        "W9: filter error wording differs (both 400 with non-empty detail)"
+      ]
+    },
+    {
+      "endpoint": "POST /api/filter (51 atoms)",
+      "method": "POST",
+      "status": "PASS",
+      "python_status": 400,
+      "rust_status": 400
+    },
+    {
+      "endpoint": "GET /api/playlists/1/export (m3u8)",
+      "method": "GET",
+      "status": "PASS",
+      "python_status": 200,
+      "rust_status": 200
+    },
+    {
+      "endpoint": "GET /api/playlists/1/export (json)",
+      "method": "GET",
+      "status": "PASS",
+      "python_status": 200,
+      "rust_status": 200
+    },
+    {
+      "endpoint": "GET /api/folders/songs?path=/music/rock",
+      "method": "GET",
+      "status": "PASS",
+      "python_status": 200,
+      "rust_status": 200
+    },
+    {
+      "endpoint": "GET /api/addons/1/search?q=sunset",
+      "method": "GET",
+      "status": "PASS",
+      "python_status": 404,
+      "rust_status": 404
+    },
+    {
+      "endpoint": "GET /api/songs/9999 (404)",
+      "method": "GET",
+      "status": "PASS",
+      "python_status": 404,
+      "rust_status": 404
+    },
+    {
+      "endpoint": "GET /api/playlists/9999 (404)",
+      "method": "GET",
+      "status": "PASS",
+      "python_status": 404,
+      "rust_status": 404
+    },
+    {
+      "endpoint": "GET /api/tags/9999 (405 expected)",
+      "method": "GET",
+      "status": "WHITELISTED",
+      "whitelist_rule": "W10",
+      "python_status": 405,
+      "rust_status": 405,
+      "notes": [
+        "W10: 405 body shape differs (Python detail vs Rust null)"
+      ]
+    },
+    {
+      "endpoint": "GET /api/addons/9999/search (404)",
+      "method": "GET",
+      "status": "PASS",
+      "python_status": 404,
+      "rust_status": 404
+    },
+    {
+      "endpoint": "POST /api/filter (bare &)",
+      "method": "POST",
+      "status": "WHITELISTED",
+      "whitelist_rule": "W9",
+      "python_status": 400,
+      "rust_status": 400,
+      "notes": [
+        "W9: filter error wording differs (both 400 with non-empty detail)"
+      ]
+    },
+    {
+      "endpoint": "GET /api/tags/9999 (W10 body shape)",
+      "method": "GET",
+      "status": "WHITELISTED",
+      "whitelist_rule": "W10",
+      "python_status": 405,
+      "rust_status": 405,
+      "notes": [
+        "W10: 405 body shape differs (Python detail vs Rust null)"
+      ]
+    },
+    {
+      "endpoint": "POST /api/tags (create shadowtest)",
+      "method": "POST",
+      "status": "PASS",
+      "python_status": 201,
+      "rust_status": 201
+    },
+    {
+      "endpoint": "DELETE /api/tags/{new_tag_id}",
+      "method": "DELETE",
+      "status": "PASS",
+      "python_status": 200,
+      "rust_status": 200
+    },
+    {
+      "endpoint": "POST /api/playlists (create)",
+      "method": "POST",
+      "status": "PASS",
+      "python_status": 201,
+      "rust_status": 201
+    },
+    {
+      "endpoint": "POST /api/playlists/{new_playlist_id}/songs (add song 1)",
+      "method": "POST",
+      "status": "PASS",
+      "python_status": 200,
+      "rust_status": 200
+    },
+    {
+      "endpoint": "POST /api/playlists/{new_playlist_id}/songs (add song 2)",
+      "method": "POST",
+      "status": "PASS",
+      "python_status": 200,
+      "rust_status": 200
+    },
+    {
+      "endpoint": "POST /api/playlists/{new_playlist_id}/songs (add song 3)",
+      "method": "POST",
+      "status": "PASS",
+      "python_status": 200,
+      "rust_status": 200
+    },
+    {
+      "endpoint": "DELETE /api/playlists/{new_playlist_id}/songs/2",
+      "method": "DELETE",
+      "status": "PASS",
+      "python_status": 200,
+      "rust_status": 200
+    },
+    {
+      "endpoint": "PUT /api/playlists/{new_playlist_id}/songs/reorder",
+      "method": "PUT",
+      "status": "PASS",
+      "python_status": 200,
+      "rust_status": 200
+    },
+    {
+      "endpoint": "PATCH /api/playlists/{new_playlist_id}/songs/1/timing",
+      "method": "PATCH",
+      "status": "PASS",
+      "python_status": 200,
+      "rust_status": 200
+    },
+    {
+      "endpoint": "POST /api/playlists/import",
+      "method": "POST",
+      "status": "PASS",
+      "python_status": 200,
+      "rust_status": 200
+    },
+    {
+      "endpoint": "PATCH /api/addons/1 (toggle off)",
+      "method": "PATCH",
+      "status": "PASS",
+      "python_status": 404,
+      "rust_status": 404
+    },
+    {
+      "endpoint": "PATCH /api/addons/1 (toggle on)",
+      "method": "PATCH",
+      "status": "PASS",
+      "python_status": 404,
+      "rust_status": 404
+    },
+    {
+      "endpoint": "DELETE /api/playlists/{new_playlist_id}",
+      "method": "DELETE",
+      "status": "PASS",
+      "python_status": 200,
+      "rust_status": 200
+    },
+    {
+      "endpoint": "GET /api/songs (post-mutation)",
+      "method": "GET",
+      "status": "PASS",
+      "python_status": 200,
+      "rust_status": 200
+    },
+    {
+      "endpoint": "GET /api/tags (post-mutation)",
+      "method": "GET",
+      "status": "PASS",
+      "python_status": 200,
+      "rust_status": 200
+    },
+    {
+      "endpoint": "GET /api/playlists (post-mutation)",
+      "method": "GET",
+      "status": "PASS",
+      "python_status": 200,
+      "rust_status": 200
+    },
+    {
+      "endpoint": "GET /api/playlists/1 (post-mutation)",
+      "method": "GET",
+      "status": "PASS",
+      "python_status": 200,
+      "rust_status": 200
+    },
+    {
+      "endpoint": "GET /api/addons (post-mutation)",
+      "method": "GET",
+      "status": "PASS",
+      "python_status": 200,
+      "rust_status": 200
+    }
+  ]
+}

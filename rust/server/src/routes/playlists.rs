@@ -573,7 +573,7 @@ pub async fn export_playlist(
                     .body(Body::from(body))
                     .unwrap_or_else(|_| Response::builder().status(StatusCode::INTERNAL_SERVER_ERROR).body(Body::empty()).expect("fallback"))
             } else {
-                // M3U / M3U8
+                // M3U / M3U8 — return raw text (Python parity)
                 let mut lines = vec!["#EXTM3U".to_string()];
                 for s in &songs {
                     let duration = s.get("duration").and_then(|v| v.as_i64()).unwrap_or(-1);
@@ -592,22 +592,12 @@ pub async fn export_playlist(
                 let mime = if format == "m3u" { "audio/x-mpegurl" } else { "application/vnd.apple.mpegurl" };
                 let ext = if format == "m3u8" { "m3u8" } else { "m3u" };
 
-                // For golden parity: wrap m3u8 in JSON
-                if format == "m3u8" {
-                    let wrapped = serde_json::json!({"content": content});
-                    Response::builder()
-                        .status(StatusCode::OK)
-                        .header("content-type", "application/json")
-                        .body(Body::from(serde_json::to_string(&wrapped).unwrap_or_default()))
-                        .unwrap_or_else(|_| Response::builder().status(StatusCode::INTERNAL_SERVER_ERROR).body(Body::empty()).expect("fallback"))
-                } else {
-                    Response::builder()
-                        .status(StatusCode::OK)
-                        .header("content-type", mime)
-                        .header("content-disposition", format!("attachment; filename=\"{}.{}\"", safe_name, ext))
-                        .body(Body::from(content))
-                        .unwrap_or_else(|_| Response::builder().status(StatusCode::INTERNAL_SERVER_ERROR).body(Body::empty()).expect("fallback"))
-                }
+                Response::builder()
+                    .status(StatusCode::OK)
+                    .header("content-type", mime)
+                    .header("content-disposition", format!("attachment; filename=\"{}.{}\"", safe_name, ext))
+                    .body(Body::from(content))
+                    .unwrap_or_else(|_| Response::builder().status(StatusCode::INTERNAL_SERVER_ERROR).body(Body::empty()).expect("fallback"))
             }
         }
         Ok(None) => envelope::not_found("Playlist not found").into_response(),
