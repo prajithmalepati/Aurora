@@ -216,6 +216,10 @@ MIGRATIONS = [
         "ALTER TABLE songs ADD COLUMN stream_url TEXT",
         "ALTER TABLE songs ADD COLUMN stream_url_expires_at TEXT",
         "ALTER TABLE songs ADD COLUMN artwork_url TEXT",
+    ]),
+    # Version 5: heal last_fail_at for pre-existing v4 DBs that were
+    # created before the column was added to the v4 migration group.
+    (5, [
         "ALTER TABLE addons ADD COLUMN last_fail_at TEXT",
     ]),
 ]
