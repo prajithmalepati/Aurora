@@ -572,7 +572,19 @@ def _diff_endpoint(
         )
         return result
 
-    # ── Status code must match (unless W2/W4 handled above) ──
+    # ── W11: Filter grammar punctuation tolerance ──
+    # Python boolean.py accepts non-semantic chars (., +, …) in unquoted tokens as no-match
+    # tag literals (200); Rust's tokenizer rejects them (400). Only `:` is matched (N41).
+    if "W11" in whitelist_rules:
+        if py_resp.status_code == 200 and rs_resp.status_code == 400:
+            result.status = "WHITELISTED"
+            result.w_ref = "W11"
+            result.notes.append(
+                "W11: filter grammar punctuation tolerance — Python 200 (no-match), Rust 400"
+            )
+            return result
+
+    # ── Status code must match (unless W2/W4/W11 handled above) ──
     if py_resp.status_code != rs_resp.status_code:
         # W2: 422 body format differs, status must match 422
         if "W2" in whitelist_rules and py_resp.status_code == 422 and rs_resp.status_code == 422:
@@ -758,6 +770,11 @@ def _build_read_battery(addon_url: str) -> list[dict[str, Any]]:
         # ── W10: 4xx error-body shape (405 method reject) ──
         {"name": "GET /api/tags/9999 (W10 body shape)", "method": "GET",
          "url": "/api/tags/9999", "rules": ["W10"]},
+
+        # ── W11: Filter grammar punctuation tolerance ──
+        # Python accepts `.` in unquoted tokens (200 no-match); Rust rejects (400)
+        {"name": "POST /api/filter (a.b — W11 punctuation)", "method": "POST",
+         "url": "/api/filter", "body": {"query": "a.b"}, "rules": ["W11"]},
     ]
     return battery
 
@@ -1044,6 +1061,7 @@ def generate_report(all_results: list[DiffResult]) -> tuple[str, dict]:
     lines.append("| W8 | Float formatting (`1.0` vs `1`) — numeric epsilon comparison |")
     lines.append("| W9 | Filter error-message wording — both 400, different detail strings |")
     lines.append("| W10 | 4xx error-body shape — status parity, body shape differs |")
+    lines.append("| W11 | Filter grammar punctuation tolerance — Python 200 (no-match), Rust 400 |")
     lines.append("")
     lines.append("## Out of Scope (deferred)")
     lines.append("")
@@ -1147,13 +1165,6 @@ def main() -> int:
             print("[*] Starting Rust server...")
             rs_base = start_rust_server(rs_data)
             print(f"    Rust:   {rs_base}")
-
-            # Register addon on both servers (addon registration is per-server state)
-            if mock_addon_url:
-                for base in (py_base, rs_base):
-                    r = httpx.post(f"{base}/api/addons", json={"base_url": mock_addon_url}, timeout=10)
-                    if r.status_code not in (200, 201):
-                        print(f"  ⚠ addon registration failed on {base}: {r.status_code}")
 
         # ── Phase 5: Run battery ──
         all_results: list[DiffResult] = []

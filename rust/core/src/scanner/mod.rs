@@ -260,11 +260,12 @@ pub fn extract_metadata(file_path: &str) -> Option<ScannedMetadata> {
     // Duration in seconds (float → round to int)
     let duration = Some(properties.duration().as_secs() as i64);
 
-    // Bitrate (kbps)
+    // Bitrate (kbps) — prefer audio_bitrate() to match Python mutagen's
+    // audio-stream bitrate; overall_bitrate() includes tags/art overhead.
     let bitrate = properties
-        .overall_bitrate()
+        .audio_bitrate()
         .map(|b| b as i64)
-        .or_else(|| properties.audio_bitrate().map(|b| b as i64));
+        .or_else(|| properties.overall_bitrate().map(|b| b as i64));
 
     // Sample rate
     let sample_rate = properties.sample_rate().map(|sr| sr as i64);
