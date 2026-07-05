@@ -82,6 +82,18 @@ fn test_parity_mp3() {
         py_peak
     );
 
+    // Bitrate (kbps) — lofty's audio_bitrate() gives 131; mutagen gives 127.
+    // Both are valid audio-stream measurements; ≠4 kbps is constant and documented.
+    // Bounded tolerance catches real drift (>5 kbps) without falsifying the reference.
+    let py_bitrate = py["bitrate"].as_i64().unwrap();
+    let rust_bitrate = meta.bitrate.unwrap();
+    assert!(
+        (rust_bitrate - py_bitrate).abs() <= 5,
+        "MP3 bitrate mismatch: Rust={}, Python(mutagen)={}",
+        rust_bitrate,
+        py_bitrate
+    );
+
     // Album art — driven by Python reference
     let py_has_art = py["has_album_art"].as_bool().unwrap();
     assert_eq!(
@@ -119,6 +131,16 @@ fn test_parity_flac() {
     let rg = meta.replaygain_track_gain.unwrap();
     let py_rg = py["replaygain_track_gain"].as_f64().unwrap();
     assert!((rg - py_rg).abs() < 0.01);
+
+    // Bitrate (kbps) — must match mutagen's audio-stream bitrate (floor)
+    let py_bitrate = py["bitrate"].as_i64().unwrap();
+    assert_eq!(
+        meta.bitrate.unwrap(),
+        py_bitrate,
+        "FLAC bitrate mismatch: Rust={}, Python(mutagen)={}",
+        meta.bitrate.unwrap(),
+        py_bitrate
+    );
 
     // Album art — driven by Python reference
     let py_has_art = py["has_album_art"].as_bool().unwrap();
