@@ -27,11 +27,12 @@ pub async fn create_tag(
 
     let conn = state.conn.lock().await;
     match aurora_core::db::queries::create_tag(&conn, &body.name) {
-        Ok(tag_id) => {
+        Ok((tag_id, created_at)) => {
             let data = serde_json::json!({
                 "id": tag_id,
                 "name": body.name.to_lowercase().trim(),
                 "song_count": 0,
+                "created_at": created_at,
             });
             (StatusCode::CREATED, envelope::ok(data, "Tag created successfully")).into_response()
         }

@@ -111,7 +111,7 @@ pub fn song_to_json(
     map.insert("duration".into(), json_opt_i64(duration));
     map.insert("file_path".into(), json_opt_str(file_path));
     map.insert("file_format".into(), json_opt_str(file_format));
-    map.insert("album_art_path".into(), json_opt_str(album_art_path));
+    map.insert("album_art_path".into(), json_opt_nullable_str(album_art_path));
     map.insert("source".into(), Value::String(source.to_string()));
     map.insert("tags".into(), Value::Array(parse_tags(tags_csv).into_iter().map(Value::String).collect()));
     map.insert("playlists".into(), Value::Array(parse_playlist_refs(playlists_csv)));
@@ -145,6 +145,18 @@ fn json_opt_str(v: Option<&str>) -> Value {
     match v {
         Some(s) => Value::String(s.to_string()),
         None => Value::Null,
+    }
+}
+
+/// Like `json_opt_str` but coerces empty string to null (Python parity).
+///
+/// Python's `raw_art if raw_art else None` maps `""` → `null`.
+/// Use for nullable string fields where the DB may store `""` but the
+/// API should return `null` (e.g. `album_art_path`).
+fn json_opt_nullable_str(v: Option<&str>) -> Value {
+    match v {
+        Some("") => Value::Null,
+        other => json_opt_str(other),
     }
 }
 
@@ -243,7 +255,7 @@ pub fn song_to_playlist_json(
     map.insert("duration".into(), json_opt_i64(duration));
     map.insert("file_path".into(), json_opt_str(file_path));
     map.insert("file_format".into(), json_opt_str(file_format));
-    map.insert("album_art_path".into(), json_opt_str(album_art_path));
+    map.insert("album_art_path".into(), json_opt_nullable_str(album_art_path));
     map.insert("source".into(), Value::String(source.to_string()));
     map.insert("tags".into(), Value::Array(parse_tags(tags_csv).into_iter().map(Value::String).collect()));
     map.insert("playlists".into(), Value::Array(vec![]));

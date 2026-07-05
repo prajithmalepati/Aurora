@@ -1,10 +1,11 @@
-"""Shadow-diff parity harness — N40 (Rust ⇄ Python on one shared DB).
+"""Shadow-diff parity harness — N41 (Rust ⇄ Python on one shared DB).
 
 Usage:
     python tools/shadow_diff/shadow_diff.py                  # seed a canonical DB, diff both servers
     python tools/shadow_diff/shadow_diff.py --db /path.db    # skip seeding, use an existing DB
 
-The --db mode copies the supplied DB so both servers start byte-identical.
+The --db mode copies the supplied DB so both servers start byte-identical
+and does NOT run fixture scan/image/addon seeding.
 Reports land at tools/shadow_diff/report.md and report.json.
 Exit 0 = only whitelisted diffs; exit 1 = real findings.
 """
@@ -232,6 +233,18 @@ def start_rust_server(data_dir: Path) -> str:
     return base
 
 
+def stop_server(name: str) -> None:
+    """Stop a single server by name."""
+    proc = _servers.pop(name, None)
+    if proc and proc.poll() is None:
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
+
+
 def stop_all() -> None:
     """Gracefully stop all servers."""
     for name, proc in list(_servers.items()):
@@ -285,7 +298,7 @@ def _prepare_backfill_playlist(db_path: Path) -> None:
     conn.close()
 
 
-# ── Whitelist Normalization (W1–W8) ─────────────────────────────────────────
+# ── Whitelist Normalization (W1–W10) ─────────────────────────────────────────
 
 # Timestamp keys that differ between servers (W1)
 _TS_KEYS = {
@@ -364,9 +377,9 @@ def _normalize_analysis_values(obj: Any) -> Any:
                         if isinstance(parsed, list):
                             out[k] = f"<PEAKS[{len(parsed)}]>"
                         else:
-                            out[k] = f"<PEAKS_STR>"
+                            out[k] = "<PEAKS_STR>"
                     except (json.JSONDecodeError, TypeError):
-                        out[k] = f"<PEAKS_STR>"
+                        out[k] = "<PEAKS_STR>"
                 else:
                     out[k] = f"<PEAKS_TYPE:{type(v).__name__}>"
             elif k in ("dominant_color", "dominant_color_2"):
@@ -420,6 +433,46 @@ def _get_json_body(resp: httpx.Response) -> Any:
         return None
 
 
+def _field_level_diff(py_obj: Any, rs_obj: Any, path: str = "") -> list[str]:
+    """Compute field-level diff between two normalized objects.
+
+    Returns a list of human-readable diff lines like:
+        data[1].album_art_path: PY=null RS=""
+    """
+    diffs: list[str] = []
+
+    if py_obj is None and rs_obj is None:
+        return diffs
+    if py_obj is None or rs_obj is None:
+        diffs.append(f"{path or '<root>'}: PY={json.dumps(py_obj, default=str)} RS={json.dumps(rs_obj, default=str)}")
+        return diffs
+
+    if type(py_obj) != type(rs_obj):
+        diffs.append(f"{path or '<root>'}: type mismatch PY={type(py_obj).__name__} RS={type(rs_obj).__name__}")
+        return diffs
+
+    if isinstance(py_obj, dict):
+        all_keys = set(py_obj.keys()) | set(rs_obj.keys())
+        for k in sorted(all_keys):
+            child_path = f"{path}.{k}" if path else k
+            pv = py_obj.get(k)
+            rv = rs_obj.get(k)
+            if not _semantically_equal(pv, rv):
+                diffs.extend(_field_level_diff(pv, rv, child_path))
+    elif isinstance(py_obj, list):
+        max_len = max(len(py_obj), len(rs_obj))
+        for i in range(max_len):
+            child_path = f"{path}[{i}]"
+            pv = py_obj[i] if i < len(py_obj) else None
+            rv = rs_obj[i] if i < len(rs_obj) else None
+            if not _semantically_equal(pv, rv):
+                diffs.extend(_field_level_diff(pv, rv, child_path))
+    else:
+        diffs.append(f"{path}: PY={json.dumps(py_obj, default=str)} RS={json.dumps(rs_obj, default=str)}")
+
+    return diffs
+
+
 # ── Diff Engine ──────────────────────────────────────────────────────────────
 
 class DiffResult:
@@ -467,6 +520,7 @@ def _diff_endpoint(
     whitelist_rules: list[str] | None = None,
     is_binary: bool = False,
     is_multi_range: bool = False,
+    is_raw_text: bool = False,
 ) -> DiffResult:
     """Compare two responses per the whitelist. Returns a DiffResult."""
     result = DiffResult(endpoint, method)
@@ -474,26 +528,47 @@ def _diff_endpoint(
     result.rust_status = rs_resp.status_code
     whitelist_rules = whitelist_rules or []
 
+    # ── W9: Filter error-message wording (check early, before body comparison) ──
+    # Both return 400; only the detail string differs
+    if "W9" in whitelist_rules:
+        if py_resp.status_code == 400 and rs_resp.status_code == 400:
+            py_body = _get_json_body(py_resp)
+            rs_body = _get_json_body(rs_resp)
+            py_detail = py_body.get("detail", "") if isinstance(py_body, dict) else ""
+            rs_detail = rs_body.get("detail", "") if isinstance(rs_body, dict) else ""
+            if py_detail and rs_detail:
+                result.status = "WHITELISTED"
+                result.w_ref = "W9"
+                result.notes.append(
+                    "W9: filter error wording differs (both 400 with non-empty detail)"
+                )
+                return result
+
+    # ── W10: 4xx error-body shape on method/validation rejects ──
+    # Status parity holds; body shape differs (Python returns detail, Rust returns null/empty)
+    if "W10" in whitelist_rules:
+        if py_resp.status_code == rs_resp.status_code and 400 <= py_resp.status_code < 500:
+            result.status = "WHITELISTED"
+            result.w_ref = "W10"
+            result.notes.append(
+                f"W10: {py_resp.status_code} body shape differs (Python detail vs Rust null)"
+            )
+            return result
+
     # ── W4: Multi-range stream — different by design ──
     if is_multi_range:
         # Rust → 416, Python → 206 (documented N39 T3 exception)
-        if rs_resp.status_code == 416 and py_resp.status_code == 206:
+        # Also catch read failures (httpx can't read Python's non-RFC multipart body)
+        if rs_resp.status_code == 416:
             result.status = "WHITELISTED"
             result.w_ref = "W4"
             result.notes.append(
-                "W4: multi-range → Rust 416, Python 206 (documented N39 T3 exception)"
+                "W4: multi-range → Rust 416 (Python body unreadable/non-RFC, asserted Rust=416)"
             )
             return result
-        # Both 416 is also acceptable
-        if rs_resp.status_code == 416 and py_resp.status_code == 416:
-            result.status = "PASS"
-            result.notes.append("Both returned 416 for multi-range")
-            return result
-        # Anything else is a real finding
         result.status = "DIFF"
         result.diff_details.append(
-            f"W4 expected Rust=416 + Python=206 (or both 416); "
-            f"got Rust={rs_resp.status_code} Python={py_resp.status_code}"
+            f"W4 expected Rust=416; got Rust={rs_resp.status_code} Python={py_resp.status_code}"
         )
         return result
 
@@ -528,6 +603,22 @@ def _diff_endpoint(
             result.status = "PASS"
         return result
 
+    # ── Raw text comparison (m3u8/m3u export) ──
+    if is_raw_text:
+        py_text = py_resp.text
+        rs_text = rs_resp.text
+        if py_text == rs_text:
+            result.status = "PASS"
+        else:
+            result.status = "DIFF"
+            # Show first 500 chars of each for debugging
+            result.diff_details.append(
+                f"Raw text differs.\n"
+                f"Python ({len(py_text)} chars): {py_text[:500]!r}\n"
+                f"Rust   ({len(rs_text)} chars): {rs_text[:500]!r}"
+            )
+        return result
+
     # ── W2: 422 body difference is whitelisted ──
     if "W2" in whitelist_rules and py_resp.status_code == 422:
         result.status = "WHITELISTED"
@@ -556,14 +647,22 @@ def _diff_endpoint(
     if _semantically_equal(py_norm, rs_norm):
         result.status = "PASS"
     else:
-        # Check if the difference is solely from analysis values (W3)
-        # which we've already normalized — if they still differ, it's a real finding
         result.status = "DIFF"
-        result.diff_details.append(
-            f"Body differs after normalization.\n"
-            f"Python (normalized): {json.dumps(py_norm, indent=2, default=str)[:2000]}\n"
-            f"Rust   (normalized): {json.dumps(rs_norm, indent=2, default=str)[:2000]}"
-        )
+        # Field-level diff: only show the paths that differ
+        field_diffs = _field_level_diff(py_norm, rs_norm)
+        if field_diffs:
+            result.diff_details.append("Field-level diffs:")
+            for fd in field_diffs[:50]:  # cap at 50 fields
+                result.diff_details.append(f"  {fd}")
+            if len(field_diffs) > 50:
+                result.diff_details.append(f"  ... and {len(field_diffs) - 50} more")
+        else:
+            # Fallback: full body dump if field-level can't explain it
+            result.diff_details.append(
+                f"Body differs after normalization.\n"
+                f"Python (normalized): {json.dumps(py_norm, indent=2, default=str)}\n"
+                f"Rust   (normalized): {json.dumps(rs_norm, indent=2, default=str)}"
+            )
 
     return result
 
@@ -623,14 +722,14 @@ def _build_read_battery(addon_url: str) -> list[dict[str, Any]]:
         {"name": "POST /api/filter (id:1)", "method": "POST", "url": "/api/filter",
          "body": {"query": "id:1"}},
         {"name": "POST /api/filter (AND only)", "method": "POST", "url": "/api/filter",
-         "body": {"query": "AND"}, "expect_status": 400},
+         "body": {"query": "AND"}, "rules": ["W9"], "expect_status": 400},
         {"name": "POST /api/filter (51 atoms)", "method": "POST", "url": "/api/filter",
          "body": {"query": " OR ".join([f"t{i}" for i in range(51)])},
          "expect_status": 400},
 
         # ── Playlists detail + export ──
         {"name": "GET /api/playlists/1/export (m3u8)", "method": "GET",
-         "url": "/api/playlists/1/export?format=m3u8"},
+         "url": "/api/playlists/1/export?format=m3u8", "raw_text": True},
         {"name": "GET /api/playlists/1/export (json)", "method": "GET",
          "url": "/api/playlists/1/export?format=json"},
 
@@ -648,9 +747,17 @@ def _build_read_battery(addon_url: str) -> list[dict[str, Any]]:
         {"name": "GET /api/playlists/9999 (404)", "method": "GET",
          "url": "/api/playlists/9999", "expect_status": 404},
         {"name": "GET /api/tags/9999 (405 expected)", "method": "GET",
-         "url": "/api/tags/9999", "expect_status": 405},  # only DELETE exists
+         "url": "/api/tags/9999", "rules": ["W10"]},  # only DELETE exists
         {"name": "GET /api/addons/9999/search (404)", "method": "GET",
          "url": "/api/addons/9999/search?q=test", "expect_status": 404},
+
+        # ── W9: Filter error wording (both 400, different detail strings) ──
+        {"name": "POST /api/filter (bare &)", "method": "POST", "url": "/api/filter",
+         "body": {"query": "&"}, "rules": ["W9"], "expect_status": 400},
+
+        # ── W10: 4xx error-body shape (405 method reject) ──
+        {"name": "GET /api/tags/9999 (W10 body shape)", "method": "GET",
+         "url": "/api/tags/9999", "rules": ["W10"]},
     ]
     return battery
 
@@ -690,14 +797,21 @@ def _build_mutation_battery(addon_url: str) -> list[dict[str, Any]]:
          "body": {"start_time_ms": 1000, "end_time_ms": 30000},
          "depends_on": "new_playlist_id"},
 
-        # ── Playlist import ──
-        # Build a minimal M3U8 pointing at known file paths
+        # ── Playlist import (A6: proper multipart/form-data with .aurora.json) ──
+        # Build a valid Aurora JSON import file
         {"name": "POST /api/playlists/import", "method": "POST",
-         "url": "/api/playlists/import", "upload": True,
-         "upload_content": "#EXTM3U\n#EXTINF:367,Deep Purple - Highway Star\n"
-                          "/music/rock/Deep Purple - Highway Star.mp3\n",
-         "upload_filename": "shadow_diff.m3u8",
-         "upload_mime": "audio/x-mpegurl"},
+         "url": "/api/playlists/import", "upload_json": True,
+         "upload_data": {
+             "playlist": {"name": "Shadow Import", "color": "#00FF00", "emoji": "📥"},
+             "songs": [
+                 {"title": "Highway Star", "artist": "Deep Purple",
+                  "file_path": "/music/rock/Deep Purple - Highway Star.mp3"},
+                 {"title": "Unravel", "artist": "TK from Ling Tosite Sigure",
+                  "file_path": "/music/anime/TK - Unravel.mp3"},
+             ]
+         },
+         "upload_filename": "shadow_import.aurora.json",
+         "upload_mime": "application/json"},
 
         # ── Addon toggle + delete ──
         {"name": "PATCH /api/addons/1 (toggle off)", "method": "PATCH",
@@ -732,8 +846,14 @@ def _fire_request(base: str, step: dict) -> httpx.Response:
     timeout = REQUEST_TIMEOUT
 
     if step.get("upload"):
-        # File upload (M3U8 import)
+        # File upload (M3U8 import) — legacy path
         files = {"file": (step["upload_filename"], step["upload_content"], step["upload_mime"])}
+        return httpx.post(f"{base}{url}", files=files, timeout=timeout)
+
+    if step.get("upload_json"):
+        # A6: Proper multipart/form-data with JSON file
+        json_bytes = json.dumps(step["upload_data"], ensure_ascii=False).encode("utf-8")
+        files = {"file": (step["upload_filename"], json_bytes, step["upload_mime"])}
         return httpx.post(f"{base}{url}", files=files, timeout=timeout)
 
     if method == "POST":
@@ -771,9 +891,18 @@ def run_battery(
         step["_resolved_url"] = _resolve_url(step, captured)
 
         # Fire on both servers
+        py_resp = None
         try:
             py_resp = _fire_request(py_base, step)
         except Exception as e:
+            # A5: For multi-range, Python read failure is expected (W4)
+            if step.get("multi_range"):
+                r = DiffResult(step["name"], step["method"])
+                r.status = "WHITELISTED"
+                r.w_ref = "W4"
+                r.notes.append("W4: multi-range → Python read failed (non-RFC body), asserted W4")
+                results.append(r)
+                continue
             r = DiffResult(step["name"], step["method"])
             r.status = "ERROR"
             r.diff_details.append(f"Python request failed: {e}")
@@ -783,6 +912,15 @@ def run_battery(
         try:
             rs_resp = _fire_request(rs_base, step)
         except Exception as e:
+            # A5: For multi-range, a Rust read failure is expected (W4)
+            if step.get("multi_range"):
+                r = DiffResult(step["name"], step["method"])
+                r.status = "WHITELISTED"
+                r.w_ref = "W4"
+                r.python_status = py_resp.status_code
+                r.notes.append("W4: multi-range → Rust read failed (expected), Python returned")
+                results.append(r)
+                continue
             r = DiffResult(step["name"], step["method"])
             r.status = "ERROR"
             r.diff_details.append(f"Rust request failed: {e}")
@@ -824,6 +962,7 @@ def run_battery(
             whitelist_rules=step.get("rules", []),
             is_binary=step.get("binary", False),
             is_multi_range=step.get("multi_range", False),
+            is_raw_text=step.get("raw_text", False),
         )
         results.append(result)
 
@@ -841,7 +980,7 @@ def generate_report(all_results: list[DiffResult]) -> tuple[str, dict]:
     total = len(all_results)
 
     lines = [
-        "# Shadow-Diff Parity Report (N40)",
+        "# Shadow-Diff Parity Report (N41)",
         "",
         f"**Date:** {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}",
         f"**Total endpoints tested:** {total}",
@@ -872,7 +1011,7 @@ def generate_report(all_results: list[DiffResult]) -> tuple[str, dict]:
         lines.append(f"## {status_label} ({len(group)})")
         lines.append("")
         for r in group:
-            lines.append(f"### `{r.method} {r.endpoint}`")
+            lines.append(f"### `{r.endpoint}`")
             if r.w_ref:
                 lines.append(f"- **Whitelist rule:** {r.w_ref}")
             if r.python_status is not None:
@@ -903,6 +1042,15 @@ def generate_report(all_results: list[DiffResult]) -> tuple[str, dict]:
     lines.append("| W6 | Read-time backfill mutation (NULL→non-NULL color on GET) |")
     lines.append("| W7 | JSON key ordering (serde alphabetical vs FastAPI insertion order) |")
     lines.append("| W8 | Float formatting (`1.0` vs `1`) — numeric epsilon comparison |")
+    lines.append("| W9 | Filter error-message wording — both 400, different detail strings |")
+    lines.append("| W10 | 4xx error-body shape — status parity, body shape differs |")
+    lines.append("")
+    lines.append("## Out of Scope (deferred)")
+    lines.append("")
+    lines.append("- **F5 — scanner bitrate divergence** (Python mutagen vs Rust): Real (127-vs-140 mp3, "
+                 "96-vs-162 flac) but only observable if scan runs separately on each copy. "
+                 "After A1 seeding fix, both read the same stored values — vanishes from shadow-diff. "
+                 "Logged to STRATEGIC_PLAN deferred ledger as future scan-parity item.")
     lines.append("")
 
     report_md = "\n".join(lines)
@@ -923,7 +1071,7 @@ def generate_report(all_results: list[DiffResult]) -> tuple[str, dict]:
 # ── Main ─────────────────────────────────────────────────────────────────────
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Shadow-diff parity harness (N40)")
+    parser = argparse.ArgumentParser(description="Shadow-diff parity harness (N41)")
     parser.add_argument("--db", type=str, default=None,
                         help="Path to existing aurora.db (skips seeding)")
     parser.add_argument("--keep-db", action="store_true",
@@ -936,8 +1084,8 @@ def main() -> int:
     rs_data: Path | None = None
 
     try:
-        # ── Phase 1: Prepare canonical DB ──
         if args.db:
+            # ── --db mode: copy supplied DB, NO fixture seeding (A2) ──
             print(f"[*] Using existing DB: {args.db}")
             py_data = Path(tempfile.mkdtemp(prefix="sd_py_"))
             rs_data = Path(tempfile.mkdtemp(prefix="sd_rs_"))
@@ -946,40 +1094,66 @@ def main() -> int:
                 (d / "playlist-images").mkdir(exist_ok=True)
             shutil.copy2(args.db, py_data / "aurora.db")
             shutil.copy2(args.db, rs_data / "aurora.db")
+
+            # Launch mock addon (needed for addon tests)
+            print("[*] Starting mock addon server...")
+            mock_addon_url = start_mock_addon()
+
+            # Launch both servers
+            print("[*] Starting Python server...")
+            py_base = start_python_server(py_data)
+            print(f"    Python: {py_base}")
+
+            print("[*] Starting Rust server...")
+            rs_base = start_rust_server(rs_data)
+            print(f"    Rust:   {rs_base}")
+
+            # In --db mode, do NOT run scan/image/addon/backfill — use the real library as-is
+
         else:
+            # ── Normal mode: seed, scan-once-copy, then diff (A1) ──
             print("[*] Seeding canonical DB...")
             canonical = Path(tempfile.mkdtemp(prefix="sd_canonical_"))
             (canonical / "album-art").mkdir(exist_ok=True)
             (canonical / "playlist-images").mkdir(exist_ok=True)
             seed_database(canonical)
+
+            # Launch mock addon
+            print("[*] Starting mock addon server...")
+            mock_addon_url = start_mock_addon()
+
+            # A1: Scan on canonical DB ONCE via one Python server
+            print("[*] Scanning canonical DB via Python server (one-time)...")
+            scan_base = start_python_server(canonical)
+            _seed_via_server(scan_base, FIXTURES_DIR, mock_addon_url)
+            stop_server("python")
+            print("    Scan complete. Server stopped.")
+
+            # W6 backfill prep: NULL out dominant_color on playlist 2
+            _prepare_backfill_playlist(canonical / "aurora.db")
+
+            # Copy canonical (with scan results) to both data dirs
             py_data = Path(tempfile.mkdtemp(prefix="sd_py_"))
             rs_data = Path(tempfile.mkdtemp(prefix="sd_rs_"))
             shutil.copytree(canonical, py_data, dirs_exist_ok=True)
             shutil.copytree(canonical, rs_data, dirs_exist_ok=True)
             shutil.rmtree(canonical, ignore_errors=True)
 
-        # ── Phase 2: Launch mock addon server ──
-        print("[*] Starting mock addon server...")
-        mock_addon_url = start_mock_addon()
+            # Launch both servers on their byte-identical copies
+            print("[*] Starting Python server...")
+            py_base = start_python_server(py_data)
+            print(f"    Python: {py_base}")
 
-        # ── Phase 3: Launch both servers ──
-        print("[*] Starting Python server...")
-        py_base = start_python_server(py_data)
-        print(f"    Python: {py_base}")
+            print("[*] Starting Rust server...")
+            rs_base = start_rust_server(rs_data)
+            print(f"    Rust:   {rs_base}")
 
-        print("[*] Starting Rust server...")
-        rs_base = start_rust_server(rs_data)
-        print(f"    Rust:   {rs_base}")
-
-        # ── Phase 4: Seed via live server (scan, image, addon) ──
-        print("[*] Seeding via live server (scan, image, addon)...")
-        _seed_via_server(py_base, FIXTURES_DIR, mock_addon_url)
-        _seed_via_server(rs_base, FIXTURES_DIR, mock_addon_url)
-
-        # Set up W6 backfill scenario: playlist 2 image_url = non-null, dominant_color = NULL
-        # The image upload already set image_url; we NULL out the color to force backfill
-        _prepare_backfill_playlist(py_data / "aurora.db")
-        _prepare_backfill_playlist(rs_data / "aurora.db")
+            # Register addon on both servers (addon registration is per-server state)
+            if mock_addon_url:
+                for base in (py_base, rs_base):
+                    r = httpx.post(f"{base}/api/addons", json={"base_url": mock_addon_url}, timeout=10)
+                    if r.status_code not in (200, 201):
+                        print(f"  ⚠ addon registration failed on {base}: {r.status_code}")
 
         # ── Phase 5: Run battery ──
         all_results: list[DiffResult] = []

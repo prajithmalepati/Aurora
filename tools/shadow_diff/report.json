@@ -1,10 +1,10 @@
 {
-  "date": "2026-07-04T20:55:32.390963+00:00",
-  "total": 51,
-  "pass": 37,
-  "diff": 13,
-  "whitelisted": 0,
-  "error": 1,
+  "date": "2026-07-05T16:40:50.087109+00:00",
+  "total": 53,
+  "pass": 48,
+  "diff": 0,
+  "whitelisted": 5,
+  "error": 0,
   "results": [
     {
       "endpoint": "GET /api/health",
@@ -16,22 +16,16 @@
     {
       "endpoint": "GET /api/songs",
       "method": "GET",
-      "status": "DIFF",
+      "status": "PASS",
       "python_status": 200,
-      "rust_status": 200,
-      "diff_details": [
-        "Body differs after normalization.\nPython (normalized): {\n  \"data\": [\n    {\n      \"id\": 2,\n      \"title\": \"Chill Vibes\",\n      \"artist\": \"LoFi Girl\",\n      \"album\": null,\n      \"artists\": null,\n      \"featured_artists\": null,\n      \"duration\": 180,\n      \"file_path\": null,\n      \"file_format\": null,\n      \"album_art_path\": null,\n      \"source\": \"manual\",\n      \"tags\": [\n        \"slow\",\n        \"chill\"\n      ],\n      \"playlists\": [\n        {\n          \"id\": 2,\n          \"name\": \"Lo-Fi Study\"\n        }\n      ],\n      \"created_at\": \"<TIMESTAMP>\",\n      \"updated_at\": \"<TIMESTAMP>\",\n      \"start_time_ms\": 0,\n      \"end_time_ms\": 0,\n      \"position\": null,\n      \"bitrate\": null,\n      \"sample_rate\": null,\n      \"bit_depth\": null,\n      \"file_size\": null,\n      \"dominant_color\": null,\n      \"dominant_color_2\": null,\n      \"replaygain_track_gain\": null,\n      \"replaygain_track_peak\": null,\n      \"replaygain_album_gain\": null,\n      \"replaygain_album_peak\": null,\n      \"stream_url\": null,\n      \"stream_url_expires_at\": null,\n      \"artwork_url\": null\n    },\n    {\n      \"id\": 4,\n      \"title\": \"FLAC Test\",\n      \"artist\": \"Artist A\",\n      \"album\": \"FLAC Album\",\n      \"artists\": [\n        \"Artist A\",\n        \"Artist B\"\n      ],\n      \"featured_artists\": null,\n      \"duration\": 1,\n      \"file_path\": \"/home/fusei/Aurora/rust/core/tests/fixtures/test_song.flac\",\n      \"file_format\": \"flac\",\n      \"album_art_path\": \"b6346c8edcd6cd0b9794b8a0b03390f6c51ee455.jpg\",\n      \"source\": \"local_scan\",\n      \"tags\": [],\n      \"playlists\": [],\n      \"created_at\": \"<TIMESTAMP>\",\n      \"updated_at\": \"<TIMESTAMP>\",\n      \"start_time_ms\": 0,\n      \"end_time_ms\": 0,\n      \"position\": null,\n      \"bitrate\": 96,\n      \"sample_rate\": 44100,\n      \"bit_depth\": 16,\n      \"file_size\": 20324,\n      \"dominant_color\": null,\n      \"dominant_color_2\": null,\n      \"replaygain_track_gain\": -4.3,\n      \"replaygain_track_peak\": 0.92,\n      \"replaygain_album_gain\": -7.1,\n      \"replaygain_album_peak\": 0.85,\n      \"stream_url\": null,\n      \"stream_url_expires_at\": nul\nRust   (normalized): {\n  \"data\": [\n    {\n      \"album\": null,\n      \"album_art_path\": null,\n      \"artist\": \"LoFi Girl\",\n      \"artists\": null,\n      \"artwork_url\": null,\n      \"bit_depth\": null,\n      \"bitrate\": null,\n      \"created_at\": \"<TIMESTAMP>\",\n      \"dominant_color\": null,\n      \"dominant_color_2\": null,\n      \"duration\": 180,\n      \"end_time_ms\": 0,\n      \"featured_artists\": null,\n      \"file_format\": null,\n      \"file_path\": null,\n      \"file_size\": null,\n      \"id\": 2,\n      \"playlists\": [\n        {\n          \"id\": 2,\n          \"name\": \"Lo-Fi Study\"\n        }\n      ],\n      \"position\": null,\n      \"replaygain_album_gain\": null,\n      \"replaygain_album_peak\": null,\n      \"replaygain_track_gain\": null,\n      \"replaygain_track_peak\": null,\n      \"sample_rate\": null,\n      \"source\": \"manual\",\n      \"start_time_ms\": 0,\n      \"stream_url\": null,\n      \"stream_url_expires_at\": null,\n      \"tags\": [\n        \"slow\",\n        \"chill\"\n      ],\n      \"title\": \"Chill Vibes\",\n      \"updated_at\": \"<TIMESTAMP>\"\n    },\n    {\n      \"album\": \"FLAC Album\",\n      \"album_art_path\": \"b6346c8edcd6cd0b9794b8a0b03390f6c51ee455.jpg\",\n      \"artist\": \"Artist A\",\n      \"artists\": [\n        \"Artist A\",\n        \"Artist B\"\n      ],\n      \"artwork_url\": null,\n      \"bit_depth\": 16,\n      \"bitrate\": 162,\n      \"created_at\": \"<TIMESTAMP>\",\n      \"dominant_color\": null,\n      \"dominant_color_2\": null,\n      \"duration\": 1,\n      \"end_time_ms\": 0,\n      \"featured_artists\": null,\n      \"file_format\": \"flac\",\n      \"file_path\": \"/home/fusei/Aurora/rust/core/tests/fixtures/test_song.flac\",\n      \"file_size\": 20324,\n      \"id\": 4,\n      \"playlists\": [],\n      \"position\": null,\n      \"replaygain_album_gain\": -7.1,\n      \"replaygain_album_peak\": 0.85,\n      \"replaygain_track_gain\": -4.3,\n      \"replaygain_track_peak\": 0.92,\n      \"sample_rate\": 44100,\n      \"source\": \"local_scan\",\n      \"start_time_ms\": 0,\n      \"stream_url\": null,\n      \"stream_url_expires_at\": null,\n      \"tags\": [],\n      \"title\": \"FLAC Test\",\n    "
-      ]
+      "rust_status": 200
     },
     {
       "endpoint": "GET /api/songs/1",
       "method": "GET",
-      "status": "DIFF",
+      "status": "PASS",
       "python_status": 200,
-      "rust_status": 200,
-      "diff_details": [
-        "Body differs after normalization.\nPython (normalized): {\n  \"data\": {\n    \"id\": 1,\n    \"title\": \"Test Song\",\n    \"artist\": \"Primary Artist\",\n    \"album\": \"Test Album\",\n    \"artists\": [\n      \"Primary Artist\",\n      \"Secondary Artist\"\n    ],\n    \"featured_artists\": null,\n    \"duration\": 1,\n    \"file_path\": \"/home/fusei/Aurora/rust/core/tests/fixtures/test_song.mp3\",\n    \"file_format\": \"mp3\",\n    \"album_art_path\": \"b6346c8edcd6cd0b9794b8a0b03390f6c51ee455.jpg\",\n    \"source\": \"local_scan\",\n    \"tags\": [\n      \"rock\",\n      \"fast\"\n    ],\n    \"playlists\": [\n      {\n        \"id\": 1,\n        \"name\": \"Rock Classics\"\n      }\n    ],\n    \"created_at\": \"<TIMESTAMP>\",\n    \"updated_at\": \"<TIMESTAMP>\",\n    \"start_time_ms\": 0,\n    \"end_time_ms\": 0,\n    \"position\": null,\n    \"bitrate\": 127,\n    \"sample_rate\": 44100,\n    \"bit_depth\": null,\n    \"file_size\": 18298,\n    \"dominant_color\": null,\n    \"dominant_color_2\": null,\n    \"replaygain_track_gain\": -6.5,\n    \"replaygain_track_peak\": 0.95,\n    \"replaygain_album_gain\": -8.2,\n    \"replaygain_album_peak\": 0.88,\n    \"stream_url\": null,\n    \"stream_url_expires_at\": null,\n    \"artwork_url\": null,\n    \"waveform_peaks\": \"<PEAKS[1000]>\"\n  },\n  \"message\": \"ok\"\n}\nRust   (normalized): {\n  \"data\": {\n    \"album\": \"Test Album\",\n    \"album_art_path\": \"b6346c8edcd6cd0b9794b8a0b03390f6c51ee455.jpg\",\n    \"artist\": \"Primary Artist\",\n    \"artists\": [\n      \"Primary Artist\",\n      \"Secondary Artist\"\n    ],\n    \"artwork_url\": null,\n    \"bit_depth\": null,\n    \"bitrate\": 140,\n    \"created_at\": \"<TIMESTAMP>\",\n    \"dominant_color\": null,\n    \"dominant_color_2\": null,\n    \"duration\": 1,\n    \"end_time_ms\": 0,\n    \"featured_artists\": null,\n    \"file_format\": \"mp3\",\n    \"file_path\": \"/home/fusei/Aurora/rust/core/tests/fixtures/test_song.mp3\",\n    \"file_size\": 18298,\n    \"id\": 1,\n    \"playlists\": [\n      {\n        \"id\": 1,\n        \"name\": \"Rock Classics\"\n      }\n    ],\n    \"position\": null,\n    \"replaygain_album_gain\": -8.2,\n    \"replaygain_album_peak\": 0.88,\n    \"replaygain_track_gain\": -6.5,\n    \"replaygain_track_peak\": 0.95,\n    \"sample_rate\": 44100,\n    \"source\": \"local_scan\",\n    \"start_time_ms\": 0,\n    \"stream_url\": null,\n    \"stream_url_expires_at\": null,\n    \"tags\": [\n      \"rock\",\n      \"fast\"\n    ],\n    \"title\": \"Test Song\",\n    \"updated_at\": \"<TIMESTAMP>\",\n    \"waveform_peaks\": \"<PEAKS[1000]>\"\n  },\n  \"message\": \"ok\"\n}"
-      ]
+      "rust_status": 200
     },
     {
       "endpoint": "GET /api/tags",
@@ -106,9 +100,10 @@
     {
       "endpoint": "GET /api/songs/1/stream (multi-range)",
       "method": "GET",
-      "status": "ERROR",
-      "diff_details": [
-        "Python request failed: peer closed connection without sending complete message body (received 379 bytes, expected 410)"
+      "status": "WHITELISTED",
+      "whitelist_rule": "W4",
+      "notes": [
+        "W4: multi-range \u2192 Python read failed (non-RFC body), asserted W4"
       ]
     },
     {
@@ -135,12 +130,9 @@
     {
       "endpoint": "POST /api/filter (rock)",
       "method": "POST",
-      "status": "DIFF",
+      "status": "PASS",
       "python_status": 200,
-      "rust_status": 200,
-      "diff_details": [
-        "Body differs after normalization.\nPython (normalized): {\n  \"data\": [\n    {\n      \"id\": 1,\n      \"title\": \"Test Song\",\n      \"artist\": \"Primary Artist\",\n      \"album\": \"Test Album\",\n      \"artists\": [\n        \"Primary Artist\",\n        \"Secondary Artist\"\n      ],\n      \"featured_artists\": null,\n      \"duration\": 1,\n      \"file_path\": \"/home/fusei/Aurora/rust/core/tests/fixtures/test_song.mp3\",\n      \"file_format\": \"mp3\",\n      \"album_art_path\": \"b6346c8edcd6cd0b9794b8a0b03390f6c51ee455.jpg\",\n      \"source\": \"local_scan\",\n      \"tags\": [\n        \"fast\",\n        \"rock\",\n        \"rock classics\"\n      ],\n      \"playlists\": [\n        {\n          \"id\": 1,\n          \"name\": \"Rock Classics\"\n        }\n      ],\n      \"created_at\": \"<TIMESTAMP>\",\n      \"updated_at\": \"<TIMESTAMP>\",\n      \"start_time_ms\": 0,\n      \"end_time_ms\": 0,\n      \"position\": null,\n      \"bitrate\": 127,\n      \"sample_rate\": 44100,\n      \"bit_depth\": null,\n      \"file_size\": 18298,\n      \"dominant_color\": null,\n      \"dominant_color_2\": null,\n      \"replaygain_track_gain\": -6.5,\n      \"replaygain_track_peak\": 0.95,\n      \"replaygain_album_gain\": -8.2,\n      \"replaygain_album_peak\": 0.88,\n      \"stream_url\": null,\n      \"stream_url_expires_at\": null,\n      \"artwork_url\": null\n    }\n  ],\n  \"meta\": {\n    \"total\": 1,\n    \"query\": \"rock\"\n  },\n  \"message\": \"ok\"\n}\nRust   (normalized): {\n  \"data\": [\n    {\n      \"album\": \"Test Album\",\n      \"album_art_path\": \"b6346c8edcd6cd0b9794b8a0b03390f6c51ee455.jpg\",\n      \"artist\": \"Primary Artist\",\n      \"artists\": [\n        \"Primary Artist\",\n        \"Secondary Artist\"\n      ],\n      \"artwork_url\": null,\n      \"bit_depth\": null,\n      \"bitrate\": 140,\n      \"created_at\": \"<TIMESTAMP>\",\n      \"dominant_color\": null,\n      \"dominant_color_2\": null,\n      \"duration\": 1,\n      \"end_time_ms\": 0,\n      \"featured_artists\": null,\n      \"file_format\": \"mp3\",\n      \"file_path\": \"/home/fusei/Aurora/rust/core/tests/fixtures/test_song.mp3\",\n      \"file_size\": 18298,\n      \"id\": 1,\n      \"playlists\": [\n        {\n          \"id\": 1,\n          \"name\": \"Rock Classics\"\n        }\n      ],\n      \"position\": null,\n      \"replaygain_album_gain\": -8.2,\n      \"replaygain_album_peak\": 0.88,\n      \"replaygain_track_gain\": -6.5,\n      \"replaygain_track_peak\": 0.95,\n      \"sample_rate\": 44100,\n      \"source\": \"local_scan\",\n      \"start_time_ms\": 0,\n      \"stream_url\": null,\n      \"stream_url_expires_at\": null,\n      \"tags\": [\n        \"fast\",\n        \"rock\",\n        \"rock classics\"\n      ],\n      \"title\": \"Test Song\",\n      \"updated_at\": \"<TIMESTAMP>\"\n    }\n  ],\n  \"message\": \"ok\",\n  \"meta\": {\n    \"query\": \"rock\",\n    \"total\": 1\n  }\n}"
-      ]
+      "rust_status": 200
     },
     {
       "endpoint": "POST /api/filter (slow AND chill)",
@@ -152,51 +144,40 @@
     {
       "endpoint": "POST /api/filter (rock OR anime)",
       "method": "POST",
-      "status": "DIFF",
+      "status": "PASS",
       "python_status": 200,
-      "rust_status": 200,
-      "diff_details": [
-        "Body differs after normalization.\nPython (normalized): {\n  \"data\": [\n    {\n      \"id\": 1,\n      \"title\": \"Test Song\",\n      \"artist\": \"Primary Artist\",\n      \"album\": \"Test Album\",\n      \"artists\": [\n        \"Primary Artist\",\n        \"Secondary Artist\"\n      ],\n      \"featured_artists\": null,\n      \"duration\": 1,\n      \"file_path\": \"/home/fusei/Aurora/rust/core/tests/fixtures/test_song.mp3\",\n      \"file_format\": \"mp3\",\n      \"album_art_path\": \"b6346c8edcd6cd0b9794b8a0b03390f6c51ee455.jpg\",\n      \"source\": \"local_scan\",\n      \"tags\": [\n        \"fast\",\n        \"rock\",\n        \"rock classics\"\n      ],\n      \"playlists\": [\n        {\n          \"id\": 1,\n          \"name\": \"Rock Classics\"\n        }\n      ],\n      \"created_at\": \"<TIMESTAMP>\",\n      \"updated_at\": \"<TIMESTAMP>\",\n      \"start_time_ms\": 0,\n      \"end_time_ms\": 0,\n      \"position\": null,\n      \"bitrate\": 127,\n      \"sample_rate\": 44100,\n      \"bit_depth\": null,\n      \"file_size\": 18298,\n      \"dominant_color\": null,\n      \"dominant_color_2\": null,\n      \"replaygain_track_gain\": -6.5,\n      \"replaygain_track_peak\": 0.95,\n      \"replaygain_album_gain\": -8.2,\n      \"replaygain_album_peak\": 0.88,\n      \"stream_url\": null,\n      \"stream_url_expires_at\": null,\n      \"artwork_url\": null\n    },\n    {\n      \"id\": 3,\n      \"title\": \"Unravel\",\n      \"artist\": \"TK from Ling Tosite Sigure\",\n      \"album\": \"Tokyo Ghoul OST\",\n      \"artists\": [\n        \"TK from Ling Tosite Sigure\"\n      ],\n      \"featured_artists\": [],\n      \"duration\": 240,\n      \"file_path\": \"/music/anime/TK - Unravel.mp3\",\n      \"file_format\": \"mp3\",\n      \"album_art_path\": null,\n      \"source\": \"local_scan\",\n      \"tags\": [\n        \"anime\",\n        \"opening\"\n      ],\n      \"playlists\": [\n        {\n          \"id\": 3,\n          \"name\": \"Anime\"\n        }\n      ],\n      \"created_at\": \"<TIMESTAMP>\",\n      \"updated_at\": \"<TIMESTAMP>\",\n      \"start_time_ms\": 0,\n      \"end_time_ms\": 0,\n      \"position\": null,\n      \"bitrate\": 256000,\n      \"sample_rate\": 44100,\n      \"bit_depth\": 16,\n      \"file_size\": 4801234,\n      \"\nRust   (normalized): {\n  \"data\": [\n    {\n      \"album\": \"Test Album\",\n      \"album_art_path\": \"b6346c8edcd6cd0b9794b8a0b03390f6c51ee455.jpg\",\n      \"artist\": \"Primary Artist\",\n      \"artists\": [\n        \"Primary Artist\",\n        \"Secondary Artist\"\n      ],\n      \"artwork_url\": null,\n      \"bit_depth\": null,\n      \"bitrate\": 140,\n      \"created_at\": \"<TIMESTAMP>\",\n      \"dominant_color\": null,\n      \"dominant_color_2\": null,\n      \"duration\": 1,\n      \"end_time_ms\": 0,\n      \"featured_artists\": null,\n      \"file_format\": \"mp3\",\n      \"file_path\": \"/home/fusei/Aurora/rust/core/tests/fixtures/test_song.mp3\",\n      \"file_size\": 18298,\n      \"id\": 1,\n      \"playlists\": [\n        {\n          \"id\": 1,\n          \"name\": \"Rock Classics\"\n        }\n      ],\n      \"position\": null,\n      \"replaygain_album_gain\": -8.2,\n      \"replaygain_album_peak\": 0.88,\n      \"replaygain_track_gain\": -6.5,\n      \"replaygain_track_peak\": 0.95,\n      \"sample_rate\": 44100,\n      \"source\": \"local_scan\",\n      \"start_time_ms\": 0,\n      \"stream_url\": null,\n      \"stream_url_expires_at\": null,\n      \"tags\": [\n        \"fast\",\n        \"rock\",\n        \"rock classics\"\n      ],\n      \"title\": \"Test Song\",\n      \"updated_at\": \"<TIMESTAMP>\"\n    },\n    {\n      \"album\": \"Tokyo Ghoul OST\",\n      \"album_art_path\": null,\n      \"artist\": \"TK from Ling Tosite Sigure\",\n      \"artists\": [\n        \"TK from Ling Tosite Sigure\"\n      ],\n      \"artwork_url\": null,\n      \"bit_depth\": 16,\n      \"bitrate\": 256000,\n      \"created_at\": \"<TIMESTAMP>\",\n      \"dominant_color\": \"<COLOR>\",\n      \"dominant_color_2\": \"<COLOR>\",\n      \"duration\": 240,\n      \"end_time_ms\": 0,\n      \"featured_artists\": [],\n      \"file_format\": \"mp3\",\n      \"file_path\": \"/music/anime/TK - Unravel.mp3\",\n      \"file_size\": 4801234,\n      \"id\": 3,\n      \"playlists\": [\n        {\n          \"id\": 3,\n          \"name\": \"Anime\"\n        }\n      ],\n      \"position\": null,\n      \"replaygain_album_gain\": -5.5,\n      \"replaygain_album_peak\": 0.92,\n      \"replaygain_track_gain\": -6.0,\n  "
-      ]
+      "rust_status": 200
     },
     {
       "endpoint": "POST /api/filter (NOT rock)",
       "method": "POST",
-      "status": "DIFF",
+      "status": "PASS",
       "python_status": 200,
-      "rust_status": 200,
-      "diff_details": [
-        "Body differs after normalization.\nPython (normalized): {\n  \"data\": [\n    {\n      \"id\": 2,\n      \"title\": \"Chill Vibes\",\n      \"artist\": \"LoFi Girl\",\n      \"album\": null,\n      \"artists\": null,\n      \"featured_artists\": null,\n      \"duration\": 180,\n      \"file_path\": null,\n      \"file_format\": null,\n      \"album_art_path\": null,\n      \"source\": \"manual\",\n      \"tags\": [\n        \"chill\",\n        \"lo-fi study\",\n        \"slow\"\n      ],\n      \"playlists\": [\n        {\n          \"id\": 2,\n          \"name\": \"Lo-Fi Study\"\n        }\n      ],\n      \"created_at\": \"<TIMESTAMP>\",\n      \"updated_at\": \"<TIMESTAMP>\",\n      \"start_time_ms\": 0,\n      \"end_time_ms\": 0,\n      \"position\": null,\n      \"bitrate\": null,\n      \"sample_rate\": null,\n      \"bit_depth\": null,\n      \"file_size\": null,\n      \"dominant_color\": null,\n      \"dominant_color_2\": null,\n      \"replaygain_track_gain\": null,\n      \"replaygain_track_peak\": null,\n      \"replaygain_album_gain\": null,\n      \"replaygain_album_peak\": null,\n      \"stream_url\": null,\n      \"stream_url_expires_at\": null,\n      \"artwork_url\": null\n    },\n    {\n      \"id\": 4,\n      \"title\": \"FLAC Test\",\n      \"artist\": \"Artist A\",\n      \"album\": \"FLAC Album\",\n      \"artists\": [\n        \"Artist A\",\n        \"Artist B\"\n      ],\n      \"featured_artists\": null,\n      \"duration\": 1,\n      \"file_path\": \"/home/fusei/Aurora/rust/core/tests/fixtures/test_song.flac\",\n      \"file_format\": \"flac\",\n      \"album_art_path\": \"b6346c8edcd6cd0b9794b8a0b03390f6c51ee455.jpg\",\n      \"source\": \"local_scan\",\n      \"tags\": [],\n      \"playlists\": [],\n      \"created_at\": \"<TIMESTAMP>\",\n      \"updated_at\": \"<TIMESTAMP>\",\n      \"start_time_ms\": 0,\n      \"end_time_ms\": 0,\n      \"position\": null,\n      \"bitrate\": 96,\n      \"sample_rate\": 44100,\n      \"bit_depth\": 16,\n      \"file_size\": 20324,\n      \"dominant_color\": null,\n      \"dominant_color_2\": null,\n      \"replaygain_track_gain\": -4.3,\n      \"replaygain_track_peak\": 0.92,\n      \"replaygain_album_gain\": -7.1,\n      \"replaygain_album_peak\": 0.85,\n      \"stream_url\": null,\n      \"stre\nRust   (normalized): {\n  \"data\": [\n    {\n      \"album\": null,\n      \"album_art_path\": null,\n      \"artist\": \"LoFi Girl\",\n      \"artists\": null,\n      \"artwork_url\": null,\n      \"bit_depth\": null,\n      \"bitrate\": null,\n      \"created_at\": \"<TIMESTAMP>\",\n      \"dominant_color\": null,\n      \"dominant_color_2\": null,\n      \"duration\": 180,\n      \"end_time_ms\": 0,\n      \"featured_artists\": null,\n      \"file_format\": null,\n      \"file_path\": null,\n      \"file_size\": null,\n      \"id\": 2,\n      \"playlists\": [\n        {\n          \"id\": 2,\n          \"name\": \"Lo-Fi Study\"\n        }\n      ],\n      \"position\": null,\n      \"replaygain_album_gain\": null,\n      \"replaygain_album_peak\": null,\n      \"replaygain_track_gain\": null,\n      \"replaygain_track_peak\": null,\n      \"sample_rate\": null,\n      \"source\": \"manual\",\n      \"start_time_ms\": 0,\n      \"stream_url\": null,\n      \"stream_url_expires_at\": null,\n      \"tags\": [\n        \"chill\",\n        \"lo-fi study\",\n        \"slow\"\n      ],\n      \"title\": \"Chill Vibes\",\n      \"updated_at\": \"<TIMESTAMP>\"\n    },\n    {\n      \"album\": \"FLAC Album\",\n      \"album_art_path\": \"b6346c8edcd6cd0b9794b8a0b03390f6c51ee455.jpg\",\n      \"artist\": \"Artist A\",\n      \"artists\": [\n        \"Artist A\",\n        \"Artist B\"\n      ],\n      \"artwork_url\": null,\n      \"bit_depth\": 16,\n      \"bitrate\": 162,\n      \"created_at\": \"<TIMESTAMP>\",\n      \"dominant_color\": null,\n      \"dominant_color_2\": null,\n      \"duration\": 1,\n      \"end_time_ms\": 0,\n      \"featured_artists\": null,\n      \"file_format\": \"flac\",\n      \"file_path\": \"/home/fusei/Aurora/rust/core/tests/fixtures/test_song.flac\",\n      \"file_size\": 20324,\n      \"id\": 4,\n      \"playlists\": [],\n      \"position\": null,\n      \"replaygain_album_gain\": -7.1,\n      \"replaygain_album_peak\": 0.85,\n      \"replaygain_track_gain\": -4.3,\n      \"replaygain_track_peak\": 0.92,\n      \"sample_rate\": 44100,\n      \"source\": \"local_scan\",\n      \"start_time_ms\": 0,\n      \"stream_url\": null,\n      \"stream_url_expires_at\": null,\n      \"tags\": [],\n      \"ti"
-      ]
+      "rust_status": 200
     },
     {
       "endpoint": "POST /api/filter (\"fast\")",
       "method": "POST",
-      "status": "DIFF",
+      "status": "PASS",
       "python_status": 200,
-      "rust_status": 200,
-      "diff_details": [
-        "Body differs after normalization.\nPython (normalized): {\n  \"data\": [\n    {\n      \"id\": 1,\n      \"title\": \"Test Song\",\n      \"artist\": \"Primary Artist\",\n      \"album\": \"Test Album\",\n      \"artists\": [\n        \"Primary Artist\",\n        \"Secondary Artist\"\n      ],\n      \"featured_artists\": null,\n      \"duration\": 1,\n      \"file_path\": \"/home/fusei/Aurora/rust/core/tests/fixtures/test_song.mp3\",\n      \"file_format\": \"mp3\",\n      \"album_art_path\": \"b6346c8edcd6cd0b9794b8a0b03390f6c51ee455.jpg\",\n      \"source\": \"local_scan\",\n      \"tags\": [\n        \"fast\",\n        \"rock\",\n        \"rock classics\"\n      ],\n      \"playlists\": [\n        {\n          \"id\": 1,\n          \"name\": \"Rock Classics\"\n        }\n      ],\n      \"created_at\": \"<TIMESTAMP>\",\n      \"updated_at\": \"<TIMESTAMP>\",\n      \"start_time_ms\": 0,\n      \"end_time_ms\": 0,\n      \"position\": null,\n      \"bitrate\": 127,\n      \"sample_rate\": 44100,\n      \"bit_depth\": null,\n      \"file_size\": 18298,\n      \"dominant_color\": null,\n      \"dominant_color_2\": null,\n      \"replaygain_track_gain\": -6.5,\n      \"replaygain_track_peak\": 0.95,\n      \"replaygain_album_gain\": -8.2,\n      \"replaygain_album_peak\": 0.88,\n      \"stream_url\": null,\n      \"stream_url_expires_at\": null,\n      \"artwork_url\": null\n    }\n  ],\n  \"meta\": {\n    \"total\": 1,\n    \"query\": \"\\\"fast\\\"\"\n  },\n  \"message\": \"ok\"\n}\nRust   (normalized): {\n  \"data\": [\n    {\n      \"album\": \"Test Album\",\n      \"album_art_path\": \"b6346c8edcd6cd0b9794b8a0b03390f6c51ee455.jpg\",\n      \"artist\": \"Primary Artist\",\n      \"artists\": [\n        \"Primary Artist\",\n        \"Secondary Artist\"\n      ],\n      \"artwork_url\": null,\n      \"bit_depth\": null,\n      \"bitrate\": 140,\n      \"created_at\": \"<TIMESTAMP>\",\n      \"dominant_color\": null,\n      \"dominant_color_2\": null,\n      \"duration\": 1,\n      \"end_time_ms\": 0,\n      \"featured_artists\": null,\n      \"file_format\": \"mp3\",\n      \"file_path\": \"/home/fusei/Aurora/rust/core/tests/fixtures/test_song.mp3\",\n      \"file_size\": 18298,\n      \"id\": 1,\n      \"playlists\": [\n        {\n          \"id\": 1,\n          \"name\": \"Rock Classics\"\n        }\n      ],\n      \"position\": null,\n      \"replaygain_album_gain\": -8.2,\n      \"replaygain_album_peak\": 0.88,\n      \"replaygain_track_gain\": -6.5,\n      \"replaygain_track_peak\": 0.95,\n      \"sample_rate\": 44100,\n      \"source\": \"local_scan\",\n      \"start_time_ms\": 0,\n      \"stream_url\": null,\n      \"stream_url_expires_at\": null,\n      \"tags\": [\n        \"fast\",\n        \"rock\",\n        \"rock classics\"\n      ],\n      \"title\": \"Test Song\",\n      \"updated_at\": \"<TIMESTAMP>\"\n    }\n  ],\n  \"message\": \"ok\",\n  \"meta\": {\n    \"query\": \"\\\"fast\\\"\",\n    \"total\": 1\n  }\n}"
-      ]
+      "rust_status": 200
     },
     {
       "endpoint": "POST /api/filter (id:1)",
       "method": "POST",
-      "status": "DIFF",
+      "status": "PASS",
       "python_status": 200,
-      "rust_status": 400,
-      "diff_details": [
-        "Status mismatch: Python=200, Rust=400"
-      ]
+      "rust_status": 200
     },
     {
       "endpoint": "POST /api/filter (AND only)",
       "method": "POST",
-      "status": "DIFF",
+      "status": "WHITELISTED",
+      "whitelist_rule": "W9",
       "python_status": 400,
       "rust_status": 400,
-      "diff_details": [
-        "Body differs after normalization.\nPython (normalized): {\n  \"detail\": \"Invalid query syntax: Invalid operator sequence without symbols such as AND OR or OR OR for token: \\\"&\\\"\"\n}\nRust   (normalized): {\n  \"detail\": \"Invalid query syntax: Unexpected token: Amp\"\n}"
+      "notes": [
+        "W9: filter error wording differs (both 400 with non-empty detail)"
       ]
     },
     {
@@ -209,12 +190,9 @@
     {
       "endpoint": "GET /api/playlists/1/export (m3u8)",
       "method": "GET",
-      "status": "DIFF",
+      "status": "PASS",
       "python_status": 200,
-      "rust_status": 200,
-      "diff_details": [
-        "Body differs after normalization.\nPython (normalized): null\nRust   (normalized): {\n  \"content\": \"#EXTM3U\\n#EXTINF:1,Primary Artist - Test Song\\n/home/fusei/Aurora/rust/core/tests/fixtures/test_song.mp3\\n\"\n}"
-      ]
+      "rust_status": 200
     },
     {
       "endpoint": "GET /api/playlists/1/export (json)",
@@ -254,11 +232,12 @@
     {
       "endpoint": "GET /api/tags/9999 (405 expected)",
       "method": "GET",
-      "status": "DIFF",
+      "status": "WHITELISTED",
+      "whitelist_rule": "W10",
       "python_status": 405,
       "rust_status": 405,
-      "diff_details": [
-        "Body differs after normalization.\nPython (normalized): {\n  \"detail\": \"Method Not Allowed\"\n}\nRust   (normalized): null"
+      "notes": [
+        "W10: 405 body shape differs (Python detail vs Rust null)"
       ]
     },
     {
@@ -269,14 +248,33 @@
       "rust_status": 404
     },
     {
+      "endpoint": "POST /api/filter (bare &)",
+      "method": "POST",
+      "status": "WHITELISTED",
+      "whitelist_rule": "W9",
+      "python_status": 400,
+      "rust_status": 400,
+      "notes": [
+        "W9: filter error wording differs (both 400 with non-empty detail)"
+      ]
+    },
+    {
+      "endpoint": "GET /api/tags/9999 (W10 body shape)",
+      "method": "GET",
+      "status": "WHITELISTED",
+      "whitelist_rule": "W10",
+      "python_status": 405,
+      "rust_status": 405,
+      "notes": [
+        "W10: 405 body shape differs (Python detail vs Rust null)"
+      ]
+    },
+    {
       "endpoint": "POST /api/tags (create shadowtest)",
       "method": "POST",
-      "status": "DIFF",
+      "status": "PASS",
       "python_status": 201,
-      "rust_status": 201,
-      "diff_details": [
-        "Body differs after normalization.\nPython (normalized): {\n  \"data\": {\n    \"id\": 7,\n    \"name\": \"shadowtest\",\n    \"song_count\": 0,\n    \"created_at\": \"<TIMESTAMP>\"\n  },\n  \"message\": \"Tag created successfully\"\n}\nRust   (normalized): {\n  \"data\": {\n    \"id\": 7,\n    \"name\": \"shadowtest\",\n    \"song_count\": 0\n  },\n  \"message\": \"Tag created successfully\"\n}"
-      ]
+      "rust_status": 201
     },
     {
       "endpoint": "DELETE /api/tags/{new_tag_id}",
@@ -337,12 +335,9 @@
     {
       "endpoint": "POST /api/playlists/import",
       "method": "POST",
-      "status": "DIFF",
-      "python_status": 404,
-      "rust_status": 400,
-      "diff_details": [
-        "Status mismatch: Python=404, Rust=400"
-      ]
+      "status": "PASS",
+      "python_status": 200,
+      "rust_status": 200
     },
     {
       "endpoint": "PATCH /api/addons/1 (toggle off)",
@@ -368,12 +363,9 @@
     {
       "endpoint": "GET /api/songs (post-mutation)",
       "method": "GET",
-      "status": "DIFF",
+      "status": "PASS",
       "python_status": 200,
-      "rust_status": 200,
-      "diff_details": [
-        "Body differs after normalization.\nPython (normalized): {\n  \"data\": [\n    {\n      \"id\": 2,\n      \"title\": \"Chill Vibes\",\n      \"artist\": \"LoFi Girl\",\n      \"album\": null,\n      \"artists\": null,\n      \"featured_artists\": null,\n      \"duration\": 180,\n      \"file_path\": null,\n      \"file_format\": null,\n      \"album_art_path\": null,\n      \"source\": \"manual\",\n      \"tags\": [\n        \"slow\",\n        \"chill\"\n      ],\n      \"playlists\": [\n        {\n          \"id\": 2,\n          \"name\": \"Lo-Fi Study\"\n        }\n      ],\n      \"created_at\": \"<TIMESTAMP>\",\n      \"updated_at\": \"<TIMESTAMP>\",\n      \"start_time_ms\": 0,\n      \"end_time_ms\": 0,\n      \"position\": null,\n      \"bitrate\": null,\n      \"sample_rate\": null,\n      \"bit_depth\": null,\n      \"file_size\": null,\n      \"dominant_color\": null,\n      \"dominant_color_2\": null,\n      \"replaygain_track_gain\": null,\n      \"replaygain_track_peak\": null,\n      \"replaygain_album_gain\": null,\n      \"replaygain_album_peak\": null,\n      \"stream_url\": null,\n      \"stream_url_expires_at\": null,\n      \"artwork_url\": null\n    },\n    {\n      \"id\": 4,\n      \"title\": \"FLAC Test\",\n      \"artist\": \"Artist A\",\n      \"album\": \"FLAC Album\",\n      \"artists\": [\n        \"Artist A\",\n        \"Artist B\"\n      ],\n      \"featured_artists\": null,\n      \"duration\": 1,\n      \"file_path\": \"/home/fusei/Aurora/rust/core/tests/fixtures/test_song.flac\",\n      \"file_format\": \"flac\",\n      \"album_art_path\": \"b6346c8edcd6cd0b9794b8a0b03390f6c51ee455.jpg\",\n      \"source\": \"local_scan\",\n      \"tags\": [],\n      \"playlists\": [],\n      \"created_at\": \"<TIMESTAMP>\",\n      \"updated_at\": \"<TIMESTAMP>\",\n      \"start_time_ms\": 0,\n      \"end_time_ms\": 0,\n      \"position\": null,\n      \"bitrate\": 96,\n      \"sample_rate\": 44100,\n      \"bit_depth\": 16,\n      \"file_size\": 20324,\n      \"dominant_color\": null,\n      \"dominant_color_2\": null,\n      \"replaygain_track_gain\": -4.3,\n      \"replaygain_track_peak\": 0.92,\n      \"replaygain_album_gain\": -7.1,\n      \"replaygain_album_peak\": 0.85,\n      \"stream_url\": null,\n      \"stream_url_expires_at\": nul\nRust   (normalized): {\n  \"data\": [\n    {\n      \"album\": null,\n      \"album_art_path\": null,\n      \"artist\": \"LoFi Girl\",\n      \"artists\": null,\n      \"artwork_url\": null,\n      \"bit_depth\": null,\n      \"bitrate\": null,\n      \"created_at\": \"<TIMESTAMP>\",\n      \"dominant_color\": null,\n      \"dominant_color_2\": null,\n      \"duration\": 180,\n      \"end_time_ms\": 0,\n      \"featured_artists\": null,\n      \"file_format\": null,\n      \"file_path\": null,\n      \"file_size\": null,\n      \"id\": 2,\n      \"playlists\": [\n        {\n          \"id\": 2,\n          \"name\": \"Lo-Fi Study\"\n        }\n      ],\n      \"position\": null,\n      \"replaygain_album_gain\": null,\n      \"replaygain_album_peak\": null,\n      \"replaygain_track_gain\": null,\n      \"replaygain_track_peak\": null,\n      \"sample_rate\": null,\n      \"source\": \"manual\",\n      \"start_time_ms\": 0,\n      \"stream_url\": null,\n      \"stream_url_expires_at\": null,\n      \"tags\": [\n        \"slow\",\n        \"chill\"\n      ],\n      \"title\": \"Chill Vibes\",\n      \"updated_at\": \"<TIMESTAMP>\"\n    },\n    {\n      \"album\": \"FLAC Album\",\n      \"album_art_path\": \"b6346c8edcd6cd0b9794b8a0b03390f6c51ee455.jpg\",\n      \"artist\": \"Artist A\",\n      \"artists\": [\n        \"Artist A\",\n        \"Artist B\"\n      ],\n      \"artwork_url\": null,\n      \"bit_depth\": 16,\n      \"bitrate\": 162,\n      \"created_at\": \"<TIMESTAMP>\",\n      \"dominant_color\": null,\n      \"dominant_color_2\": null,\n      \"duration\": 1,\n      \"end_time_ms\": 0,\n      \"featured_artists\": null,\n      \"file_format\": \"flac\",\n      \"file_path\": \"/home/fusei/Aurora/rust/core/tests/fixtures/test_song.flac\",\n      \"file_size\": 20324,\n      \"id\": 4,\n      \"playlists\": [],\n      \"position\": null,\n      \"replaygain_album_gain\": -7.1,\n      \"replaygain_album_peak\": 0.85,\n      \"replaygain_track_gain\": -4.3,\n      \"replaygain_track_peak\": 0.92,\n      \"sample_rate\": 44100,\n      \"source\": \"local_scan\",\n      \"start_time_ms\": 0,\n      \"stream_url\": null,\n      \"stream_url_expires_at\": null,\n      \"tags\": [],\n      \"title\": \"FLAC Test\",\n    "
-      ]
+      "rust_status": 200
     },
     {
       "endpoint": "GET /api/tags (post-mutation)",

@@ -80,7 +80,7 @@ fn is_ident_start(b: u8) -> bool {
 }
 
 fn is_ident_char(b: u8) -> bool {
-    is_ident_start(b) || b.is_ascii_digit()
+    is_ident_start(b) || b.is_ascii_digit() || b == b':'
 }
 
 /// Tokenize the processed query (after quote extraction + operator normalization).
@@ -782,5 +782,15 @@ mod tests {
         // Whitespace-only inner (≥1 raw char) must still parse — no over-reject
         assert!(matches("\"   \"", &[""]));
         assert!(matches("\" \"", &[""]));
+    }
+
+    #[test]
+    fn test_colon_in_ident_accepted() {
+        // Python's boolean.py accepts ':' inside identifiers (e.g. "id:1").
+        // Rust must match: tokenize to Ident("id:1") → no tag match → 200 empty.
+        assert!(!matches("id:1", &[]));
+        assert!(!matches("id:1", &["id"]));  // "id:1" ≠ "id"
+        // Colon-containing tag should still match if the tag set has it
+        assert!(matches("id:1", &["id:1"]));
     }
 }

@@ -150,6 +150,14 @@ async fn send(app: &axum::Router, req: Request<Body>) -> (StatusCode, Value) {
     (status, body)
 }
 
+/// Send request and return raw bytes (for non-JSON responses like m3u8).
+async fn send_raw(app: &axum::Router, req: Request<Body>) -> (StatusCode, Vec<u8>) {
+    let response = app.clone().oneshot(req).await.unwrap();
+    let status = response.status();
+    let body_bytes = response.into_body().collect().await.unwrap().to_bytes();
+    (status, body_bytes.to_vec())
+}
+
 fn assert_body(name: &str, actual: &Value, golden: &Value) {
     assert_eq!(actual, golden,
         "Golden mismatch for '{}':\n--- Expected ---\n{}\n--- Actual ---\n{}",
@@ -292,8 +300,19 @@ async fn golden_tags() {
     assert_eq!(s, 200); assert_body("tags_list", &b, &load_golden("tags_list"));
 
     // tags_create_happy (creates tag 7)
-    let (s, b) = send(&app, post_json("/api/tags", r#"{"name":"golden-test-tag"}"#)).await;
+    let (s, mut b) = send(&app, post_json("/api/tags", r#"{"name":"golden-test-tag"}"#)).await;
     assert_eq!(s, 201);
+    // Strip volatile created_at before golden comparison (chrono_now() is non-deterministic)
+    if let Some(data) = b.get_mut("data").and_then(|d| d.as_object_mut()) {
+        data.remove("created_at");
+    }
+    // Verify created_at was present (F3 parity)
+    let (s2, b2) = send(&app, post_json("/api/tags", r#"{"name":"golden-test-tag-ts-check"}"#)).await;
+    assert_eq!(s2, 201);
+    assert!(b2.get("data").and_then(|d| d.get("created_at")).is_some(),
+        "created_at must be present in tag create response (F3)");
+    // Clean up the extra tag
+    let _ = send(&app, delete("/api/tags/8")).await;
     assert_body("tags_create_happy", &b, &load_golden("tags_create_happy"));
 
     // tags_create_422 (status only)
@@ -717,9 +736,12 @@ async fn golden_playlists() {
     assert_body("playlists_export_json", &b, &load_golden("playlists_export_json"));
 
     // ── export_m3u8 (playlist 1 = Rock Classics Updated, has song 1) ──
-    let (s, b) = send(&app, get("/api/playlists/1/export?format=m3u8")).await;
+    // Raw text response (F2 parity: no JSON wrapper)
+    let (s, raw) = send_raw(&app, get("/api/playlists/1/export?format=m3u8")).await;
     assert_eq!(s, 200);
-    assert_body("playlists_export_m3u8", &b, &load_golden("playlists_export_m3u8"));
+    let expected_m3u8 = "#EXTM3U\n#EXTINF:367,Deep Purple - Highway Star\n/music/rock/Deep Purple - Highway Star.mp3\n";
+    assert_eq!(String::from_utf8_lossy(&raw), expected_m3u8,
+        "Golden mismatch for 'playlists_export_m3u8': raw text should match Python parity");
 
     // ── export_404 ──
     let (s, b) = send(&app, get("/api/playlists/999/export?format=json")).await;
