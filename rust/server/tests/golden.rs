@@ -138,7 +138,7 @@ fn load_golden(name: &str) -> Value {
 fn build_test_app() -> (axum::Router, Arc<AppState>) {
     let conn = aurora_core::db::open_memory().expect("open_memory failed");
     seed_database(&conn);
-    let state = Arc::new(AppState { conn: Mutex::new(conn), db_path: None, addon_state: Arc::new(aurora_server::routes::addons::AddonState::new()), watcher_handle: None });
+    let state = Arc::new(AppState { conn: Mutex::new(conn), db_path: None, addon_state: Arc::new(aurora_server::routes::addons::AddonState::new()), watcher_handle: None, aurora_token: None });
     (aurora_server::build_router(state.clone()), state)
 }
 
@@ -852,7 +852,7 @@ async fn stream_range_tests() {
         aurora_core::rusqlite::params![file_path],
     ).unwrap();
 
-    let state = Arc::new(AppState { conn: tokio::sync::Mutex::new(conn), db_path: None, addon_state: Arc::new(aurora_server::routes::addons::AddonState::new()), watcher_handle: None });
+    let state = Arc::new(AppState { conn: tokio::sync::Mutex::new(conn), db_path: None, addon_state: Arc::new(aurora_server::routes::addons::AddonState::new()), watcher_handle: None, aurora_token: None });
     let app = aurora_server::build_router(state);
 
     // ── Full request (no Range) → 200 ──
@@ -1143,7 +1143,7 @@ async fn cross_run_proof() {
     seed_database(&conn);
     conn.execute("UPDATE songs SET artist = 'WRONG' WHERE id = 1", []).unwrap();
 
-    let state = Arc::new(AppState { conn: Mutex::new(conn), db_path: None, addon_state: Arc::new(aurora_server::routes::addons::AddonState::new()), watcher_handle: None });
+    let state = Arc::new(AppState { conn: Mutex::new(conn), db_path: None, addon_state: Arc::new(aurora_server::routes::addons::AddonState::new()), watcher_handle: None, aurora_token: None });
     let app = aurora_server::build_router(state);
 
     let (status, body) = send(&app, get("/api/songs/1")).await;
