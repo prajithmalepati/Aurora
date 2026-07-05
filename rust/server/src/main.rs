@@ -32,11 +32,17 @@ async fn main() -> anyhow::Result<()> {
     let (watcher_handle, _shutdown) = aurora_server::background_watcher::start_background_watcher(db_path.clone());
     println!("  Background watcher: started");
 
+    let aurora_token = std::env::var("AURORA_TOKEN").ok().filter(|t| !t.is_empty());
+    if aurora_token.is_some() {
+        println!("  Token:   configured (auth enabled)");
+    }
+
     let state = Arc::new(AppState {
         conn: Mutex::new(conn),
         db_path: Some(db_path),
         addon_state: Arc::new(aurora_server::routes::addons::AddonState::new()),
         watcher_handle: Some(watcher_handle),
+        aurora_token,
     });
 
     let app = aurora_server::build_router(state);
