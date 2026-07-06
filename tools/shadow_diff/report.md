@@ -1,6 +1,6 @@
 # Shadow-Diff Parity Report (N41)
 
-**Date:** 2026-07-05 16:40 UTC
+**Date:** 2026-07-05 23:08 UTC
 **Total endpoints tested:** 53
 **PASS:** 48 | **DIFF:** 0 | **WHITELISTED:** 5 | **ERROR:** 0
 

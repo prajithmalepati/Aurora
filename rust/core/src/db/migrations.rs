@@ -200,6 +200,13 @@ const MIGRATIONS: &[Migration] = &[
             "ALTER TABLE songs ADD COLUMN stream_url TEXT",
             "ALTER TABLE songs ADD COLUMN stream_url_expires_at TEXT",
             "ALTER TABLE songs ADD COLUMN artwork_url TEXT",
+        ],
+    },
+    // Version 5: heal last_fail_at for pre-existing v4 DBs that were
+    // created before the column was added to the v4 migration group.
+    Migration {
+        version: 5,
+        stmts: &[
             "ALTER TABLE addons ADD COLUMN last_fail_at TEXT",
         ],
     },
@@ -323,6 +330,97 @@ mod tests {
         assert!(tables.contains(&"song_tags".to_string()));
         assert!(tables.contains(&"watched_folders".to_string()));
         assert!(tables.contains(&"addons".to_string()));
+    }
+
+    /// Test: old v4 DB (addons table without last_fail_at) is healed by v5.
+    #[test]
+    fn test_old_v4_db_healed_by_v5() {
+        let tmp = tempfile::tempdir().unwrap();
+        let db_path = tmp.path().join("test.db");
+        let conn = Connection::open(&db_path).unwrap();
+
+        // Create v4 addons table WITHOUT last_fail_at + insert a row
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS addons (
+                id              TEXT PRIMARY KEY,
+                base_url        TEXT NOT NULL UNIQUE,
+                name            TEXT,
+                version         TEXT,
+                manifest_json   TEXT NOT NULL,
+                enabled         INTEGER DEFAULT 1,
+                added_at        TEXT,
+                last_ok_at      TEXT,
+                fail_count      INTEGER DEFAULT 0
+            );
+            INSERT INTO addons (id, base_url, name, version, manifest_json)
+            VALUES ('test-addon', 'https://example.com', 'Test', '1.0', '{\"id\":\"test-addon\"}');
+            PRAGMA user_version = 4;
+            "
+        ).unwrap();
+
+        // Verify last_fail_at does NOT exist
+        let err = conn.query_row("SELECT last_fail_at FROM addons", [], |_| Ok(()));
+        assert!(err.is_err());
+        assert!(err.unwrap_err().to_string().contains("no such column"));
+
+        // Run migrations — must heal to v5
+        run_migrations(&conn).unwrap();
+
+        // Verify last_fail_at exists now
+        conn.query_row("SELECT last_fail_at FROM addons", [], |_| Ok(())).unwrap();
+
+        // Verify user_version is 5
+        let version: i64 = conn
+            .pragma_query_value(None, "user_version", |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, 5);
+
+        // Verify data survived
+        let id: String = conn
+            .query_row("SELECT id FROM addons", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(id, "test-addon");
+    }
+
+    /// Test: a v5 DB skips v5 migration (idempotent).
+    #[test]
+    fn test_v5_db_skips_v5() {
+        let tmp = tempfile::tempdir().unwrap();
+        let db_path = tmp.path().join("test.db");
+        let conn = Connection::open(&db_path).unwrap();
+
+        // Create v4 DB, heal to v5
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS addons (
+                id              TEXT PRIMARY KEY,
+                base_url        TEXT NOT NULL UNIQUE,
+                name            TEXT,
+                version         TEXT,
+                manifest_json   TEXT NOT NULL,
+                enabled         INTEGER DEFAULT 1,
+                added_at        TEXT,
+                last_ok_at      TEXT,
+                fail_count      INTEGER DEFAULT 0
+            );
+            INSERT INTO addons (id, base_url, name, version, manifest_json)
+            VALUES ('test-addon', 'https://example.com', 'Test', '1.0', '{}');
+            PRAGMA user_version = 4;
+            "
+        ).unwrap();
+
+        run_migrations(&conn).unwrap();
+
+        let version: i64 = conn
+            .pragma_query_value(None, "user_version", |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, 5);
+
+        // Second run: no-op
+        run_migrations(&conn).unwrap();
+        let version2: i64 = conn
+            .pragma_query_value(None, "user_version", |row| row.get(0))
+            .unwrap();
+        assert_eq!(version2, 5);
     }
 
     /// Test: version beyond CURRENT_VERSION is rejected.
