@@ -11,6 +11,9 @@ venv/
 dist/
 build/
 
+# Tauri staging dir (build artifact — do not commit)
+frontend/src-tauri/backend-bin/
+
 # Database
 *.db
 *.db-journal
