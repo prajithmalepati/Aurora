@@ -20,20 +20,21 @@ fn find_free_port() -> u16 {
 }
 
 const BIN: &str = if cfg!(target_os = "windows") {
-    "aurora-backend.exe"
+    "aurora-server.exe"
 } else {
-    "aurora-backend"
+    "aurora-server"
 };
 
 fn resolve_backend_bin(app: &tauri::AppHandle) -> std::path::PathBuf {
     if cfg!(debug_assertions) {
         // Dev: repo-relative path from src-tauri/
+        // Requires: cargo build --release -p aurora_server
         let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        manifest_dir.join("../../backend/dist/aurora-backend").join(BIN)
+        manifest_dir.join("../../rust/target/release").join(BIN)
     } else {
-        // Bundled: resources map puts aurora-backend/ at resource_dir/backend/
+        // Bundled: tauri.conf.json resource map places the binary at resource_dir/<BIN>
         let resource_dir = app.path().resource_dir().expect("resource_dir");
-        resource_dir.join("backend").join(BIN)
+        resource_dir.join(BIN)
     }
 }
 
@@ -60,9 +61,8 @@ fn spawn_backend(
             .stderr(std::process::Stdio::inherit());
     } else if let Some(path) = log_path {
         // Release: tee backend stdout+stderr to a file so backend-side failures
-        // (Python tracebacks, uvicorn access log, port-bind errors) survive for
-        // post-mortem — release builds otherwise log nothing. Append so monitor
-        // -thread restarts don't truncate the history.
+        // survive for post-mortem — release builds otherwise log nothing. Append
+        // so monitor-thread restarts don't truncate the history.
         match std::fs::OpenOptions::new().create(true).append(true).open(path) {
             Ok(file) => match file.try_clone() {
                 Ok(err_file) => {
@@ -84,12 +84,11 @@ fn spawn_backend(
             .stderr(std::process::Stdio::null());
     }
 
-    // Windows: the frozen backend is a console exe (console=True in the
-    // PyInstaller spec). Without this flag Windows gives it a visible console
-    // window; closing that window kills the backend and the monitor thread
-    // respawns it → the window reopens in a loop. CREATE_NO_WINDOW suppresses
-    // the console for the initial spawn AND every monitor-thread restart, since
-    // both go through this function.
+    // Windows: the Rust binary is a console-subsystem exe. Without this flag
+    // Windows gives it a visible console window; closing that window kills the
+    // backend and the monitor thread respawns it → the window reopens in a loop.
+    // CREATE_NO_WINDOW suppresses the console for the initial spawn AND every
+    // monitor-thread restart, since both go through this function.
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -127,7 +126,7 @@ fn spawn_with_health_gate(app: &tauri::AppHandle) -> std::io::Result<(Child, u16
         let mut healthy = false;
 
         while start.elapsed() < Duration::from_secs(15) {
-            // Early-exit check — bind failure kills uvicorn within ~1s
+            // Early-exit check — bind failure kills the server within ~1s
             match child.try_wait() {
                 Ok(Some(status)) => {
                     log::warn!(
