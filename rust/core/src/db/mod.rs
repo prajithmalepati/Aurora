@@ -14,9 +14,20 @@ use std::path::Path;
 /// Open (or create) the Aurora database at `db_path`, run the INIT_SQL,
 /// apply the migration ladder, and return the connection.
 ///
-/// Mirrors Python `init_db()` exactly: runs INIT_SQL (CREATE TABLE IF NOT EXISTS),
-/// then the forward migration ladder, then stamps user_version.
+/// Mirrors Python `init_db()` exactly: creates parent directories (Python
+/// `DATA_DIR.mkdir(parents=True, exist_ok=True)`), runs INIT_SQL
+/// (CREATE TABLE IF NOT EXISTS), then the forward migration ladder, then
+/// stamps user_version.
 pub fn open_and_migrate(db_path: &Path) -> Result<Connection> {
+    // Python mirror: DATA_DIR.mkdir(parents=True, exist_ok=True) runs before
+    // init_db().  Without this, a fresh install (or an uninstall that cleaned
+    // the data directory tree) fails — rusqlite's Connection::open does not
+    // create parent directories.
+    if let Some(parent) = db_path.parent() {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("failed to create data directory {}", parent.display()))?;
+    }
+
     let conn = Connection::open(db_path)
         .with_context(|| format!("failed to open DB at {}", db_path.display()))?;
 
