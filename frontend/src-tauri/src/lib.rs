@@ -20,9 +20,9 @@ fn find_free_port() -> u16 {
 }
 
 const BIN: &str = if cfg!(target_os = "windows") {
-    "aurora-server.exe"
+    "aurora_server.exe"
 } else {
-    "aurora-server"
+    "aurora_server"
 };
 
 fn resolve_backend_bin(app: &tauri::AppHandle) -> std::path::PathBuf {
@@ -32,9 +32,9 @@ fn resolve_backend_bin(app: &tauri::AppHandle) -> std::path::PathBuf {
         let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         manifest_dir.join("../../rust/target/release").join(BIN)
     } else {
-        // Bundled: tauri.conf.json resource map places the binary at resource_dir/<BIN>
+        // Bundled under resource_dir/backend/ (see resource map in tauri.conf.json).
         let resource_dir = app.path().resource_dir().expect("resource_dir");
-        resource_dir.join(BIN)
+        resource_dir.join("backend").join(BIN)
     }
 }
 

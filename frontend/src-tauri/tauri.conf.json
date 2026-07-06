@@ -33,8 +33,7 @@
       "icons/icon.ico"
     ],
     "resources": {
-      "../../rust/target/release/aurora_server": "aurora-server",
-      "../../rust/target/release/aurora_server.exe": "aurora-server.exe"
+      "backend-bin/*": "backend/"
     },
     "createUpdaterArtifacts": true,
     "windows": {

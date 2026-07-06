@@ -34,6 +34,9 @@ jobs:
       - name: Build Rust backend
         run: cd rust && cargo build --release -p aurora_server
 
+      - name: Stage backend binary
+        run: mkdir -p frontend/src-tauri/backend-bin && cp rust/target/release/aurora_server frontend/src-tauri/backend-bin/
+
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0
         with:
@@ -75,6 +78,10 @@ jobs:
 
       - name: Build Rust backend
         run: cd rust && cargo build --release -p aurora_server
+
+      - name: Stage backend binary
+        run: mkdir frontend\src-tauri\backend-bin && copy rust\target\release\aurora_server.exe frontend\src-tauri\backend-bin\
+        shell: cmd
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0
