@@ -8,9 +8,14 @@ export function getBaseUrl(): string {
   return "http://localhost:8000"
 }
 
-const BASE_URL = `${getBaseUrl()}/api`
+/** Evaluate the API base at call time (NOT module-level const).
+ *  This ensures the Tauri initialization script has run before the first request
+ *  even if WebView2 module-load timing differs from Linux/macOS. */
+function getBaseApiUrl(): string {
+  return `${getBaseUrl()}/api`
+}
 
-export { BASE_URL }
+export { getBaseApiUrl as BASE_URL }
 
 /** Get the sidecar auth token injected by Tauri, or undefined in dev mode. */
 export function getAuroraToken(): string | undefined {
@@ -47,7 +52,7 @@ export class ApiError extends Error {
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   let res: Response
   try {
-    res = await fetch(`${BASE_URL}${path}`, {
+    res = await fetch(`${getBaseApiUrl()}${path}`, {
       headers: { "Content-Type": "application/json", ...authHeaders(), ...options.headers },
       ...options,
     })
@@ -65,7 +70,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 async function uploadRequest<T>(path: string, formData: FormData): Promise<T> {
   let res: Response
   try {
-    res = await fetch(`${BASE_URL}${path}`, { method: "PUT", body: formData, headers: authHeaders() })
+    res = await fetch(`${getBaseApiUrl()}${path}`, { method: "PUT", body: formData, headers: authHeaders() })
   } catch {
     throw new ApiError("Cannot reach server — check that the backend is running", 0)
   }
@@ -80,7 +85,7 @@ async function uploadRequest<T>(path: string, formData: FormData): Promise<T> {
 async function postUploadRequest<T>(path: string, formData: FormData): Promise<T> {
   let res: Response
   try {
-    res = await fetch(`${BASE_URL}${path}`, { method: "POST", body: formData, headers: authHeaders() })
+    res = await fetch(`${getBaseApiUrl()}${path}`, { method: "POST", body: formData, headers: authHeaders() })
   } catch {
     throw new ApiError("Cannot reach server — check that the backend is running", 0)
   }
