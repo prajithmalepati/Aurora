@@ -368,7 +368,7 @@ pub fn extract_metadata(file_path: &str) -> Option<ScannedMetadata> {
         artists: all_artists,
         featured_artists,
         duration,
-        file_path: path_abs.to_string_lossy().to_string(),
+        file_path: crate::paths::strip_verbatim_prefix(&path_abs.to_string_lossy()),
         file_format,
         file_mtime,
         bitrate,

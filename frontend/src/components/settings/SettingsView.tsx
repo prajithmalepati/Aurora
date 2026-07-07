@@ -500,7 +500,7 @@ export function SettingsView() {
       />
 
       {/* Dialogs */}
-      <ScanDialog open={scanOpen} onOpenChange={setScanOpen} />
+      <ScanDialog open={scanOpen} onOpenChange={setScanOpen} onScanComplete={fetchWatchedFolders} />
       <AddSongDialog open={addSongOpen} onOpenChange={setAddSongOpen} />
 
       {/* About / Updates */}

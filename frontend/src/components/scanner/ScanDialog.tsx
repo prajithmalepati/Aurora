@@ -20,6 +20,7 @@ const isTauri = "__TAURI_INTERNALS__" in window
 interface ScanDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  onScanComplete?: () => void
 }
 
 interface ScanProgress {
@@ -48,7 +49,7 @@ const INITIAL_STATE: ScanState = {
   watchFolder: false,
 }
 
-export function ScanDialog({ open, onOpenChange }: ScanDialogProps) {
+export function ScanDialog({ open, onOpenChange, onScanComplete }: ScanDialogProps) {
   const [state, setState] = useState<ScanState>(INITIAL_STATE)
   const abortRef = useRef<AbortController | null>(null)
 
@@ -156,6 +157,7 @@ export function ScanDialog({ open, onOpenChange }: ScanDialogProps) {
     }
     fetchSongs()
     fetchPlaylists()
+    onScanComplete?.()
     onOpenChange(false)
     setState(INITIAL_STATE)
   }

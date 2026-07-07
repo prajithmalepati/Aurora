@@ -74,6 +74,43 @@ fn platform_data_dir() -> PathBuf {
     }
 }
 
+// ── Path normalization helpers ─────────────────────────────────────────
+// Windows `fs::canonicalize` returns extended-length paths prefixed with
+// `\\?\` (or `\\.\`).  These prefixes survive `.to_string_lossy()` and
+// confuse path-splitting code that expects `D:\...` or `/...`.
+// Strip them once at the boundary so downstream code sees clean paths.
+
+/// Strip the Windows extended-length prefix (`\\?\` or `\\.\`) from a path
+/// string.  Returns the input unchanged on non-Windows paths.
+///
+/// ```
+/// use aurora_core::paths::strip_verbatim_prefix;
+/// assert_eq!(strip_verbatim_prefix(r"\\?\D:\Music\OP"), r"D:\Music\OP");
+/// assert_eq!(strip_verbatim_prefix(r"\\.\UNC\server\share"), r"UNC\server\share");
+/// assert_eq!(strip_verbatim_prefix("/home/user/Music"), "/home/user/Music");
+/// assert_eq!(strip_verbatim_prefix("D:\\Music\\OP"), "D:\\Music\\OP");
+/// ```
+pub fn strip_verbatim_prefix(path: &str) -> String {
+    if path.starts_with(r"\\?\") || path.starts_with(r"\\.\") {
+        path[4..].to_string()
+    } else {
+        path.to_string()
+    }
+}
+
+/// Normalize path separators to forward slashes and strip any Windows
+/// extended-length prefix.  Safe to call on any platform.
+///
+/// ```
+/// use aurora_core::paths::normalize_path;
+/// assert_eq!(normalize_path(r"\\?\D:\Music\OP"), "D:/Music/OP");
+/// assert_eq!(normalize_path(r"D:\Music\OP"), "D:/Music/OP");
+/// assert_eq!(normalize_path("/home/user/Music"), "/home/user/Music");
+/// ```
+pub fn normalize_path(path: &str) -> String {
+    strip_verbatim_prefix(path).replace('\\', "/")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -100,5 +137,46 @@ mod tests {
         // AURORA_DATA_DIR is tested via the live battery (sets the env var).
         // This test just verifies the static resolves without panic.
         let _ = DATA_DIR.clone();
+    }
+
+    #[test]
+    fn test_strip_verbatim_prefix_unc() {
+        assert_eq!(strip_verbatim_prefix(r"\\?\D:\Music\OP"), r"D:\Music\OP");
+        assert_eq!(
+            strip_verbatim_prefix(r"\\.\UNC\server\share"),
+            r"UNC\server\share"
+        );
+    }
+
+    #[test]
+    fn test_strip_verbatim_prefix_passthrough() {
+        assert_eq!(
+            strip_verbatim_prefix("/home/user/Music"),
+            "/home/user/Music"
+        );
+        assert_eq!(strip_verbatim_prefix("D:\\Music\\OP"), "D:\\Music\\OP");
+        assert_eq!(strip_verbatim_prefix(""), "");
+    }
+
+    #[test]
+    fn test_normalize_path_windows_verbatim() {
+        assert_eq!(normalize_path(r"\\?\D:\Music\OP"), "D:/Music/OP");
+        assert_eq!(normalize_path(r"\\?\C:\"), "C:/");
+    }
+
+    #[test]
+    fn test_normalize_path_backslash() {
+        assert_eq!(normalize_path(r"D:\Music\OP"), "D:/Music/OP");
+        assert_eq!(normalize_path(r"C:\Users\test"), "C:/Users/test");
+    }
+
+    #[test]
+    fn test_normalize_path_unix_passthrough() {
+        assert_eq!(normalize_path("/home/user/Music"), "/home/user/Music");
+    }
+
+    #[test]
+    fn test_normalize_path_empty() {
+        assert_eq!(normalize_path(""), "");
     }
 }
