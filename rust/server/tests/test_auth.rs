@@ -57,7 +57,8 @@ fn seed_minimal(conn: &aurora_core::rusqlite::Connection) {
          NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL, \
          '2025-01-01T00:00:00Z','2025-01-01T00:00:00Z')",
         [],
-    ).unwrap();
+    )
+    .unwrap();
 }
 
 async fn send(app: &axum::Router, req: Request<Body>) -> (StatusCode, String) {
@@ -84,6 +85,24 @@ fn options(uri: &str) -> Request<Body> {
     Request::builder()
         .method("OPTIONS")
         .uri(uri)
+        .body(Body::empty())
+        .unwrap()
+}
+
+fn options_with_origin(uri: &str, origin: &str) -> Request<Body> {
+    Request::builder()
+        .method("OPTIONS")
+        .uri(uri)
+        .header("Origin", origin)
+        .header("Access-Control-Request-Method", "GET")
+        .body(Body::empty())
+        .unwrap()
+}
+
+fn get_with_origin(uri: &str, origin: &str) -> Request<Body> {
+    Request::builder()
+        .uri(uri)
+        .header("Origin", origin)
         .body(Body::empty())
         .unwrap()
 }
@@ -119,16 +138,30 @@ async fn auth_no_token_rejects() {
 #[tokio::test]
 async fn auth_wrong_header_token_rejects() {
     let app = build_app_with_token();
-    let (s, body) = send(&app, get_with_header("/api/songs", "X-Aurora-Token", "wrong-token")).await;
-    assert_eq!(s, 401, "GET /api/songs with wrong X-Aurora-Token must be 401");
+    let (s, body) = send(
+        &app,
+        get_with_header("/api/songs", "X-Aurora-Token", "wrong-token"),
+    )
+    .await;
+    assert_eq!(
+        s, 401,
+        "GET /api/songs with wrong X-Aurora-Token must be 401"
+    );
     assert_eq!(body, "Unauthorized");
 }
 
 #[tokio::test]
 async fn auth_correct_header_token_passes() {
     let app = build_app_with_token();
-    let (s, _) = send(&app, get_with_header("/api/songs", "X-Aurora-Token", TEST_TOKEN)).await;
-    assert_eq!(s, 200, "GET /api/songs with correct X-Aurora-Token must be 200");
+    let (s, _) = send(
+        &app,
+        get_with_header("/api/songs", "X-Aurora-Token", TEST_TOKEN),
+    )
+    .await;
+    assert_eq!(
+        s, 200,
+        "GET /api/songs with correct X-Aurora-Token must be 200"
+    );
 }
 
 #[tokio::test]
@@ -136,7 +169,10 @@ async fn auth_correct_query_token_passes() {
     let app = build_app_with_token();
     let uri = format!("/api/songs?token={}", TEST_TOKEN);
     let (s, _) = send(&app, get(&uri)).await;
-    assert_eq!(s, 200, "GET /api/songs?token=<correct> must be 200 (query fallback)");
+    assert_eq!(
+        s, 200,
+        "GET /api/songs?token=<correct> must be 200 (query fallback)"
+    );
 }
 
 #[tokio::test]
@@ -155,5 +191,113 @@ async fn auth_wrong_query_token_rejects() {
 async fn no_token_allows_all() {
     let app = build_app_no_token();
     let (s, _) = send(&app, get("/api/songs")).await;
-    assert_eq!(s, 200, "GET /api/songs with no token configured must be 200 (auth off)");
+    assert_eq!(
+        s, 200,
+        "GET /api/songs with no token configured must be 200 (auth off)"
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// CORS tests — Tauri WebView2 origins
+// ═══════════════════════════════════════════════════════════════════════
+
+#[tokio::test]
+async fn cors_preflight_tauri_localhost_not_rejected() {
+    let app = build_app_with_token();
+    let (s, _) = send(
+        &app,
+        options_with_origin("/api/songs", "https://tauri.localhost"),
+    )
+    .await;
+    assert_ne!(
+        s, 401,
+        "Preflight from https://tauri.localhost must not be rejected by auth"
+    );
+    assert_ne!(
+        s, 403,
+        "Preflight from https://tauri.localhost must not be forbidden"
+    );
+    assert_ne!(
+        s, 405,
+        "Preflight from https://tauri.localhost must be allowed"
+    );
+}
+
+#[tokio::test]
+async fn cors_preflight_tauri_scheme_not_rejected() {
+    let app = build_app_with_token();
+    let (s, _) = send(&app, options_with_origin("/api/songs", "tauri://localhost")).await;
+    assert_ne!(
+        s, 401,
+        "Preflight from tauri://localhost must not be rejected by auth"
+    );
+    assert_ne!(
+        s, 403,
+        "Preflight from tauri://localhost must not be forbidden"
+    );
+    assert_ne!(s, 405, "Preflight from tauri://localhost must be allowed");
+}
+
+#[tokio::test]
+async fn cors_preflight_has_acao_header() {
+    let app = build_app_with_token();
+    let resp = app
+        .clone()
+        .oneshot(options_with_origin("/api/songs", "https://tauri.localhost"))
+        .await
+        .unwrap();
+    let acao = resp.headers().get("access-control-allow-origin");
+    assert!(
+        acao.is_some(),
+        "Preflight response must include access-control-allow-origin"
+    );
+}
+
+#[tokio::test]
+async fn cors_get_has_acao_for_tauri_origin() {
+    let app = build_app_with_token();
+    let resp = app
+        .clone()
+        .oneshot(get_with_origin("/api/health", "tauri://localhost"))
+        .await
+        .unwrap();
+    let acao = resp.headers().get("access-control-allow-origin");
+    assert!(
+        acao.is_some(),
+        "GET from tauri://localhost must have access-control-allow-origin"
+    );
+    // very_permissive() reflects the request origin
+    assert_eq!(acao.unwrap().to_str().unwrap(), "tauri://localhost");
+}
+
+#[tokio::test]
+async fn cors_get_has_acao_for_https_tauri_origin() {
+    let app = build_app_with_token();
+    let resp = app
+        .clone()
+        .oneshot(get_with_origin("/api/health", "https://tauri.localhost"))
+        .await
+        .unwrap();
+    let acao = resp.headers().get("access-control-allow-origin");
+    assert!(
+        acao.is_some(),
+        "GET from https://tauri.localhost must have access-control-allow-origin"
+    );
+    assert_eq!(acao.unwrap().to_str().unwrap(), "https://tauri.localhost");
+}
+
+#[tokio::test]
+async fn auth_still_rejects_without_token_despite_cors() {
+    // CORS allows the request through, but auth middleware must still block it
+    let app = build_app_with_token();
+    let (s, body) = send(
+        &app,
+        get_with_origin("/api/songs", "https://tauri.localhost"),
+    )
+    .await;
+    assert_eq!(
+        s, 401,
+        "GET /api/songs from Tauri origin without token must still be 401"
+    );
+    assert_eq!(body, "Unauthorized");
 }

@@ -185,7 +185,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
   const handleExport = async (format: 'm3u' | 'm3u8' | 'json') => {
     if (!activePlaylist) return
     try {
-      const response = await fetch(`${BASE_URL}/playlists/${activePlaylist.id}/export?format=${format}`, { headers: { "X-Aurora-Token": getAuroraToken() ?? "" } })
+      const response = await fetch(`${BASE_URL()}/playlists/${activePlaylist.id}/export?format=${format}`, { headers: { "X-Aurora-Token": getAuroraToken() ?? "" } })
       if (!response.ok) {
         const err = await response.json().catch(() => ({ detail: 'Export failed' }))
         throw new Error(err.detail || 'Export failed')

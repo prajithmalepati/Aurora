@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use tokio::sync::Mutex;
+use tower_http::cors::CorsLayer;
 
 pub mod background_watcher;
 pub mod routes;
@@ -83,8 +84,7 @@ async fn token_auth_middleware(
         None
     };
 
-    let provided = token_from_header
-        .or(token_from_query.as_deref());
+    let provided = token_from_header.or(token_from_query.as_deref());
 
     match provided {
         Some(t) if constant_time_eq(t, expected) => next.run(request).await,
@@ -129,7 +129,10 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
             "/api/tags",
             axum::routing::get(routes::list_tags).post(routes::create_tag),
         )
-        .route("/api/tags/{tag_id}", axum::routing::delete(routes::delete_tag))
+        .route(
+            "/api/tags/{tag_id}",
+            axum::routing::delete(routes::delete_tag),
+        )
         .route(
             "/api/songs/{song_id}/tags",
             axum::routing::post(routes::assign_tags),
@@ -187,19 +190,13 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
             axum::routing::get(routes::serve_playlist_image),
         )
         // ── Folder routes ──
-        .route(
-            "/api/folders",
-            axum::routing::get(routes::get_folder_tree),
-        )
+        .route("/api/folders", axum::routing::get(routes::get_folder_tree))
         .route(
             "/api/folders/songs",
             axum::routing::get(routes::get_folder_songs),
         )
         // ── Album routes ──
-        .route(
-            "/api/albums",
-            axum::routing::get(routes::list_albums),
-        )
+        .route("/api/albums", axum::routing::get(routes::list_albums))
         .route(
             "/api/albums/{album_name}",
             axum::routing::get(routes::get_album),
@@ -234,8 +231,7 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
         )
         .route(
             "/api/addons/{addon_id}",
-            axum::routing::patch(routes::addons::toggle_addon)
-                .delete(routes::addons::delete_addon),
+            axum::routing::patch(routes::addons::toggle_addon).delete(routes::addons::delete_addon),
         )
         .route(
             "/api/addons/{addon_id}/search",
@@ -260,7 +256,13 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
 
     // Apply token-auth middleware around all /api routes.
     // Health and OPTIONS are exempted inside the middleware function.
+    //
+    // CORS: Tauri WebView2 sends requests from tauri://localhost or
+    // https://tauri.localhost — origins the browser considers opaque.
+    // Reflect any origin, which is fine because token auth protects
+    // all mutating endpoints.
     api_routes
+        .layer(CorsLayer::very_permissive())
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
             token_auth_middleware,
