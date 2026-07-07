@@ -6,6 +6,7 @@ import { usePlayerStore } from "@/stores/playerStore"
 import { isPlayable } from "@/stores/playerStore"
 
 import { albumGradient } from "@/lib/albumGradient"
+import { displayArtist } from "@/lib/displayArtist"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -599,7 +600,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
                       >
                         <span className="text-[var(--aurora-text)] font-medium truncate">{song.title}</span>
                         <span className="text-[10px] text-[var(--aurora-text-tertiary)] truncate">
-                          {song.artist ?? "Unknown artist"}{song.album ? ` · ${song.album}` : ""}
+                          {displayArtist(song)}{song.album ? ` · ${song.album}` : ""}
                         </span>
                       </button>
                     ))

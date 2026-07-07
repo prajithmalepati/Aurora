@@ -13,6 +13,7 @@ import { useState, useEffect } from "react"
 import { formatFileSize, qualityLabel } from "@/lib/utils"
 import { api } from "@/lib/api"
 import type { Song } from "@/types"
+import { displayArtist } from "@/lib/displayArtist"
 
 const bleedThumbCache = new Map<number, string>()
 
@@ -156,7 +157,7 @@ export function PlayerBar() {
                       {currentSong.title || "Untitled"}
                     </span>
                     <span className="text-[10px] text-[var(--aurora-text-secondary)] truncate">
-                      {currentSong.artist || "Unknown Artist"}
+                      {displayArtist(currentSong)}
                     </span>
                     <AudioMetadataLine song={currentSong!} />
                     {/* Crossfade indicator */}
@@ -293,7 +294,7 @@ export function PlayerBar() {
                       {currentSong.title || "Untitled"}
                     </span>
                     <span className="text-[11px] text-[var(--aurora-text-secondary)] truncate mt-0.5 tracking-wide">
-                      {currentSong.artist || "Unknown Artist"}
+                      {displayArtist(currentSong)}
                     </span>
                     <AudioMetadataLine song={currentSong!} />
                     {/* Crossfade indicator */}
