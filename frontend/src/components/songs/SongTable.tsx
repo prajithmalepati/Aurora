@@ -809,24 +809,14 @@ export function SongTable({
     return () => clearTimeout(timer)
   }, [currentSongId, songs, rowVirtualizer])
 
-  // ── Infinite scroll via IntersectionObserver (sentinel at content bottom) ──
-  const loadMoreSentinelRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const sentinel = loadMoreSentinelRef.current
-    const root = tableContainerRef.current
-    if (!sentinel || !root) return
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && hasMore && !useSongStore.getState().loading) {
-          fetchMore()
-        }
-      },
-      { root, rootMargin: "0px 0px 300px 0px" },
-    )
-    observer.observe(sentinel)
-    return () => observer.disconnect()
+  // ── Infinite scroll via onScroll (IntersectionObserver is unreliable with spacer rows) ──
+  const handleScroll = useCallback(() => {
+    const el = tableContainerRef.current
+    if (!el || !hasMore || useSongStore.getState().loading) return
+    const { scrollTop, scrollHeight, clientHeight } = el
+    if (scrollHeight - scrollTop - clientHeight < 300) {
+      fetchMore()
+    }
   }, [hasMore, fetchMore])
 
   const virtualItems = rowVirtualizer.getVirtualItems()
@@ -972,7 +962,7 @@ export function SongTable({
       <div
         ref={tableContainerRef}
         className={fillHeight ? "w-full flex-1 min-h-0 overflow-auto aurora-fade-in @container" : "w-full h-[calc(100vh-15rem)] overflow-auto aurora-fade-in @container"}
-
+        onScroll={handleScroll}
       >
         {toolbar}
         <table className="w-full border-separate border-spacing-0" style={{ tableLayout: "fixed" }}>
@@ -1070,8 +1060,7 @@ export function SongTable({
           </tbody>
         </table>
 
-        {/* Sentinel: IntersectionObserver watches this for auto-load */}
-        <div ref={loadMoreSentinelRef} aria-hidden="true" className="h-px" />
+        {/* Sentinel removed — infinite scroll uses onScroll on the container */}
 
         {/* Song count footer */}
         <div className="sticky bottom-0 text-center py-2.5 text-[11px] text-[var(--aurora-text-tertiary)] bg-[var(--aurora-obsidian)] border-t border-[var(--aurora-rim-bright)] shadow-[0_-8px_16px_-8px_rgba(0,0,0,0.5)]">
