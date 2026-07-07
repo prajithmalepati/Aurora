@@ -588,6 +588,37 @@ async fn golden_playlists() {
     let golden = strip_playlist_detail_ts(load_golden("playlists_update_crossfade"));
     assert_body("playlists_update_crossfade (no ts)", &b_stripped, &golden);
 
+    // ── update_crossfade_null (clear crossfade override — "Inherit global") ──
+    let (s, b) = send(&app, put_json("/api/playlists/1",
+        r#"{"crossfade_enabled":null,"crossfade_duration_s":null}"#)).await;
+    assert_eq!(s, 200, "crossfade null update should succeed");
+    let data = b.get("data").expect("response should have data");
+    assert!(data.get("crossfade_enabled").unwrap().is_null(),
+        "crossfade_enabled should be null after clearing override, got: {:?}",
+        data.get("crossfade_enabled"));
+    assert!(data.get("crossfade_duration_s").unwrap().is_null(),
+        "crossfade_duration_s should be null after clearing override, got: {:?}",
+        data.get("crossfade_duration_s"));
+
+    // Verify the cleared state persists: re-fetch via GET
+    let (s2, b2) = send(&app, get("/api/playlists/1")).await;
+    assert_eq!(s2, 200);
+    let data2 = b2.get("data").expect("response should have data");
+    assert!(data2.get("crossfade_enabled").unwrap().is_null(),
+        "crossfade_enabled should still be null on re-fetch");
+    assert!(data2.get("crossfade_duration_s").unwrap().is_null(),
+        "crossfade_duration_s should still be null on re-fetch");
+
+    // Verify the list endpoint also returns null
+    let (s3, b3) = send(&app, get("/api/playlists")).await;
+    assert_eq!(s3, 200);
+    let playlists = b3.get("data").unwrap().as_array().unwrap();
+    let pl1 = playlists.iter().find(|p| p["id"].as_i64() == Some(1)).unwrap();
+    assert!(pl1.get("crossfade_enabled").unwrap().is_null(),
+        "crossfade_enabled should be null in list endpoint too");
+    assert!(pl1.get("crossfade_duration_s").unwrap().is_null(),
+        "crossfade_duration_s should be null in list endpoint too");
+
     // ── update_404 ──
     let (s, b) = send(&app, put_json("/api/playlists/999", r#"{"name":"Nope"}"#)).await;
     assert_eq!(s, 404);

@@ -146,8 +146,30 @@ pub struct UpdatePlaylist {
     pub name: Option<String>,
     pub color: Option<String>,
     pub emoji: Option<String>,
-    pub crossfade_enabled: Option<Option<i64>>,
-    pub crossfade_duration_s: Option<Option<i64>>,
+    #[serde(flatten)]
+    pub extra: std::collections::HashMap<String, serde_json::Value>,
+}
+
+impl UpdatePlaylist {
+    /// Extract crossfade_enabled as Option<Option<i64>>:
+    ///   key absent  → None  (don't update column)
+    ///   key = null  → Some(None) (set column to NULL)
+    ///   key = num   → Some(Some(n)) (set column to n)
+    fn crossfade_enabled(&self) -> Option<Option<i64>> {
+        match self.extra.get("crossfade_enabled") {
+            None => None,
+            Some(v) if v.is_null() => Some(None),
+            Some(v) => Some(v.as_i64()),
+        }
+    }
+
+    fn crossfade_duration_s(&self) -> Option<Option<i64>> {
+        match self.extra.get("crossfade_duration_s") {
+            None => None,
+            Some(v) if v.is_null() => Some(None),
+            Some(v) => Some(v.as_i64()),
+        }
+    }
 }
 
 /// PUT /api/playlists/{id} — update playlist metadata.
@@ -164,8 +186,8 @@ pub async fn update_playlist(
         body.name.as_deref(),
         body.color.as_deref(),
         body.emoji.as_deref(),
-        body.crossfade_enabled,
-        body.crossfade_duration_s,
+        body.crossfade_enabled(),
+        body.crossfade_duration_s(),
     ) {
         Ok(true) => {
             // Fetch updated playlist with song_count

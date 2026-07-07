@@ -79,8 +79,21 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [addSongSearch, setAddSongSearch] = useState("")
   const [addSongOpen, setAddSongOpen] = useState(false)
-  const [sortField] = useState<'position'|'title'|'artist'|'album'|'duration'>('position')
-  const [sortOrder] = useState<'asc'|'desc'>('asc')
+  const [sortField, setSortField] = useState<'position'|'title'|'artist'|'album'|'duration'>('position')
+  const [sortOrder, setSortOrder] = useState<'asc'|'desc'>('asc')
+
+  const handlePlaylistSort = useCallback((field: string, order?: 'asc' | 'desc') => {
+    const f = field as typeof sortField
+    if (order) {
+      setSortField(f)
+      setSortOrder(order)
+    } else if (f === sortField) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(f)
+      setSortOrder('asc')
+    }
+  }, [sortField, sortOrder])
 
   // Track hero header rect for position:fixed bleed overlay
   // Drag state removed — now handled by dnd-kit in SongTable
@@ -649,6 +662,9 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
           fillHeight
           disableInfiniteScroll
           showSort
+          sortField={sortField}
+          sortOrder={sortOrder}
+          onSortChange={handlePlaylistSort}
           onPlay={(_song, index) => {
             const ps = sortedSongs[index]
             if (ps) handlePlaySong(ps)
@@ -861,6 +877,18 @@ function CrossfadeChip({ playlist }: CrossfadeChipProps) {
   )
   const [duration, setDuration] = useState(playlist.crossfade_duration_s ?? globalDuration)
   const [saving, setSaving] = useState(false)
+
+  // Sync local state when playlist data changes (e.g. after save + refetch)
+  useEffect(() => {
+    setMode(
+      playlist.crossfade_enabled === null || playlist.crossfade_enabled === undefined
+        ? "inherit"
+        : playlist.crossfade_enabled === 0
+        ? "off"
+        : "on"
+    )
+    setDuration(playlist.crossfade_duration_s ?? globalDuration)
+  }, [playlist.crossfade_enabled, playlist.crossfade_duration_s, globalDuration])
 
   const resolvedDuration =
     mode === "inherit" ? globalDuration : duration
