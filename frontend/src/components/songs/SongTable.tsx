@@ -826,15 +826,28 @@ export function SongTable({
     return () => clearTimeout(timer)
   }, [currentSongId, songs, rowVirtualizer])
 
-  // ── Infinite scroll via onScroll (IntersectionObserver is unreliable with spacer rows) ──
-  const handleScroll = useCallback(() => {
-    const el = tableContainerRef.current
-    if (!el || !hasMore || useSongStore.getState().loading) return
-    const { scrollTop, scrollHeight, clientHeight } = el
-    if (scrollHeight - scrollTop - clientHeight < 300) {
-      fetchMore()
-    }
-  }, [hasMore, fetchMore])
+  // ── Infinite scroll via IntersectionObserver (viewport-relative) ──
+  // Using root:null so the observer works regardless of which ancestor is the
+  // actual scroll container. The onScroll approach failed on Windows WebView2
+  // because the AppShell's outer overflow-y-auto div was the real scroller,
+  // not the SongTable's inner container.
+  const loadMoreSentinelRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const sentinel = loadMoreSentinelRef.current
+    if (!sentinel) return
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && useSongStore.getState().hasMore && !useSongStore.getState().loading) {
+          fetchMore()
+        }
+      },
+      { rootMargin: "0px 0px 600px 0px" }, // trigger 600px before sentinel is visible
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [fetchMore])
 
   const virtualItems = rowVirtualizer.getVirtualItems()
   const topSpacerHeight = virtualItems.length > 0 ? virtualItems[0].start : 0
@@ -979,7 +992,6 @@ export function SongTable({
       <div
         ref={tableContainerRef}
         className={fillHeight ? "w-full flex-1 min-h-0 overflow-auto aurora-fade-in @container" : "w-full h-[calc(100vh-15rem)] overflow-auto aurora-fade-in @container"}
-        onScroll={handleScroll}
       >
         {toolbar}
         <table className="w-full border-separate border-spacing-0" style={{ tableLayout: "fixed" }}>
@@ -1077,7 +1089,25 @@ export function SongTable({
           </tbody>
         </table>
 
-        {/* Sentinel removed — infinite scroll uses onScroll on the container */}
+        {/* Load More — sentinel for IntersectionObserver + visible fallback button */}
+        {hasMore && (
+          <div className="py-3 flex flex-col items-center gap-2">
+            <div ref={loadMoreSentinelRef} aria-hidden="true" className="h-px w-full" />
+            {!loading && songs.length < totalCount && (
+              <button
+                type="button"
+                onClick={() => fetchMore()}
+                className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[11px] font-medium text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] transition-colors duration-150"
+                style={{
+                  background: "var(--aurora-surface)",
+                  boxShadow: "inset 0 0 0 1px var(--aurora-rim)",
+                }}
+              >
+                Load more ({songs.length} of {totalCount.toLocaleString()})
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Song count footer */}
         <div className="sticky bottom-0 text-center py-2.5 text-[11px] text-[var(--aurora-text-tertiary)] bg-[var(--aurora-obsidian)] border-t border-[var(--aurora-rim-bright)] shadow-[0_-8px_16px_-8px_rgba(0,0,0,0.5)]">

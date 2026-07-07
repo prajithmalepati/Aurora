@@ -279,4 +279,44 @@ describe("songStore pagination", () => {
     expect(state.songs.length).toBe(100)
     expect(state.songs[0].id).toBe(1) // Fresh fetch from offset 0
   })
+
+  it("WD-06 regression: 352-song library is NOT stuck at first page (100)", async () => {
+    // This is the exact scenario from the Windows dogfood feedback:
+    // 352 songs total, PAGE_SIZE=100. After initial fetch, hasMore must be true
+    // and fetchMore must successfully load all remaining songs.
+    const TOTAL = 352
+    const allSongs = Array.from({ length: TOTAL }, (_, i) => makeSong(i + 1))
+
+    vi.mocked(api.get).mockImplementation(async (url: string) => {
+      const params = new URLSearchParams(url.split("?")[1])
+      const offset = parseInt(params.get("offset") ?? "0", 10)
+      const limit = parseInt(params.get("limit") ?? "50", 10)
+      return buildPageResponse(allSongs, offset, limit)
+    })
+
+    const { useSongStore } = await import("@/stores/songStore")
+
+    // Initial fetch returns exactly PAGE_SIZE (100) songs
+    await useSongStore.getState().fetchSongs()
+    const afterFirst = useSongStore.getState()
+
+    // CRITICAL: After first page, hasMore MUST be true
+    expect(afterFirst.hasMore).toBe(true)
+    expect(afterFirst.totalCount).toBe(TOTAL)
+    expect(afterFirst.songs.length).toBe(100)
+
+    // Keep calling fetchMore until hasMore is false
+    let iterations = 0
+    while (useSongStore.getState().hasMore && iterations < 10) {
+      await useSongStore.getState().fetchMore()
+      iterations++
+    }
+
+    const final = useSongStore.getState()
+    expect(final.songs.length).toBe(TOTAL)
+    expect(final.hasMore).toBe(false)
+    expect(final.totalCount).toBe(TOTAL)
+    // 4 pages: 100 + 100 + 100 + 52
+    expect(iterations).toBe(3)
+  })
 })
