@@ -10,9 +10,7 @@ use aurora_server::AppState;
 async fn main() -> anyhow::Result<()> {
     let db_path = std::env::var("AURORA_DB_PATH")
         .map(PathBuf::from)
-        .unwrap_or_else(|_| {
-            aurora_core::paths::DB_PATH.clone()
-        });
+        .unwrap_or_else(|_| aurora_core::paths::DB_PATH.clone());
 
     let port: u16 = std::env::var("AURORA_PORT")
         .ok()
@@ -24,12 +22,12 @@ async fn main() -> anyhow::Result<()> {
     println!("  Port:    {port}");
 
     let conn = aurora_core::db::open_and_migrate(&db_path)?;
-    let user_version: i64 =
-        conn.pragma_query_value(None, "user_version", |row| row.get(0))?;
+    let user_version: i64 = conn.pragma_query_value(None, "user_version", |row| row.get(0))?;
     println!("  user_version: {user_version}");
 
     // Start background file watcher (native FS events, debounced)
-    let (watcher_handle, _shutdown) = aurora_server::background_watcher::start_background_watcher(db_path.clone());
+    let (watcher_handle, _shutdown) =
+        aurora_server::background_watcher::start_background_watcher(db_path.clone());
     println!("  Background watcher: started");
 
     let aurora_token = std::env::var("AURORA_TOKEN").ok().filter(|t| !t.is_empty());
@@ -47,7 +45,7 @@ async fn main() -> anyhow::Result<()> {
 
     let app = aurora_server::build_router(state);
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], port));
+    let addr = SocketAddr::from(([127, 0, 0, 1], port));
     println!("Listening on {addr}");
 
     let listener = tokio::net::TcpListener::bind(addr).await?;

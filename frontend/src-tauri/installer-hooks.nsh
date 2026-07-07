@@ -7,6 +7,7 @@
   ; which sends SIGKILL to the sidecar, but we kill both defensively.
   nsExec::Exec 'taskkill /F /IM Aurora.exe'
   nsExec::Exec 'taskkill /F /IM aurora-backend.exe'
+  nsExec::Exec 'taskkill /F /IM aurora_server.exe'
   ; Give processes time to release file locks
   Sleep 1500
 !macroend
