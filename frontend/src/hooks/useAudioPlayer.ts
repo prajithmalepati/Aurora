@@ -220,10 +220,20 @@ export function useAudioPlayer() {
     })
 
     engine.on("loaderror", (error) => {
-      console.error(`Playback load error song ${songId}:`, error)
+      const diag = error as { code: number | null; name: string; message: string; format?: string }
+      console.error(`[Aurora] loaderror song ${songId}:`, diag)
       const song = usePlayerStore.getState().currentSong
       const songTitle = song?.title ?? "Unknown song"
-      toast.error(`Failed to load "${songTitle}" — format may be unsupported`)
+      const fmt = diag.format ?? song?.file_format ?? "unknown"
+      const hint =
+        diag.code === 4
+          ? ` — ${fmt.toUpperCase()} may not be supported in this browser`
+          : diag.code === 3
+            ? ` — decode error (${fmt.toUpperCase()})`
+            : diag.code === 2
+              ? " — network error"
+              : ""
+      toast.error(`Failed to load "${songTitle}"${hint}`)
       setTimeout(() => {
         const { currentSong } = usePlayerStore.getState()
         if (currentSong && String(currentSong.id) === songId) {
@@ -233,10 +243,18 @@ export function useAudioPlayer() {
     })
 
     engine.on("playerror", (error) => {
-      console.error(`Playback error song ${songId}:`, error)
+      const diag = error as { code: number | null; name: string; message: string; format?: string }
+      console.error(`[Aurora] playerror song ${songId}:`, diag)
       const song = usePlayerStore.getState().currentSong
       const songTitle = song?.title ?? "Unknown song"
-      toast.error(`Playback interrupted for "${songTitle}"`)
+      const fmt = diag.format ?? song?.file_format ?? "unknown"
+      const hint =
+        diag.code === 4
+          ? ` — ${fmt.toUpperCase()} format not playable`
+          : diag.code === 3
+            ? ` — decode failed (${fmt.toUpperCase()})`
+            : ""
+      toast.error(`Playback error for "${songTitle}"${hint}`)
       setTimeout(() => {
         const { currentSong } = usePlayerStore.getState()
         if (currentSong && String(currentSong.id) === songId) {
@@ -299,8 +317,9 @@ export function useAudioPlayer() {
     preEngine.on("load", () => {
       preloadReadyRef.current = true
     })
-    preEngine.on("loaderror", () => {
-      console.error(`Gapless preload failed for song ${preId} — falling back to normal load`)
+    preEngine.on("loaderror", (error) => {
+      const diag = error as { code: number | null; name: string; format?: string }
+      console.error(`[Aurora] gapless preload failed song ${preId}: code=${diag.code} (${diag.name}) fmt=${diag.format ?? "unknown"}`)
       if (nextEngineRef.current?.songId === preId) {
         nextEngineRef.current.engine.unload()
         nextEngineRef.current = null
