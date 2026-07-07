@@ -26,6 +26,8 @@ export function SettingsView() {
   const setReplaygainMode = useSettingsStore((s) => s.setReplaygainMode)
   const respectTrims = useSettingsStore((s) => s.respectTrims)
   const setRespectTrims = useSettingsStore((s) => s.setRespectTrims)
+  const continuePlayback = useSettingsStore((s) => s.continuePlayback)
+  const setContinuePlayback = useSettingsStore((s) => s.setContinuePlayback)
 
   const durPct = ((crossfadeDuration - 1) / 11) * 100
 
@@ -374,6 +376,33 @@ export function SettingsView() {
             <span
               className="absolute top-0.5 left-0.5 w-[18px] h-[18px] rounded-full bg-white shadow-sm transition-transform duration-200"
               style={{ transform: respectTrims ? "translateX(18px)" : "translateX(0)" }}
+            />
+          </button>
+        </div>
+
+        {/* Continue playback */}
+        <div className="px-5 py-4 border-t border-[var(--aurora-rim)] flex items-center justify-between">
+          <div>
+            <p className="text-[14px] text-[var(--aurora-text)] font-medium">Continue playback</p>
+            <p className="text-[12px] text-[var(--aurora-text-secondary)] mt-0.5">
+              When an album or playlist ends, continue with songs from your library
+            </p>
+          </div>
+          <button
+            onClick={() => setContinuePlayback(!continuePlayback)}
+            role="switch"
+            aria-label="Continue playback"
+            aria-checked={continuePlayback}
+            className={`relative rounded-full transition-colors duration-200 flex-shrink-0 ${
+              continuePlayback
+                ? "bg-[var(--aurora-accent-interactive)]"
+                : "bg-white/[0.12]"
+            }`}
+            style={{ height: "22px", width: "40px" }}
+          >
+            <span
+              className="absolute top-0.5 left-0.5 w-[18px] h-[18px] rounded-full bg-white shadow-sm transition-transform duration-200"
+              style={{ transform: continuePlayback ? "translateX(18px)" : "translateX(0)" }}
             />
           </button>
         </div>
