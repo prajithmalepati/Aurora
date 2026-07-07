@@ -7,6 +7,7 @@ import { usePlaylistStore } from "@/stores/playlistStore"
 import { toast } from "@/lib/toast"
 import { getBaseUrl, withToken, api } from "@/lib/api"
 import { createPlaybackEngine, unlockAudioOutput } from "@/lib/engines/howlerEngine"
+import { buildPlaybackErrorHint } from "@/lib/playbackErrorHints"
 import type { PlaybackEngine, PlaybackSource } from "@/types/playback"
 
 /** Build the PlaybackSource for a library song. URL resolution lives here —
@@ -225,14 +226,7 @@ export function useAudioPlayer() {
       const song = usePlayerStore.getState().currentSong
       const songTitle = song?.title ?? "Unknown song"
       const fmt = diag.format ?? song?.file_format ?? "unknown"
-      const hint =
-        diag.code === 4
-          ? ` — ${fmt.toUpperCase()} may not be supported in this browser`
-          : diag.code === 3
-            ? ` — decode error (${fmt.toUpperCase()})`
-            : diag.code === 2
-              ? " — network error"
-              : ""
+      const hint = buildPlaybackErrorHint(diag.code, fmt, "load")
       toast.error(`Failed to load "${songTitle}"${hint}`)
       setTimeout(() => {
         const { currentSong } = usePlayerStore.getState()
@@ -248,12 +242,7 @@ export function useAudioPlayer() {
       const song = usePlayerStore.getState().currentSong
       const songTitle = song?.title ?? "Unknown song"
       const fmt = diag.format ?? song?.file_format ?? "unknown"
-      const hint =
-        diag.code === 4
-          ? ` — ${fmt.toUpperCase()} format not playable`
-          : diag.code === 3
-            ? ` — decode failed (${fmt.toUpperCase()})`
-            : ""
+      const hint = buildPlaybackErrorHint(diag.code, fmt, "play")
       toast.error(`Playback error for "${songTitle}"${hint}`)
       setTimeout(() => {
         const { currentSong } = usePlayerStore.getState()
