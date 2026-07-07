@@ -59,6 +59,10 @@ interface SongTableProps {
   // Drag-and-drop (dnd-kit)
   isDraggable?: boolean
   onReorder?: (fromId: number, toId: number) => void
+  // External sort control (playlist mode — overrides global songStore sort)
+  sortField?: string
+  sortOrder?: "asc" | "desc"
+  onSortChange?: (field: string, order?: "asc" | "desc") => void
 }
 
 const HEADER_CLASS =
@@ -403,6 +407,7 @@ function AddToPlaylistDialog({ open, onOpenChange, songIds, onComplete }: AddToP
 
 // ── SortDropdown ──
 const SORT_OPTIONS: { value: string; label: string }[] = [
+  { value: "position-asc", label: "Default order" },
   { value: "title-asc", label: "Title A–Z" },
   { value: "title-desc", label: "Title Z–A" },
   { value: "artist-asc", label: "Artist A–Z" },
@@ -502,10 +507,14 @@ export function SongTable({
   emptyTitle = "Nothing here yet",
   emptyHint = "Scan a folder or add a song to begin.",
   isDraggable, onReorder,
+  sortField: externalSortField, sortOrder: externalSortOrder, onSortChange,
 }: SongTableProps) {
-  const sortField = useSongStore((state) => state.sortField)
-  const sortOrder = useSongStore((state) => state.sortOrder)
+  const storeSortField = useSongStore((state) => state.sortField)
+  const storeSortOrder = useSongStore((state) => state.sortOrder)
   const sortSongs = useSongStore((state) => state.sortSongs)
+  // Use external sort when provided (playlist mode), otherwise store
+  const sortField = (externalSortField ?? storeSortField) as SortField
+  const sortOrder = externalSortOrder ?? storeSortOrder
   const storeTotalCount = useSongStore((state) => state.totalCount)
   const storeHasMore = useSongStore((state) => state.hasMore)
   const fetchMore = useSongStore((state) => state.fetchMore)
@@ -720,7 +729,9 @@ export function SongTable({
   }, [contextTargets, onRemoveFromPlaylist, closeContextMenu])
 
   function handleColumnSort(field: SortField) {
-    if (field === sortField) {
+    if (onSortChange) {
+      onSortChange(field)
+    } else if (field === sortField) {
       sortSongs(field, sortOrder === "asc" ? "desc" : "asc")
     } else {
       sortSongs(field, "asc")
@@ -728,8 +739,14 @@ export function SongTable({
   }
 
   function handleSortSelect(value: string) {
-    const [field, order] = value.split("-") as [SortField, "asc" | "desc"]
-    sortSongs(field, order)
+    const parts = value.split("-")
+    const field = parts[0]
+    const order = (parts[1] ?? "asc") as "asc" | "desc"
+    if (onSortChange) {
+      onSortChange(field, order)
+    } else if (field !== "position") {
+      sortSongs(field as SortField, order)
+    }
   }
 
   const sortDropdownValue = `${sortField}-${sortOrder}`
