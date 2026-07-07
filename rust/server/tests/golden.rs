@@ -1024,6 +1024,174 @@ async fn stream_range_tests() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+// FLAC stream tests — verifies MIME, Range, and auth for .flac files
+// ═══════════════════════════════════════════════════════════════════════
+
+#[tokio::test]
+async fn flac_stream_content_type_and_range() {
+    // Create a temp FLAC file with known content
+    let tmp = tempfile::Builder::new().suffix(".flac").tempfile().unwrap();
+    let test_data: Vec<u8> = (0..=255u8).collect(); // 256 bytes
+    std::fs::write(tmp.path(), &test_data).unwrap();
+    let file_path = tmp.path().to_string_lossy().to_string();
+
+    let conn = aurora_core::db::open_memory().expect("open_memory failed");
+    seed_database(&conn);
+    conn.execute(
+        "INSERT INTO songs (id, title, artist, source, file_path, file_format, created_at, updated_at) \
+         VALUES (200, 'FLAC Test', 'Test', 'manual', ?1, 'flac', '2025-01-01T00:00:00Z', '2025-01-01T00:00:00Z')",
+        aurora_core::rusqlite::params![file_path],
+    ).unwrap();
+
+    let state = Arc::new(AppState {
+        conn: tokio::sync::Mutex::new(conn),
+        db_path: None,
+        addon_state: Arc::new(aurora_server::routes::addons::AddonState::new()),
+        watcher_handle: None,
+        aurora_token: None,
+    });
+    let app = aurora_server::build_router(state);
+
+    // ── Full request → 200 with audio/flac ──
+    let req = Request::builder()
+        .uri("/api/songs/200/stream")
+        .body(Body::empty())
+        .unwrap();
+    let response = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(response.status(), 200);
+    assert_eq!(
+        response.headers().get("content-type").unwrap().to_str().unwrap(),
+        "audio/flac",
+        "FLAC content-type must be audio/flac"
+    );
+    assert_eq!(
+        response.headers().get("accept-ranges").unwrap().to_str().unwrap(),
+        "bytes"
+    );
+    assert_eq!(
+        response.headers().get("content-length").unwrap().to_str().unwrap(),
+        "256"
+    );
+    let body_bytes = response.into_body().collect().await.unwrap().to_bytes();
+    assert_eq!(body_bytes.as_ref(), test_data.as_slice());
+
+    // ── Range: bytes=0-99 → 206 with audio/flac ──
+    let req = Request::builder()
+        .uri("/api/songs/200/stream")
+        .header("range", "bytes=0-99")
+        .body(Body::empty())
+        .unwrap();
+    let response = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(response.status(), 206);
+    assert_eq!(
+        response.headers().get("content-type").unwrap().to_str().unwrap(),
+        "audio/flac",
+        "206 FLAC content-type must be audio/flac"
+    );
+    assert_eq!(
+        response.headers().get("content-range").unwrap().to_str().unwrap(),
+        "bytes 0-99/256"
+    );
+    assert_eq!(
+        response.headers().get("content-length").unwrap().to_str().unwrap(),
+        "100"
+    );
+    let body_bytes = response.into_body().collect().await.unwrap().to_bytes();
+    assert_eq!(body_bytes.as_ref(), &test_data[0..=99]);
+
+    // ── ETag + Last-Modified present on 200 ──
+    let req = Request::builder()
+        .uri("/api/songs/200/stream")
+        .body(Body::empty())
+        .unwrap();
+    let response = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(response.status(), 200);
+    assert!(
+        response.headers().get("etag").is_some(),
+        "FLAC 200 must include ETag"
+    );
+    assert!(
+        response.headers().get("last-modified").is_some(),
+        "FLAC 200 must include Last-Modified"
+    );
+    let _ = response.into_body().collect().await.unwrap();
+}
+
+#[tokio::test]
+async fn flac_stream_with_token_auth() {
+    // Verify that token-authenticated FLAC streams work via ?token= query param
+    // (this is how <audio> elements pass auth — no custom headers available)
+    let tmp = tempfile::Builder::new().suffix(".flac").tempfile().unwrap();
+    let test_data: Vec<u8> = (0..=255u8).collect();
+    std::fs::write(tmp.path(), &test_data).unwrap();
+    let file_path = tmp.path().to_string_lossy().to_string();
+
+    let conn = aurora_core::db::open_memory().expect("open_memory failed");
+    seed_database(&conn);
+    conn.execute(
+        "INSERT INTO songs (id, title, artist, source, file_path, file_format, created_at, updated_at) \
+         VALUES (201, 'FLAC Auth Test', 'Test', 'manual', ?1, 'flac', '2025-01-01T00:00:00Z', '2025-01-01T00:00:00Z')",
+        aurora_core::rusqlite::params![file_path],
+    ).unwrap();
+
+    let secret = "test-token-abc123".to_string();
+    let state = Arc::new(AppState {
+        conn: tokio::sync::Mutex::new(conn),
+        db_path: None,
+        addon_state: Arc::new(aurora_server::routes::addons::AddonState::new()),
+        watcher_handle: None,
+        aurora_token: Some(secret.clone()),
+    });
+    let app = aurora_server::build_router(state);
+
+    // ── No token → 401 ──
+    let req = Request::builder()
+        .uri("/api/songs/201/stream")
+        .body(Body::empty())
+        .unwrap();
+    let response = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(response.status(), 401, "stream without token must be 401");
+
+    // ── Token via query param → 200 (simulates <audio src="?token=...">) ──
+    let req = Request::builder()
+        .uri(format!("/api/songs/201/stream?token={}", secret))
+        .body(Body::empty())
+        .unwrap();
+    let response = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(response.status(), 200, "stream with ?token= must be 200");
+    assert_eq!(
+        response.headers().get("content-type").unwrap().to_str().unwrap(),
+        "audio/flac"
+    );
+    let body_bytes = response.into_body().collect().await.unwrap().to_bytes();
+    assert_eq!(body_bytes.len(), 256);
+
+    // ── Token via header → 200 ──
+    let req = Request::builder()
+        .uri("/api/songs/201/stream")
+        .header("X-Aurora-Token", &secret)
+        .body(Body::empty())
+        .unwrap();
+    let response = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(response.status(), 200, "stream with X-Aurora-Token must be 200");
+    let _ = response.into_body().collect().await.unwrap();
+
+    // ── Range request with token → 206 ──
+    let req = Request::builder()
+        .uri(format!("/api/songs/201/stream?token={}", secret))
+        .header("range", "bytes=0-49")
+        .body(Body::empty())
+        .unwrap();
+    let response = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(response.status(), 206, "authenticated FLAC range must be 206");
+    assert_eq!(
+        response.headers().get("content-range").unwrap().to_str().unwrap(),
+        "bytes 0-49/256"
+    );
+    let _ = response.into_body().collect().await.unwrap();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 // WATCHER golden tests — cumulative mutations
 // ═══════════════════════════════════════════════════════════════════════
 

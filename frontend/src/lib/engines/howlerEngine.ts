@@ -22,6 +22,42 @@ import type {
   PlaybackSource,
 } from "@/types/playback"
 
+/** MediaError.code values from the HTML5 spec. */
+const MEDIA_ERROR_NAMES: Record<number, string> = {
+  1: "MEDIA_ERR_ABORTED",
+  2: "MEDIA_ERR_NETWORK",
+  3: "MEDIA_ERR_DECODE",
+  4: "MEDIA_ERR_SRC_NOT_SUPPORTED",
+}
+
+/**
+ * Extract a structured diagnostic from a Howler load/play error.
+ * Howler passes the native MediaError object (or a number on some paths).
+ */
+function describeMediaError(error: unknown): {
+  code: number | null
+  name: string
+  message: string
+} {
+  if (error && typeof error === "object") {
+    const me = error as MediaError
+    const code = typeof me.code === "number" ? me.code : null
+    return {
+      code,
+      name: (code && MEDIA_ERROR_NAMES[code]) || "UNKNOWN",
+      message: me.message || String(error),
+    }
+  }
+  if (typeof error === "number") {
+    return {
+      code: error,
+      name: MEDIA_ERROR_NAMES[error] || "UNKNOWN",
+      message: "",
+    }
+  }
+  return { code: null, name: "UNKNOWN", message: String(error) }
+}
+
 /** Unlock the shared audio output after a user gesture (browser autoplay
  *  policy). Must be called in a gesture handler or the leaf effect closest
  *  to it. Engine-agnostic name; today it resumes Howler's AudioContext. */
@@ -61,13 +97,21 @@ class HowlerEngine implements PlaybackEngine {
     howl.on("pause", () => this.emit("pause", undefined))
     howl.on("end", () => this.emit("end", undefined))
     howl.on("load", () => this.emit("load", howl.duration()))
-    howl.on("loaderror", (_id, error) => {
+    howl.on("loaderror", (_id: number, error: unknown) => {
+      const diag = describeMediaError(error)
+      console.error(
+        `[Aurora] loaderror: code=${diag.code} (${diag.name}) msg="${diag.message}" src=${source.url.split("?")[0]} fmt=${source.format ?? "unknown"}`,
+      )
       this.emit("buffering", false)
-      this.emit("loaderror", error)
+      this.emit("loaderror", { ...diag, source: source.url.split("?")[0], format: source.format })
     })
-    howl.on("playerror", (_id, error) => {
+    howl.on("playerror", (_id: number, error: unknown) => {
+      const diag = describeMediaError(error)
+      console.error(
+        `[Aurora] playerror: code=${diag.code} (${diag.name}) msg="${diag.message}" src=${source.url.split("?")[0]} fmt=${source.format ?? "unknown"}`,
+      )
       this.emit("buffering", false)
-      this.emit("playerror", error)
+      this.emit("playerror", { ...diag, source: source.url.split("?")[0], format: source.format })
     })
 
     this.howl = howl
