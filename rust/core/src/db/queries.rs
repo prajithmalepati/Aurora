@@ -93,23 +93,29 @@ fn row_to_song(row: &rusqlite::Row, include_peaks: bool) -> rusqlite::Result<ser
         row.get(col::DURATION)?,
         row.get::<_, Option<String>>(col::FILE_PATH)?.as_deref(),
         row.get::<_, Option<String>>(col::FILE_FORMAT)?.as_deref(),
-        row.get::<_, Option<String>>(col::ALBUM_ART_PATH)?.as_deref(),
+        row.get::<_, Option<String>>(col::ALBUM_ART_PATH)?
+            .as_deref(),
         row.get::<_, String>(col::SOURCE)?.as_str(),
         row.get(col::BITRATE)?,
         row.get(col::SAMPLE_RATE)?,
         row.get(col::BIT_DEPTH)?,
         row.get(col::FILE_SIZE)?,
-        row.get::<_, Option<String>>(col::WAVEFORM_PEAKS)?.as_deref(),
-        row.get::<_, Option<String>>(col::DOMINANT_COLOR)?.as_deref(),
-        row.get::<_, Option<String>>(col::DOMINANT_COLOR_2)?.as_deref(),
+        row.get::<_, Option<String>>(col::WAVEFORM_PEAKS)?
+            .as_deref(),
+        row.get::<_, Option<String>>(col::DOMINANT_COLOR)?
+            .as_deref(),
+        row.get::<_, Option<String>>(col::DOMINANT_COLOR_2)?
+            .as_deref(),
         row.get(col::REPLAYGAIN_TRACK_GAIN)?,
         row.get(col::REPLAYGAIN_TRACK_PEAK)?,
         row.get(col::REPLAYGAIN_ALBUM_GAIN)?,
         row.get(col::REPLAYGAIN_ALBUM_PEAK)?,
         row.get::<_, Option<String>>(col::ARTISTS)?.as_deref(),
-        row.get::<_, Option<String>>(col::FEATURED_ARTISTS)?.as_deref(),
+        row.get::<_, Option<String>>(col::FEATURED_ARTISTS)?
+            .as_deref(),
         row.get::<_, Option<String>>(col::STREAM_URL)?.as_deref(),
-        row.get::<_, Option<String>>(col::STREAM_URL_EXPIRES_AT)?.as_deref(),
+        row.get::<_, Option<String>>(col::STREAM_URL_EXPIRES_AT)?
+            .as_deref(),
         row.get::<_, Option<String>>(col::ARTWORK_URL)?.as_deref(),
         row.get::<_, Option<String>>(col::TAGS)?.as_deref(),
         row.get::<_, Option<String>>(col::PLAYLISTS)?.as_deref(),
@@ -449,8 +455,7 @@ pub fn filter_songs(conn: &Connection, query: &str) -> Result<Vec<serde_json::Va
             })
         });
 
-        let tag_set =
-            filter::build_tag_set(tags_csv.as_deref(), playlists_csv.as_deref());
+        let tag_set = filter::build_tag_set(tags_csv.as_deref(), playlists_csv.as_deref());
 
         if filter::evaluate(&expr, &quoted_tags, &tag_set) {
             // Replace tags with sorted set (filter-specific behavior)
@@ -458,7 +463,12 @@ pub fn filter_songs(conn: &Connection, query: &str) -> Result<Vec<serde_json::Va
             sorted_tags.sort();
             song.as_object_mut().unwrap().insert(
                 "tags".into(),
-                serde_json::Value::Array(sorted_tags.into_iter().map(serde_json::Value::String).collect()),
+                serde_json::Value::Array(
+                    sorted_tags
+                        .into_iter()
+                        .map(serde_json::Value::String)
+                        .collect(),
+                ),
             );
             results.push(song);
         }
@@ -572,24 +582,31 @@ fn row_to_playlist_song(row: &rusqlite::Row) -> rusqlite::Result<serde_json::Val
         row.get::<_, Option<String>>(pl_col::ALBUM)?.as_deref(),
         row.get(pl_col::DURATION)?,
         row.get::<_, Option<String>>(pl_col::FILE_PATH)?.as_deref(),
-        row.get::<_, Option<String>>(pl_col::FILE_FORMAT)?.as_deref(),
-        row.get::<_, Option<String>>(pl_col::ALBUM_ART_PATH)?.as_deref(),
+        row.get::<_, Option<String>>(pl_col::FILE_FORMAT)?
+            .as_deref(),
+        row.get::<_, Option<String>>(pl_col::ALBUM_ART_PATH)?
+            .as_deref(),
         row.get::<_, String>(pl_col::SOURCE)?.as_str(),
         row.get(pl_col::BITRATE)?,
         row.get(pl_col::SAMPLE_RATE)?,
         row.get(pl_col::BIT_DEPTH)?,
         row.get(pl_col::FILE_SIZE)?,
-        row.get::<_, Option<String>>(pl_col::DOMINANT_COLOR)?.as_deref(),
-        row.get::<_, Option<String>>(pl_col::DOMINANT_COLOR_2)?.as_deref(),
+        row.get::<_, Option<String>>(pl_col::DOMINANT_COLOR)?
+            .as_deref(),
+        row.get::<_, Option<String>>(pl_col::DOMINANT_COLOR_2)?
+            .as_deref(),
         row.get(pl_col::REPLAYGAIN_TRACK_GAIN)?,
         row.get(pl_col::REPLAYGAIN_TRACK_PEAK)?,
         row.get(pl_col::REPLAYGAIN_ALBUM_GAIN)?,
         row.get(pl_col::REPLAYGAIN_ALBUM_PEAK)?,
         row.get::<_, Option<String>>(pl_col::ARTISTS)?.as_deref(),
-        row.get::<_, Option<String>>(pl_col::FEATURED_ARTISTS)?.as_deref(),
+        row.get::<_, Option<String>>(pl_col::FEATURED_ARTISTS)?
+            .as_deref(),
         row.get::<_, Option<String>>(pl_col::STREAM_URL)?.as_deref(),
-        row.get::<_, Option<String>>(pl_col::STREAM_URL_EXPIRES_AT)?.as_deref(),
-        row.get::<_, Option<String>>(pl_col::ARTWORK_URL)?.as_deref(),
+        row.get::<_, Option<String>>(pl_col::STREAM_URL_EXPIRES_AT)?
+            .as_deref(),
+        row.get::<_, Option<String>>(pl_col::ARTWORK_URL)?
+            .as_deref(),
         row.get::<_, Option<String>>(pl_col::TAGS)?.as_deref(),
         row.get(pl_col::START_TIME_MS)?,
         row.get(pl_col::END_TIME_MS)?,
@@ -662,7 +679,9 @@ pub fn get_playlist(conn: &Connection, playlist_id: i64) -> Result<Option<serde_
     };
 
     // Fetch songs
-    let sql = format!("{PLAYLIST_SONG_SELECT} WHERE ps.playlist_id = ?1 GROUP BY s.id ORDER BY ps.position ASC");
+    let sql = format!(
+        "{PLAYLIST_SONG_SELECT} WHERE ps.playlist_id = ?1 GROUP BY s.id ORDER BY ps.position ASC"
+    );
     let mut stmt = conn.prepare(&sql)?;
     let song_rows = stmt.query_map([playlist_id], row_to_playlist_song)?;
     let mut songs = Vec::new();
@@ -755,7 +774,11 @@ pub fn update_playlist(
     }
     if let Some(v) = emoji {
         sets.push(format!("emoji = ?{idx}"));
-        params.push(Box::new(if v.is_empty() { None::<String> } else { Some(v.to_string()) }));
+        params.push(Box::new(if v.is_empty() {
+            None::<String>
+        } else {
+            Some(v.to_string())
+        }));
         idx += 1;
     }
     if let Some(ce) = crossfade_enabled {
@@ -789,11 +812,7 @@ pub fn delete_playlist(conn: &Connection, playlist_id: i64) -> Result<bool> {
 
 /// Add a song to a playlist.
 /// Returns Ok(new_position), Err("playlist_not_found"), Err("song_not_found"), or Err("duplicate").
-pub fn add_song_to_playlist(
-    conn: &Connection,
-    playlist_id: i64,
-    song_id: i64,
-) -> Result<i64> {
+pub fn add_song_to_playlist(conn: &Connection, playlist_id: i64, song_id: i64) -> Result<i64> {
     // Check playlist exists
     let pl_exists: bool = conn.query_row(
         "SELECT COUNT(*) FROM playlists WHERE id = ?1",
@@ -804,11 +823,10 @@ pub fn add_song_to_playlist(
         return Err(anyhow::anyhow!("playlist_not_found"));
     }
     // Check song exists
-    let song_exists: bool = conn.query_row(
-        "SELECT COUNT(*) FROM songs WHERE id = ?1",
-        [song_id],
-        |r| r.get::<_, i64>(0),
-    )? > 0;
+    let song_exists: bool =
+        conn.query_row("SELECT COUNT(*) FROM songs WHERE id = ?1", [song_id], |r| {
+            r.get::<_, i64>(0)
+        })? > 0;
     if !song_exists {
         return Err(anyhow::anyhow!("song_not_found"));
     }
@@ -839,11 +857,7 @@ pub fn add_song_to_playlist(
 
 /// Remove a song from a playlist and recompact positions.
 /// Returns Ok(()), Err("playlist_not_found"), Err("song_not_found"), or Err("not_in_playlist").
-pub fn remove_song_from_playlist(
-    conn: &Connection,
-    playlist_id: i64,
-    song_id: i64,
-) -> Result<()> {
+pub fn remove_song_from_playlist(conn: &Connection, playlist_id: i64, song_id: i64) -> Result<()> {
     // Check playlist
     let pl_exists: bool = conn.query_row(
         "SELECT COUNT(*) FROM playlists WHERE id = ?1",
@@ -854,22 +868,22 @@ pub fn remove_song_from_playlist(
         return Err(anyhow::anyhow!("playlist_not_found"));
     }
     // Check song
-    let song_exists: bool = conn.query_row(
-        "SELECT COUNT(*) FROM songs WHERE id = ?1",
-        [song_id],
-        |r| r.get::<_, i64>(0),
-    )? > 0;
+    let song_exists: bool =
+        conn.query_row("SELECT COUNT(*) FROM songs WHERE id = ?1", [song_id], |r| {
+            r.get::<_, i64>(0)
+        })? > 0;
     if !song_exists {
         return Err(anyhow::anyhow!("song_not_found"));
     }
     // Get position
-    let position: Option<i64> = conn.query_row(
-        "SELECT position FROM playlist_songs WHERE playlist_id = ?1 AND song_id = ?2",
-        rusqlite::params![playlist_id, song_id],
-        |r| r.get(0),
-    )
-    .optional()?
-    .flatten();
+    let position: Option<i64> = conn
+        .query_row(
+            "SELECT position FROM playlist_songs WHERE playlist_id = ?1 AND song_id = ?2",
+            rusqlite::params![playlist_id, song_id],
+            |r| r.get(0),
+        )
+        .optional()?
+        .flatten();
     let position = match position {
         Some(p) => p,
         None => return Err(anyhow::anyhow!("not_in_playlist")),
@@ -888,11 +902,7 @@ pub fn remove_song_from_playlist(
 
 /// Reorder songs in a playlist.
 /// Returns Ok(()), Err("playlist_not_found"), or Err("id_mismatch").
-pub fn reorder_playlist_songs(
-    conn: &Connection,
-    playlist_id: i64,
-    song_ids: &[i64],
-) -> Result<()> {
+pub fn reorder_playlist_songs(conn: &Connection, playlist_id: i64, song_ids: &[i64]) -> Result<()> {
     // Check playlist
     let pl_exists: bool = conn.query_row(
         "SELECT COUNT(*) FROM playlists WHERE id = ?1",
@@ -903,10 +913,11 @@ pub fn reorder_playlist_songs(
         return Err(anyhow::anyhow!("playlist_not_found"));
     }
     // Get current song ids
-    let mut stmt = conn.prepare(
-        "SELECT song_id FROM playlist_songs WHERE playlist_id = ?1 ORDER BY position",
-    )?;
-    let current: Vec<i64> = stmt.query_map([playlist_id], |r| r.get(0))?.collect::<std::result::Result<Vec<_>, _>>()?;
+    let mut stmt = conn
+        .prepare("SELECT song_id FROM playlist_songs WHERE playlist_id = ?1 ORDER BY position")?;
+    let current: Vec<i64> = stmt
+        .query_map([playlist_id], |r| r.get(0))?
+        .collect::<std::result::Result<Vec<_>, _>>()?;
 
     let current_set: std::collections::HashSet<i64> = current.iter().copied().collect();
     let new_set: std::collections::HashSet<i64> = song_ids.iter().copied().collect();
@@ -948,11 +959,10 @@ pub fn update_song_timing(
     // Clamp end_time_ms to duration
     let mut final_end = end_time_ms;
     if final_end > 0 {
-        let duration: Option<i64> = conn.query_row(
-            "SELECT duration FROM songs WHERE id = ?1",
-            [song_id],
-            |r| r.get(0),
-        )?;
+        let duration: Option<i64> =
+            conn.query_row("SELECT duration FROM songs WHERE id = ?1", [song_id], |r| {
+                r.get(0)
+            })?;
         if let Some(dur) = duration {
             let max_ms = dur * 1000;
             if final_end > max_ms {
@@ -984,7 +994,10 @@ pub fn update_playlist_image(
 }
 
 /// Get playlist info for image operations.
-pub fn get_playlist_image_info(conn: &Connection, playlist_id: i64) -> Result<Option<Option<String>>> {
+pub fn get_playlist_image_info(
+    conn: &Connection,
+    playlist_id: i64,
+) -> Result<Option<Option<String>>> {
     // Returns Some(Some(image_url)) if playlist exists and has image,
     // Some(None) if playlist exists but no image, None if playlist not found.
     let mut stmt = conn.prepare("SELECT image_url FROM playlists WHERE id = ?1")?;
@@ -996,7 +1009,10 @@ pub fn get_playlist_image_info(conn: &Connection, playlist_id: i64) -> Result<Op
 }
 
 /// Get playlist metadata for export.
-pub fn get_playlist_for_export(conn: &Connection, playlist_id: i64) -> Result<Option<(serde_json::Value, Vec<serde_json::Value>)>> {
+pub fn get_playlist_for_export(
+    conn: &Connection,
+    playlist_id: i64,
+) -> Result<Option<(serde_json::Value, Vec<serde_json::Value>)>> {
     let meta = conn.query_row(
         "SELECT id, name, color, emoji, crossfade_enabled, crossfade_duration_s FROM playlists WHERE id = ?1",
         [playlist_id],
@@ -1017,7 +1033,9 @@ pub fn get_playlist_for_export(conn: &Connection, playlist_id: i64) -> Result<Op
     };
 
     // Fetch songs
-    let sql = format!("{PLAYLIST_SONG_SELECT} WHERE ps.playlist_id = ?1 GROUP BY s.id ORDER BY ps.position ASC");
+    let sql = format!(
+        "{PLAYLIST_SONG_SELECT} WHERE ps.playlist_id = ?1 GROUP BY s.id ORDER BY ps.position ASC"
+    );
     let mut stmt = conn.prepare(&sql)?;
     let song_rows = stmt.query_map([playlist_id], |row| {
         // For export, we need a simplified song shape
@@ -1059,10 +1077,14 @@ pub fn import_playlist(
     file_paths: &[String],
 ) -> Result<(i64, String, usize, Vec<String>)> {
     // Build path → song_id lookup
-    let mut stmt = conn.prepare("SELECT id, file_path FROM songs WHERE file_path IS NOT NULL AND file_path != ''")?;
-    let db_rows: Vec<(i64, String)> = stmt.query_map([], |row| {
-        Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
-    })?.collect::<std::result::Result<Vec<_>, _>>()?;
+    let mut stmt = conn.prepare(
+        "SELECT id, file_path FROM songs WHERE file_path IS NOT NULL AND file_path != ''",
+    )?;
+    let db_rows: Vec<(i64, String)> = stmt
+        .query_map([], |row| {
+            Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+        })?
+        .collect::<std::result::Result<Vec<_>, _>>()?;
 
     let mut path_to_id: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
     for (id, fp) in &db_rows {
@@ -1109,7 +1131,10 @@ pub fn import_playlist(
 
     // Deduplicate preserving order
     let mut seen = std::collections::HashSet::new();
-    let unique_ids: Vec<i64> = matched_ids.into_iter().filter(|id| seen.insert(*id)).collect();
+    let unique_ids: Vec<i64> = matched_ids
+        .into_iter()
+        .filter(|id| seen.insert(*id))
+        .collect();
 
     // Handle name collision
     let mut final_name = name.trim().to_string();
@@ -1148,11 +1173,12 @@ pub fn import_playlist(
 }
 
 /// Get the playlist id + image_url for a given playlist.
-pub fn get_playlist_image_url(conn: &Connection, playlist_id: i64) -> Result<Option<(Option<String>,)>> {
+pub fn get_playlist_image_url(
+    conn: &Connection,
+    playlist_id: i64,
+) -> Result<Option<(Option<String>,)>> {
     let mut stmt = conn.prepare("SELECT image_url FROM playlists WHERE id = ?1")?;
-    let mut rows = stmt.query_map([playlist_id], |row| {
-        Ok((row.get::<_, Option<String>>(0)?,))
-    })?;
+    let mut rows = stmt.query_map([playlist_id], |row| Ok((row.get::<_, Option<String>>(0)?,)))?;
     match rows.next() {
         Some(r) => Ok(Some(r?)),
         None => Ok(None),
@@ -1217,9 +1243,8 @@ fn build_folder_json(
 /// Returns `(tree_array_value, total_folders, total_songs)`.
 /// Songs with `file_path = NULL` are excluded.
 pub fn list_folder_tree(conn: &Connection) -> Result<(serde_json::Value, i64, i64)> {
-    let mut stmt = conn.prepare(
-        "SELECT file_path FROM songs WHERE file_path IS NOT NULL AND file_path != ''",
-    )?;
+    let mut stmt = conn
+        .prepare("SELECT file_path FROM songs WHERE file_path IS NOT NULL AND file_path != ''")?;
     let rows: Vec<String> = stmt
         .query_map([], |row| row.get::<_, String>(0))?
         .collect::<std::result::Result<Vec<_>, _>>()?;
@@ -1227,7 +1252,7 @@ pub fn list_folder_tree(conn: &Connection) -> Result<(serde_json::Value, i64, i6
     // Count songs per directory
     let mut dir_counts: std::collections::BTreeMap<String, i64> = std::collections::BTreeMap::new();
     for fp in &rows {
-        let fp = fp.replace('\\', "/");
+        let fp = crate::paths::normalize_path(fp);
         if let Some(parent) = std::path::Path::new(&fp).parent() {
             let dir = parent.to_string_lossy().to_string();
             if !dir.is_empty() {
@@ -1280,7 +1305,11 @@ pub fn list_folder_tree(conn: &Connection) -> Result<(serde_json::Value, i64, i6
     let total_folders = all_paths.len() as i64;
     let total_songs: i64 = dir_counts.values().sum();
 
-    Ok((serde_json::Value::Array(folders), total_folders, total_songs))
+    Ok((
+        serde_json::Value::Array(folders),
+        total_folders,
+        total_songs,
+    ))
 }
 
 /// List songs within a specific folder path.
@@ -1297,9 +1326,7 @@ pub fn list_folder_songs(
     let normalized_path = path.trim_end_matches('/');
 
     // Escape % and _ in the path for LIKE patterns (backslash escape)
-    let escaped_path = normalized_path
-        .replace('%', "\\%")
-        .replace('_', "\\_");
+    let escaped_path = normalized_path.replace('%', "\\%").replace('_', "\\_");
     let like_pattern = format!("{}/%", escaped_path);
 
     // Normalize column: convert backslash to '/', ensure leading '/'
@@ -1309,7 +1336,10 @@ pub fn list_folder_songs(
     // Count
     let total: i64 = if recursive {
         conn.query_row(
-            &format!("SELECT COUNT(*) FROM songs s WHERE {} LIKE ?1 ESCAPE '\\'", norm_col),
+            &format!(
+                "SELECT COUNT(*) FROM songs s WHERE {} LIKE ?1 ESCAPE '\\'",
+                norm_col
+            ),
             rusqlite::params![like_pattern],
             |row| row.get(0),
         )?
@@ -1343,9 +1373,9 @@ pub fn list_folder_songs(
         let rows = stmt.query_map(
             rusqlite::params![like_pattern, deeper_pattern, limit, offset],
             |row| row_to_song(row, false),
- )?;
- rows.collect::<std::result::Result<Vec<_>, _>>()?
- };
+        )?;
+        rows.collect::<std::result::Result<Vec<_>, _>>()?
+    };
 
     Ok((songs, total))
 }
@@ -1455,7 +1485,10 @@ pub fn chrono_now_z() -> String {
     let m = if mp < 10 { mp + 3 } else { mp - 9 };
     let y = if m <= 2 { y + 1 } else { y };
 
-    format!("{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z", y, m, d, hours, minutes, seconds)
+    format!(
+        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
+        y, m, d, hours, minutes, seconds
+    )
 }
 
 // ── Addon queries ────────────────────────────────────────────────────────
@@ -1520,7 +1553,10 @@ pub fn get_addon(conn: &Connection, addon_id: &str) -> Result<Option<serde_json:
 }
 
 /// Get a single addon by base_url (for duplicate checking).
-pub fn get_addon_by_base_url(conn: &Connection, base_url: &str) -> Result<Option<serde_json::Value>> {
+pub fn get_addon_by_base_url(
+    conn: &Connection,
+    base_url: &str,
+) -> Result<Option<serde_json::Value>> {
     let mut stmt = conn.prepare(
         "SELECT id, base_url, name, version, enabled, fail_count, last_ok_at, last_fail_at \
          FROM addons WHERE base_url = ?1",
@@ -1533,7 +1569,10 @@ pub fn get_addon_by_base_url(conn: &Connection, base_url: &str) -> Result<Option
 }
 
 /// Get full addon row (including manifest_json) for proxy operations.
-pub fn get_addon_full(conn: &Connection, addon_id: &str) -> Result<Option<(serde_json::Value, String)>> {
+pub fn get_addon_full(
+    conn: &Connection,
+    addon_id: &str,
+) -> Result<Option<(serde_json::Value, String)>> {
     let mut stmt = conn.prepare(
         "SELECT id, base_url, name, version, enabled, fail_count, last_ok_at, last_fail_at, manifest_json \
          FROM addons WHERE id = ?1",
@@ -1612,39 +1651,53 @@ pub fn save_addon_track(
     }
 
     // Default expiry: 1 hour from now if not provided
-    let expires_at = stream_url_expires_at.map(|s| s.to_string()).unwrap_or_else(|| {
-        // Parse stream_url_expires_at or use now + 3600s
-        // For simplicity, compute from now
-        let ts = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs()
-            + 3600;
-        let days = (ts / 86400) as i64;
-        let time_of_day = ts % 86400;
-        let hours = time_of_day / 3600;
-        let minutes = (time_of_day % 3600) / 60;
-        let seconds = time_of_day % 60;
-        let z = days + 719468;
-        let era = if z >= 0 { z } else { z - 146096 } / 146097;
-        let doe = (z - era * 146097) as u32;
-        let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
-        let y = yoe as i64 + era * 400;
-        let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-        let mp = (5 * doy + 2) / 153;
-        let d = doy - (153 * mp + 2) / 5 + 1;
-        let m = if mp < 10 { mp + 3 } else { mp - 9 };
-        let y = if m <= 2 { y + 1 } else { y };
-        format!("{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z", y, m, d, hours, minutes, seconds)
-    });
+    let expires_at = stream_url_expires_at
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| {
+            // Parse stream_url_expires_at or use now + 3600s
+            // For simplicity, compute from now
+            let ts = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs()
+                + 3600;
+            let days = (ts / 86400) as i64;
+            let time_of_day = ts % 86400;
+            let hours = time_of_day / 3600;
+            let minutes = (time_of_day % 3600) / 60;
+            let seconds = time_of_day % 60;
+            let z = days + 719468;
+            let era = if z >= 0 { z } else { z - 146096 } / 146097;
+            let doe = (z - era * 146097) as u32;
+            let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+            let y = yoe as i64 + era * 400;
+            let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+            let mp = (5 * doy + 2) / 153;
+            let d = doy - (153 * mp + 2) / 5 + 1;
+            let m = if mp < 10 { mp + 3 } else { mp - 9 };
+            let y = if m <= 2 { y + 1 } else { y };
+            format!(
+                "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
+                y, m, d, hours, minutes, seconds
+            )
+        });
 
     conn.execute(
         "INSERT INTO songs (title, artist, album, duration, source, external_id, \
          stream_url, stream_url_expires_at, artwork_url, created_at, updated_at) \
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
         rusqlite::params![
-            title, artist, album, duration, source, external_id,
-            stream_url, expires_at, artwork_url, now, now
+            title,
+            artist,
+            album,
+            duration,
+            source,
+            external_id,
+            stream_url,
+            expires_at,
+            artwork_url,
+            now,
+            now
         ],
     )?;
     Ok(conn.last_insert_rowid())
@@ -1656,7 +1709,15 @@ pub fn save_addon_track(
 pub fn get_song_resolve_info(
     conn: &Connection,
     song_id: i64,
-) -> Result<Option<(Option<String>, Option<String>, Option<String>, String, Option<String>)>> {
+) -> Result<
+    Option<(
+        Option<String>,
+        Option<String>,
+        Option<String>,
+        String,
+        Option<String>,
+    )>,
+> {
     let mut stmt = conn.prepare(
         "SELECT file_path, stream_url, stream_url_expires_at, source, external_id \
          FROM songs WHERE id = ?1",
@@ -1714,10 +1775,7 @@ pub fn list_watched_folders(conn: &Connection) -> Result<Vec<serde_json::Value>>
 }
 
 /// Get a watched folder by path. Returns (id, is_active) or None.
-pub fn get_watched_folder_by_path(
-    conn: &Connection,
-    path: &str,
-) -> Result<Option<(i64, bool)>> {
+pub fn get_watched_folder_by_path(conn: &Connection, path: &str) -> Result<Option<(i64, bool)>> {
     conn.query_row(
         "SELECT id, is_active FROM watched_folders WHERE folder_path = ?1",
         [path],
@@ -1785,13 +1843,151 @@ pub fn update_watched_folder_last_scan(conn: &Connection, folder_id: i64) -> Res
 /// List active watched folders for the background watcher.
 /// Returns (id, folder_path) pairs.
 pub fn list_active_watched_folders(conn: &Connection) -> Result<Vec<(i64, String)>> {
-    let mut stmt = conn.prepare_cached(
-        "SELECT id, folder_path FROM watched_folders WHERE is_active = 1",
-    )?;
-    let rows = stmt.query_map([], |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)))?;
+    let mut stmt =
+        conn.prepare_cached("SELECT id, folder_path FROM watched_folders WHERE is_active = 1")?;
+    let rows = stmt.query_map([], |row| {
+        Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+    })?;
     let mut data = Vec::new();
     for r in rows {
         data.push(r?);
     }
     Ok(data)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Helper: open an in-memory DB with the songs table.
+    fn test_db() -> rusqlite::Connection {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS songs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                artist TEXT NOT NULL DEFAULT '',
+                file_path TEXT UNIQUE,
+                source TEXT NOT NULL DEFAULT 'manual',
+                created_at TEXT NOT NULL DEFAULT '',
+                updated_at TEXT NOT NULL DEFAULT ''
+            );",
+        )
+        .unwrap();
+        conn
+    }
+
+    fn insert_song(conn: &rusqlite::Connection, id: i64, file_path: &str) {
+        conn.execute(
+            "INSERT INTO songs (id, title, artist, file_path, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, '', '')",
+            rusqlite::params![id, format!("Song {}", id), "Test", file_path],
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn test_folder_tree_unix_paths() {
+        let conn = test_db();
+        insert_song(&conn, 1, "/music/rock/song1.mp3");
+        insert_song(&conn, 2, "/music/rock/song2.mp3");
+        insert_song(&conn, 3, "/music/anime/song3.mp3");
+
+        let (tree, _total_folders, total_songs) = list_folder_tree(&conn).unwrap();
+        assert_eq!(total_songs, 3);
+        let arr = tree.as_array().unwrap();
+        // Single root: /music
+        assert_eq!(arr.len(), 1);
+        assert_eq!(arr[0]["name"], "music");
+        assert_eq!(arr[0]["path"], "/music");
+        // Two children: anime, rock
+        let subs = arr[0]["subfolders"].as_array().unwrap();
+        assert_eq!(subs.len(), 2);
+    }
+
+    #[test]
+    fn test_folder_tree_windows_backslash_paths() {
+        let conn = test_db();
+        // Simulate paths stored with backslashes (old Python scanner format)
+        insert_song(&conn, 1, r"D:\music\rock\song1.mp3");
+        insert_song(&conn, 2, r"D:\music\anime\song2.mp3");
+
+        let (tree, _, total_songs) = list_folder_tree(&conn).unwrap();
+        assert_eq!(total_songs, 2);
+        let arr = tree.as_array().unwrap();
+        // Should create a D: root
+        assert_eq!(arr.len(), 1);
+        assert_eq!(arr[0]["name"], "D:");
+        assert_eq!(arr[0]["path"], "/D:");
+        let subs = arr[0]["subfolders"].as_array().unwrap();
+        assert_eq!(subs.len(), 1);
+        assert_eq!(subs[0]["name"], "music");
+    }
+
+    #[test]
+    fn test_folder_tree_windows_verbatim_prefix_stripped() {
+        let conn = test_db();
+        // Simulate paths stored with \\?\ prefix (Rust canonicalize on Windows)
+        insert_song(&conn, 1, r"\\?\D:\Music\OP\song1.mp3");
+        insert_song(&conn, 2, r"\\?\D:\Music\Rock\song2.mp3");
+
+        let (tree, _, total_songs) = list_folder_tree(&conn).unwrap();
+        assert_eq!(total_songs, 2);
+        let arr = tree.as_array().unwrap();
+        // After stripping \\?\, paths become D:/Music/...
+        // So root should be D: (not ? or \\)
+        assert_eq!(arr.len(), 1);
+        assert_eq!(arr[0]["name"], "D:");
+        assert_eq!(arr[0]["path"], "/D:");
+        let subs = arr[0]["subfolders"].as_array().unwrap();
+        assert_eq!(subs.len(), 1);
+        assert_eq!(subs[0]["name"], "Music");
+    }
+
+    #[test]
+    fn test_folder_tree_no_question_mark_root() {
+        let conn = test_db();
+        // This is the exact pattern from the bug report: \\?\D:\Music\OP
+        insert_song(&conn, 1, r"\\?\D:\Music\OP\song1.mp3");
+
+        let (tree, _, _) = list_folder_tree(&conn).unwrap();
+        let arr = tree.as_array().unwrap();
+        // Verify no root named "?" or empty string
+        for root in arr {
+            let name = root["name"].as_str().unwrap();
+            assert_ne!(name, "?", "Should not have a '?' root");
+            assert_ne!(name, "", "Should not have an empty root");
+        }
+    }
+
+    #[test]
+    fn test_folder_tree_mixed_path_formats() {
+        let conn = test_db();
+        // Mix of old (no drive letter) and new (with drive letter) paths
+        insert_song(&conn, 1, "/music/rock/song1.mp3");
+        insert_song(&conn, 2, r"D:\Music\OP\song2.mp3");
+
+        let (tree, _, total_songs) = list_folder_tree(&conn).unwrap();
+        assert_eq!(total_songs, 2);
+        let arr = tree.as_array().unwrap();
+        // Should have two roots: /music and D:
+        assert_eq!(arr.len(), 2);
+        let names: Vec<&str> = arr.iter().map(|r| r["name"].as_str().unwrap()).collect();
+        assert!(names.contains(&"music"));
+        assert!(names.contains(&"D:"));
+    }
+
+    #[test]
+    fn test_folder_tree_windows_forward_slash() {
+        let conn = test_db();
+        // Paths already normalized to forward slashes (with drive letter)
+        insert_song(&conn, 1, "D:/Music/OP/song1.mp3");
+        insert_song(&conn, 2, "D:/Music/Rock/song2.mp3");
+
+        let (tree, _, total_songs) = list_folder_tree(&conn).unwrap();
+        assert_eq!(total_songs, 2);
+        let arr = tree.as_array().unwrap();
+        assert_eq!(arr.len(), 1);
+        assert_eq!(arr[0]["name"], "D:");
+        assert_eq!(arr[0]["path"], "/D:");
+    }
 }

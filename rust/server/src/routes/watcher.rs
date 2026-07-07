@@ -5,16 +5,16 @@
 //! DELETE /watch/{id} — remove watched folder.
 //! POST /watch/{id}/scan — trigger scan of watched folder.
 
+use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use axum::Json;
 use serde::Deserialize;
 use serde_json::Value;
 use std::sync::Arc;
 
-use crate::AppState;
 use super::envelope;
+use crate::AppState;
 
 #[derive(Deserialize)]
 pub struct WatchFolderRequest {
@@ -41,13 +41,15 @@ async fn signal_reconfigure(state: &AppState) {
 }
 
 /// GET /api/watch — list all watched folders.
-pub async fn list_watched_folders(
-    State(state): State<Arc<AppState>>,
-) -> Response {
+pub async fn list_watched_folders(State(state): State<Arc<AppState>>) -> Response {
     let conn = state.conn.lock().await;
     match aurora_core::db::queries::list_watched_folders(&conn) {
         Ok(data) => envelope::ok(Value::Array(data), "ok").into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"detail": e.to_string()}))).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"detail": e.to_string()})),
+        )
+            .into_response(),
     }
 }
 
@@ -59,14 +61,16 @@ pub async fn add_watched_folder(
     let folder_path = std::path::Path::new(&req.path).canonicalize();
     let folder_path = match folder_path {
         Ok(p) => p,
-        Err(_) => return envelope::not_found("Path does not exist or is not a directory").into_response(),
+        Err(_) => {
+            return envelope::not_found("Path does not exist or is not a directory").into_response();
+        }
     };
 
     if !folder_path.is_dir() {
         return envelope::not_found("Path does not exist or is not a directory").into_response();
     }
 
-    let path_str = folder_path.to_string_lossy().to_string();
+    let path_str = aurora_core::paths::strip_verbatim_prefix(&folder_path.to_string_lossy());
     let conn = state.conn.lock().await;
 
     let existing = aurora_core::db::queries::get_watched_folder_by_path(&conn, &path_str);
@@ -76,28 +80,40 @@ pub async fn add_watched_folder(
             if !is_active {
                 let _ = aurora_core::db::queries::reactivate_watched_folder(&conn, id);
             }
-            let message = if is_active { "Folder already watched" } else { "Folder reactivated" };
+            let message = if is_active {
+                "Folder already watched"
+            } else {
+                "Folder reactivated"
+            };
             drop(conn);
             signal_reconfigure(&state).await;
             envelope::ok(
                 serde_json::json!({"id": id, "folder_path": path_str, "is_active": true}),
                 message,
-            ).into_response()
+            )
+            .into_response()
         }
-        Ok(None) => {
-            match aurora_core::db::queries::insert_watched_folder(&conn, &path_str) {
-                Ok(id) => {
-                    drop(conn);
-                    signal_reconfigure(&state).await;
-                    envelope::ok(
-                        serde_json::json!({"id": id, "folder_path": path_str, "is_active": true}),
-                        "ok",
-                    ).into_response()
-                }
-                Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"detail": e.to_string()}))).into_response(),
+        Ok(None) => match aurora_core::db::queries::insert_watched_folder(&conn, &path_str) {
+            Ok(id) => {
+                drop(conn);
+                signal_reconfigure(&state).await;
+                envelope::ok(
+                    serde_json::json!({"id": id, "folder_path": path_str, "is_active": true}),
+                    "ok",
+                )
+                .into_response()
             }
-        }
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"detail": e.to_string()}))).into_response(),
+            Err(e) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"detail": e.to_string()})),
+            )
+                .into_response(),
+        },
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"detail": e.to_string()})),
+        )
+            .into_response(),
     }
 }
 
@@ -110,7 +126,13 @@ pub async fn remove_watched_folder(
     match aurora_core::db::queries::watched_folder_exists(&conn, folder_id) {
         Ok(true) => {}
         Ok(false) => return envelope::not_found("Watched folder not found").into_response(),
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"detail": e.to_string()}))).into_response(),
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"detail": e.to_string()})),
+            )
+                .into_response();
+        }
     }
 
     let _ = aurora_core::db::queries::delete_watched_folder(&conn, folder_id);
@@ -134,7 +156,13 @@ pub async fn trigger_scan(
         match aurora_core::db::queries::get_watched_folder_path(&conn, folder_id) {
             Ok(Some(p)) => p,
             Ok(None) => return envelope::not_found("Watched folder not found").into_response(),
-            Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"detail": e.to_string()}))).into_response(),
+            Err(e) => {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({"detail": e.to_string()})),
+                )
+                    .into_response();
+            }
         }
     };
     // Lock released — other routes can proceed
@@ -154,8 +182,14 @@ pub async fn trigger_scan(
             );
             let _ = aurora_core::db::queries::update_watched_folder_last_scan(&conn, folder_id);
             return match result {
-                Ok(scan_result) => envelope::ok(build_scan_response(scan_result), "ok").into_response(),
-                Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"detail": e.to_string()}))).into_response(),
+                Ok(scan_result) => {
+                    envelope::ok(build_scan_response(scan_result), "ok").into_response()
+                }
+                Err(e) => (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({"detail": e.to_string()})),
+                )
+                    .into_response(),
             };
         }
     };
@@ -163,13 +197,7 @@ pub async fn trigger_scan(
     // Scan using dedicated connection on blocking thread (AppState.conn NOT held)
     let scan_result = tokio::task::spawn_blocking(move || {
         let conn = aurora_core::db::open_and_migrate(&db_path)?;
-        aurora_core::scanner::db::import_scanned_songs(
-            &conn,
-            &folder_path,
-            None,
-            None,
-            None,
-        )
+        aurora_core::scanner::db::import_scanned_songs(&conn, &folder_path, None, None, None)
     })
     .await;
 
@@ -181,7 +209,15 @@ pub async fn trigger_scan(
 
     match scan_result {
         Ok(Ok(result)) => envelope::ok(build_scan_response(result), "ok").into_response(),
-        Ok(Err(e)) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"detail": e.to_string()}))).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"detail": e.to_string()}))).into_response(),
+        Ok(Err(e)) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"detail": e.to_string()})),
+        )
+            .into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"detail": e.to_string()})),
+        )
+            .into_response(),
     }
 }
