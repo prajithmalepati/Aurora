@@ -8,6 +8,7 @@ interface SettingsState {
   crossfadeCurve: CrossfadeCurve
   replaygainMode: "off" | "track" | "album"
   respectTrims: boolean
+  continuePlayback: boolean
   zoomLevel: number
 
   setCrossfadeEnabled: (enabled: boolean) => void
@@ -15,6 +16,7 @@ interface SettingsState {
   setCrossfadeCurve: (curve: CrossfadeCurve) => void
   setReplaygainMode: (mode: "off" | "track" | "album") => void
   setRespectTrims: (respect: boolean) => void
+  setContinuePlayback: (continuePlayback: boolean) => void
   setZoomLevel: (level: number) => void
   zoomIn: () => void
   zoomOut: () => void
@@ -56,6 +58,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   })(),
   replaygainMode: load<"off" | "track" | "album">("aurora-rg-mode", "track"),
   respectTrims: load("aurora-respect-trims", true),
+  continuePlayback: load("aurora-continue-playback", true),
 
   setCrossfadeEnabled: (enabled) => {
     localStorage.setItem("aurora-xfade-enabled", JSON.stringify(enabled))
@@ -81,6 +84,11 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   setRespectTrims: (respect) => {
     localStorage.setItem("aurora-respect-trims", JSON.stringify(respect))
     set({ respectTrims: respect })
+  },
+
+  setContinuePlayback: (v) => {
+    localStorage.setItem("aurora-continue-playback", JSON.stringify(v))
+    set({ continuePlayback: v })
   },
 
   zoomLevel: snapZoom(load("aurora-zoom", 100)),

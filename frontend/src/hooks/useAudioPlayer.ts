@@ -9,6 +9,7 @@ import { getBaseUrl, withToken, api } from "@/lib/api"
 import { createPlaybackEngine, unlockAudioOutput } from "@/lib/engines/howlerEngine"
 import { buildPlaybackErrorHint } from "@/lib/playbackErrorHints"
 import type { PlaybackEngine, PlaybackSource } from "@/types/playback"
+import type { Song } from "@/types"
 
 /** Build the PlaybackSource for a library song. URL resolution lives here —
  *  engines receive a fully resolved URL and never construct API paths. */
@@ -22,6 +23,24 @@ function streamSource(
     url: withToken(`${getBaseUrl()}/api/songs/${songId}/stream`),
     format: ext,
     gapless,
+  }
+}
+
+/** Fetch random songs from the library for queue-end continuation.
+ *  Excludes songs already in the queue to avoid duplicates. */
+async function fetchContinuationSongs(excludeIds: number[]): Promise<Song[]> {
+  try {
+    // Fetch total count first to compute a random offset
+    const countRes = await api.get<{ meta: { total: number } }>("/songs?limit=1")
+    const total = countRes.meta?.total ?? 0
+    if (total <= 20) return []
+    const maxOffset = Math.max(0, total - 20)
+    const offset = Math.floor(Math.random() * maxOffset)
+    const res = await api.get<{ data: Song[] }>(`/songs?limit=20&offset=${offset}`)
+    const songs = (res.data ?? []).filter(s => isPlayable(s) && !excludeIds.includes(s.id))
+    return songs.slice(0, 10)
+  } catch {
+    return []
   }
 }
 
@@ -43,6 +62,8 @@ export function useAudioPlayer() {
   const preloadReadyRef = useRef<boolean>(false)
   const intervalRef = useRef<number | null>(null)
   const xfadeIntervalRef = useRef<number | null>(null) // equal-power crossfade interval
+  // Cleanup timeout for tick-path crossfade old-engine stop/unload (overlap/linear/lagged)
+  const tickFadeCleanupRef = useRef<number | null>(null)
   const currentSongRef = useRef<string | null>(null)
   const seekingRef = useRef(false)
   // Collects all engines from rapid transitions that need cleanup
@@ -164,16 +185,124 @@ export function useAudioPlayer() {
 
           // Crossfade early trigger — fires at crossfadeDuration seconds
           // before the EFFECTIVE end (trim-out if set, else file end).
-          // Skipped on repeat-one: the song must loop via the end handler.
-          const { enabled: xEnabled, duration: xDuration } = resolveXfade()
-          if (xEnabled && usePlayerStore.getState().repeatMode !== "one") {
+          const { enabled: xEnabled, duration: xDuration, curve: xCurve } = resolveXfade()
+          if (xEnabled) {
             const engineDuration = engineRef.current.duration()
             const effectiveEnd = trimEndSec ?? (engineDuration > 0 ? engineDuration : 0)
             if (effectiveEnd > 0) {
               const triggerPoint = Math.max(0, effectiveEnd - xDuration)
               if (seekSec >= triggerPoint) {
                 if (intervalRef.current) { window.clearTimeout(intervalRef.current); intervalRef.current = null }
-                next()
+
+                const curRepeat = usePlayerStore.getState().repeatMode
+                if (curRepeat === "one") {
+                  // Repeat-one crossfade: start new instance of same song, fade out old
+                  const song = usePlayerStore.getState().currentSong
+                  const songId = song ? String(song.id) : null
+                  if (!song || !songId) return
+
+                  const newEngine = createPlaybackEngine()
+                  const targetVol = resolveVolume()
+                  const fadeDurationMs = xDuration * 1000
+                  const oldEngine = engineRef.current!
+
+                  // --- WD-11 race fix: neutralize old engine BEFORE handoff ---
+                  // Strip all event handlers from the old engine so its natural
+                  // `end` event cannot trigger the repeat-one preload promotion
+                  // path (which would create a second orphaned engine).
+                  for (const ev of ["buffering", "play", "pause", "end", "load", "loaderror", "playerror"] as const) {
+                    oldEngine.off(ev)
+                  }
+
+                  // Clear preload refs — the tick path is now the authority for
+                  // this song transition. A stale same-song preload must not be
+                  // promoted by any late-arriving end handler.
+                  if (nextEngineRef.current) {
+                    nextEngineRef.current.engine.unload()
+                    nextEngineRef.current = null
+                    preloadReadyRef.current = false
+                  }
+
+                  // Clear any in-flight tick-path fade cleanup from a prior cycle
+                  if (tickFadeCleanupRef.current) {
+                    window.clearTimeout(tickFadeCleanupRef.current)
+                    tickFadeCleanupRef.current = null
+                  }
+
+                  bindEngineHandlers(newEngine, songId)
+                  newEngine.load(streamSource(songId, song.file_path, true))
+                  engineRef.current = newEngine
+                  fadingOutRef.current = oldEngine
+
+                  if (xCurve === 'overlap') {
+                    newEngine.setVolume(targetVol); newEngine.play()
+                    usePlayerStore.getState().setCrossfading(true, song.title ?? undefined)
+                    tickFadeCleanupRef.current = window.setTimeout(() => {
+                      tickFadeCleanupRef.current = null
+                      oldEngine.fade(oldEngine.getVolume(), 0, 250)
+                      window.setTimeout(() => {
+                        oldEngine.stop(); oldEngine.unload()
+                        if (fadingOutRef.current === oldEngine) fadingOutRef.current = null
+                        usePlayerStore.getState().setCrossfading(false)
+                      }, 250)
+                    }, fadeDurationMs)
+                  } else if (xCurve === 'equalpower') {
+                    newEngine.setVolume(0); newEngine.play()
+                    const prevVol = oldEngine.getVolume()
+                    const startEq = performance.now()
+                    usePlayerStore.getState().setCrossfading(true, song.title ?? undefined)
+                    const eqInterval = setInterval(() => {
+                      const t = Math.min(1, (performance.now() - startEq) / fadeDurationMs)
+                      newEngine.setVolume(Math.sin(t * Math.PI / 2) * targetVol)
+                      if (oldEngine.isPlaying()) oldEngine.setVolume(Math.cos(t * Math.PI / 2) * prevVol)
+                      if (t >= 1) {
+                        clearInterval(eqInterval)
+                        xfadeIntervalRef.current = null
+                        oldEngine.stop(); oldEngine.unload()
+                        if (fadingOutRef.current === oldEngine) fadingOutRef.current = null
+                        usePlayerStore.getState().setCrossfading(false)
+                      }
+                    }, 33)
+                    xfadeIntervalRef.current = eqInterval as unknown as number
+                  } else if (xCurve === 'lagged') {
+                    newEngine.setVolume(0)
+                    const startFadeIn = () => { newEngine.off("play", startFadeIn); newEngine.fade(0, targetVol, fadeDurationMs / 2) }
+                    newEngine.on("play", startFadeIn)
+                    laggedStartTimerRef.current = window.setTimeout(() => {
+                      laggedStartTimerRef.current = null
+                      if (engineRef.current !== newEngine) return
+                      if (newEngine.isPlaying()) return
+                      if (!usePlayerStore.getState().isPlaying) {
+                        newEngine.off("play", startFadeIn); newEngine.setVolume(targetVol); return
+                      }
+                      newEngine.play()
+                    }, fadeDurationMs / 2)
+                    oldEngine.fade(oldEngine.getVolume(), 0, fadeDurationMs)
+                    usePlayerStore.getState().setCrossfading(true, song.title ?? undefined)
+                    tickFadeCleanupRef.current = window.setTimeout(() => {
+                      tickFadeCleanupRef.current = null
+                      oldEngine.stop(); oldEngine.unload()
+                      if (fadingOutRef.current === oldEngine) fadingOutRef.current = null
+                      usePlayerStore.getState().setCrossfading(false)
+                    }, fadeDurationMs)
+                  } else {
+                    // Linear: engine-native fade, deferred to play event (PLAYLOCK TRAP)
+                    newEngine.setVolume(0)
+                    const startFadeIn = () => { newEngine.off("play", startFadeIn); newEngine.fade(0, targetVol, fadeDurationMs) }
+                    newEngine.on("play", startFadeIn)
+                    newEngine.play()
+                    oldEngine.fade(oldEngine.getVolume(), 0, fadeDurationMs)
+                    usePlayerStore.getState().setCrossfading(true, song.title ?? undefined)
+                    tickFadeCleanupRef.current = window.setTimeout(() => {
+                      tickFadeCleanupRef.current = null
+                      oldEngine.stop(); oldEngine.unload()
+                      if (fadingOutRef.current === oldEngine) fadingOutRef.current = null
+                      usePlayerStore.getState().setCrossfading(false)
+                    }, fadeDurationMs)
+                  }
+                } else {
+                  next()
+                }
                 return
               }
             }
@@ -195,6 +324,15 @@ export function useAudioPlayer() {
     })
 
     engine.on("end", () => {
+      // Stale-engine guard: if a newer engine has taken over (e.g. tick-triggered
+      // repeat-one crossfade fired first), this end event belongs to an old engine
+      // and must no-op to prevent orphaned engines / double audio (WD-11 race).
+      if (engineRef.current !== engine) {
+        if (localStorage.getItem("aurora-debug-audio")) {
+          console.log("[audio] stale end ignored", { engine: songId, current: usePlayerStore.getState().currentSong?.id })
+        }
+        return
+      }
       if (intervalRef.current) {
         window.clearTimeout(intervalRef.current)
         intervalRef.current = null
@@ -206,11 +344,54 @@ export function useAudioPlayer() {
       if (repeatMode === "one") {
         const { respectTrims } = useSettingsStore.getState()
         const startSec = respectTrims ? (song?.start_time_ms ?? 0) / 1000 : 0
-        engine.seek(startSec)
-        engine.play()
-        updateSeek(startSec)
+        const songId = song ? String(song.id) : null
+        // Try gapless: promote preloaded same-song engine
+        const preloadedEngine = nextEngineRef.current
+        if (songId && preloadedEngine?.songId === songId && preloadReadyRef.current) {
+          const newEngine = preloadedEngine.engine
+          nextEngineRef.current = null
+          preloadReadyRef.current = false
+          bindEngineHandlers(newEngine, songId)
+          initEngineAfterLoad(newEngine)
+          engineRef.current = newEngine
+          newEngine.setVolume(resolveVolume())
+          newEngine.seek(startSec)
+          newEngine.play()
+          updateSeek(startSec)
+          // Stop old engine after new one is playing
+          engine.stop()
+          engine.unload()
+        } else {
+          // No preload available — fall back to seek+play (small gap)
+          engine.seek(startSec)
+          engine.play()
+          updateSeek(startSec)
+        }
       } else {
-        next()
+        // Queue-end continuation: if at last track and continuePlayback is on,
+        // fetch random songs to extend the queue before advancing
+        const state = usePlayerStore.getState()
+        const { queue, queueIndex, repeatMode: rm } = state
+        const atQueueEnd = queueIndex >= queue.length - 1 && rm !== "all"
+        if (atQueueEnd && useSettingsStore.getState().continuePlayback) {
+          const excludeIds = queue.map(s => s.id)
+          const curId = state.currentSong?.id
+          fetchContinuationSongs(excludeIds).then(songs => {
+            if (songs.length === 0) {
+              next()
+              return
+            }
+            const curState = usePlayerStore.getState()
+            if (curState.currentSong?.id !== curId) return
+            usePlayerStore.setState({
+              queue: [...curState.queue, ...songs]
+            })
+            toast(`Continuing with ${songs.length} songs from your library`, { duration: 3000 })
+            next()
+          }).catch(() => { next() })
+        } else {
+          next()
+        }
       }
     })
 
@@ -272,7 +453,10 @@ export function useAudioPlayer() {
     const state = usePlayerStore.getState()
     const { queue, queueIndex, repeatMode, currentSong } = state
     let nextSong = null
-    if (queueIndex < queue.length - 1) {
+    if (repeatMode === 'one' && currentSong) {
+      // Repeat-one: preload the same song for gapless self-loop
+      nextSong = currentSong
+    } else if (queueIndex < queue.length - 1) {
       nextSong = queue[queueIndex + 1]
     } else if (repeatMode === 'all' && queue.length > 0) {
       nextSong = queue[0]
@@ -290,7 +474,8 @@ export function useAudioPlayer() {
 
     const preId = String(nextSong.id)
     const curId = currentSong?.id != null ? String(currentSong.id) : null
-    if (preId === curId) return
+    // Allow same-song preload for repeat-one gapless loop
+    if (preId === curId && repeatMode !== 'one') return
 
     // Already preloaded the correct song
     if (nextEngineRef.current?.songId === preId) return
@@ -333,6 +518,7 @@ export function useAudioPlayer() {
       if (nextEngineRef.current) { nextEngineRef.current.engine.unload(); nextEngineRef.current = null; preloadReadyRef.current = false }
       if (intervalRef.current) window.clearTimeout(intervalRef.current)
       if (laggedStartTimerRef.current) window.clearTimeout(laggedStartTimerRef.current)
+      if (tickFadeCleanupRef.current) window.clearTimeout(tickFadeCleanupRef.current)
     }
   }, [])
 
@@ -676,6 +862,10 @@ export function useAudioPlayer() {
       if (laggedStartTimerRef.current) {
         window.clearTimeout(laggedStartTimerRef.current)
         laggedStartTimerRef.current = null
+      }
+      if (tickFadeCleanupRef.current) {
+        window.clearTimeout(tickFadeCleanupRef.current)
+        tickFadeCleanupRef.current = null
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
