@@ -625,6 +625,14 @@ input[type="text"]:focus-visible {
     0 3px 12px rgba(0, 0, 0, 0.44);
 }
 
+/* Primary variant (player bar) gets a stronger glow */
+.glass-play-btn--primary:not(:disabled):hover {
+  box-shadow:
+    inset 0 0 0 1px var(--aurora-rim-bright),
+    0 0 28px 4px color-mix(in oklch, var(--aurora-accent-interactive-glow) 70%, transparent),
+    0 3px 12px rgba(0, 0, 0, 0.44);
+}
+
 /* icon */
 .glass-play-btn__icon {
   position: relative;
@@ -1006,8 +1014,13 @@ input[type="text"]:focus-visible {
 }
 
 /* ============================================================
-   SCROLLBAR — ghost thin, only visible on hover
+   SCROLLBAR — ghost thin with always-visible idle thumb
    ============================================================ */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.06) transparent;
+}
 
 ::-webkit-scrollbar {
   width: 10px;
@@ -1017,18 +1030,19 @@ input[type="text"]:focus-visible {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.06);
   border-radius: 999px;
   border: 3px solid transparent;
   background-clip: padding-box;
-  transition: background 200ms ease;
-}
-*:hover::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
-  background-clip: padding-box;
+  transition: background 300ms ease;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.18) !important;
+  background: rgba(255, 255, 255, 0.18);
+  background-clip: padding-box;
+  transition: background 100ms ease;
+}
+::-webkit-scrollbar-thumb:active {
+  background: rgba(255, 255, 255, 0.24);
   background-clip: padding-box;
 }
 ::-webkit-scrollbar-corner {
@@ -1155,9 +1169,9 @@ pre, code {
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.05em;
-  color: var(--aurora-text-secondary);
+  color: var(--aurora-text);
   background: var(--aurora-surface);
-  border: 1px solid var(--aurora-surface-border);
+  border: 1px solid var(--aurora-rim-bright);
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03);
   cursor: pointer;
   transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
@@ -1181,8 +1195,8 @@ pre, code {
 .mix-btn-search {
   position: relative;
   isolation: isolate;
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--aurora-slate);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--aurora-accent-interactive);
   box-shadow:
     inset 0 0 0 1px var(--aurora-rim-bright),
     0 0 var(--aurora-button-glow-rest) calc(-1 * var(--aurora-button-glow-spread))
@@ -1202,18 +1216,18 @@ pre, code {
     transparent 100%
   );
   filter: blur(var(--aurora-backlight-blur));
-  opacity: var(--aurora-backlight-rest);
+  opacity: 0.4;
   transition: opacity 200ms ease;
 }
 .mix-btn-search:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.12);
   box-shadow:
     inset 0 0 0 1px var(--aurora-rim-bright),
     0 0 var(--aurora-button-glow-hover) calc(-1 * var(--aurora-button-glow-spread-hover))
       var(--aurora-accent-interactive-glow);
 }
 .mix-btn-search:hover:not(:disabled)::before {
-  opacity: var(--aurora-backlight-hover);
+  opacity: 0.65;
 }
 
 /* Jam button — muted teal→violet gradient, white text */
@@ -1310,15 +1324,12 @@ pre, code {
   border-radius: 999px;
   position: relative;
   isolation: isolate;
-  background: rgba(255, 255, 255, 0.04);
-  color: #ffffff;
+  background: var(--aurora-gradient);
+  color: #060709;
   box-shadow:
-    inset 0 0 0 1px var(--aurora-rim-bright),
-    0 0 var(--aurora-button-glow-rest) calc(-1 * var(--aurora-button-glow-spread))
-      var(--aurora-accent-interactive-glow),
-    0 0 var(--aurora-button-glow-rest) calc(-1 * var(--aurora-button-glow-spread))
-      var(--aurora-secondary-glow);
-  transition: box-shadow 200ms ease, transform 100ms ease;
+    0 0 28px -6px rgba(94, 234, 212, 0.30),
+    0 0 28px -6px rgba(167, 139, 250, 0.20);
+  transition: box-shadow 200ms ease, transform 100ms ease, background 150ms ease;
 }
 .mix-jam-primary::before {
   content: "";
@@ -1338,11 +1349,9 @@ pre, code {
 }
 .mix-jam-primary:not(:disabled):hover {
   box-shadow:
-    inset 0 0 0 1px var(--aurora-rim-bright),
-    0 0 var(--aurora-button-glow-hover) calc(-1 * var(--aurora-button-glow-spread-hover))
-      var(--aurora-accent-interactive-glow),
-    0 0 var(--aurora-button-glow-hover) calc(-1 * var(--aurora-button-glow-spread-hover))
-      var(--aurora-secondary-glow);
+    0 0 36px -4px rgba(94, 234, 212, 0.40),
+    0 0 36px -4px rgba(167, 139, 250, 0.28);
+  transform: scale(1.02);
 }
 .mix-jam-primary:not(:disabled):hover::before {
   opacity: var(--aurora-backlight-hover);
@@ -1397,14 +1406,14 @@ pre, code {
   border-radius: 999px;
   font-size: 12px;
   font-weight: 600;
-  color: var(--aurora-text-secondary);
-  background: transparent;
+  color: var(--aurora-accent-interactive);
+  background: rgba(255, 255, 255, 0.08);
   border: 0;
   cursor: pointer;
   transition: color 150ms ease;
 }
 .mix-float-search:not(:disabled):hover {
-  color: var(--aurora-text);
+  background: rgba(255, 255, 255, 0.12);
 }
 .mix-float-search:disabled {
   opacity: 0.55;
@@ -1421,16 +1430,13 @@ pre, code {
   border-radius: 999px;
   position: relative;
   isolation: isolate;
-  background: rgba(255, 255, 255, 0.04);
-  color: #ffffff;
+  background: var(--aurora-gradient);
+  color: #060709;
   cursor: pointer;
   box-shadow:
-    inset 0 0 0 1px var(--aurora-rim-bright),
-    0 0 var(--aurora-button-glow-rest) calc(-1 * var(--aurora-button-glow-spread))
-      var(--aurora-accent-interactive-glow),
-    0 0 var(--aurora-button-glow-rest) calc(-1 * var(--aurora-button-glow-spread))
-      var(--aurora-secondary-glow);
-  transition: box-shadow 200ms ease, transform 100ms ease;
+    0 0 28px -6px rgba(94, 234, 212, 0.30),
+    0 0 28px -6px rgba(167, 139, 250, 0.20);
+  transition: box-shadow 200ms ease, transform 100ms ease, background 150ms ease;
 }
 .mix-float-jam::before {
   content: "";
@@ -1450,11 +1456,9 @@ pre, code {
 }
 .mix-float-jam:not(:disabled):hover {
   box-shadow:
-    inset 0 0 0 1px var(--aurora-rim-bright),
-    0 0 var(--aurora-button-glow-hover) calc(-1 * var(--aurora-button-glow-spread-hover))
-      var(--aurora-accent-interactive-glow),
-    0 0 var(--aurora-button-glow-hover) calc(-1 * var(--aurora-button-glow-spread-hover))
-      var(--aurora-secondary-glow);
+    0 0 36px -4px rgba(94, 234, 212, 0.40),
+    0 0 36px -4px rgba(167, 139, 250, 0.28);
+  transform: scale(1.02);
 }
 .mix-float-jam:not(:disabled):hover::before {
   opacity: var(--aurora-backlight-hover);

@@ -44,7 +44,7 @@
   --radius-pill: 999px;  /* play button */
 
   /* Elevation */
-  --halo-art:  0 0 60px 12px color-mix(in oklch, var(--song-color) 40%, transparent);
+  --halo-art:  0 0 60px 12px color-mix(in oklch, var(--song-color) 50%, transparent);
   --focus-ring: 0 0 0 2px color-mix(in oklch, var(--aurora-teal) 70%, white 10%),
                 0 0 0 4px oklch(0 0 0 / 0.6);
 }
