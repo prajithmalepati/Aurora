@@ -72,6 +72,7 @@ export const SongRow = memo(function SongRow({
     transform,
     transition,
     isDragging,
+    isOver,
   } = useSortable({ id: song.id, disabled: !isDraggable })
 
   const sortableStyle: React.CSSProperties = isDraggable
@@ -79,6 +80,7 @@ export const SongRow = memo(function SongRow({
         transform: CSS.Transform.toString(transform),
         transition,
         opacity: isDragging ? 0.4 : 1,
+        ...(isOver && !isDragging ? { borderTop: "2px solid var(--aurora-accent-vivid)", marginTop: -2 } : {}),
       }
     : {}
 

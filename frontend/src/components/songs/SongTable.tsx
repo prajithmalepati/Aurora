@@ -20,9 +20,11 @@ import {
 } from "@/components/ui/dialog"
 import { toast } from "@/lib/toast"
 import { api } from "@/lib/api"
+import { formatDuration } from "@/lib/utils"
 import { EditSongDialog } from "@/components/songs/EditSongDialog"
 import { TagEditor } from "@/components/tags/TagEditor"
 import { ColumnPicker } from "./ColumnPicker"
+import { AlbumArt } from "./AlbumArt"
 import { Music, ChevronUp, ChevronDown, AlertTriangle, RefreshCw, ListPlus, Tag as TagIcon, X, Trash2, Pencil, Scissors } from "lucide-react"
 import {
   DndContext,
@@ -31,7 +33,9 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
+  DragOverlay,
   type DragEndEvent,
+  type DragStartEvent,
 } from "@dnd-kit/core"
 import {
   SortableContext,
@@ -537,6 +541,18 @@ export function SongTable({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
 
+  // DragOverlay state
+  const [activeDragId, setActiveDragId] = useState<number | null>(null)
+  const activeDragSong = activeDragId != null ? songs.find((s) => s.id === activeDragId) ?? null : null
+
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    setActiveDragId(event.active.id as number)
+  }, [])
+
+  const handleDragCancel = useCallback(() => {
+    setActiveDragId(null)
+  }, [])
+
   // Column state from persistent store (or defaults if no context)
   const columnContext = _columnContext ?? "all-songs"
   const columnConfig = useColumnStore((s) => s.getConfig(columnContext))
@@ -547,6 +563,7 @@ export function SongTable({
   }, [columnContext, setColumnWidth])
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
+    setActiveDragId(null)
     const { active, over } = event
     if (!over || active.id === over.id || !onReorder) return
     onReorder(active.id as number, over.id as number)
@@ -1057,10 +1074,47 @@ export function SongTable({
               if (isDraggable) {
                 const songIds = songs.map(s => s.id)
                 return (
-                  <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                  <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
                     <SortableContext items={songIds} strategy={verticalListSortingStrategy}>
                       {rowContent}
                     </SortableContext>
+                    <DragOverlay dropAnimation={null}>
+                      {activeDragSong ? (
+                        <table
+                          className="rounded-xl border max-w-[480px]"
+                          style={{
+                            background: "color-mix(in oklch, var(--aurora-surface) 92%, transparent)",
+                            backdropFilter: "blur(12px)",
+                            borderColor: "var(--aurora-rim-bright)",
+                            boxShadow: "0 8px 32px rgba(0, 0, 0, 0.45)",
+                            transform: "scale(1.02)",
+                            transformOrigin: "0 50%",
+                            cursor: "grabbing",
+                            borderCollapse: "separate",
+                            borderSpacing: 0,
+                          }}
+                        >
+                          <tbody>
+                            <tr>
+                              <td className="px-2 py-1.5">
+                                <AlbumArt song={activeDragSong} size="sm" className="!w-12 !h-12 rounded-[6px]" />
+                              </td>
+                              <td className="px-2 py-1.5 pr-3">
+                                <div className="text-[13px] font-medium text-[var(--aurora-text)] truncate max-w-[280px]">
+                                  {activeDragSong.title}
+                                </div>
+                                <div className="text-[11px] text-[var(--aurora-text-secondary)] truncate max-w-[280px]">
+                                  {activeDragSong.artist}{activeDragSong.album ? ` · ${activeDragSong.album}` : ""}
+                                </div>
+                              </td>
+                              <td className="px-3 py-1.5 text-right text-[11px] text-[var(--aurora-text-tertiary)] tabular-nums whitespace-nowrap">
+                                {formatDuration(activeDragSong.duration)}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      ) : null}
+                    </DragOverlay>
                   </DndContext>
                 )
               }
