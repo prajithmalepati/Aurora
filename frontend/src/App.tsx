@@ -1,4 +1,4 @@
-import { useEffect, useState, lazy, Suspense, type ReactNode } from "react"
+import { useEffect, useState, useRef, lazy, Suspense, type ReactNode } from "react"
 import { useSongStore } from "@/stores/songStore"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { useTagStore } from "@/stores/tagStore"
@@ -99,6 +99,49 @@ function App() {
       dismissWelcome()
     }
   }, [songs.length, songsLoading])
+
+  const scrollToTop = useSongStore((state) => state.scrollToTop)
+  const prevViewRef = useRef(view)
+
+  // Helper: get a stable key for a view
+  const viewKey = (v: typeof view) =>
+    v.kind === "playlist" ? `playlist-${v.playlistId}` : v.kind
+
+  // Save scroll position of old view, restore for new view
+  useEffect(() => {
+    const prev = prevViewRef.current
+    const prevKey = viewKey(prev)
+    const nextKey = viewKey(view)
+
+    if (prevKey !== nextKey) {
+      // Save position of the view we're leaving
+      const el = document.querySelector("[data-scroll-main]") as HTMLElement | null
+      if (el) {
+        const positions = useSongStore.getState().scrollPositions
+        useSongStore.setState({
+          scrollPositions: { ...positions, [prevKey]: el.scrollTop },
+        })
+      }
+      // Restore after the new view mounts (next frame)
+      requestAnimationFrame(() => {
+        const scrollEl = document.querySelector("[data-scroll-main]") as HTMLElement | null
+        if (scrollEl) {
+          const saved = useSongStore.getState().scrollPositions[nextKey] ?? 0
+          scrollEl.scrollTop = saved
+        }
+      })
+    }
+    prevViewRef.current = view
+  }, [view])
+
+  // Same-nav click: scroll to top
+  useEffect(() => {
+    if (scrollToTop === 0) return
+    const el = document.querySelector("[data-scroll-main]") as HTMLElement | null
+    if (el) {
+      el.scrollTo({ top: 0, behavior: "smooth" })
+    }
+  }, [scrollToTop])
 
   // Global keyboard shortcuts
   const { isOverlayOpen, closeOverlay } = useKeyboardShortcuts()

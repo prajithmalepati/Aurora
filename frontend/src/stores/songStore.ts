@@ -32,6 +32,10 @@ interface SongState {
   offset: number
   // Search term of the last fetchSongs call — fetchMore must page within it
   lastSearch: string | undefined
+  // Incremented when user clicks the already-active sidebar item (scroll-to-top signal)
+  scrollToTop: number
+  // Per-view scroll positions saved before leaving a view
+  scrollPositions: Record<string, number>
 
   fetchSongs: (search?: string) => Promise<void>
   fetchMore: () => Promise<void>
@@ -69,6 +73,8 @@ export const useSongStore = create<SongState>((set, get) => ({
   hasMore: false,
   offset: 0,
   lastSearch: undefined,
+  scrollToTop: 0,
+  scrollPositions: {},
 
   fetchSongs: async (search) => {
     const myId = ++fetchId
@@ -243,6 +249,14 @@ export const useSongStore = create<SongState>((set, get) => ({
   },
 
   setView: (view) => {
+    const current = get().view
+    // Same-view re-click: signal scroll-to-top instead of re-setting view
+    const isSame = view.kind === current.kind &&
+      (view.kind !== "playlist" || current.kind !== "playlist" || view.playlistId === current.playlistId)
+    if (isSame) {
+      set((s) => ({ scrollToTop: s.scrollToTop + 1 }))
+      return
+    }
     set({ view })
     // Entering Recently Added pins sort to created_at desc
     if (view.kind === "recently-added") {
