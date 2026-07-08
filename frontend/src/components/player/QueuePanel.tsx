@@ -2,6 +2,7 @@ import { createPortal } from "react-dom"
 import { usePlayerStore } from "@/stores/playerStore"
 import type { Song } from "@/types"
 import { formatDuration } from "@/lib/utils"
+import { displayArtist } from "@/lib/displayArtist"
 import { AlbumArt } from "@/components/songs/AlbumArt"
 import { Equalizer } from "@/components/ui/Equalizer"
 import { X, GripVertical, ListMusic, ChevronDown, ChevronUp, Trash2 } from "lucide-react"
@@ -88,7 +89,7 @@ function SortableQueueItem({
           {song.title}
         </p>
         <p className="text-[10px] text-[var(--aurora-text-secondary)] truncate">
-          {song.artist}
+          {displayArtist(song)}
         </p>
       </div>
 
@@ -262,7 +263,7 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
                             {currentSong.title}
                           </p>
                           <p className="text-[11px] text-[var(--aurora-text-secondary)] truncate">
-                            {currentSong.artist}
+                            {displayArtist(currentSong)}
                           </p>
                         </div>
                         <div className="flex-shrink-0">
@@ -355,7 +356,7 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
                                     {song.title}
                                   </p>
                                   <p className="text-[10px] text-[var(--aurora-text-secondary)] truncate">
-                                    {song.artist}
+                                    {displayArtist(song)}
                                   </p>
                                 </div>
 

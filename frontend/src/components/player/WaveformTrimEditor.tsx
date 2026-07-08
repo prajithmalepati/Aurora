@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react"
 import type { PlaylistSong } from "@/types"
 import { api } from "@/lib/api"
 import { toast } from "@/lib/toast"
+import { displayArtist } from "@/lib/displayArtist"
 import {
   Dialog,
   DialogContent,
@@ -378,7 +379,7 @@ export function WaveformTrimEditor({ song, playlistId, open, onClose, onSaved }:
                 {song.title}
               </span>
               <span className="text-[12px] text-[var(--aurora-text-secondary)] truncate">
-                {song.artist}
+                {displayArtist(song)}
               </span>
             </div>
           </div>

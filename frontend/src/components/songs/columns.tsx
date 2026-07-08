@@ -1,5 +1,6 @@
 import type { Song } from "@/types"
 import { formatDuration } from "@/lib/utils"
+import { displayArtist } from "@/lib/displayArtist"
 import { AlbumArt } from "@/components/songs/AlbumArt"
 import { Equalizer } from "@/components/ui/Equalizer"
 import { AuroraPlayButton } from "@/components/player/AuroraPlayButton"
@@ -116,12 +117,7 @@ export const COLUMN_REGISTRY: ColumnDef[] = [
               )}
             </div>
             <span className="truncate text-[12px] text-[var(--aurora-text-secondary)] mt-0.5">
-              {song.artist || "Unknown Artist"}
-              {song.featured_artists && song.featured_artists.length > 0 && (
-                <span className="text-[var(--aurora-text-tertiary)]">
-                  {" "}feat. {song.featured_artists.join(", ")}
-                </span>
-              )}
+              {displayArtist(song)}
             </span>
           </div>
         </div>
@@ -184,7 +180,7 @@ export const COLUMN_REGISTRY: ColumnDef[] = [
     render: (song, _ctx) => (
       <>
         <span className="relative z-10 truncate text-[var(--aurora-text-secondary)]">
-          {song.artist || "Unknown Artist"}
+          {displayArtist(song)}
         </span>
       </>
     ),
