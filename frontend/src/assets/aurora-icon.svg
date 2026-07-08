@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="aurora-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5eead4"/>
+      <stop offset="45%" stop-color="#86efac"/>
+      <stop offset="100%" stop-color="#a78bfa"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="60%" r="35%">
+      <stop offset="0%" stop-color="#5eead4" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#5eead4" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="blur-glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="18"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1024" height="1024" fill="#060709"/>
+
+  <!-- Glow halo beneath the arc -->
+  <ellipse cx="512" cy="560" rx="320" ry="180" fill="url(#glow)"/>
+
+  <!-- Luminous ribbon — smooth C-arc with slight S-curve personality -->
+  <path
+    d="M 220 580
+       C 280 380, 420 280, 512 320
+       C 604 360, 720 340, 804 420
+       C 860 472, 820 560, 760 580"
+    fill="none"
+    stroke="url(#aurora-grad)"
+    stroke-width="28"
+    stroke-linecap="round"
+    opacity="0.35"
+    filter="url(#blur-glow)"
+  />
+  <path
+    d="M 220 580
+       C 280 380, 420 280, 512 320
+       C 604 360, 720 340, 804 420
+       C 860 472, 820 560, 760 580"
+    fill="none"
+    stroke="url(#aurora-grad)"
+    stroke-width="22"
+    stroke-linecap="round"
+  />
+</svg>
