@@ -2109,15 +2109,6 @@ mod tests {
         .unwrap();
     }
 
-    fn insert_song_null_source(conn: &rusqlite::Connection, id: i64, title: &str) {
-        conn.execute(
-            "INSERT INTO songs (id, title, artist, source, file_path, created_at, updated_at) \
-             VALUES (?1, ?2, 'Test', NULL, ?3, '', '')",
-            rusqlite::params![id, title, format!("/music/{}.mp3", id)],
-        )
-        .unwrap();
-    }
-
     #[test]
     fn test_list_songs_no_source_filter_returns_all() {
         let conn = test_db();
