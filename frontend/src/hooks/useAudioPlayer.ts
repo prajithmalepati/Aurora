@@ -896,6 +896,19 @@ export function useAudioPlayer() {
     }
   }, [isPlaying])
 
+  // Resume AudioContext on tab/page return (alt-tab, minimize, workspace switch).
+  // Browsers may suspend the AudioContext when the page is hidden; without this,
+  // playback stutters or goes silent until the next user gesture triggers resume.
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === "visible" && usePlayerStore.getState().isPlaying) {
+        unlockAudioOutput()
+      }
+    }
+    document.addEventListener("visibilitychange", onVisibility)
+    return () => document.removeEventListener("visibilitychange", onVisibility)
+  }, [])
+
   // Volume sync (includes ReplayGain)
   useEffect(() => {
     if (!engineRef.current) return
