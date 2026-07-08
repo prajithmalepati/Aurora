@@ -4,6 +4,7 @@ import { usePlaylistStore } from "@/stores/playlistStore"
 import { useTagStore } from "@/stores/tagStore"
 import { usePlayerStore } from "@/stores/playerStore"
 import { useSettingsStore } from "@/stores/settingsStore"
+import { useAddonStore } from "@/stores/addonStore"
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts"
 import { KeyboardShortcutsOverlay } from "@/components/ui/KeyboardShortcutsOverlay"
 import { AppShell } from "@/components/layout/AppShell"
@@ -15,7 +16,7 @@ import { ToastClickDismiss } from "@/components/ui/ToastClickDismiss"
 import { AnimatePresence, motion } from "motion/react"
 import { AuroraColorBridge } from "@/components/aurora/AuroraColorBridge"
 import { WelcomeOverlay, dismissWelcome, isWelcomeDismissed } from "@/components/welcome/WelcomeOverlay"
-import { Search, Shuffle } from "lucide-react"
+import { Search, Shuffle, Cloud, HardDrive } from "lucide-react"
 import type { Song } from "@/types"
 import { scheduleStartupUpdateCheck } from "@/lib/updater"
 
@@ -39,6 +40,10 @@ function App() {
   const totalCount = useSongStore((state) => state.totalCount)
   const view = useSongStore((state) => state.view)
   const setView = useSongStore((state) => state.setView)
+  const sourceFilter = useSongStore((state) => state.sourceFilter)
+  const setSourceFilter = useSongStore((state) => state.setSourceFilter)
+  const addons = useAddonStore((state) => state.addons)
+  const fetchAddons = useAddonStore((state) => state.fetchAddons)
   const fetchPlaylists = usePlaylistStore((state) => state.fetchPlaylists)
   const fetchTags = useTagStore((state) => state.fetchTags)
   const playSong = usePlayerStore((state) => state.playSong)
@@ -47,7 +52,8 @@ function App() {
     fetchSongs()
     fetchPlaylists()
     fetchTags()
-  }, [fetchSongs, fetchPlaylists, fetchTags])
+    fetchAddons()
+  }, [fetchSongs, fetchPlaylists, fetchTags, fetchAddons])
 
   // One-shot update check 10s after mount + apply saved zoom
   useEffect(() => {
@@ -158,6 +164,17 @@ function App() {
 
     let content: ReactNode
     if (view.kind === "all-songs") {
+      // Compute enabled addons for filter chips
+      const enabledAddons = addons.filter((a) => a.enabled)
+      const hasAddons = enabledAddons.length > 0
+
+      // Client-side source filter on loaded songs
+      const filteredSongs = sourceFilter === null
+        ? songs
+        : sourceFilter === "offline"
+          ? songs.filter((s) => s.source === "local_scan" || s.source === "manual")
+          : songs.filter((s) => s.source === sourceFilter)
+
       content = (
         <div className="p-4 sm:px-10 sm:pt-8 sm:pb-6 max-w-[1800px] mx-auto h-full flex flex-col min-h-0">
           <div className="flex items-center justify-between mb-6">
@@ -183,7 +200,7 @@ function App() {
             </span>
           </div>
           <div
-            className="search-shell relative flex items-center rounded-full mb-6 transition-[box-shadow] duration-200"
+            className="search-shell relative flex items-center rounded-full mb-4 transition-[box-shadow] duration-200"
             style={{
               background: "rgba(255, 255, 255, 0.06)",
             }}
@@ -200,9 +217,34 @@ function App() {
               className="w-full bg-transparent border-0 outline-none pl-11 pr-5 py-2.5 text-[13px] text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-tertiary)] placeholder:font-display-italic placeholder:text-[14px] focus-visible:shadow-none"
             />
           </div>
+          {/* Source filter chips — visible when addons exist or filter is active */}
+          {(hasAddons || sourceFilter !== null) && (
+            <div className="flex items-center gap-2 mb-4 flex-wrap">
+              <SourceFilterChip
+                label="All Sources"
+                active={sourceFilter === null}
+                onClick={() => setSourceFilter(null)}
+              />
+              <SourceFilterChip
+                label="Offline"
+                icon={<HardDrive className="h-3 w-3" />}
+                active={sourceFilter === "offline"}
+                onClick={() => setSourceFilter("offline")}
+              />
+              {enabledAddons.map((addon) => (
+                <SourceFilterChip
+                  key={addon.id}
+                  label={addon.name ?? addon.id}
+                  icon={<Cloud className="h-3 w-3" />}
+                  active={sourceFilter === `addon:${addon.id}`}
+                  onClick={() => setSourceFilter(`addon:${addon.id}`)}
+                />
+              ))}
+            </div>
+          )}
           <OnlineResults searchQuery={searchQuery} />
           <SongTable
-            songs={songs}
+            songs={filteredSongs}
             loading={songsLoading}
             error={songsError}
             onPlay={handlePlaySong}
@@ -322,6 +364,37 @@ function App() {
         }}
       />
     </>
+  )
+}
+
+// ── Source filter chip (All Songs view) ──────────────────────────────────
+
+interface SourceFilterChipProps {
+  label: string
+  icon?: React.ReactNode
+  active: boolean
+  onClick: () => void
+}
+
+function SourceFilterChip({ label, icon, active, onClick }: SourceFilterChipProps) {
+  return (
+    <button
+      onClick={onClick}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all duration-150 ${
+        active
+          ? "text-[var(--aurora-text)]"
+          : "text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)]"
+      }`}
+      style={{
+        background: active ? "rgba(45, 212, 191, 0.12)" : "transparent",
+        border: active
+          ? "1px solid rgba(45, 212, 191, 0.3)"
+          : "1px solid var(--aurora-rim)",
+      }}
+    >
+      {icon}
+      <span>{label}</span>
+    </button>
   )
 }
 

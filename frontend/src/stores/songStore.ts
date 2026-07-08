@@ -36,6 +36,9 @@ interface SongState {
   scrollToTop: number
   // Per-view scroll positions saved before leaving a view
   scrollPositions: Record<string, number>
+  // Client-side source filter for All Songs view
+  // null = "All Sources", "offline" = local_scan + manual, "addon:<id>" = specific addon
+  sourceFilter: string | null
 
   fetchSongs: (search?: string) => Promise<void>
   fetchMore: () => Promise<void>
@@ -58,6 +61,7 @@ interface SongState {
   removeTag: (songId: number, tagId: number) => Promise<void>
   removeTagByName: (songId: number, tagName: string) => Promise<void>
   setView: (view: View) => void
+  setSourceFilter: (filter: string | null) => void
 }
 
 let fetchId = 0
@@ -75,6 +79,7 @@ export const useSongStore = create<SongState>((set, get) => ({
   lastSearch: undefined,
   scrollToTop: 0,
   scrollPositions: {},
+  sourceFilter: null,
 
   fetchSongs: async (search) => {
     const myId = ++fetchId
@@ -265,5 +270,9 @@ export const useSongStore = create<SongState>((set, get) => ({
         get().sortSongs("created_at", "desc")
       }
     }
+  },
+
+  setSourceFilter: (filter) => {
+    set({ sourceFilter: filter })
   },
 }))
