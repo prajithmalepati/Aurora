@@ -1323,15 +1323,30 @@ pub fn list_folder_songs(
     limit: i64,
     offset: i64,
 ) -> Result<(Vec<serde_json::Value>, i64)> {
-    let normalized_path = path.trim_end_matches('/');
+    // Normalize the incoming path the same way the folder tree does:
+    // strip verbatim prefix, backslashes → forward slashes, trailing slash.
+    let norm_input = crate::paths::normalize_path(path);
+    let norm_input = norm_input.trim_end_matches('/').to_string();
+    // Ensure leading '/' to match norm_col output
+    let normalized_path = if norm_input.starts_with('/') {
+        norm_input
+    } else {
+        format!("/{}", norm_input)
+    };
 
     // Escape % and _ in the path for LIKE patterns (backslash escape)
     let escaped_path = normalized_path.replace('%', "\\%").replace('_', "\\_");
     let like_pattern = format!("{}/%", escaped_path);
 
-    // Normalize column: convert backslash to '/', ensure leading '/'
-    // char(92) = backslash in SQLite
-    let norm_col = "('/' || LTRIM(REPLACE(s.file_path, char(92), '/'), '/'))";
+    // Normalize column: convert backslash to '/', strip Windows verbatim
+    // prefix (\\?\ → //?/ after slash conversion), ensure leading '/'.
+    // char(92) = backslash in SQLite.  Reuses the same normalization
+    // semantics as aurora_core::paths::normalize_path.
+    let norm_col = "('/' || LTRIM( \
+        CASE WHEN REPLACE(s.file_path, char(92), '/') LIKE '//?/%' \
+            THEN SUBSTR(REPLACE(s.file_path, char(92), '/'), 5) \
+            ELSE REPLACE(s.file_path, char(92), '/') \
+        END, '/'))";
 
     // Count
     let total: i64 = if recursive {
@@ -1867,10 +1882,49 @@ mod tests {
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 title TEXT NOT NULL,
                 artist TEXT NOT NULL DEFAULT '',
+                album TEXT DEFAULT '',
+                duration INTEGER DEFAULT 0,
                 file_path TEXT UNIQUE,
+                file_format TEXT DEFAULT '',
+                album_art_path TEXT DEFAULT '',
                 source TEXT NOT NULL DEFAULT 'manual',
+                bitrate INTEGER DEFAULT 0,
+                sample_rate INTEGER DEFAULT 0,
+                bit_depth INTEGER DEFAULT 0,
+                file_size INTEGER DEFAULT 0,
+                waveform_peaks TEXT DEFAULT '',
+                dominant_color TEXT DEFAULT '',
+                dominant_color_2 TEXT DEFAULT '',
+                replaygain_track_gain REAL DEFAULT 0,
+                replaygain_track_peak REAL DEFAULT 0,
+                replaygain_album_gain REAL DEFAULT 0,
+                replaygain_album_peak REAL DEFAULT 0,
+                artists TEXT DEFAULT '',
+                featured_artists TEXT DEFAULT '',
+                stream_url TEXT DEFAULT '',
+                stream_url_expires_at TEXT DEFAULT '',
+                artwork_url TEXT DEFAULT '',
                 created_at TEXT NOT NULL DEFAULT '',
                 updated_at TEXT NOT NULL DEFAULT ''
+            );
+            CREATE TABLE IF NOT EXISTS tags (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE
+            );
+            CREATE TABLE IF NOT EXISTS song_tags (
+                song_id INTEGER NOT NULL,
+                tag_id INTEGER NOT NULL,
+                PRIMARY KEY (song_id, tag_id)
+            );
+            CREATE TABLE IF NOT EXISTS playlists (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS playlist_songs (
+                playlist_id INTEGER NOT NULL,
+                song_id INTEGER NOT NULL,
+                position INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (playlist_id, song_id)
             );",
         )
         .unwrap();
@@ -1989,5 +2043,36 @@ mod tests {
         assert_eq!(arr.len(), 1);
         assert_eq!(arr[0]["name"], "D:");
         assert_eq!(arr[0]["path"], "/D:");
+    }
+
+    /// Regression: list_folder_songs must match stored paths that still
+    /// carry the Windows verbatim prefix (\\?\).  The folder tree strips
+    /// this prefix via normalize_path, so the query path is clean — the
+    /// SQL normalization in list_folder_songs must do the same.
+    #[test]
+    fn test_list_folder_songs_strips_verbatim_prefix() {
+        let conn = test_db();
+        // Simulate stale rows stored with \\?\ prefix (Rust canonicalize on Windows)
+        insert_song(&conn, 1, r"\\?\D:\Music\OP\song1.mp3");
+        insert_song(&conn, 2, r"\\?\D:\Music\OP\song2.mp3");
+        insert_song(&conn, 3, r"\\?\D:\Music\Rock\song3.mp3");
+
+        // Query with clean path (as the folder tree would emit)
+        let (songs, total) = list_folder_songs(&conn, "D:/Music/OP", true, 100, 0).unwrap();
+        assert_eq!(total, 2, "Should match 2 songs under D:/Music/OP");
+        assert_eq!(songs.len(), 2);
+    }
+
+    /// Non-recursive variant must also strip verbatim prefix.
+    #[test]
+    fn test_list_folder_songs_strips_verbatim_prefix_non_recursive() {
+        let conn = test_db();
+        insert_song(&conn, 1, r"\\?\D:\Music\OP\song1.mp3");
+        insert_song(&conn, 2, r"\\?\D:\Music\OP\Sub\song2.mp3");
+
+        // Non-recursive: only direct children, not deeper subfolders
+        let (songs, total) = list_folder_songs(&conn, "D:/Music/OP", false, 100, 0).unwrap();
+        assert_eq!(total, 1, "Non-recursive should match only direct children");
+        assert_eq!(songs.len(), 1);
     }
 }
