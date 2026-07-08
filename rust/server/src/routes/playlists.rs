@@ -151,24 +151,27 @@ pub struct UpdatePlaylist {
 }
 
 impl UpdatePlaylist {
+    /// Extract a nullable integer field from the extra map.
+    /// Handles both JSON integer (`1`) and float (`1.0`) values —
+    /// serde_json stores `1.0` as f64, for which `as_i64()` returns None.
+    fn extract_optional_i64(&self, key: &str) -> Option<Option<i64>> {
+        match self.extra.get(key) {
+            None => None,
+            Some(v) if v.is_null() => Some(None),
+            Some(v) => Some(v.as_i64().or_else(|| v.as_f64().map(|f| f as i64))),
+        }
+    }
+
     /// Extract crossfade_enabled as Option<Option<i64>>:
     ///   key absent  → None  (don't update column)
     ///   key = null  → Some(None) (set column to NULL)
     ///   key = num   → Some(Some(n)) (set column to n)
     fn crossfade_enabled(&self) -> Option<Option<i64>> {
-        match self.extra.get("crossfade_enabled") {
-            None => None,
-            Some(v) if v.is_null() => Some(None),
-            Some(v) => Some(v.as_i64()),
-        }
+        self.extract_optional_i64("crossfade_enabled")
     }
 
     fn crossfade_duration_s(&self) -> Option<Option<i64>> {
-        match self.extra.get("crossfade_duration_s") {
-            None => None,
-            Some(v) if v.is_null() => Some(None),
-            Some(v) => Some(v.as_i64()),
-        }
+        self.extract_optional_i64("crossfade_duration_s")
     }
 }
 

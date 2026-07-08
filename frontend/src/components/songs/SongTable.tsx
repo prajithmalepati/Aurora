@@ -160,6 +160,11 @@ function TableHeader({ visibleColumns, sortField, sortOrder, onSort, showCheckbo
     document.body.style.userSelect = "none"
   }, [columnWidths, onResize])
 
+  const handleDoubleClick = useCallback((col: ColumnDef) => {
+    if (col.fixed || !onResize) return
+    onResize(col.id, col.defaultWidth ?? 100)
+  }, [onResize])
+
   return (
     <thead>
       <tr>
@@ -200,6 +205,7 @@ function TableHeader({ visibleColumns, sortField, sortOrder, onSort, showCheckbo
                   className="absolute right-0 top-0 bottom-0 w-[6px] cursor-col-resize opacity-0 pointer-events-none group-hover/th:opacity-60 group-hover/th:pointer-events-auto hover:!opacity-100 transition-opacity z-10"
                   style={{ background: "var(--aurora-accent-interactive)" }}
                   onMouseDown={(e) => handleResizeStart(e, col)}
+                  onDoubleClick={() => handleDoubleClick(col)}
                   onClick={(e) => e.stopPropagation()}
                 />
               )}
