@@ -13,7 +13,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 
-export function SourcesSection() {
+interface SourcesSectionProps {
+  className?: string
+  embedded?: boolean
+}
+
+export function SourcesSection({ className, embedded }: SourcesSectionProps) {
   const addons = useAddonStore((s) => s.addons)
   const addonsLoading = useAddonStore((s) => s.addonsLoading)
   const fetchAddons = useAddonStore((s) => s.fetchAddons)
@@ -49,9 +54,103 @@ export function SourcesSection() {
     setDeleteTarget(null)
   }, [deleteTarget, removeAddon])
 
+  if (embedded) {
+    return (
+      <>
+        {/* Add source input */}
+        <div className="px-5 py-4 border-b border-[var(--aurora-rim)]">
+          <p className="text-[14px] text-[var(--aurora-text)] font-medium mb-3">
+            Add a source
+          </p>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="https://addon.example.com"
+              value={urlInput}
+              onChange={(e) => setUrlInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleAdd()
+              }}
+              disabled={adding}
+              className="flex-1 bg-white/[0.06] border border-[var(--aurora-rim)] rounded-lg px-3 py-2 text-[13px] text-[var(--aurora-text)] placeholder:text-[var(--aurora-text-tertiary)] outline-none focus:border-[var(--aurora-accent-interactive)]/50 transition-colors disabled:opacity-50"
+            />
+            <button
+              onClick={handleAdd}
+              disabled={adding || !urlInput.trim()}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[12px] font-medium transition-colors disabled:opacity-40"
+              style={{
+                background: "var(--aurora-accent-interactive)",
+                color: "var(--aurora-slate)",
+              }}
+            >
+              {adding ? (
+                <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              ) : (
+                <Plus className="h-3.5 w-3.5" strokeWidth={2} />
+              )}
+              <span>Add</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Installed list */}
+        <div className="px-5 py-4">
+          <p className="text-[14px] text-[var(--aurora-text)] font-medium mb-3">
+            Installed
+          </p>
+
+          {addonsLoading ? (
+            <p className="text-[12px] text-[var(--aurora-text-tertiary)] py-2">
+              Loading…
+            </p>
+          ) : addons.length === 0 ? (
+            <div className="py-3 text-center">
+              <Cloud className="h-5 w-5 text-[var(--aurora-text-tertiary)] mx-auto mb-2" />
+              <p className="text-[12px] text-[var(--aurora-text-secondary)]">
+                No sources installed yet
+              </p>
+              <p className="text-[11px] text-[var(--aurora-text-tertiary)] mt-1">
+                Add a streaming source above to search online music catalogs
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {addons.map((addon) => (
+                <AddonRow
+                  key={addon.id}
+                  addon={addon}
+                  onToggle={(enabled) => toggleAddon(addon.id, enabled)}
+                  onRemove={() => setDeleteTarget(addon)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Delete confirmation */}
+        <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Remove "{deleteTarget?.name ?? deleteTarget?.id}"?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will unregister the addon. Songs already saved from it will stay in your library.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction variant="destructive" onClick={handleRemove}>
+                Remove
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </>
+    )
+  }
+
   return (
     <div
-      className="rounded-xl overflow-hidden mt-6"
+      className={`rounded-xl overflow-hidden ${className ?? "mt-6"}`}
       style={{
         background: "var(--aurora-surface)",
         border: "1px solid var(--aurora-rim)",

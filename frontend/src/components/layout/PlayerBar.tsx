@@ -106,9 +106,9 @@ export function PlayerBar() {
             maskImage: 'radial-gradient(closest-side, black, transparent)',
             WebkitMaskImage: 'radial-gradient(closest-side, black, transparent)',
             mixBlendMode: 'screen',
-            opacity: 0.15,
+            opacity: 0.22,
             pointerEvents: 'none',
-            transition: 'opacity 0.4s ease-out',
+            transition: 'opacity 400ms ease',
           }}
         />
       )}
@@ -268,7 +268,7 @@ export function PlayerBar() {
             <AnimatePresence mode="wait">
             <motion.div
               key={currentSong.id}
-              className="flex items-center gap-3.5 w-[300px] min-w-[200px] flex-shrink-0"
+              className="flex items-center gap-3.5 w-[340px] min-w-[240px] flex-shrink-0"
               initial={{ opacity: 0, y: 8, scale: 0.97 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, scale: 1.04 }}
@@ -317,7 +317,9 @@ export function PlayerBar() {
 
             {/* CENTER: Controls + seek bar */}
             <div className="flex-1 flex flex-col items-center gap-2 max-w-[580px] mx-auto min-w-0">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3"
+                style={{ boxShadow: "inset 0 0 40px 10px color-mix(in oklch, var(--song-color) 8%, transparent)" }}
+              >
                 <button
                   onClick={toggleShuffle}
                   disabled={!hasSong}

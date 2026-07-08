@@ -21,6 +21,17 @@ export function PlaylistItem({ playlist, isActive, onSelect }: PlaylistItemProps
           : "text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)]"
       }`}
     >
+      {/* Color bar — playlist color accent on left edge */}
+      {playlist.color && (
+        <span
+          className="absolute left-0 top-1 bottom-1 w-1 rounded-l-md transition-opacity duration-200"
+          style={{
+            background: playlist.color,
+            opacity: isActive ? 1 : 0.6,
+          }}
+          aria-hidden="true"
+        />
+      )}
       {/* Active indicator — 3px left bar, solid primary */}
       <span
         className={`absolute left-0 top-1/2 -translate-y-1/2 w-[3px] rounded-r-full transition-[height,opacity] duration-200 ${
