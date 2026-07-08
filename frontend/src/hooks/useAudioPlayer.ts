@@ -64,6 +64,8 @@ export function useAudioPlayer() {
   const xfadeIntervalRef = useRef<number | null>(null) // equal-power crossfade interval
   // Cleanup timeout for tick-path crossfade old-engine stop/unload (overlap/linear/lagged)
   const tickFadeCleanupRef = useRef<number | null>(null)
+  // Cleanup timeout for startPlayback fade-completion (overlap/linear/lagged curves)
+  const fadeCompletionTimerRef = useRef<number | null>(null)
   const currentSongRef = useRef<string | null>(null)
   const seekingRef = useRef(false)
   // Collects all engines from rapid transitions that need cleanup
@@ -519,6 +521,7 @@ export function useAudioPlayer() {
       if (intervalRef.current) window.clearTimeout(intervalRef.current)
       if (laggedStartTimerRef.current) window.clearTimeout(laggedStartTimerRef.current)
       if (tickFadeCleanupRef.current) window.clearTimeout(tickFadeCleanupRef.current)
+      if (fadeCompletionTimerRef.current) window.clearTimeout(fadeCompletionTimerRef.current)
     }
   }, [])
 
@@ -724,9 +727,10 @@ export function useAudioPlayer() {
             engine.setVolume(targetVol)
             engine.play()
             usePlayerStore.getState().setCrossfading(true, prevTitleRef.current ?? undefined)
-            setTimeout(() => {
+            fadeCompletionTimerRef.current = window.setTimeout(() => {
               outgoing.fade(outgoing.getVolume(), 0, 250)
-              setTimeout(() => {
+              fadeCompletionTimerRef.current = window.setTimeout(() => {
+                fadeCompletionTimerRef.current = null
                 outgoing.stop()
                 outgoing.unload()
                 fadeDone()
@@ -823,7 +827,8 @@ export function useAudioPlayer() {
           } else {
             // Linear AND lagged: engine-native fade out over the full duration
             prev.fade(prev.getVolume(), 0, fadeDurationMs)
-            setTimeout(() => {
+            fadeCompletionTimerRef.current = window.setTimeout(() => {
+              fadeCompletionTimerRef.current = null
               prev.stop()
               prev.unload()
               if (fadingOutRef.current === prev) fadingOutRef.current = null
@@ -866,6 +871,10 @@ export function useAudioPlayer() {
       if (tickFadeCleanupRef.current) {
         window.clearTimeout(tickFadeCleanupRef.current)
         tickFadeCleanupRef.current = null
+      }
+      if (fadeCompletionTimerRef.current) {
+        window.clearTimeout(fadeCompletionTimerRef.current)
+        fadeCompletionTimerRef.current = null
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
