@@ -16,16 +16,6 @@ import { SettingsCard } from "@/components/settings/SettingsCard"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { FolderSearch, Music, Upload } from "lucide-react"
 
-const SETTINGS_SECTIONS = [
-  { id: "playback", label: "Audio" },
-  { id: "library", label: "Library" },
-  { id: "watch", label: "Auto-Watch" },
-  { id: "sources", label: "Sources" },
-  { id: "appearance", label: "Display" },
-] as const
-
-type SectionId = (typeof SETTINGS_SECTIONS)[number]["id"]
-
 export function SettingsView() {
   const crossfadeEnabled = useSettingsStore((s) => s.crossfadeEnabled)
   const crossfadeDuration = useSettingsStore((s) => s.crossfadeDuration)
@@ -48,9 +38,6 @@ export function SettingsView() {
   const [importLoading, setImportLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const fetchPlaylists = usePlaylistStore((state) => state.fetchPlaylists)
-
-  // ── Section nav state ─────────────────────────────────────────────
-  const [activeSection, setActiveSection] = useState<SectionId>("playback")
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -124,13 +111,14 @@ export function SettingsView() {
     { label: "Extended", value: 12 },
   ]
 
-  // ── Section content renderers ─────────────────────────────────────
+  // ── Section cards ─────────────────────────────────────────────────
 
-  const renderPlayback = () => (
+  const playbackCard = (
     <SettingsCard
       label="PLAYBACK"
       title="Transitions & loudness"
       description="Shape how Aurora moves between tracks."
+      style={{ gridRow: "span 2" }}
     >
       {/* Crossfade toggle */}
       <div className="px-5 py-4 flex items-center justify-between">
@@ -360,7 +348,7 @@ export function SettingsView() {
     </SettingsCard>
   )
 
-  const renderLibrary = () => (
+  const libraryCard = (
     <SettingsCard
       label="LIBRARY"
       title="Import & intake"
@@ -417,7 +405,7 @@ export function SettingsView() {
     </SettingsCard>
   )
 
-  const renderWatch = () => (
+  const watchCard = (
     <SettingsCard
       label="WATCH FOLDERS"
       title="Auto-watch"
@@ -488,7 +476,7 @@ export function SettingsView() {
     </SettingsCard>
   )
 
-  const renderSources = () => (
+  const addonsCard = (
     <SettingsCard
       label="ADDONS"
       title="Online sources"
@@ -498,7 +486,7 @@ export function SettingsView() {
     </SettingsCard>
   )
 
-  const renderAppearance = () => (
+  const appearanceCard = (
     <SettingsCard
       label="APPEARANCE & ABOUT"
       title="Desktop behavior"
@@ -544,9 +532,9 @@ export function SettingsView() {
   )
 
   return (
-    <div className="aurora-view-enter w-full mx-auto p-4 sm:p-8 lg:p-10 pb-28">
+    <div className="aurora-view-enter w-full max-w-[1280px] mx-auto p-4 sm:p-8 lg:p-10 pb-28">
       {/* Header */}
-      <div className="max-w-[900px] lg:max-w-[1080px] mx-auto mb-6 sm:mb-8">
+      <div className="mb-6 sm:mb-8">
         <h1 className="font-display text-[30px] sm:text-[34px] leading-none tracking-tight text-[var(--aurora-text)]">
           Settings
         </h1>
@@ -555,39 +543,13 @@ export function SettingsView() {
         </p>
       </div>
 
-      {/* ── Desktop: nav rail + content ── */}
-      <div className="hidden lg:grid lg:grid-cols-[180px_1fr] gap-8 max-w-[1080px] mx-auto items-start">
-        <nav className="sticky top-8 space-y-0.5 pt-1">
-          {SETTINGS_SECTIONS.map((s) => (
-            <button
-              key={s.id}
-              onClick={() => setActiveSection(s.id)}
-              className={`w-full text-left px-3 py-2 rounded-md text-[12px] font-medium tracking-wide transition-colors duration-150 ${
-                activeSection === s.id
-                  ? "text-[var(--aurora-text)] bg-white/[0.05]"
-                  : "text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-text-secondary)] hover:bg-white/[0.03]"
-              }`}
-            >
-              {s.label}
-            </button>
-          ))}
-        </nav>
-        <div className="max-w-[720px] space-y-4 lg:space-y-5">
-          {activeSection === "playback" && renderPlayback()}
-          {activeSection === "library" && renderLibrary()}
-          {activeSection === "watch" && renderWatch()}
-          {activeSection === "sources" && renderSources()}
-          {activeSection === "appearance" && renderAppearance()}
-        </div>
-      </div>
-
-      {/* ── Mobile/Tablet: all sections stacked ── */}
-      <div className="lg:hidden max-w-[900px] mx-auto space-y-4">
-        {renderPlayback()}
-        {renderLibrary()}
-        {renderWatch()}
-        {renderSources()}
-        {renderAppearance()}
+      {/* 2-column card grid — all sections visible simultaneously */}
+      <div className="grid gap-4 lg:gap-5 xl:gap-6 lg:grid-cols-[minmax(0,1.05fr)_minmax(360px,0.95fr)] items-start">
+        {playbackCard}
+        {libraryCard}
+        {watchCard}
+        {addonsCard}
+        {appearanceCard}
       </div>
 
       {/* Hidden file input for import */}
