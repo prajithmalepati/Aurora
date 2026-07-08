@@ -376,8 +376,13 @@ async fn golden_health() {
     assert_eq!(b["song_count"], 3);
     assert_eq!(b["tag_count"], 6);
     assert_eq!(b["playlist_count"], 3);
-    // Also assert golden parity
-    assert_body("health_golden", &b, &load_golden("health_golden"));
+    // New fields: db_path and data_dir are environment-dependent
+    assert!(b["db_path"].is_string(), "db_path should be a string");
+    assert!(b["data_dir"].is_string(), "data_dir should be a string");
+    // Golden parity (strip environment-dependent fields first)
+    let mut b_stripped = b.clone();
+    b_stripped.as_object_mut().map(|o| { o.remove("db_path"); o.remove("data_dir") });
+    assert_body("health_golden", &b_stripped, &load_golden("health_golden"));
 }
 
 // ═══════════════════════════════════════════════════════════════════════

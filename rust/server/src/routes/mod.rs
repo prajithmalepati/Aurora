@@ -33,9 +33,11 @@ pub struct HealthResponse {
     pub song_count: i64,
     pub tag_count: i64,
     pub playlist_count: i64,
+    pub db_path: String,
+    pub data_dir: String,
 }
 
-/// GET /api/health — full health probe matching Python parity (5-key body).
+/// GET /api/health — full health probe matching Python parity (7-key body).
 pub async fn health(
     State(state): State<Arc<crate::AppState>>,
 ) -> Json<HealthResponse> {
@@ -49,11 +51,21 @@ pub async fn health(
     let playlist_count: i64 = conn
         .query_row("SELECT COUNT(*) FROM playlists", [], |r| r.get(0))
         .unwrap_or(0);
+
+    let db_path = state
+        .db_path
+        .as_ref()
+        .map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_else(|| aurora_core::paths::DB_PATH.to_string_lossy().into_owned());
+    let data_dir = aurora_core::paths::DATA_DIR.to_string_lossy().into_owned();
+
     Json(HealthResponse {
         status: "ok",
         database: "connected",
         song_count,
         tag_count,
         playlist_count,
+        db_path,
+        data_dir,
     })
 }

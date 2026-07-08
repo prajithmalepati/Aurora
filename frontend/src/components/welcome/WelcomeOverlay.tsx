@@ -5,6 +5,7 @@ import { AuroraWordmark } from "@/components/aurora/AuroraWordmark"
 import { ScanDialog } from "@/components/scanner/ScanDialog"
 import { AddSongDialog } from "@/components/songs/AddSongDialog"
 import { KeyboardShortcutsOverlay } from "@/components/ui/KeyboardShortcutsOverlay"
+import auroraIcon from "@/assets/aurora-icon.svg"
 
 const WELCOME_DISMISSED_KEY = "aurora-welcome-dismissed"
 
@@ -83,7 +84,28 @@ export function WelcomeOverlay() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: "easeOut" }}
         >
-          {/* Aurora logo */}
+          {/* Aurora icon — oversized visual anchor with shimmer */}
+          <motion.div
+            className="mb-5"
+            initial={{ opacity: 0, scale: 0.85 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.6, delay: 0.05 }}
+          >
+            <div className="relative w-[140px] h-[140px] mx-auto">
+              <img
+                src={auroraIcon}
+                alt="Aurora"
+                className="w-full h-full drop-shadow-[0_0_24px_rgba(94,234,212,0.25)]"
+              />
+              {/* Shimmer overlay — reuses aurora-idle-pulse keyframes */}
+              <div
+                className="absolute inset-0 rounded-full aurora-idle-shimmer opacity-40 pointer-events-none"
+                aria-hidden="true"
+              />
+            </div>
+          </motion.div>
+
+          {/* Aurora wordmark */}
           <motion.div
             className="mb-6"
             initial={{ opacity: 0, scale: 0.9 }}
