@@ -624,6 +624,21 @@ async fn golden_playlists() {
     assert!(pl1.get("crossfade_duration_s").unwrap().is_null(),
         "crossfade_duration_s should be null in list endpoint too");
 
+    // ── update_crossfade_float_1_0 (float 1.0 should persist as 1, not clear to null) ──
+    let (s, b) = send(&app, put_json("/api/playlists/1",
+        r#"{"crossfade_enabled":1,"crossfade_duration_s":1.0}"#)).await;
+    assert_eq!(s, 200, "crossfade 1.0 update should succeed");
+    let data = b.get("data").expect("response should have data");
+    assert_eq!(data.get("crossfade_duration_s").unwrap().as_i64(), Some(1),
+        "crossfade_duration_s 1.0 should persist as 1, not null");
+
+    // Verify persistence on re-fetch
+    let (s2, b2) = send(&app, get("/api/playlists/1")).await;
+    assert_eq!(s2, 200);
+    let data2 = b2.get("data").expect("response should have data");
+    assert_eq!(data2.get("crossfade_duration_s").unwrap().as_i64(), Some(1),
+        "crossfade_duration_s should still be 1 on re-fetch");
+
     // ── update_404 ──
     let (s, b) = send(&app, put_json("/api/playlists/999", r#"{"name":"Nope"}"#)).await;
     assert_eq!(s, 404);
