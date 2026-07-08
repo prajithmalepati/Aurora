@@ -15,6 +15,7 @@ import { formatFileSize, qualityLabel } from "@/lib/utils"
 import { api } from "@/lib/api"
 import type { Song } from "@/types"
 import { displayArtist } from "@/lib/displayArtist"
+import { addonName } from "@/lib/addonName"
 
 const bleedThumbCache = new Map<number, string>()
 
@@ -168,10 +169,7 @@ export function PlayerBar() {
                           }}
                         >
                           <Cloud className="h-2.5 w-2.5" />
-                          {(() => {
-                            const addonId = currentSong.source.replace("addon:", "")
-                            return useAddonStore.getState().addons.find(a => a.id === addonId)?.name ?? addonId
-                          })()}
+                          {addonName(currentSong.source, useAddonStore.getState().addons)}
                         </span>
                       )}
                     </div>
@@ -323,10 +321,7 @@ export function PlayerBar() {
                           }}
                         >
                           <Cloud className="h-2.5 w-2.5" />
-                          {(() => {
-                            const addonId = currentSong.source.replace("addon:", "")
-                            return useAddonStore.getState().addons.find(a => a.id === addonId)?.name ?? addonId
-                          })()}
+                          {addonName(currentSong.source, useAddonStore.getState().addons)}
                         </span>
                       )}
                     </div>

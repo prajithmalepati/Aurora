@@ -164,17 +164,7 @@ function App() {
 
     let content: ReactNode
     if (view.kind === "all-songs") {
-      // Compute enabled addons for filter chips
-      const enabledAddons = addons.filter((a) => a.enabled)
-      const hasAddons = enabledAddons.length > 0
-
-      // Client-side source filter on loaded songs
-      const filteredSongs = sourceFilter === null
-        ? songs
-        : sourceFilter === "offline"
-          ? songs.filter((s) => s.source === "local_scan" || s.source === "manual")
-          : songs.filter((s) => s.source === sourceFilter)
-
+      // Server-backed source filter — songs already filtered by API
       content = (
         <div className="p-4 sm:px-10 sm:pt-8 sm:pb-6 max-w-[1800px] mx-auto h-full flex flex-col min-h-0">
           <div className="flex items-center justify-between mb-6">
@@ -218,7 +208,7 @@ function App() {
             />
           </div>
           {/* Source filter chips — visible when addons exist or filter is active */}
-          {(hasAddons || sourceFilter !== null) && (
+          {(addons.length > 0 || sourceFilter !== null) && (
             <div className="flex items-center gap-2 mb-4 flex-wrap">
               <SourceFilterChip
                 label="All Sources"
@@ -231,7 +221,7 @@ function App() {
                 active={sourceFilter === "offline"}
                 onClick={() => setSourceFilter("offline")}
               />
-              {enabledAddons.map((addon) => (
+              {addons.filter((a) => a.enabled).map((addon) => (
                 <SourceFilterChip
                   key={addon.id}
                   label={addon.name ?? addon.id}
@@ -244,7 +234,7 @@ function App() {
           )}
           <OnlineResults searchQuery={searchQuery} />
           <SongTable
-            songs={filteredSongs}
+            songs={songs}
             loading={songsLoading}
             error={songsError}
             onPlay={handlePlaySong}

@@ -24,9 +24,11 @@ pub struct ListParams {
     pub order: Option<String>,
     pub limit: Option<i64>,
     pub offset: Option<i64>,
+    /// Source filter: "offline" for local_scan+manual+NULL, "addon:<id>" for specific addon.
+    pub source: Option<String>,
 }
 
-/// GET /api/songs — list with search/sort/pagination.
+/// GET /api/songs — list with search/sort/pagination/source-filter.
 pub async fn list_songs(
     State(state): State<Arc<AppState>>,
     Query(params): Query<ListParams>,
@@ -40,6 +42,7 @@ pub async fn list_songs(
     let (songs, total) = aurora_core::db::queries::list_songs(
         &conn,
         params.search.as_deref(),
+        params.source.as_deref(),
         sort,
         order,
         limit,

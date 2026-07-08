@@ -8,6 +8,7 @@ import { TagList } from "@/components/tags/TagList"
 import { Cloud } from "lucide-react"
 import type { SortField } from "./SongTable"
 import { useAddonStore } from "@/stores/addonStore"
+import { addonName } from "@/lib/addonName"
 
 // ── Column ID type ──
 export type ColumnId = "index" | "title" | "type" | "duration" | "artist" | "album" | "tags"
@@ -113,10 +114,7 @@ export const COLUMN_REGISTRY: ColumnDef[] = [
                   }}
                 >
                   <Cloud className="h-2.5 w-2.5" />
-                  {(() => {
-                    const addonId = song.source.replace("addon:", "")
-                    return useAddonStore.getState().addons.find(a => a.id === addonId)?.name ?? addonId
-                  })()}
+                  {addonName(song.source, useAddonStore.getState().addons)}
                 </span>
               )}
             </div>
