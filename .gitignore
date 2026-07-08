@@ -70,6 +70,7 @@ verify-*.jpg
 # Local-only docs
 CHALLENGES.md
 DEVIATIONS.md
+docs/design/
 
 # Playwright snapshots
 .playwright-mcp/

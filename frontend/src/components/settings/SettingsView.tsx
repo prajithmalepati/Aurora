@@ -12,8 +12,19 @@ import { AddSongDialog } from "@/components/songs/AddSongDialog"
 import { UpdateCard } from "@/components/settings/UpdateCard"
 import { ZoomControl } from "@/components/settings/ZoomControl"
 import { SourcesSection } from "@/components/settings/SourcesSection"
+import { SettingsCard } from "@/components/settings/SettingsCard"
 import { usePlaylistStore } from "@/stores/playlistStore"
 import { FolderSearch, Music, Upload } from "lucide-react"
+
+const SETTINGS_SECTIONS = [
+  { id: "playback", label: "Audio" },
+  { id: "library", label: "Library" },
+  { id: "watch", label: "Auto-Watch" },
+  { id: "sources", label: "Sources" },
+  { id: "appearance", label: "Display" },
+] as const
+
+type SectionId = (typeof SETTINGS_SECTIONS)[number]["id"]
 
 export function SettingsView() {
   const crossfadeEnabled = useSettingsStore((s) => s.crossfadeEnabled)
@@ -37,6 +48,9 @@ export function SettingsView() {
   const [importLoading, setImportLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const fetchPlaylists = usePlaylistStore((state) => state.fetchPlaylists)
+
+  // ── Section nav state ─────────────────────────────────────────────
+  const [activeSection, setActiveSection] = useState<SectionId>("playback")
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -110,413 +124,470 @@ export function SettingsView() {
     { label: "Extended", value: 12 },
   ]
 
-  return (
-    <div className="aurora-view-enter p-4 sm:p-10 max-w-[600px]">
-      <h1 className="font-display text-[28px] leading-none tracking-tight text-[var(--aurora-text)] mb-8">
-        Settings
-      </h1>
+  // ── Section content renderers ─────────────────────────────────────
 
-      {/* Library Management section */}
+  const renderPlayback = () => (
+    <SettingsCard
+      label="PLAYBACK"
+      title="Transitions & loudness"
+      description="Shape how Aurora moves between tracks."
+    >
+      {/* Crossfade toggle */}
+      <div className="px-5 py-4 flex items-center justify-between">
+        <div>
+          <p className="text-[14px] text-[var(--aurora-text)] font-medium">Crossfade</p>
+          <p className="text-[12px] text-[var(--aurora-text-secondary)] mt-0.5">
+            Blend songs smoothly as they transition
+          </p>
+        </div>
+        <button
+          onClick={() => setCrossfadeEnabled(!crossfadeEnabled)}
+          role="switch"
+          aria-checked={crossfadeEnabled}
+          className={`relative rounded-full transition-colors duration-200 flex-shrink-0 ${
+            crossfadeEnabled
+              ? "bg-[var(--aurora-accent-interactive)]"
+              : "bg-white/[0.12]"
+          }`}
+          style={{ height: "22px", width: "40px" }}
+        >
+          <span
+            className="absolute top-0.5 left-0.5 w-[18px] h-[18px] rounded-full bg-white shadow-sm transition-transform duration-200"
+            style={{ transform: crossfadeEnabled ? "translateX(18px)" : "translateX(0)" }}
+          />
+        </button>
+      </div>
+
+      {/* Duration presets + slider */}
       <div
-        className="rounded-xl overflow-hidden"
-        style={{
-          background: "var(--aurora-surface)",
-          border: "1px solid var(--aurora-rim)",
-          backdropFilter: "blur(12px)",
-        }}
+        className="px-5 py-4 border-t border-[var(--aurora-rim)] transition-opacity duration-200"
+        style={{ opacity: crossfadeEnabled ? 1 : 0.35, pointerEvents: crossfadeEnabled ? "auto" : "none" }}
       >
-        <div className="px-5 py-3 border-b border-[var(--aurora-rim)]">
-          <p className="label-micro text-[10px] tracking-[0.2em] text-[var(--aurora-text-tertiary)]">Library Management</p>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-[14px] text-[var(--aurora-text)]">Duration</p>
+          <span className="text-[13px] tabular-nums text-[var(--aurora-accent-interactive)] font-medium">
+            {crossfadeDuration}s
+          </span>
         </div>
 
+        {/* Preset buttons */}
+        <div className="flex gap-1.5 mb-3">
+          {durationPresets.map((preset) => (
+            <button
+              key={preset.value}
+              onClick={() => setCrossfadeDuration(preset.value)}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors duration-150 active:bg-white/[0.03] ${
+                crossfadeDuration === preset.value
+                  ? "bg-[var(--aurora-accent-interactive)]/15 text-[var(--aurora-accent-interactive)]"
+                  : "bg-white/[0.06] text-[var(--aurora-text-secondary)] hover:bg-white/[0.10] hover:text-[var(--aurora-text)]"
+              }`}
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Custom slider */}
+        <div className="flex items-center gap-3">
+          <span className="text-[11px] text-[var(--aurora-text-tertiary)] w-4">1s</span>
+          <input
+            type="range"
+            min={1}
+            max={12}
+            step={1}
+            value={crossfadeDuration}
+            onChange={(e) => setCrossfadeDuration(Number(e.target.value))}
+            className="aurora-range flex-1"
+            style={{ ["--aurora-range-pct" as string]: `${durPct}%` }}
+            aria-label="Crossfade duration"
+          />
+          <span className="text-[11px] text-[var(--aurora-text-tertiary)] w-5">12s</span>
+        </div>
+      </div>
+
+      {/* Crossfade curve */}
+      <div
+        className="px-5 py-4 border-t border-[var(--aurora-rim)] transition-opacity duration-200"
+        style={{ opacity: crossfadeEnabled ? 1 : 0.35, pointerEvents: crossfadeEnabled ? "auto" : "none" }}
+      >
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <p className="text-[14px] text-[var(--aurora-text)] font-medium">Fade curve</p>
+            <p className="text-[12px] text-[var(--aurora-text-secondary)] mt-0.5">
+              How the two songs blend during transition
+            </p>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4 gap-2">
+          {([
+            {
+              value: "linear" as CrossfadeCurve,
+              label: "Linear",
+              outgoing: "M 0 0 L 80 40",
+              incoming: "M 0 40 L 80 0",
+            },
+            {
+              value: "equalpower" as CrossfadeCurve,
+              label: "Equal Power",
+              outgoing: "M 0 0 C 20 0 60 40 80 40",
+              incoming: "M 0 40 C 20 40 60 0 80 0",
+            },
+            {
+              value: "overlap" as CrossfadeCurve,
+              label: "Overlap",
+              outgoing: "M 0 0 L 65 0 L 80 40",
+              incoming: "M 0 0 L 80 0",
+            },
+            {
+              value: "lagged" as CrossfadeCurve,
+              label: "Lagged",
+              outgoing: "M 0 0 L 80 40",
+              incoming: "M 0 40 L 40 40 L 80 0",
+            },
+          ]).map(({ value, label, outgoing, incoming }) => (
+            <button
+              key={value}
+              onClick={() => setCrossfadeCurve(value)}
+              className={`flex flex-col items-center gap-1.5 px-3 py-3 rounded-lg text-[12px] font-medium transition-colors active:bg-white/[0.03] ${
+                crossfadeCurve === value
+                  ? "bg-[var(--aurora-accent-interactive)]/15 text-[var(--aurora-accent-interactive)] ring-1 ring-[var(--aurora-accent-interactive)]/30"
+                  : "bg-white/[0.06] text-[var(--aurora-text-secondary)] hover:bg-white/[0.10] hover:text-[var(--aurora-text)]"
+              }`}
+            >
+              <svg viewBox="0 0 80 40" className="w-20 h-10" fill="none">
+                <line x1="0" y1="20" x2="80" y2="20" stroke="currentColor" strokeOpacity={0.15} strokeWidth="0.75" strokeDasharray="2 2" />
+                <path d={outgoing} stroke="#f97316" strokeOpacity={0.7} strokeWidth="1.5" />
+                <path d={incoming} stroke="#5eead4" strokeOpacity={0.7} strokeWidth="1.5" strokeDasharray="3 2" />
+              </svg>
+              <span>{label}</span>
+            </button>
+          ))}
+        </div>
+        <p className="text-[11px] text-[var(--aurora-text-tertiary)] mt-2">
+          {crossfadeCurve === "linear" && "Both tracks fade evenly — a smooth X-shaped crossfade."}
+          {crossfadeCurve === "equalpower" && "Keeps combined volume steady so the mix doesn't dip in the middle."}
+          {crossfadeCurve === "overlap" && "Both play at full volume, then the old track cuts out at the end."}
+          {crossfadeCurve === "lagged" && "Outgoing starts fading first; incoming joins halfway through."}
+        </p>
+      </div>
+
+      {/* ReplayGain mode */}
+      <div className="px-5 py-4 border-t border-[var(--aurora-rim)]">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <p className="text-[14px] text-[var(--aurora-text)] font-medium">ReplayGain</p>
+            <p className="text-[12px] text-[var(--aurora-text-secondary)] mt-0.5">
+              Normalize loudness across songs
+            </p>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          {(["off", "track", "album"] as const).map((mode) => (
+            <button
+              key={mode}
+              onClick={() => setReplaygainMode(mode)}
+              className={`px-3 py-1.5 rounded-lg text-[13px] font-medium transition-colors active:bg-white/[0.03] ${
+                replaygainMode === mode
+                  ? "bg-[var(--aurora-accent-interactive)] text-white"
+                  : "bg-white/[0.08] text-[var(--aurora-text-secondary)] hover:bg-white/[0.12]"
+              }`}
+            >
+              {mode === "off" ? "Off" : mode === "track" ? "Track" : "Album"}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Respect song trims */}
+      <div className="px-5 py-4 border-t border-[var(--aurora-rim)] flex items-center justify-between">
+        <div>
+          <p className="text-[14px] text-[var(--aurora-text)] font-medium">Respect song trims</p>
+          <p className="text-[12px] text-[var(--aurora-text-secondary)] mt-0.5">
+            Play playlist songs between their trim points and crossfade at the trim-out
+          </p>
+        </div>
+        <button
+          onClick={() => setRespectTrims(!respectTrims)}
+          role="switch"
+          aria-label="Respect song trims"
+          aria-checked={respectTrims}
+          className={`relative rounded-full transition-colors duration-200 flex-shrink-0 ${
+            respectTrims
+              ? "bg-[var(--aurora-accent-interactive)]"
+              : "bg-white/[0.12]"
+          }`}
+          style={{ height: "22px", width: "40px" }}
+        >
+          <span
+            className="absolute top-0.5 left-0.5 w-[18px] h-[18px] rounded-full bg-white shadow-sm transition-transform duration-200"
+            style={{ transform: respectTrims ? "translateX(18px)" : "translateX(0)" }}
+          />
+        </button>
+      </div>
+
+      {/* Continue playback */}
+      <div className="px-5 py-4 border-t border-[var(--aurora-rim)] flex items-center justify-between">
+        <div>
+          <p className="text-[14px] text-[var(--aurora-text)] font-medium">Continue playback</p>
+          <p className="text-[12px] text-[var(--aurora-text-secondary)] mt-0.5">
+            When an album or playlist ends, continue with songs from your library
+          </p>
+        </div>
+        <button
+          onClick={() => setContinuePlayback(!continuePlayback)}
+          role="switch"
+          aria-label="Continue playback"
+          aria-checked={continuePlayback}
+          className={`relative rounded-full transition-colors duration-200 flex-shrink-0 ${
+            continuePlayback
+              ? "bg-[var(--aurora-accent-interactive)]"
+              : "bg-white/[0.12]"
+          }`}
+          style={{ height: "22px", width: "40px" }}
+        >
+          <span
+            className="absolute top-0.5 left-0.5 w-[18px] h-[18px] rounded-full bg-white shadow-sm transition-transform duration-200"
+            style={{ transform: continuePlayback ? "translateX(18px)" : "translateX(0)" }}
+          />
+        </button>
+      </div>
+
+      {/* Manual skip info */}
+      <div className="px-5 py-4 border-t border-[var(--aurora-rim)] flex items-center justify-between">
+        <p className="text-[13px] text-[var(--aurora-text-secondary)]">Manual skip fade</p>
+        <span className="text-[13px] tabular-nums text-[var(--aurora-text-tertiary)]">1s (fixed)</span>
+      </div>
+    </SettingsCard>
+  )
+
+  const renderLibrary = () => (
+    <SettingsCard
+      label="LIBRARY"
+      title="Import & intake"
+      description="Add music to your library from files and folders."
+    >
+      <div className="grid grid-cols-3 lg:grid-cols-1 xl:grid-cols-3 gap-3 p-4">
+        {/* Scan Folder tile */}
         <button
           onClick={() => setScanOpen(true)}
-          className="w-full px-5 py-4 flex items-center gap-3 hover:bg-white/[0.03] transition-colors text-left border-b border-[var(--aurora-rim)]"
+          className="flex flex-col items-start gap-2 p-4 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] transition-colors text-left group"
         >
-          <FolderSearch className="h-4 w-4 text-[var(--aurora-text-secondary)]" />
+          <FolderSearch className="h-5 w-5 text-[var(--aurora-text-secondary)] group-hover:text-[var(--aurora-accent-interactive)] transition-colors" />
           <div>
-            <p className="text-[14px] text-[var(--aurora-text)] font-medium">Scan Folder</p>
-            <p className="text-[12px] text-[var(--aurora-text-secondary)] mt-0.5">
-              Add music from a folder to your library
+            <p className="text-[13px] text-[var(--aurora-text)] font-medium">Scan folder</p>
+            <p className="text-[11px] text-[var(--aurora-text-secondary)] mt-0.5">
+              Index a folder of music.
             </p>
           </div>
         </button>
 
+        {/* Add Song tile */}
         <button
           onClick={() => setAddSongOpen(true)}
-          className="w-full px-5 py-4 flex items-center gap-3 hover:bg-white/[0.03] transition-colors text-left border-b border-[var(--aurora-rim)]"
+          className="flex flex-col items-start gap-2 p-4 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] transition-colors text-left group"
         >
-          <Music className="h-4 w-4 text-[var(--aurora-text-secondary)]" />
+          <Music className="h-5 w-5 text-[var(--aurora-text-secondary)] group-hover:text-[var(--aurora-accent-interactive)] transition-colors" />
           <div>
-            <p className="text-[14px] text-[var(--aurora-text)] font-medium">Add Song</p>
-            <p className="text-[12px] text-[var(--aurora-text-secondary)] mt-0.5">
-              Add a single song file to your library
+            <p className="text-[13px] text-[var(--aurora-text)] font-medium">Add song</p>
+            <p className="text-[11px] text-[var(--aurora-text-secondary)] mt-0.5">
+              Import one local file.
             </p>
           </div>
         </button>
 
+        {/* Import Playlist tile */}
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={importLoading}
-          className="w-full px-5 py-4 flex items-center gap-3 hover:bg-white/[0.03] transition-colors text-left disabled:opacity-50"
+          className="flex flex-col items-start gap-2 p-4 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] transition-colors text-left group disabled:opacity-50"
         >
           {importLoading ? (
-            <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent text-[var(--aurora-text-secondary)]" />
+            <span className="h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent text-[var(--aurora-text-secondary)]" />
           ) : (
-            <Upload className="h-4 w-4 text-[var(--aurora-text-secondary)]" />
+            <Upload className="h-5 w-5 text-[var(--aurora-text-secondary)] group-hover:text-[var(--aurora-accent-interactive)] transition-colors" />
           )}
           <div>
-            <p className="text-[14px] text-[var(--aurora-text)] font-medium">Import Playlist</p>
-            <p className="text-[12px] text-[var(--aurora-text-secondary)] mt-0.5">
-              Import songs from an M3U, M3U8, or JSON file into a new playlist
+            <p className="text-[13px] text-[var(--aurora-text)] font-medium">Import playlist</p>
+            <p className="text-[11px] text-[var(--aurora-text-secondary)] mt-0.5">
+              Create a playlist from M3U, M3U8, or JSON.
             </p>
           </div>
         </button>
       </div>
+    </SettingsCard>
+  )
 
-      {/* Audio section */}
-      <div
-        className="rounded-xl overflow-hidden mt-6"
-        style={{
-          background: "var(--aurora-surface)",
-          border: "1px solid var(--aurora-rim)",
-          backdropFilter: "blur(12px)",
-        }}
-      >
-        <div className="px-5 py-3 border-b border-[var(--aurora-rim)]">
-          <p className="label-micro text-[10px] tracking-[0.2em] text-[var(--aurora-text-tertiary)]">Audio</p>
-        </div>
-
-        {/* Crossfade toggle */}
-        <div className="px-5 py-4 flex items-center justify-between">
-          <div>
-            <p className="text-[14px] text-[var(--aurora-text)] font-medium">Crossfade</p>
-            <p className="text-[12px] text-[var(--aurora-text-secondary)] mt-0.5">
-              Blend songs smoothly as they transition
+  const renderWatch = () => (
+    <SettingsCard
+      label="WATCH FOLDERS"
+      title="Auto-watch"
+      description="Aurora checks these folders for new or changed files."
+    >
+      <div className="px-5 py-4">
+        {watchedFolders.length === 0 ? (
+          <div
+            className="rounded-lg px-4 py-3 text-center"
+            style={{ background: "var(--aurora-surface-inset)" }}
+          >
+            <p className="text-[12px] text-[var(--aurora-text-tertiary)]">
+              No folders watched yet. Add one from Scan folder.
             </p>
           </div>
-          <button
-            onClick={() => setCrossfadeEnabled(!crossfadeEnabled)}
-            role="switch"
-            aria-checked={crossfadeEnabled}
-            className={`relative w-10 h-5.5 rounded-full transition-colors duration-200 flex-shrink-0 ${
-              crossfadeEnabled
-                ? "bg-[var(--aurora-accent-interactive)]"
-                : "bg-white/[0.12]"
-            }`}
-            style={{ height: "22px", width: "40px" }}
-          >
-            <span
-              className="absolute top-0.5 left-0.5 w-[18px] h-[18px] rounded-full bg-white shadow-sm transition-transform duration-200"
-              style={{ transform: crossfadeEnabled ? "translateX(18px)" : "translateX(0)" }}
-            />
-          </button>
-        </div>
-
-        {/* Duration presets + slider */}
-        <div
-          className="px-5 py-4 border-t border-[var(--aurora-rim)] transition-opacity duration-200"
-          style={{ opacity: crossfadeEnabled ? 1 : 0.35, pointerEvents: crossfadeEnabled ? "auto" : "none" }}
-        >
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-[14px] text-[var(--aurora-text)]">Duration</p>
-            <span className="text-[13px] tabular-nums text-[var(--aurora-accent-interactive)] font-medium">
-              {crossfadeDuration}s
-            </span>
-          </div>
-
-          {/* Preset buttons */}
-          <div className="flex gap-1.5 mb-3">
-            {durationPresets.map((preset) => (
-              <button
-                key={preset.value}
-                onClick={() => setCrossfadeDuration(preset.value)}
-                className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors duration-150 active:bg-white/[0.03] ${
-                  crossfadeDuration === preset.value
-                    ? "bg-[var(--aurora-accent-interactive)]/15 text-[var(--aurora-accent-interactive)]"
-                    : "bg-white/[0.06] text-[var(--aurora-text-secondary)] hover:bg-white/[0.10] hover:text-[var(--aurora-text)]"
-                }`}
+        ) : (
+          <div className="space-y-2">
+            {watchedFolders.map((folder) => (
+              <div
+                key={folder.id}
+                className="flex items-center gap-3 rounded-lg px-3 py-2.5"
+                style={{
+                  background: "var(--aurora-surface-inset)",
+                  boxShadow: "inset 0 0 0 1px var(--aurora-rim)",
+                }}
               >
-                {preset.label}
-              </button>
+                {/* Status dot */}
+                <span
+                  className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                    folder.is_active ? "bg-green-400" : "bg-[var(--aurora-text-tertiary)]"
+                  }`}
+                  style={folder.is_active ? { boxShadow: "0 0 6px rgba(74,222,128,0.5)" } : undefined}
+                />
+
+                {/* Path + metadata */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] text-[var(--aurora-text)] truncate font-mono">
+                    {folder.folder_path}
+                  </p>
+                  {folder.last_scan_at && (
+                    <p className="text-[10px] text-[var(--aurora-text-tertiary)] mt-0.5">
+                      Last scan: {new Date(folder.last_scan_at).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+
+                {/* Action buttons */}
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <button
+                    onClick={() => handleTriggerScan(folder.id)}
+                    disabled={scanningId === folder.id}
+                    className="px-2 py-1 rounded-md text-[11px] font-medium transition-colors bg-white/[0.06] text-[var(--aurora-text-secondary)] hover:bg-white/[0.10] hover:text-[var(--aurora-text)] disabled:opacity-50"
+                  >
+                    {scanningId === folder.id ? "Scanning…" : "Scan now"}
+                  </button>
+                  <button
+                    onClick={() => handleRemoveFolder(folder.id)}
+                    className="px-2 py-1 rounded-md text-[11px] font-medium transition-colors bg-white/[0.06] text-[var(--aurora-text-tertiary)] hover:bg-[var(--aurora-danger)]/15 hover:text-[var(--aurora-danger)]"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
             ))}
           </div>
+        )}
+      </div>
+    </SettingsCard>
+  )
 
-          {/* Custom slider */}
-          <div className="flex items-center gap-3">
-            <span className="text-[11px] text-[var(--aurora-text-tertiary)] w-4">1s</span>
-            <input
-              type="range"
-              min={1}
-              max={12}
-              step={1}
-              value={crossfadeDuration}
-              onChange={(e) => setCrossfadeDuration(Number(e.target.value))}
-              className="aurora-range flex-1"
-              style={{ ["--aurora-range-pct" as string]: `${durPct}%` }}
-              aria-label="Crossfade duration"
-            />
-            <span className="text-[11px] text-[var(--aurora-text-tertiary)] w-5">12s</span>
-          </div>
-        </div>
+  const renderSources = () => (
+    <SettingsCard
+      label="ADDONS"
+      title="Online sources"
+      description="Add streaming/search providers when an addon is available."
+    >
+      <SourcesSection embedded />
+    </SettingsCard>
+  )
 
-        {/* Crossfade curve */}
-        <div
-          className="px-5 py-4 border-t border-[var(--aurora-rim)] transition-opacity duration-200"
-          style={{ opacity: crossfadeEnabled ? 1 : 0.35, pointerEvents: crossfadeEnabled ? "auto" : "none" }}
-        >
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <p className="text-[14px] text-[var(--aurora-text)] font-medium">Fade curve</p>
-              <p className="text-[12px] text-[var(--aurora-text-secondary)] mt-0.5">
-                How the two songs blend during transition
-              </p>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            {([
-              {
-                value: "linear" as CrossfadeCurve,
-                label: "Linear",
-                outgoing: "M 0 0 L 80 40",
-                incoming: "M 0 40 L 80 0",
-              },
-              {
-                value: "equalpower" as CrossfadeCurve,
-                label: "Equal Power",
-                outgoing: "M 0 0 C 20 0 60 40 80 40",
-                incoming: "M 0 40 C 20 40 60 0 80 0",
-              },
-              {
-                value: "overlap" as CrossfadeCurve,
-                label: "Overlap",
-                outgoing: "M 0 0 L 65 0 L 80 40",
-                incoming: "M 0 0 L 80 0",
-              },
-              {
-                value: "lagged" as CrossfadeCurve,
-                label: "Lagged",
-                outgoing: "M 0 0 L 80 40",
-                incoming: "M 0 40 L 40 40 L 80 0",
-              },
-            ]).map(({ value, label, outgoing, incoming }) => (
-              <button
-                key={value}
-                onClick={() => setCrossfadeCurve(value)}
-                className={`flex flex-col items-center gap-1.5 px-3 py-3 rounded-lg text-[12px] font-medium transition-colors active:bg-white/[0.03] ${
-                  crossfadeCurve === value
-                    ? "bg-[var(--aurora-accent-interactive)]/15 text-[var(--aurora-accent-interactive)] ring-1 ring-[var(--aurora-accent-interactive)]/30"
-                    : "bg-white/[0.06] text-[var(--aurora-text-secondary)] hover:bg-white/[0.10] hover:text-[var(--aurora-text)]"
-                }`}
-              >
-                <svg viewBox="0 0 80 40" className="w-20 h-10" fill="none">
-                  <line x1="0" y1="20" x2="80" y2="20" stroke="currentColor" strokeOpacity={0.15} strokeWidth="0.75" strokeDasharray="2 2" />
-                  <path d={outgoing} stroke="#f97316" strokeOpacity={0.7} strokeWidth="1.5" />
-                  <path d={incoming} stroke="#5eead4" strokeOpacity={0.7} strokeWidth="1.5" strokeDasharray="3 2" />
-                </svg>
-                <span>{label}</span>
-              </button>
-            ))}
-          </div>
-          <p className="text-[11px] text-[var(--aurora-text-tertiary)] mt-2">
-            {crossfadeCurve === "linear" && "Both tracks fade evenly — a smooth X-shaped crossfade."}
-            {crossfadeCurve === "equalpower" && "Keeps combined volume steady so the mix doesn't dip in the middle."}
-            {crossfadeCurve === "overlap" && "Both play at full volume, then the old track cuts out at the end."}
-            {crossfadeCurve === "lagged" && "Outgoing starts fading first; incoming joins halfway through."}
+  const renderAppearance = () => (
+    <SettingsCard
+      label="APPEARANCE & ABOUT"
+      title="Desktop behavior"
+      description="Interface scale, updates, and first-run help."
+    >
+      {/* Zoom */}
+      <div className="px-5 py-4 flex items-center justify-between">
+        <div>
+          <p className="text-[14px] text-[var(--aurora-text)] font-medium">Zoom</p>
+          <p className="text-[12px] text-[var(--aurora-text-secondary)] mt-0.5">
+            Scale the entire interface.
           </p>
         </div>
+        <ZoomControl />
+      </div>
 
-        {/* ReplayGain mode */}
-        <div className="px-5 py-4 border-t border-[var(--aurora-rim)]">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <p className="text-[14px] text-[var(--aurora-text)] font-medium">ReplayGain</p>
-              <p className="text-[12px] text-[var(--aurora-text-secondary)] mt-0.5">
-                Normalize loudness across songs
-              </p>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            {(["off", "track", "album"] as const).map((mode) => (
-              <button
-                key={mode}
-                onClick={() => setReplaygainMode(mode)}
-                className={`px-3 py-1.5 rounded-lg text-[13px] font-medium transition-colors active:bg-white/[0.03] ${
-                  replaygainMode === mode
-                    ? "bg-[var(--aurora-accent-interactive)] text-white"
-                    : "bg-white/[0.08] text-[var(--aurora-text-secondary)] hover:bg-white/[0.12]"
-                }`}
-              >
-                {mode === "off" ? "Off" : mode === "track" ? "Track" : "Album"}
-              </button>
-            ))}
-          </div>
-        </div>
+      {/* Update card (embedded) */}
+      <UpdateCard embedded />
 
-        {/* Respect song trims */}
-        <div className="px-5 py-4 border-t border-[var(--aurora-rim)] flex items-center justify-between">
-          <div>
-            <p className="text-[14px] text-[var(--aurora-text)] font-medium">Respect song trims</p>
-            <p className="text-[12px] text-[var(--aurora-text-secondary)] mt-0.5">
-              Play playlist songs between their trim points and crossfade at the trim-out
-            </p>
-          </div>
-          <button
-            onClick={() => setRespectTrims(!respectTrims)}
-            role="switch"
-            aria-label="Respect song trims"
-            aria-checked={respectTrims}
-            className={`relative rounded-full transition-colors duration-200 flex-shrink-0 ${
-              respectTrims
-                ? "bg-[var(--aurora-accent-interactive)]"
-                : "bg-white/[0.12]"
-            }`}
-            style={{ height: "22px", width: "40px" }}
-          >
-            <span
-              className="absolute top-0.5 left-0.5 w-[18px] h-[18px] rounded-full bg-white shadow-sm transition-transform duration-200"
-              style={{ transform: respectTrims ? "translateX(18px)" : "translateX(0)" }}
-            />
-          </button>
-        </div>
+      {/* Check for updates */}
+      <div className="px-5 py-4 border-t border-[var(--aurora-rim)]">
+        <button
+          onClick={() => checkForUpdates(true)}
+          className="text-[13px] text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-accent-interactive)] transition-colors duration-150"
+        >
+          Check for updates
+        </button>
+      </div>
 
-        {/* Continue playback */}
-        <div className="px-5 py-4 border-t border-[var(--aurora-rim)] flex items-center justify-between">
-          <div>
-            <p className="text-[14px] text-[var(--aurora-text)] font-medium">Continue playback</p>
-            <p className="text-[12px] text-[var(--aurora-text-secondary)] mt-0.5">
-              When an album or playlist ends, continue with songs from your library
-            </p>
-          </div>
-          <button
-            onClick={() => setContinuePlayback(!continuePlayback)}
-            role="switch"
-            aria-label="Continue playback"
-            aria-checked={continuePlayback}
-            className={`relative rounded-full transition-colors duration-200 flex-shrink-0 ${
-              continuePlayback
-                ? "bg-[var(--aurora-accent-interactive)]"
-                : "bg-white/[0.12]"
-            }`}
-            style={{ height: "22px", width: "40px" }}
-          >
-            <span
-              className="absolute top-0.5 left-0.5 w-[18px] h-[18px] rounded-full bg-white shadow-sm transition-transform duration-200"
-              style={{ transform: continuePlayback ? "translateX(18px)" : "translateX(0)" }}
-            />
-          </button>
-        </div>
+      {/* Reset welcome screen */}
+      <div className="px-5 py-4 border-t border-[var(--aurora-rim)]">
+        <button
+          onClick={() => {
+            resetWelcome()
+            window.location.reload()
+          }}
+          className="text-[13px] text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-accent-interactive)] transition-colors duration-150"
+        >
+          Reset welcome screen
+        </button>
+      </div>
+    </SettingsCard>
+  )
 
-        {/* Manual skip info */}
-        <div className="px-5 py-4 border-t border-[var(--aurora-rim)] flex items-center justify-between">
-          <p className="text-[13px] text-[var(--aurora-text-secondary)]">Manual skip fade</p>
-          <span className="text-[13px] tabular-nums text-[var(--aurora-text-tertiary)]">1s (fixed)</span>
+  return (
+    <div className="aurora-view-enter w-full mx-auto p-4 sm:p-8 lg:p-10 pb-28">
+      {/* Header */}
+      <div className="max-w-[900px] lg:max-w-[1080px] mx-auto mb-6 sm:mb-8">
+        <h1 className="font-display text-[30px] sm:text-[34px] leading-none tracking-tight text-[var(--aurora-text)]">
+          Settings
+        </h1>
+        <p className="text-[13px] text-[var(--aurora-text-secondary)] mt-2">
+          Tune playback, sources, library intake, and desktop behavior.
+        </p>
+      </div>
+
+      {/* ── Desktop: nav rail + content ── */}
+      <div className="hidden lg:grid lg:grid-cols-[180px_1fr] gap-8 max-w-[1080px] mx-auto items-start">
+        <nav className="sticky top-8 space-y-0.5 pt-1">
+          {SETTINGS_SECTIONS.map((s) => (
+            <button
+              key={s.id}
+              onClick={() => setActiveSection(s.id)}
+              className={`w-full text-left px-3 py-2 rounded-md text-[12px] font-medium tracking-wide transition-colors duration-150 ${
+                activeSection === s.id
+                  ? "text-[var(--aurora-text)] bg-white/[0.05]"
+                  : "text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-text-secondary)] hover:bg-white/[0.03]"
+              }`}
+            >
+              {s.label}
+            </button>
+          ))}
+        </nav>
+        <div className="max-w-[720px] space-y-4 lg:space-y-5">
+          {activeSection === "playback" && renderPlayback()}
+          {activeSection === "library" && renderLibrary()}
+          {activeSection === "watch" && renderWatch()}
+          {activeSection === "sources" && renderSources()}
+          {activeSection === "appearance" && renderAppearance()}
         </div>
       </div>
 
-      {/* Display section */}
-      <div
-        className="rounded-xl overflow-hidden mt-6"
-        style={{
-          background: "var(--aurora-surface)",
-          border: "1px solid var(--aurora-rim)",
-          backdropFilter: "blur(12px)",
-        }}
-      >
-        <div className="px-5 py-3 border-b border-[var(--aurora-rim)]">
-          <p className="label-micro text-[10px] tracking-[0.2em] text-[var(--aurora-text-tertiary)]">Display</p>
-        </div>
-        <div className="px-5 py-4 flex items-center justify-between">
-          <div>
-            <p className="text-[14px] text-[var(--aurora-text)] font-medium">Zoom</p>
-            <p className="text-[12px] text-[var(--aurora-text-secondary)] mt-0.5">
-              Scale the entire interface.
-            </p>
-          </div>
-          <ZoomControl />
-        </div>
-      </div>
-
-      {/* Sources section */}
-      <SourcesSection />
-
-      {/* Watched Folders section */}
-      <div
-        className="rounded-xl overflow-hidden mt-6"
-        style={{
-          background: "var(--aurora-surface)",
-          border: "1px solid var(--aurora-rim)",
-          backdropFilter: "blur(12px)",
-        }}
-      >
-        <div className="px-5 py-3 border-b border-[var(--aurora-rim)]">
-          <p className="label-micro text-[10px] tracking-[0.2em] text-[var(--aurora-text-tertiary)]">Auto-Watch</p>
-        </div>
-
-        <div className="px-5 py-4">
-          <div className="mb-3">
-            <p className="text-[14px] text-[var(--aurora-text)] font-medium">Watched Folders</p>
-            <p className="text-[12px] text-[var(--aurora-text-secondary)] mt-0.5">
-              Folders are polled every 30 seconds for new or changed music files
-            </p>
-          </div>
-
-          {watchedFolders.length === 0 ? (
-            <p className="text-[12px] text-[var(--aurora-text-tertiary)] py-2">
-              No folders watched yet. Use the Scan dialog to add one.
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {watchedFolders.map((folder) => (
-                <div
-                  key={folder.id}
-                  className="flex items-center gap-3 rounded-lg px-3 py-2.5"
-                  style={{
-                    background: "var(--aurora-surface-inset)",
-                    boxShadow: "inset 0 0 0 1px var(--aurora-rim)",
-                  }}
-                >
-                  {/* Status dot */}
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                      folder.is_active ? "bg-green-400" : "bg-[var(--aurora-text-tertiary)]"
-                    }`}
-                    style={folder.is_active ? { boxShadow: "0 0 6px rgba(74,222,128,0.5)" } : undefined}
-                  />
-
-                  {/* Path + metadata */}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] text-[var(--aurora-text)] truncate font-mono">
-                      {folder.folder_path}
-                    </p>
-                    {folder.last_scan_at && (
-                      <p className="text-[10px] text-[var(--aurora-text-tertiary)] mt-0.5">
-                        Last scan: {new Date(folder.last_scan_at).toLocaleString()}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Action buttons */}
-                  <div className="flex items-center gap-1.5 flex-shrink-0">
-                    <button
-                      onClick={() => handleTriggerScan(folder.id)}
-                      disabled={scanningId === folder.id}
-                      className="px-2 py-1 rounded-md text-[11px] font-medium transition-colors bg-white/[0.06] text-[var(--aurora-text-secondary)] hover:bg-white/[0.10] hover:text-[var(--aurora-text)] disabled:opacity-50"
-                    >
-                      {scanningId === folder.id ? "Scanning…" : "Scan now"}
-                    </button>
-                    <button
-                      onClick={() => handleRemoveFolder(folder.id)}
-                      className="px-2 py-1 rounded-md text-[11px] font-medium transition-colors bg-white/[0.06] text-[var(--aurora-text-tertiary)] hover:bg-[var(--aurora-danger)]/15 hover:text-[var(--aurora-danger)]"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+      {/* ── Mobile/Tablet: all sections stacked ── */}
+      <div className="lg:hidden max-w-[900px] mx-auto space-y-4">
+        {renderPlayback()}
+        {renderLibrary()}
+        {renderWatch()}
+        {renderSources()}
+        {renderAppearance()}
       </div>
 
       {/* Hidden file input for import */}
@@ -531,26 +602,6 @@ export function SettingsView() {
       {/* Dialogs */}
       <ScanDialog open={scanOpen} onOpenChange={setScanOpen} onScanComplete={fetchWatchedFolders} />
       <AddSongDialog open={addSongOpen} onOpenChange={setAddSongOpen} />
-
-      {/* About / Updates */}
-      <div className="mt-8 flex flex-col items-center gap-3">
-        <UpdateCard />
-        <button
-          onClick={() => checkForUpdates(true)}
-          className="text-[12px] text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-accent-interactive)] transition-colors duration-150"
-        >
-          Check for updates
-        </button>
-        <button
-          onClick={() => {
-            resetWelcome()
-            window.location.reload()
-          }}
-          className="text-[12px] text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-accent-interactive)] transition-colors duration-150"
-        >
-          Reset welcome screen
-        </button>
-      </div>
     </div>
   )
 }

@@ -189,7 +189,17 @@ function AlbumCard({ album, onClick, onPlay, onShuffle }: AlbumCardProps) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       className="group relative flex flex-col rounded-xl overflow-hidden text-left aurora-focus cursor-pointer"
-      style={{ background: "var(--aurora-surface)" }}
+      style={{
+        background: "var(--aurora-surface)",
+        ...(album.dominant_color
+          ? {
+              boxShadow: hovered
+                ? `inset 0 -40px 30px -20px color-mix(in oklch, ${album.dominant_color} 25%, transparent)`
+                : `inset 0 -40px 30px -20px color-mix(in oklch, ${album.dominant_color} 15%, transparent)`,
+              transition: "box-shadow 200ms ease",
+            }
+          : {}),
+      }}
     >
       {/* Composited rim — opacity transition (GPU-composited, no box-shadow jank) */}
       <div
