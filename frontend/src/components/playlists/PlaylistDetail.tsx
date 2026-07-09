@@ -6,6 +6,7 @@ import { usePlayerStore } from "@/stores/playerStore"
 import { isPlayable } from "@/stores/playerStore"
 
 import { albumGradient } from "@/lib/albumGradient"
+import { buildPlaylistQueue } from "@/lib/playlistQueue"
 import { displayArtist } from "@/lib/displayArtist"
 
 import { Button } from "@/components/ui/button"
@@ -359,14 +360,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
 
   const handlePlaySong = (song: PlaylistSong) => {
     if (!isPlayable(song) || !activePlaylist) return
-    const queue = activePlaylist.songs
-      .filter(isPlayable)
-      .map((s) => ({
-        ...s,
-        playlists: [],
-        created_at: "",
-        updated_at: "",
-      }))
+    const queue = buildPlaylistQueue(sortedSongs)
     const asSong = { ...song, playlists: [], created_at: "", updated_at: "" }
     playSong(asSong, queue, activePlaylist.id)
   }
