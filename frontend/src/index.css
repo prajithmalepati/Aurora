@@ -100,8 +100,8 @@
   /* The signature gradient — identity and primary intent only:
      play button, seek fill, currently-playing title, primary Button fill,
      Jam buttons, and aurora keyline fades at PlayerBar / Sidebar edges. */
-  --aurora-gradient: linear-gradient(135deg, #5eead4 0%, #86efac 55%, #a78bfa 100%);
-  --aurora-gradient-soft: linear-gradient(135deg, rgba(94, 234, 212, 0.16) 0%, rgba(134, 239, 172, 0.12) 55%, rgba(167, 139, 250, 0.16) 100%);
+  --aurora-gradient: linear-gradient(135deg, #0e1116 0%, #134e4a 40%, #115e59 70%, #2dd4bf 100%);
+  --aurora-gradient-soft: linear-gradient(135deg, rgba(14, 17, 22, 0.16) 0%, rgba(19, 78, 74, 0.12) 55%, rgba(45, 212, 191, 0.10) 100%);
 
   /* Text hierarchy — warm near-white to dim steel */
   --aurora-text: #e8e6e3;
@@ -1327,8 +1327,8 @@ pre, code {
   background: var(--aurora-gradient);
   color: #060709;
   box-shadow:
-    0 0 28px -6px rgba(94, 234, 212, 0.30),
-    0 0 28px -6px rgba(167, 139, 250, 0.20);
+    0 0 20px -8px rgba(45, 212, 191, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
   transition: box-shadow 200ms ease, transform 100ms ease, background 150ms ease;
 }
 .mix-jam-primary::before {
@@ -1340,7 +1340,7 @@ pre, code {
   background: radial-gradient(
     closest-side,
     var(--aurora-accent-interactive) 0%,
-    var(--aurora-secondary) 55%,
+    var(--aurora-accent-interactive-glow) 55%,
     transparent 100%
   );
   filter: blur(var(--aurora-backlight-blur));
@@ -1349,8 +1349,8 @@ pre, code {
 }
 .mix-jam-primary:not(:disabled):hover {
   box-shadow:
-    0 0 36px -4px rgba(94, 234, 212, 0.40),
-    0 0 36px -4px rgba(167, 139, 250, 0.28);
+    0 0 28px -4px rgba(45, 212, 191, 0.30),
+    inset 0 1px 0 rgba(255, 255, 255, 0.10);
   transform: scale(1.02);
 }
 .mix-jam-primary:not(:disabled):hover::before {
@@ -1434,8 +1434,8 @@ pre, code {
   color: #060709;
   cursor: pointer;
   box-shadow:
-    0 0 28px -6px rgba(94, 234, 212, 0.30),
-    0 0 28px -6px rgba(167, 139, 250, 0.20);
+    0 0 20px -8px rgba(45, 212, 191, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
   transition: box-shadow 200ms ease, transform 100ms ease, background 150ms ease;
 }
 .mix-float-jam::before {
@@ -1447,7 +1447,7 @@ pre, code {
   background: radial-gradient(
     closest-side,
     var(--aurora-accent-interactive) 0%,
-    var(--aurora-secondary) 55%,
+    var(--aurora-accent-interactive-glow) 55%,
     transparent 100%
   );
   filter: blur(var(--aurora-backlight-blur));
@@ -1456,8 +1456,8 @@ pre, code {
 }
 .mix-float-jam:not(:disabled):hover {
   box-shadow:
-    0 0 36px -4px rgba(94, 234, 212, 0.40),
-    0 0 36px -4px rgba(167, 139, 250, 0.28);
+    0 0 28px -4px rgba(45, 212, 191, 0.30),
+    inset 0 1px 0 rgba(255, 255, 255, 0.10);
   transform: scale(1.02);
 }
 .mix-float-jam:not(:disabled):hover::before {
