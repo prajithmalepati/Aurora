@@ -115,6 +115,18 @@ fn is_valid_health_response(status: reqwest::StatusCode, body: &str) -> bool {
         && v.get("database").and_then(|d| d.as_str()) == Some("connected")
 }
 
+/// Format an actionable diagnostic message for an alive-but-unhealthy sidecar.
+///
+/// The message names the failure (health gate), points to the log file for
+/// details, and deliberately omits secrets (auth token, port, env vars).
+fn format_startup_diagnostic(log_dir: &str, log_file: &str) -> String {
+    format!(
+        "The backend started but did not pass its health check.\n\n\
+         Check the backend log for errors:\n  {log_dir}/{log_file}\n\n\
+         If the problem persists, try restarting Aurora.",
+    )
+}
+
 /// Spawn backend with health gate, retrying on early exit (port-bind race).
 ///
 /// Returns `(child, port, token, healthy)`. After 3 early-exit attempts, returns Err.
@@ -248,8 +260,15 @@ pub fn run() {
             };
 
             if !healthy {
-                log::error!("sidecar: backend did not become healthy in 15s");
-                // Don't block forever — show window anyway, user will see error
+                let log_info = backend_log_path(app.handle());
+                let diagnostic = if let Some(ref path) = log_info {
+                    let dir = path.parent().map(|p| p.display().to_string()).unwrap_or_default();
+                    let file = path.file_name().map(|f| f.to_string_lossy().into_owned()).unwrap_or_else(|| "backend.log".into());
+                    format_startup_diagnostic(&dir, &file)
+                } else {
+                    "The backend started but did not pass its health check. Check the application logs for details.".into()
+                };
+                log::error!("sidecar: {}", diagnostic);
             }
 
             // Store port + token + child in managed state
@@ -416,5 +435,27 @@ mod tests {
     fn non_2xx_rejected_even_with_valid_body() {
         let body = r#"{"status":"ok","database":"connected"}"#;
         assert!(!is_valid_health_response(StatusCode::SERVICE_UNAVAILABLE, body));
+    }
+
+    // --- format_startup_diagnostic tests ---
+
+    #[test]
+    fn diagnostic_includes_health_check_failure() {
+        let msg = format_startup_diagnostic("/home/user/.config/Aurora/logs", "backend.log");
+        assert!(msg.contains("health check"), "message names the failure: {}", msg);
+    }
+
+    #[test]
+    fn diagnostic_includes_log_path() {
+        let msg = format_startup_diagnostic("/home/user/.config/Aurora/logs", "backend.log");
+        assert!(msg.contains("/home/user/.config/Aurora/logs/backend.log"));
+    }
+
+    #[test]
+    fn diagnostic_no_secrets() {
+        let msg = format_startup_diagnostic("/tmp/logs", "backend.log");
+        assert!(!msg.contains("token"), "must not mention token");
+        assert!(!msg.to_lowercase().contains("port"), "must not mention port");
+        assert!(!msg.contains("AURORA_TOKEN"), "must not mention env vars");
     }
 }
