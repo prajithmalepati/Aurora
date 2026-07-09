@@ -303,6 +303,20 @@ export function useAudioPlayer() {
                     }, fadeDurationMs)
                   }
                 } else {
+                  // Neutralize old engine's event handlers before calling next().
+                  // Without this, the old engine's natural `end` event can fire
+                  // between next() and the React effect that strips handlers.
+                  // The stale-engine guard (engineRef.current !== engine) passes
+                  // because the effect hasn't run yet, so the end handler reads
+                  // the *updated* queueIndex from next() and calls next() again
+                  // — double-advance.  With 3 s crossfade the end lands only
+                  // ~3 s after the trigger; a late tick or slow render lets the
+                  // race through.  With 6 s the window is large enough that
+                  // React always wins, which is why the bug manifests at 3 s
+                  // but not at 6 s.
+                  for (const ev of ["buffering", "play", "pause", "end", "load", "loaderror", "playerror"] as const) {
+                    engine.off(ev)
+                  }
                   next()
                 }
                 return

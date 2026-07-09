@@ -112,3 +112,62 @@ describe("repeat-one + crossfade config resolution", () => {
     // This is the song that gets preloaded for gapless self-loop
   })
 })
+
+describe("crossfade natural-end: double-next race symptom", () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it("single next() on 2-song queue advances correctly", async () => {
+    const { usePlayerStore } = await import("@/stores/playerStore")
+    const songs = [makeSong(1), makeSong(2)]
+    usePlayerStore.getState().playSong(songs[0], songs)
+    expect(usePlayerStore.getState().queueIndex).toBe(0)
+
+    usePlayerStore.getState().next()
+    const state = usePlayerStore.getState()
+    expect(state.currentSong?.id).toBe(2)
+    expect(state.queueIndex).toBe(1)
+    expect(state.isPlaying).toBe(true)
+  })
+
+  it("double next() on 2-song queue stops playback (race symptom)", async () => {
+    // This demonstrates the symptom that the W1/P0 fix prevents.
+    // When the early crossfade trigger calls next() and the engine's `end`
+    // event fires before the React effect strips handlers, the end handler
+    // reads the UPDATED queueIndex and calls next() again.
+    //
+    // With a 2-song queue, the second next() sees queueIndex=1 (last song)
+    // and sets isPlaying=false — playback stops at the natural end of song 1.
+    const { usePlayerStore } = await import("@/stores/playerStore")
+    const songs = [makeSong(1), makeSong(2)]
+    usePlayerStore.getState().playSong(songs[0], songs)
+
+    // First next() — tick crossfade trigger advances to song 2
+    usePlayerStore.getState().next()
+    expect(usePlayerStore.getState().currentSong?.id).toBe(2)
+    expect(usePlayerStore.getState().isPlaying).toBe(true)
+
+    // Second next() — stale end handler fires, reads updated queueIndex
+    usePlayerStore.getState().next()
+    const state = usePlayerStore.getState()
+    expect(state.currentSong?.id).toBe(2) // still song 2 (queue end)
+    expect(state.isPlaying).toBe(false)   // BUG SYMPTOM: playback stopped
+  })
+
+  it("double next() on 3-song queue skips a song (race symptom)", async () => {
+    // With 3+ songs, the race causes a skip rather than a stop.
+    const { usePlayerStore } = await import("@/stores/playerStore")
+    const songs = [makeSong(1), makeSong(2), makeSong(3)]
+    usePlayerStore.getState().playSong(songs[0], songs)
+
+    // First next() — should go to song 2
+    usePlayerStore.getState().next()
+    expect(usePlayerStore.getState().currentSong?.id).toBe(2)
+
+    // Second next() — skips song 2, goes to song 3
+    usePlayerStore.getState().next()
+    expect(usePlayerStore.getState().currentSong?.id).toBe(3)
+    expect(usePlayerStore.getState().queueIndex).toBe(2)
+  })
+})
