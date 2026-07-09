@@ -4,7 +4,7 @@
 # Invocation:  ./tick.sh [--dry-run]
 #
 # What it does (in order):
-#   1. Acquire a non-overlapping lock (.tick/tick.lock)
+#   1. Acquire a non-overlapping lock ($XDG_CACHE_HOME/aurora/tick/tick.lock)
 #   2. Check for PAUSE file at repo root → exit 0 if present
 #   3. Verify required commands (git, gh, jq)
 #   4. git fetch origin
@@ -15,7 +15,7 @@
 #
 # Environment contract:
 #   TICK_REPO_ROOT   override repo root  (default: directory containing this script)
-#   TICK_RUNTIME_DIR override runtime dir (default: $TICK_REPO_ROOT/.tick)
+#   TICK_RUNTIME_DIR override runtime dir (default: ${XDG_CACHE_HOME:-$HOME/.cache}/aurora/tick)
 #   TICK_DRY_RUN     same as --dry-run flag
 #
 # Required commands: git, gh (GitHub CLI), jq
