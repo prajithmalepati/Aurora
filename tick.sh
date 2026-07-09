@@ -38,7 +38,7 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="${TICK_REPO_ROOT:-$SCRIPT_DIR}"
-RUNTIME_DIR="${TICK_RUNTIME_DIR:-$REPO_ROOT/.tick}"
+RUNTIME_DIR="${TICK_RUNTIME_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/aurora/tick}"
 
 # Resolve .git dir — in a worktree, .git is a file containing "gitdir: <path>"
 # For exclude files and shared config, we need the MAIN repo's .git, not the
@@ -92,7 +92,12 @@ done
 # ---------------------------------------------------------------------------
 cd "$REPO_ROOT"
 if ! $DRY_RUN; then
-  git fetch origin --prune 2>/dev/null || true
+  if git remote get-url origin &>/dev/null; then
+    if ! git fetch origin --prune 2>/dev/null; then
+      echo "tick: git fetch failed — cannot proceed with stale refs" >&2
+      exit 1
+    fi
+  fi
 fi
 
 # ---------------------------------------------------------------------------
@@ -106,27 +111,40 @@ build_snapshot() {
   status="$(git status --short 2>/dev/null || echo 'unavailable')"
   open_prs="$(gh pr list --state open --limit 20 2>/dev/null || echo 'unavailable')"
   merged_prs="$(gh pr list --state merged --limit 5 --json number,title,mergedAt 2>/dev/null || echo 'unavailable')"
-  kanban="$(hermes kanban dump 2>/dev/null || echo 'unavailable')"
-  worktrees="$(git worktree list 2>/dev/null || echo 'unavailable')"
+  kanban="$(hermes kanban list --json 2>/dev/null || echo '[]')"
+  worktrees="$(git worktree list 2>/dev/null | while read -r line; do
+    echo "$(basename "${line%% *}") ${line#* }"
+  done || echo 'unavailable')"
+  # Use temp files + --rawfile to avoid ARG_MAX overflow on large repos
+  local tmpd; tmpd="$(mktemp -d)"
+  printf '%s' "$sha" > "$tmpd/sha"
+  printf '%s' "$log" > "$tmpd/log"
+  printf '%s' "$branch" > "$tmpd/branch"
+  printf '%s' "$status" > "$tmpd/status"
+  printf '%s' "$open_prs" > "$tmpd/open_prs"
+  printf '%s' "$merged_prs" > "$tmpd/merged_prs"
+  printf '%s' "$kanban" > "$tmpd/kanban"
+  printf '%s' "$worktrees" > "$tmpd/worktrees"
   jq -n \
-    --arg sha "$sha" \
-    --arg log "$log" \
-    --arg branch "$branch" \
-    --arg status "$status" \
-    --arg open_prs "$open_prs" \
-    --arg merged_prs "$merged_prs" \
-    --arg kanban "$kanban" \
-    --arg worktrees "$worktrees" \
+    --rawfile sha "$tmpd/sha" \
+    --rawfile log "$tmpd/log" \
+    --rawfile branch "$tmpd/branch" \
+    --rawfile status "$tmpd/status" \
+    --rawfile open_prs "$tmpd/open_prs" \
+    --rawfile merged_prs "$tmpd/merged_prs" \
+    --rawfile kanban "$tmpd/kanban" \
+    --rawfile worktrees "$tmpd/worktrees" \
     '{
-      origin_main_sha: $sha,
-      origin_main_short_log: $log,
-      branch: $branch,
-      git_status: $status,
-      open_prs: $open_prs,
-      merged_prs: $merged_prs,
-      kanban: $kanban,
-      worktrees: $worktrees
+      origin_main_sha: ($sha | gsub("\\s+$"; "")),
+      origin_main_short_log: ($log | gsub("\\s+$"; "")),
+      branch: ($branch | gsub("\\s+$"; "")),
+      git_status: ($status | gsub("\\s+$"; "")),
+      open_prs: ($open_prs | gsub("\\s+$"; "")),
+      merged_prs: ($merged_prs | gsub("\\s+$"; "")),
+      kanban: (try ($kanban | gsub("\\s+$"; "") | fromjson) catch []),
+      worktrees: ($worktrees | gsub("\\s+$"; ""))
     }'
+  rm -rf "$tmpd"
 }
 
 SNAPSHOT_FILE="$RUNTIME_DIR/snapshot.json"
@@ -178,17 +196,26 @@ GIT_STATUS="$(git status --short 2>/dev/null || echo 'unavailable')"
 OPEN_PRS="$(gh pr list --state open --limit 20 2>/dev/null || echo 'No pull requests found.')"
 MERGED_PRS="$(gh pr list --state merged --limit 5 2>/dev/null || echo 'No pull requests found.')"
 
-# Kanban
-KANBAN_DATA="$(hermes kanban dump 2>/dev/null || echo 'unavailable')"
-if [[ "$KANBAN_DATA" == "[]" || -z "$KANBAN_DATA" ]]; then
+# Kanban — derive from supported list --json, project safe fields only
+KANBAN_JSON="$(hermes kanban list --json 2>/dev/null || echo '[]')"
+if [[ "$KANBAN_JSON" == "[]" || -z "$KANBAN_JSON" ]]; then
   KANBAN_SUMMARY="0 cards"
+  KANBAN_ACTIVE="(none)"
 else
-  KANBAN_SUMMARY="$(echo "$KANBAN_DATA" | jq -r 'length' 2>/dev/null || echo 'unavailable') cards"
+  KANBAN_SUMMARY="$(echo "$KANBAN_JSON" | jq -r 'length' 2>/dev/null || echo 'unavailable') cards"
+  KANBAN_ACTIVE="$(echo "$KANBAN_JSON" | jq -r '
+    .[] | select(.status == "running") |
+    {id, title, assignee, status, priority}
+  ' 2>/dev/null || echo 'unavailable')"
+  if [[ -z "$KANBAN_ACTIVE" ]]; then
+    KANBAN_ACTIVE="(none)"
+  fi
 fi
-KANBAN_ACTIVE="$(hermes kanban active 2>/dev/null || echo 'unavailable')"
 
-# Worktrees
-WORKTREES="$(git worktree list 2>/dev/null || echo 'unavailable')"
+# Worktrees — sanitize to basenames only (no absolute paths)
+WORKTREES="$(git worktree list 2>/dev/null | while read -r line; do
+  echo "$(basename "${line%% *}") ${line#* }"
+done || echo 'unavailable')"
 
 # Gate counts — evidence-only; "unavailable" if no evidence exists
 GATE_FILE="$RUNTIME_DIR/last_gate.txt"
