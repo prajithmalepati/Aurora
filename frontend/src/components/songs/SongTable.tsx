@@ -188,13 +188,13 @@ function TableHeader({ visibleColumns, sortField, sortOrder, onSort, showCheckbo
           return (
             <th
               key={col.id}
-              className={`${HEADER_CLASS} ${isSortable ? "cursor-pointer select-none hover:text-[var(--aurora-text-secondary)]" : ""} ${active ? "text-[var(--aurora-text-secondary)]" : ""} ${col.headerClassName ?? ""} relative group/th`}
+              className={`${HEADER_CLASS} ${isSortable ? "cursor-pointer select-none hover:text-[var(--aurora-text-secondary)] hover:bg-[var(--aurora-surface-hover)] transition-[background-color,color] duration-150" : ""} ${active ? "text-[var(--aurora-text-secondary)] border-b border-[var(--aurora-accent-interactive)]/20" : ""} ${col.headerClassName ?? ""} relative group/th`}
               onClick={isSortable ? () => onSort(col.sortable!) : undefined}
             >
               {isSortable ? (
                 <span className="inline-flex items-center gap-0.5">
                   {col.label}
-                  {active && <SortArrow className="h-2.5 w-2.5" />}
+                  <SortArrow className={`h-2.5 w-2.5 transition-opacity duration-200 ${active ? "opacity-100" : "opacity-0"}`} />
                 </span>
               ) : (
                 col.label

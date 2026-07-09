@@ -350,9 +350,7 @@ export function PlayerBar() {
 
             {/* CENTER: Controls + seek bar */}
             <div className="flex-1 flex flex-col items-center gap-2 max-w-[580px] mx-auto min-w-0">
-              <div className="flex items-center gap-3"
-                style={{ boxShadow: "inset 0 0 40px 10px color-mix(in oklch, var(--song-color) 8%, transparent)" }}
-              >
+              <div className="flex items-center gap-3">
                 <button
                   onClick={toggleShuffle}
                   disabled={!hasSong}

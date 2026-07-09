@@ -150,7 +150,9 @@ pub fn list_songs(
 
     if let Some(q) = search {
         let pattern = format!("%{}%", q);
-        conditions.push("(s.title LIKE ? OR s.artist LIKE ?)".to_string());
+        conditions.push("(s.title LIKE ? OR s.artist LIKE ? OR s.artists LIKE ? OR s.featured_artists LIKE ?)".to_string());
+        params.push(Box::new(pattern.clone()));
+        params.push(Box::new(pattern.clone()));
         params.push(Box::new(pattern.clone()));
         params.push(Box::new(pattern));
     }
