@@ -98,6 +98,23 @@ fn spawn_backend(
     cmd.spawn()
 }
 
+/// Validate that an HTTP response matches the Aurora health contract.
+///
+/// The Rust server returns at minimum `{"status": "ok", "database": "connected"}`.
+/// A 2xx response with a different body (e.g. plain text, missing fields) is not
+/// considered healthy — the server may still be starting up or misconfigured.
+fn is_valid_health_response(status: reqwest::StatusCode, body: &str) -> bool {
+    if !status.is_success() {
+        return false;
+    }
+    let v: serde_json::Value = match serde_json::from_str(body) {
+        Ok(v) => v,
+        Err(_) => return false,
+    };
+    v.get("status").and_then(|s| s.as_str()) == Some("ok")
+        && v.get("database").and_then(|d| d.as_str()) == Some("connected")
+}
+
 /// Spawn backend with health gate, retrying on early exit (port-bind race).
 ///
 /// Returns `(child, port, token, healthy)`. After 3 early-exit attempts, returns Err.
@@ -147,7 +164,9 @@ fn spawn_with_health_gate(app: &tauri::AppHandle) -> std::io::Result<(Child, u16
             }
 
             if let Ok(resp) = reqwest::blocking::get(&url) {
-                if resp.status().is_success() {
+                let status = resp.status();
+                let body = resp.text().unwrap_or_default();
+                if is_valid_health_response(status, &body) {
                     healthy = true;
                     break;
                 }
@@ -346,4 +365,56 @@ pub fn run() {
             }
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use reqwest::StatusCode;
+
+    #[test]
+    fn valid_health_accepted() {
+        let body = r#"{"status":"ok","database":"connected","song_count":5,"tag_count":3,"playlist_count":1,"db_path":"/tmp/aurora.db","data_dir":"/tmp/aurora"}"#;
+        assert!(is_valid_health_response(StatusCode::OK, body));
+    }
+
+    #[test]
+    fn missing_status_rejected() {
+        let body = r#"{"database":"connected","song_count":0}"#;
+        assert!(!is_valid_health_response(StatusCode::OK, body));
+    }
+
+    #[test]
+    fn missing_database_rejected() {
+        let body = r#"{"status":"ok","song_count":0}"#;
+        assert!(!is_valid_health_response(StatusCode::OK, body));
+    }
+
+    #[test]
+    fn wrong_status_value_rejected() {
+        let body = r#"{"status":"error","database":"connected"}"#;
+        assert!(!is_valid_health_response(StatusCode::OK, body));
+    }
+
+    #[test]
+    fn wrong_database_value_rejected() {
+        let body = r#"{"status":"ok","database":"disconnected"}"#;
+        assert!(!is_valid_health_response(StatusCode::OK, body));
+    }
+
+    #[test]
+    fn plain_text_rejected() {
+        assert!(!is_valid_health_response(StatusCode::OK, "OK"));
+    }
+
+    #[test]
+    fn empty_body_rejected() {
+        assert!(!is_valid_health_response(StatusCode::OK, ""));
+    }
+
+    #[test]
+    fn non_2xx_rejected_even_with_valid_body() {
+        let body = r#"{"status":"ok","database":"connected"}"#;
+        assert!(!is_valid_health_response(StatusCode::SERVICE_UNAVAILABLE, body));
+    }
 }
