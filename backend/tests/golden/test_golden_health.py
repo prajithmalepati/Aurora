@@ -20,3 +20,11 @@ def test_health(client):
     assert isinstance(data["song_count"], int)
     assert isinstance(data["tag_count"], int)
     assert isinstance(data["playlist_count"], int)
+
+
+def test_app_version(client):
+    """OpenAPI schema reports Aurora version 2.0.0."""
+    resp = client.get("/openapi.json")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["info"]["version"] == "2.0.0"

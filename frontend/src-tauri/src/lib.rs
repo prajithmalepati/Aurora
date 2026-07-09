@@ -98,6 +98,35 @@ fn spawn_backend(
     cmd.spawn()
 }
 
+/// Validate that an HTTP response matches the Aurora health contract.
+///
+/// The Rust server returns at minimum `{"status": "ok", "database": "connected"}`.
+/// A 2xx response with a different body (e.g. plain text, missing fields) is not
+/// considered healthy — the server may still be starting up or misconfigured.
+fn is_valid_health_response(status: reqwest::StatusCode, body: &str) -> bool {
+    if !status.is_success() {
+        return false;
+    }
+    let v: serde_json::Value = match serde_json::from_str(body) {
+        Ok(v) => v,
+        Err(_) => return false,
+    };
+    v.get("status").and_then(|s| s.as_str()) == Some("ok")
+        && v.get("database").and_then(|d| d.as_str()) == Some("connected")
+}
+
+/// Format an actionable diagnostic message for an alive-but-unhealthy sidecar.
+///
+/// The message names the failure (health gate), points to the log file for
+/// details, and deliberately omits secrets (auth token, port, env vars).
+fn format_startup_diagnostic(log_dir: &str, log_file: &str) -> String {
+    format!(
+        "The backend started but did not pass its health check.\n\n\
+         Check the backend log for errors:\n  {log_dir}/{log_file}\n\n\
+         If the problem persists, try restarting Aurora.",
+    )
+}
+
 /// Spawn backend with health gate, retrying on early exit (port-bind race).
 ///
 /// Returns `(child, port, token, healthy)`. After 3 early-exit attempts, returns Err.
@@ -147,7 +176,9 @@ fn spawn_with_health_gate(app: &tauri::AppHandle) -> std::io::Result<(Child, u16
             }
 
             if let Ok(resp) = reqwest::blocking::get(&url) {
-                if resp.status().is_success() {
+                let status = resp.status();
+                let body = resp.text().unwrap_or_default();
+                if is_valid_health_response(status, &body) {
                     healthy = true;
                     break;
                 }
@@ -229,8 +260,15 @@ pub fn run() {
             };
 
             if !healthy {
-                log::error!("sidecar: backend did not become healthy in 15s");
-                // Don't block forever — show window anyway, user will see error
+                let log_info = backend_log_path(app.handle());
+                let diagnostic = if let Some(ref path) = log_info {
+                    let dir = path.parent().map(|p| p.display().to_string()).unwrap_or_default();
+                    let file = path.file_name().map(|f| f.to_string_lossy().into_owned()).unwrap_or_else(|| "backend.log".into());
+                    format_startup_diagnostic(&dir, &file)
+                } else {
+                    "The backend started but did not pass its health check. Check the application logs for details.".into()
+                };
+                log::error!("sidecar: {}", diagnostic);
             }
 
             // Store port + token + child in managed state
@@ -346,4 +384,78 @@ pub fn run() {
             }
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use reqwest::StatusCode;
+
+    #[test]
+    fn valid_health_accepted() {
+        let body = r#"{"status":"ok","database":"connected","song_count":5,"tag_count":3,"playlist_count":1,"db_path":"/tmp/aurora.db","data_dir":"/tmp/aurora"}"#;
+        assert!(is_valid_health_response(StatusCode::OK, body));
+    }
+
+    #[test]
+    fn missing_status_rejected() {
+        let body = r#"{"database":"connected","song_count":0}"#;
+        assert!(!is_valid_health_response(StatusCode::OK, body));
+    }
+
+    #[test]
+    fn missing_database_rejected() {
+        let body = r#"{"status":"ok","song_count":0}"#;
+        assert!(!is_valid_health_response(StatusCode::OK, body));
+    }
+
+    #[test]
+    fn wrong_status_value_rejected() {
+        let body = r#"{"status":"error","database":"connected"}"#;
+        assert!(!is_valid_health_response(StatusCode::OK, body));
+    }
+
+    #[test]
+    fn wrong_database_value_rejected() {
+        let body = r#"{"status":"ok","database":"disconnected"}"#;
+        assert!(!is_valid_health_response(StatusCode::OK, body));
+    }
+
+    #[test]
+    fn plain_text_rejected() {
+        assert!(!is_valid_health_response(StatusCode::OK, "OK"));
+    }
+
+    #[test]
+    fn empty_body_rejected() {
+        assert!(!is_valid_health_response(StatusCode::OK, ""));
+    }
+
+    #[test]
+    fn non_2xx_rejected_even_with_valid_body() {
+        let body = r#"{"status":"ok","database":"connected"}"#;
+        assert!(!is_valid_health_response(StatusCode::SERVICE_UNAVAILABLE, body));
+    }
+
+    // --- format_startup_diagnostic tests ---
+
+    #[test]
+    fn diagnostic_includes_health_check_failure() {
+        let msg = format_startup_diagnostic("/home/user/.config/Aurora/logs", "backend.log");
+        assert!(msg.contains("health check"), "message names the failure: {}", msg);
+    }
+
+    #[test]
+    fn diagnostic_includes_log_path() {
+        let msg = format_startup_diagnostic("/home/user/.config/Aurora/logs", "backend.log");
+        assert!(msg.contains("/home/user/.config/Aurora/logs/backend.log"));
+    }
+
+    #[test]
+    fn diagnostic_no_secrets() {
+        let msg = format_startup_diagnostic("/tmp/logs", "backend.log");
+        assert!(!msg.contains("token"), "must not mention token");
+        assert!(!msg.to_lowercase().contains("port"), "must not mention port");
+        assert!(!msg.contains("AURORA_TOKEN"), "must not mention env vars");
+    }
 }
