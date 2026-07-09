@@ -125,11 +125,17 @@ fn row_to_song(row: &rusqlite::Row, include_peaks: bool) -> rusqlite::Result<ser
     ))
 }
 
-/// List songs with optional search, sort, limit, offset.
+/// List songs with optional search, source filter, sort, limit, offset.
 /// Returns `(songs_json, total_count)`.
+///
+/// `source` filter values:
+/// - `"offline"` => `source IN ('local_scan','manual') OR source IS NULL`
+/// - `"addon:<id>"` => exact source match
+/// - `None` => no source filter (all songs)
 pub fn list_songs(
     conn: &Connection,
     search: Option<&str>,
+    source: Option<&str>,
     sort: &str,
     order: &str,
     limit: i64,
@@ -138,19 +144,30 @@ pub fn list_songs(
     let sort_col = sort_column(sort);
     let order_str = if order == "desc" { "DESC" } else { "ASC" };
 
-    // Build WHERE clause
-    let (where_clause, params): (String, Vec<Box<dyn rusqlite::types::ToSql>>) = match search {
-        Some(q) => {
-            let pattern = format!("%{}%", q);
-            (
-                " WHERE (s.title LIKE ?1 OR s.artist LIKE ?2)".to_string(),
-                vec![
-                    Box::new(pattern.clone()) as Box<dyn rusqlite::types::ToSql>,
-                    Box::new(pattern),
-                ],
-            )
+    // Build WHERE clause dynamically
+    let mut conditions: Vec<String> = Vec::new();
+    let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+
+    if let Some(q) = search {
+        let pattern = format!("%{}%", q);
+        conditions.push("(s.title LIKE ? OR s.artist LIKE ?)".to_string());
+        params.push(Box::new(pattern.clone()));
+        params.push(Box::new(pattern));
+    }
+
+    if let Some(src) = source {
+        if src == "offline" {
+            conditions.push("(s.source IN ('local_scan', 'manual'))".to_string());
+        } else if let Some(addon_id) = src.strip_prefix("addon:") {
+            conditions.push("s.source = ?".to_string());
+            params.push(Box::new(format!("addon:{}", addon_id)));
         }
-        None => (String::new(), vec![]),
+    }
+
+    let where_clause = if conditions.is_empty() {
+        String::new()
+    } else {
+        format!(" WHERE {}", conditions.join(" AND "))
     };
 
     // Count query
@@ -165,7 +182,7 @@ pub fn list_songs(
     let data_sql = format!(
         "{SONG_SELECT}{where_clause} GROUP BY s.id ORDER BY {sort_col} {order_str}, s.id ASC LIMIT ? OFFSET ?",
     );
-    let mut all_params: Vec<Box<dyn rusqlite::types::ToSql>> = params;
+    let mut all_params = params;
     all_params.push(Box::new(limit));
     all_params.push(Box::new(offset));
 
@@ -2074,5 +2091,90 @@ mod tests {
         let (songs, total) = list_folder_songs(&conn, "D:/Music/OP", false, 100, 0).unwrap();
         assert_eq!(total, 1, "Non-recursive should match only direct children");
         assert_eq!(songs.len(), 1);
+    }
+
+    // ── Source filter tests ──────────────────────────────────────────────
+
+    fn insert_song_with_source(
+        conn: &rusqlite::Connection,
+        id: i64,
+        title: &str,
+        source: &str,
+    ) {
+        conn.execute(
+            "INSERT INTO songs (id, title, artist, source, file_path, created_at, updated_at) \
+             VALUES (?1, ?2, 'Test', ?3, ?4, '', '')",
+            rusqlite::params![id, title, source, format!("/music/{}.mp3", id)],
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn test_list_songs_no_source_filter_returns_all() {
+        let conn = test_db();
+        insert_song_with_source(&conn, 1, "Local Song", "local_scan");
+        insert_song_with_source(&conn, 2, "Manual Song", "manual");
+        insert_song_with_source(&conn, 3, "Addon Song", "addon:spotify");
+
+        let (songs, total) = list_songs(&conn, None, None, "title", "asc", 100, 0).unwrap();
+        assert_eq!(total, 3);
+        assert_eq!(songs.len(), 3);
+    }
+
+    #[test]
+    fn test_list_songs_source_filter_offline() {
+        let conn = test_db();
+        insert_song_with_source(&conn, 1, "Local Song", "local_scan");
+        insert_song_with_source(&conn, 2, "Manual Song", "manual");
+        insert_song_with_source(&conn, 3, "Addon Song", "addon:spotify");
+
+        let (songs, total) =
+            list_songs(&conn, None, Some("offline"), "title", "asc", 100, 0).unwrap();
+        assert_eq!(total, 2, "offline should match local_scan and manual");
+        assert_eq!(songs.len(), 2);
+        let titles: Vec<&str> = songs.iter().map(|s| s["title"].as_str().unwrap()).collect();
+        assert!(titles.contains(&"Local Song"));
+        assert!(titles.contains(&"Manual Song"));
+    }
+    #[test]
+    fn test_list_songs_source_filter_addon() {
+        let conn = test_db();
+        insert_song_with_source(&conn, 1, "Spotify Song", "addon:spotify");
+        insert_song_with_source(&conn, 2, "Tidal Song", "addon:tidal");
+        insert_song_with_source(&conn, 3, "Local Song", "local_scan");
+
+        let (songs, total) = list_songs(&conn, None, Some("addon:spotify"), "title", "asc", 100, 0).unwrap();
+        assert_eq!(total, 1);
+        assert_eq!(songs[0]["title"], "Spotify Song");
+    }
+
+    #[test]
+    fn test_list_songs_source_filter_combined_with_search() {
+        let conn = test_db();
+        insert_song_with_source(&conn, 1, "Rock Anthem", "local_scan");
+        insert_song_with_source(&conn, 2, "Rock Ballad", "addon:spotify");
+        insert_song_with_source(&conn, 3, "Pop Hit", "manual");
+
+        let (songs, total) = list_songs(&conn, Some("Rock"), Some("offline"), "title", "asc", 100, 0).unwrap();
+        assert_eq!(total, 1, "search 'Rock' + offline should match only 'Rock Anthem'");
+        assert_eq!(songs[0]["title"], "Rock Anthem");
+    }
+
+    #[test]
+    fn test_list_songs_source_filter_with_pagination() {
+        let conn = test_db();
+        for i in 1..=5 {
+            insert_song_with_source(&conn, i, &format!("Song {}", i), "addon:spotify");
+        }
+        insert_song_with_source(&conn, 6, "Local Song", "local_scan");
+
+        // Page 1: 3 addon songs
+        let (songs, total) = list_songs(&conn, None, Some("addon:spotify"), "title", "asc", 3, 0).unwrap();
+        assert_eq!(total, 5, "total should be 5 addon songs");
+        assert_eq!(songs.len(), 3);
+
+        // Page 2: remaining 2 addon songs
+        let (songs2, _) = list_songs(&conn, None, Some("addon:spotify"), "title", "asc", 3, 3).unwrap();
+        assert_eq!(songs2.len(), 2);
     }
 }

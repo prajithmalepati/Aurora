@@ -32,10 +32,15 @@ interface SongState {
   offset: number
   // Search term of the last fetchSongs call — fetchMore must page within it
   lastSearch: string | undefined
+  // Source filter of the last fetchSongs call — fetchMore must page within it
+  lastSourceFilter: string | undefined
   // Incremented when user clicks the already-active sidebar item (scroll-to-top signal)
   scrollToTop: number
   // Per-view scroll positions saved before leaving a view
   scrollPositions: Record<string, number>
+  // Client-side source filter for All Songs view
+  // null = "All Sources", "offline" = local_scan + manual, "addon:<id>" = specific addon
+  sourceFilter: string | null
 
   fetchSongs: (search?: string) => Promise<void>
   fetchMore: () => Promise<void>
@@ -58,6 +63,7 @@ interface SongState {
   removeTag: (songId: number, tagId: number) => Promise<void>
   removeTagByName: (songId: number, tagName: string) => Promise<void>
   setView: (view: View) => void
+  setSourceFilter: (filter: string | null) => void
 }
 
 let fetchId = 0
@@ -73,12 +79,15 @@ export const useSongStore = create<SongState>((set, get) => ({
   hasMore: false,
   offset: 0,
   lastSearch: undefined,
+  lastSourceFilter: undefined,
   scrollToTop: 0,
   scrollPositions: {},
+  sourceFilter: null,
 
   fetchSongs: async (search) => {
     const myId = ++fetchId
-    set({ loading: true, error: null, offset: 0, lastSearch: search })
+    const { sourceFilter } = get()
+    set({ loading: true, error: null, offset: 0, lastSearch: search, lastSourceFilter: sourceFilter ?? undefined })
     try {
       const { sortField, sortOrder } = get()
       const params = new URLSearchParams({
@@ -86,6 +95,7 @@ export const useSongStore = create<SongState>((set, get) => ({
         offset: "0",
       })
       if (search) params.set("search", search)
+      if (sourceFilter) params.set("source", sourceFilter)
       params.set("sort", sortField)
       params.set("order", sortOrder)
       const res = await api.get<ApiResponse<Song[]>>(`/songs?${params.toString()}`)
@@ -104,7 +114,7 @@ export const useSongStore = create<SongState>((set, get) => ({
   },
 
   fetchMore: async () => {
-    const { sortField, sortOrder, songs, totalCount, loading, lastSearch } = get()
+    const { sortField, sortOrder, songs, totalCount, loading, lastSearch, lastSourceFilter } = get()
     if (loading || songs.length >= totalCount) return
     const myId = ++fetchId
     const newOffset = songs.length
@@ -115,6 +125,7 @@ export const useSongStore = create<SongState>((set, get) => ({
         offset: String(newOffset),
       })
       if (lastSearch) params.set("search", lastSearch)
+      if (lastSourceFilter) params.set("source", lastSourceFilter)
       params.set("sort", sortField)
       params.set("order", sortOrder)
       const res = await api.get<ApiResponse<Song[]>>(`/songs?${params.toString()}`)
@@ -265,5 +276,10 @@ export const useSongStore = create<SongState>((set, get) => ({
         get().sortSongs("created_at", "desc")
       }
     }
+  },
+
+  setSourceFilter: (filter) => {
+    set({ sourceFilter: filter, offset: 0, songs: [], totalCount: 0, hasMore: false })
+    get().fetchSongs(get().lastSearch)
   },
 }))

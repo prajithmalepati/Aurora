@@ -7,6 +7,8 @@ import { AuroraPlayButton } from "@/components/player/AuroraPlayButton"
 import { TagList } from "@/components/tags/TagList"
 import { Cloud } from "lucide-react"
 import type { SortField } from "./SongTable"
+import { useAddonStore } from "@/stores/addonStore"
+import { addonName } from "@/lib/addonName"
 
 // ── Column ID type ──
 export type ColumnId = "index" | "title" | "type" | "duration" | "artist" | "album" | "tags"
@@ -112,7 +114,7 @@ export const COLUMN_REGISTRY: ColumnDef[] = [
                   }}
                 >
                   <Cloud className="h-2.5 w-2.5" />
-                  {song.source.replace("addon:", "").split(".").pop() ?? "online"}
+                  {addonName(song.source, useAddonStore.getState().addons)}
                 </span>
               )}
             </div>

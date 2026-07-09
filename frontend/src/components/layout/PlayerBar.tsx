@@ -1,10 +1,11 @@
 import { usePlayerStore } from "@/stores/playerStore"
 import { isPlayable } from "@/stores/playerStore"
 import { useSongStore } from "@/stores/songStore"
+import { useAddonStore } from "@/stores/addonStore"
 import { useAudioPlayer } from "@/hooks/useAudioPlayer"
 import { AlbumArt } from "@/components/songs/AlbumArt"
 import { Equalizer } from "@/components/ui/Equalizer"
-import { SkipBack, SkipForward, Volume2, VolumeX, Shuffle, Repeat, Repeat1, ListMusic, Sparkles } from "lucide-react"
+import { SkipBack, SkipForward, Volume2, VolumeX, Shuffle, Repeat, Repeat1, ListMusic, Sparkles, Cloud } from "lucide-react"
 import { motion, AnimatePresence } from "motion/react"
 import { AuroraPlayButton } from "@/components/player/AuroraPlayButton"
 import { SeekScrubber } from "@/components/player/SeekScrubber"
@@ -14,6 +15,7 @@ import { formatFileSize, qualityLabel } from "@/lib/utils"
 import { api } from "@/lib/api"
 import type { Song } from "@/types"
 import { displayArtist } from "@/lib/displayArtist"
+import { addonName } from "@/lib/addonName"
 
 const bleedThumbCache = new Map<number, string>()
 
@@ -151,11 +153,26 @@ export function PlayerBar() {
               <div className="flex flex-col min-w-0 flex-1">
                 {hasSong ? (
                   <>
-                    <span
-                      className="font-display text-[15px] leading-tight text-[var(--aurora-text)] truncate"
-                    >
-                      {currentSong.title || "Untitled"}
-                    </span>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span
+                        className="font-display text-[15px] leading-tight text-[var(--aurora-text)] truncate"
+                      >
+                        {currentSong.title || "Untitled"}
+                      </span>
+                      {currentSong.source.startsWith("addon:") && (
+                        <span
+                          className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium tracking-wide flex-shrink-0"
+                          style={{
+                            background: "var(--aurora-surface-inset)",
+                            color: "var(--aurora-text-secondary)",
+                            border: "1px solid var(--aurora-rim)",
+                          }}
+                        >
+                          <Cloud className="h-2.5 w-2.5" />
+                          {addonName(currentSong.source, useAddonStore.getState().addons)}
+                        </span>
+                      )}
+                    </div>
                     <span className="text-[10px] text-[var(--aurora-text-secondary)] truncate">
                       {displayArtist(currentSong)}
                     </span>
@@ -288,11 +305,26 @@ export function PlayerBar() {
               <div className="flex flex-col min-w-0 flex-1">
                 {hasSong ? (
                   <>
-                    <span
-                      className="font-display text-[18px] leading-tight text-[var(--aurora-text)] truncate"
-                    >
-                      {currentSong.title || "Untitled"}
-                    </span>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span
+                        className="font-display text-[18px] leading-tight text-[var(--aurora-text)] truncate"
+                      >
+                        {currentSong.title || "Untitled"}
+                      </span>
+                      {currentSong.source.startsWith("addon:") && (
+                        <span
+                          className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium tracking-wide flex-shrink-0"
+                          style={{
+                            background: "var(--aurora-surface-inset)",
+                            color: "var(--aurora-text-secondary)",
+                            border: "1px solid var(--aurora-rim)",
+                          }}
+                        >
+                          <Cloud className="h-2.5 w-2.5" />
+                          {addonName(currentSong.source, useAddonStore.getState().addons)}
+                        </span>
+                      )}
+                    </div>
                     <span className="text-[11px] text-[var(--aurora-text-secondary)] truncate mt-0.5 tracking-wide">
                       {displayArtist(currentSong)}
                     </span>

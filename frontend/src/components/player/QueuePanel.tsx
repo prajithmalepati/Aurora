@@ -5,9 +5,11 @@ import { formatDuration } from "@/lib/utils"
 import { displayArtist } from "@/lib/displayArtist"
 import { AlbumArt } from "@/components/songs/AlbumArt"
 import { Equalizer } from "@/components/ui/Equalizer"
-import { X, GripVertical, ListMusic, ChevronDown, ChevronUp, Trash2 } from "lucide-react"
+import { X, GripVertical, ListMusic, ChevronDown, ChevronUp, Trash2, Cloud } from "lucide-react"
 import { motion, AnimatePresence } from "motion/react"
 import { useState, useCallback } from "react"
+import { useAddonStore } from "@/stores/addonStore"
+import { addonName } from "@/lib/addonName"
 import {
   DndContext,
   closestCenter,
@@ -85,9 +87,24 @@ function SortableQueueItem({
       <AlbumArt song={song} size="sm" className="flex-shrink-0 rounded-sm" />
 
       <div className="flex-1 min-w-0">
-        <p className="text-[13px] text-[var(--aurora-text)] truncate leading-tight">
-          {song.title}
-        </p>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <p className="text-[13px] text-[var(--aurora-text)] truncate leading-tight">
+            {song.title}
+          </p>
+          {song.source.startsWith("addon:") && (
+            <span
+              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium tracking-wide flex-shrink-0"
+              style={{
+                background: "var(--aurora-surface-inset)",
+                color: "var(--aurora-text-secondary)",
+                border: "1px solid var(--aurora-rim)",
+              }}
+            >
+              <Cloud className="h-2.5 w-2.5" />
+              {addonName(song.source, useAddonStore.getState().addons)}
+            </span>
+          )}
+        </div>
         <p className="text-[10px] text-[var(--aurora-text-secondary)] truncate">
           {displayArtist(song)}
         </p>
@@ -259,9 +276,24 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
                       >
                         <AlbumArt song={currentSong} size="sm" className="aurora-rim flex-shrink-0" />
                         <div className="flex-1 min-w-0">
-                          <p className="text-[14px] font-medium text-[var(--aurora-text)] truncate">
-                            {currentSong.title}
-                          </p>
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <p className="text-[14px] font-medium text-[var(--aurora-text)] truncate">
+                              {currentSong.title}
+                            </p>
+                            {currentSong.source.startsWith("addon:") && (
+                              <span
+                                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium tracking-wide flex-shrink-0"
+                                style={{
+                                  background: "var(--aurora-surface-inset)",
+                                  color: "var(--aurora-text-secondary)",
+                                  border: "1px solid var(--aurora-rim)",
+                                }}
+                              >
+                                <Cloud className="h-2.5 w-2.5" />
+                                {addonName(currentSong.source, useAddonStore.getState().addons)}
+                              </span>
+                            )}
+                          </div>
                           <p className="text-[11px] text-[var(--aurora-text-secondary)] truncate">
                             {displayArtist(currentSong)}
                           </p>
@@ -352,9 +384,24 @@ export function QueuePanel({ open, onClose }: QueuePanelProps) {
                                 <AlbumArt song={song} size="sm" className="flex-shrink-0 rounded-sm" />
 
                                 <div className="flex-1 min-w-0">
-                                  <p className="text-[13px] text-[var(--aurora-text)] truncate leading-tight">
-                                    {song.title}
-                                  </p>
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <p className="text-[13px] text-[var(--aurora-text)] truncate leading-tight">
+                                      {song.title}
+                                    </p>
+                                    {song.source.startsWith("addon:") && (
+                                      <span
+                                        className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium tracking-wide flex-shrink-0"
+                                        style={{
+                                          background: "var(--aurora-surface-inset)",
+                                          color: "var(--aurora-text-secondary)",
+                                          border: "1px solid var(--aurora-rim)",
+                                        }}
+                                      >
+                                        <Cloud className="h-2.5 w-2.5" />
+                                        {addonName(song.source, useAddonStore.getState().addons)}
+                                      </span>
+                                    )}
+                                  </div>
                                   <p className="text-[10px] text-[var(--aurora-text-secondary)] truncate">
                                     {displayArtist(song)}
                                   </p>

@@ -12,13 +12,15 @@ import { usePlaylistStore } from "@/stores/playlistStore"
 import { useTagStore } from "@/stores/tagStore"
 import { useFilterStore } from "@/stores/filterStore"
 import { useUpdateStore } from "@/stores/updateStore"
+import { useAddonStore } from "@/stores/addonStore"
+import { useSongStore } from "@/stores/songStore"
 import { PlaylistItem } from "@/components/playlists/PlaylistItem"
 import { BorderGlow } from "@/components/ui/BorderGlow"
 import { CreatePlaylistDialog } from "@/components/playlists/CreatePlaylistDialog"
 
 import { Skeleton } from "@/components/ui/skeleton"
 import { useState } from "react"
-import { Library, SlidersHorizontal, Plus, Settings, FolderOpen, Info, Disc3, Clock } from "lucide-react"
+import { Library, SlidersHorizontal, Plus, Settings, FolderOpen, Info, Disc3, Clock, Cloud } from "lucide-react"
 import { AuroraWordmark } from "@/components/aurora/AuroraWordmark"
 
 function hexToGlowHSL(hex: string | null | undefined): string {
@@ -63,6 +65,10 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
   const filterQuery = useFilterStore((state) => state.query)
   const updateStatus = useUpdateStore((state) => state.status)
   const showUpdateDot = updateStatus === "available" || updateStatus === "downloading" || updateStatus === "installed"
+  const addons = useAddonStore((state) => state.addons)
+  const setSourceFilter = useSongStore((state) => state.setSourceFilter)
+  const sourceFilter = useSongStore((state) => state.sourceFilter)
+  const enabledAddons = addons.filter((a) => a.enabled)
 
   const handleTagClick = (tagName: string) => {
     const term = `"${tagName}"`
@@ -138,6 +144,30 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
             onClick={() => onViewChange({ kind: "albums" })}
           />
         </nav>
+
+        {/* Online section — visible only when ≥1 addon is enabled */}
+        {enabledAddons.length > 0 && (
+          <>
+            <div className="aurora-divider-h mx-6 my-5" />
+            <div className="px-3 space-y-0.5">
+              <div className="px-3 mb-1.5">
+                <span className="label-micro">Online</span>
+              </div>
+              {enabledAddons.map((addon) => (
+                <NavItem
+                  key={addon.id}
+                  icon={<Cloud className="h-4 w-4" strokeWidth={1.5} />}
+                  label={addon.name ?? addon.id}
+                  active={currentView.kind === "all-songs" && sourceFilter === `addon:${addon.id}`}
+                  onClick={() => {
+                    setSourceFilter(`addon:${addon.id}`)
+                    onViewChange({ kind: "all-songs" })
+                  }}
+                />
+              ))}
+            </div>
+          </>
+        )}
 
         {/* Divider */}
         <div className="aurora-divider-h mx-6 my-5" />
