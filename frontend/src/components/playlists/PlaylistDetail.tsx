@@ -80,7 +80,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [addSongSearch, setAddSongSearch] = useState("")
   const [addSongOpen, setAddSongOpen] = useState(false)
-  const [sortField, setSortField] = useState<'position'|'title'|'artist'|'album'|'duration'>('position')
+  const [sortField, setSortField] = useState<'position'|'title'|'artist'|'album'|'duration'|'file_format'>('position')
   const [sortOrder, setSortOrder] = useState<'asc'|'desc'>('asc')
 
   const handlePlaylistSort = useCallback((field: string, order?: 'asc' | 'desc') => {
@@ -122,7 +122,8 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
       if (sortField === 'title')    { va = a.title.toLowerCase(); vb = b.title.toLowerCase() }
       if (sortField === 'artist')   { va = (a.artist ?? '').toLowerCase(); vb = (b.artist ?? '').toLowerCase() }
       if (sortField === 'album')    { va = (a.album ?? '').toLowerCase(); vb = (b.album ?? '').toLowerCase() }
-      if (sortField === 'duration') { va = a.duration ?? 0; vb = b.duration ?? 0 }
+      if (sortField === 'duration')   { va = a.duration ?? 0; vb = b.duration ?? 0 }
+      if (sortField === 'file_format') { va = (a.file_format ?? '').toLowerCase(); vb = (b.file_format ?? '').toLowerCase() }
       if (va < vb) return sortOrder === 'asc' ? -1 : 1
       if (va > vb) return sortOrder === 'asc' ? 1 : -1
       return 0
