@@ -101,7 +101,7 @@ async def lifespan(app: FastAPI):
         fw.stop()
 
 
-app = FastAPI(title="Aurora", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Aurora", version="2.0.0", lifespan=lifespan)
 
 # CORS — allow React dev server
 app.add_middleware(
