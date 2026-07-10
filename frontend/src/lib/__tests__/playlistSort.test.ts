@@ -55,7 +55,7 @@ describe("sortPlaylistSongs", () => {
     expect(result.map((s) => s.id)).toEqual([2, 4, 1, 3])
   })
 
-  it("sorts null and empty file_format to the end in ascending order", () => {
+  it("sorts null and empty file_format to the beginning in ascending order", () => {
     const unsorted: PlaylistSong[] = [
       makeSong({ id: 1, title: "Null", file_format: null }),
       makeSong({ id: 2, title: "Flac", file_format: "flac" }),
@@ -74,7 +74,7 @@ describe("sortPlaylistSongs", () => {
     expect(formats.slice(0, 2)).toEqual([null, ""])
   })
 
-  it("null/empty file_format sorts to the beginning in descending order", () => {
+  it("null/empty file_format sorts to the end in descending order", () => {
     const unsorted: PlaylistSong[] = [
       makeSong({ id: 1, title: "Null", file_format: null }),
       makeSong({ id: 2, title: "Flac", file_format: "flac" }),
