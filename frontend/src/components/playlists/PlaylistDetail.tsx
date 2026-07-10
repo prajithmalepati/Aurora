@@ -6,7 +6,9 @@ import { usePlayerStore } from "@/stores/playerStore"
 import { isPlayable } from "@/stores/playerStore"
 
 import { albumGradient } from "@/lib/albumGradient"
+import { buildPlaylistQueue } from "@/lib/playlistQueue"
 import { displayArtist } from "@/lib/displayArtist"
+import { sortPlaylistSongs, type PlaylistSortField, type SortOrder } from "@/lib/playlistSort"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -80,8 +82,8 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [addSongSearch, setAddSongSearch] = useState("")
   const [addSongOpen, setAddSongOpen] = useState(false)
-  const [sortField, setSortField] = useState<'position'|'title'|'artist'|'album'|'duration'|'file_format'>('position')
-  const [sortOrder, setSortOrder] = useState<'asc'|'desc'>('asc')
+  const [sortField, setSortField] = useState<PlaylistSortField>('position')
+  const [sortOrder, setSortOrder] = useState<SortOrder>('asc')
 
   const handlePlaylistSort = useCallback((field: string, order?: 'asc' | 'desc') => {
     const f = field as typeof sortField
@@ -114,21 +116,10 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
     )
   }, [activePlaylist, searchQuery])
 
-  const sortedSongs = useMemo(() => {
-    if (sortField === 'position') return filteredSongs
-    return [...filteredSongs].sort((a, b) => {
-      let va: string | number = ''
-      let vb: string | number = ''
-      if (sortField === 'title')    { va = a.title.toLowerCase(); vb = b.title.toLowerCase() }
-      if (sortField === 'artist')   { va = (a.artist ?? '').toLowerCase(); vb = (b.artist ?? '').toLowerCase() }
-      if (sortField === 'album')    { va = (a.album ?? '').toLowerCase(); vb = (b.album ?? '').toLowerCase() }
-      if (sortField === 'duration')   { va = a.duration ?? 0; vb = b.duration ?? 0 }
-      if (sortField === 'file_format') { va = (a.file_format ?? '').toLowerCase(); vb = (b.file_format ?? '').toLowerCase() }
-      if (va < vb) return sortOrder === 'asc' ? -1 : 1
-      if (va > vb) return sortOrder === 'asc' ? 1 : -1
-      return 0
-    })
-  }, [filteredSongs, sortField, sortOrder])
+  const sortedSongs = useMemo(
+    () => sortPlaylistSongs(filteredSongs, sortField, sortOrder),
+    [filteredSongs, sortField, sortOrder],
+  )
 
   const songsForTable = useMemo(() => sortedSongs.map(playlistSongToSong), [sortedSongs])
 
@@ -359,14 +350,7 @@ export function PlaylistDetail({ playlistId }: PlaylistDetailProps) {
 
   const handlePlaySong = (song: PlaylistSong) => {
     if (!isPlayable(song) || !activePlaylist) return
-    const queue = activePlaylist.songs
-      .filter(isPlayable)
-      .map((s) => ({
-        ...s,
-        playlists: [],
-        created_at: "",
-        updated_at: "",
-      }))
+    const queue = buildPlaylistQueue(sortedSongs)
     const asSong = { ...song, playlists: [], created_at: "", updated_at: "" }
     playSong(asSong, queue, activePlaylist.id)
   }
