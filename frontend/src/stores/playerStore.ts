@@ -3,6 +3,44 @@ import type { Song } from "@/types"
 
 const MAX_HISTORY = 100
 
+const QUEUE_SAVE_KEY = "aurora-queue-v1"
+
+interface QueuePersistShape {
+  queueIds: number[]
+  originalQueueIds: number[]
+  currentSongId: number
+  currentIndex: number
+  seek: number
+  repeatMode: "none" | "all" | "one"
+  shuffle: boolean
+  queuePlaylistId: number | null
+}
+
+/** Throttle: only save seek to localStorage every 5 seconds. */
+let lastSeekSaveTime = 0
+const SEEK_SAVE_INTERVAL_MS = 5000
+
+/** Write current queue state to localStorage. */
+function saveQueueToStorage(get: () => PlayerState, seekOverride?: number): void {
+  const s = get()
+  if (!s.currentSong || s.queue.length === 0) return
+  const shape: QueuePersistShape = {
+    queueIds: s.queue.map((song) => song.id),
+    originalQueueIds: s.originalQueue.map((song) => song.id),
+    currentSongId: s.currentSong.id,
+    currentIndex: s.queueIndex,
+    seek: seekOverride ?? s.seek,
+    repeatMode: s.repeatMode,
+    shuffle: s.isShuffled,
+    queuePlaylistId: s.queuePlaylistId,
+  }
+  try {
+    localStorage.setItem(QUEUE_SAVE_KEY, JSON.stringify(shape))
+  } catch {
+    // localStorage full or unavailable — silently ignore
+  }
+}
+
 /** A song is playable if it has a local file OR comes from an addon (stream). */
 export function isPlayable(song: { file_path?: string | null; source?: string }): boolean {
   return !!song.file_path || !!song.source?.startsWith("addon:")
@@ -50,6 +88,7 @@ interface PlayerState {
   reorderQueue: (fromIndex: number, toIndex: number) => void
   removeFromQueue: (index: number) => void
   clearQueue: () => void
+  restoreQueue: (allSongs: Song[]) => void
 }
 
 function loadStoredVolume(): number {
@@ -107,12 +146,17 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       originalQueue: [],
       queuePlaylistId: playlistId ?? null,
     })
+    saveQueueToStorage(get)
   },
 
   togglePlay: () => {
     const { currentSong, isPlaying } = get()
     if (!currentSong) return
     set({ isPlaying: !isPlaying })
+    // Save on pause so seek is persisted
+    if (isPlaying) {
+      saveQueueToStorage(get)
+    }
   },
 
   next: () => {
@@ -131,6 +175,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         seek: 0,
         duration: nextSong.duration ?? 0,
       })
+      saveQueueToStorage(get)
     } else if (repeatMode === "all") {
       const firstSong = queue[0]
       const history = currentSong
@@ -144,6 +189,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         seek: 0,
         duration: firstSong.duration ?? 0,
       })
+      saveQueueToStorage(get)
     } else {
       // end of queue, no repeat — stop but keep currentSong visible
       set({ isPlaying: false })
@@ -154,6 +200,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     const { queue, queueIndex, seek, queueHistory } = get()
     if (seek > 3) {
       set({ seek: 0 })
+      saveQueueToStorage(get)
       return
     }
     // Try history first — pop the last played song
@@ -168,6 +215,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         seek: 0,
         duration: historySong.duration ?? 0,
       })
+      saveQueueToStorage(get)
       return
     }
     if (queueIndex > 0) {
@@ -179,6 +227,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         seek: 0,
         duration: prevSong.duration ?? 0,
       })
+      saveQueueToStorage(get)
     } else {
       // at queue start with seek <= 3s — restart current song
       set({ seek: 0 })
@@ -208,20 +257,32 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
   setSeek: (s) => set({ seek: s }),
   setDuration: (d) => set({ duration: d }),
-  updateSeek: (s) => set({ seek: s }),
+  updateSeek: (s) => {
+    set({ seek: s })
+    // Throttled seek save — at most every 5 seconds
+    const now = Date.now()
+    if (now - lastSeekSaveTime >= SEEK_SAVE_INTERVAL_MS) {
+      lastSeekSaveTime = now
+      saveQueueToStorage(get, s)
+    }
+  },
 
-  stop: () => set({
-    currentSong: null,
-    isPlaying: false,
-    seek: 0,
-    duration: 0,
-    queue: [],
-    queueIndex: 0,
-    queueHistory: [],
-    isShuffled: false,
-    originalQueue: [],
-    queuePlaylistId: null,
-  }),
+  stop: () => {
+    set({
+      currentSong: null,
+      isPlaying: false,
+      seek: 0,
+      duration: 0,
+      queue: [],
+      queueIndex: 0,
+      queueHistory: [],
+      isShuffled: false,
+      originalQueue: [],
+      queuePlaylistId: null,
+    })
+    // Clear persisted queue on stop
+    try { localStorage.removeItem(QUEUE_SAVE_KEY) } catch { /* */ }
+  },
 
   setIsBuffering: (v) => set({ isBuffering: v }),
 
@@ -238,6 +299,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       one: "none",
     }
     set({ repeatMode: nextMode[repeatMode] })
+    saveQueueToStorage(get)
   },
 
   toggleShuffle: () => {
@@ -262,6 +324,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         originalQueue: [],
       })
     }
+    saveQueueToStorage(get)
   },
 
   playNext: (song) => {
@@ -287,6 +350,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     if (isShuffled && originalQueue.length > 0) {
       set({ originalQueue: [...originalQueue, song] })
     }
+    saveQueueToStorage(get)
   },
 
   reorderQueue: (fromIndex, toIndex) => {
@@ -307,6 +371,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       newIndex = queueIndex + 1
     }
     set({ queue: newQueue, queueIndex: newIndex })
+    saveQueueToStorage(get)
   },
 
   removeFromQueue: (index) => {
@@ -331,12 +396,14 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         duration: nextSong.duration ?? 0,
         originalQueue: newOrig,
       })
+      saveQueueToStorage(get)
     } else {
       const newQueue = queue.filter((_, i) => i !== index)
       const newIndex = index < queueIndex ? queueIndex - 1 : queueIndex
       const removed = queue[index]
       const newOrig = isShuffled ? removeOneById(originalQueue, removed.id) : originalQueue
       set({ queue: newQueue, queueIndex: newIndex, originalQueue: newOrig })
+      saveQueueToStorage(get)
     }
   },
 
@@ -344,8 +411,57 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     const current = get().currentSong
     if (current) {
       set({ queue: [current], queueIndex: 0 })
+      saveQueueToStorage(get)
     } else {
       get().stop()
     }
+  },
+
+  restoreQueue: (allSongs: Song[]) => {
+    const raw = localStorage.getItem(QUEUE_SAVE_KEY)
+    if (!raw) return
+    let data: QueuePersistShape
+    try {
+      data = JSON.parse(raw)
+    } catch {
+      return
+    }
+    // Build ID → Song lookup
+    const songMap = new Map(allSongs.map((s) => [s.id, s]))
+
+    // Map queue IDs, silently drop missing
+    const queue = data.queueIds
+      .map((id) => songMap.get(id))
+      .filter((s): s is Song => s !== undefined)
+
+    if (queue.length === 0) return
+
+    // Map originalQueue IDs (for shuffle state)
+    const originalQueue = data.originalQueueIds
+      .map((id) => songMap.get(id))
+      .filter((s): s is Song => s !== undefined)
+
+    // Find current song — may have been deleted
+    const currentSong = songMap.get(data.currentSongId) ?? queue[0]
+    const currentIndex = currentSong
+      ? queue.findIndex((s) => s.id === currentSong.id)
+      : 0
+    const queueIndex = currentIndex >= 0 ? currentIndex : 0
+
+    // Only restore seek if the current song is the same one that was playing
+    const seekRestored = currentSong?.id === data.currentSongId ? data.seek : 0
+
+    set({
+      queue,
+      queueIndex,
+      currentSong,
+      isPlaying: false,
+      seek: seekRestored,
+      duration: currentSong?.duration ?? 0,
+      repeatMode: data.repeatMode,
+      isShuffled: data.shuffle,
+      originalQueue,
+      queuePlaylistId: data.queuePlaylistId,
+    })
   },
 }))
