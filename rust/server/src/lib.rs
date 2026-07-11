@@ -114,6 +114,10 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
                 .delete(routes::delete_song),
         )
         .route(
+            "/api/songs/{song_id}/played",
+            axum::routing::post(routes::mark_played),
+        )
+        .route(
             "/api/songs/{song_id}/stream",
             axum::routing::get(routes::stream_song),
         )

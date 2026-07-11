@@ -390,6 +390,23 @@ pub async fn stream_song(
         .unwrap()
 }
 
+/// POST /api/songs/{song_id}/played — increment play_count, set last_played_at.
+pub async fn mark_played(
+    State(state): State<Arc<AppState>>,
+    Path(song_id): Path<i64>,
+) -> Response {
+    let conn = state.conn.lock().await;
+    match aurora_core::db::queries::increment_play_count(&conn, song_id) {
+        Ok(Some(song)) => envelope::ok(song, "ok").into_response(),
+        Ok(None) => envelope::not_found("Song not found").into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"detail": e.to_string()})),
+        )
+            .into_response(),
+    }
+}
+
 /// GET /api/songs/{song_id}/bleed-thumb — bleed thumbnail.
 pub async fn bleed_thumb(
     State(state): State<Arc<AppState>>,
