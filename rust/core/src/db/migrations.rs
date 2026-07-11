@@ -52,7 +52,9 @@ CREATE TABLE IF NOT EXISTS songs (
     featured_artists        TEXT,
     stream_url              TEXT,
     stream_url_expires_at   TEXT,
-    artwork_url             TEXT
+    artwork_url             TEXT,
+    play_count              INTEGER NOT NULL DEFAULT 0,
+    last_played_at          TEXT
 );
 
 CREATE TABLE IF NOT EXISTS playlists (
@@ -66,7 +68,9 @@ CREATE TABLE IF NOT EXISTS playlists (
     crossfade_enabled   INTEGER DEFAULT NULL,
     crossfade_duration_s INTEGER DEFAULT NULL,
     dominant_color      TEXT,
-    dominant_color_2    TEXT
+    dominant_color_2    TEXT,
+    type                TEXT    NOT NULL DEFAULT 'normal',
+    query               TEXT
 );
 
 CREATE TABLE IF NOT EXISTS tags (
@@ -210,6 +214,16 @@ const MIGRATIONS: &[Migration] = &[
             "ALTER TABLE addons ADD COLUMN last_fail_at TEXT",
         ],
     },
+    // Version 6: play counts + smart playlist fields
+    Migration {
+        version: 6,
+        stmts: &[
+            "ALTER TABLE songs ADD COLUMN play_count INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE songs ADD COLUMN last_played_at TEXT",
+            "ALTER TABLE playlists ADD COLUMN type TEXT NOT NULL DEFAULT 'normal'",
+            "ALTER TABLE playlists ADD COLUMN query TEXT",
+        ],
+    },
 ];
 
 /// Run the PRAGMA user_version migration ladder.
@@ -229,9 +243,9 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
                     Ok(_) => {}
                     Err(e) => {
                         let msg = e.to_string();
-                        if !msg.contains("duplicate column") {
-                            return Err(e.into());
-                        }
+                         if !msg.contains("duplicate column") && !msg.contains("no such table") {
+                             return Err(e.into());
+                         }
                     }
                 }
             }
@@ -258,7 +272,7 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
                 Ok(_) => {}
                 Err(e) => {
                     let msg = e.to_string();
-                    if !msg.contains("duplicate column") {
+                    if !msg.contains("duplicate column") && !msg.contains("no such table") {
                         return Err(e.into());
                     }
                 }
@@ -369,11 +383,11 @@ mod tests {
         // Verify last_fail_at exists now
         conn.query_row("SELECT last_fail_at FROM addons", [], |_| Ok(())).unwrap();
 
-        // Verify user_version is 5
+        // Verify user_version reaches CURRENT_VERSION (6)
         let version: i64 = conn
             .pragma_query_value(None, "user_version", |row| row.get(0))
             .unwrap();
-        assert_eq!(version, 5);
+        assert_eq!(version, CURRENT_VERSION);
 
         // Verify data survived
         let id: String = conn
@@ -413,14 +427,14 @@ mod tests {
         let version: i64 = conn
             .pragma_query_value(None, "user_version", |row| row.get(0))
             .unwrap();
-        assert_eq!(version, 5);
+        assert_eq!(version, CURRENT_VERSION);
 
         // Second run: no-op
         run_migrations(&conn).unwrap();
         let version2: i64 = conn
             .pragma_query_value(None, "user_version", |row| row.get(0))
             .unwrap();
-        assert_eq!(version2, 5);
+        assert_eq!(version2, CURRENT_VERSION);
     }
 
     /// Test: version beyond CURRENT_VERSION is rejected.
@@ -443,5 +457,196 @@ mod tests {
                 .to_string()
                 .contains("schema version 99")
         );
+    }
+
+    /// Test: fresh DB reaches v6 with new columns and correct defaults.
+    #[test]
+    fn test_fresh_db_v6_columns() {
+        let tmp = tempfile::tempdir().unwrap();
+        let db_path = tmp.path().join("test.db");
+        let conn = Connection::open(&db_path).unwrap();
+        conn.execute_batch("PRAGMA foreign_keys = ON;").unwrap();
+        conn.execute_batch(INIT_SQL).unwrap();
+        run_migrations(&conn).unwrap();
+
+        let version: i64 = conn
+            .pragma_query_value(None, "user_version", |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, 6);
+
+        // Insert a song — play_count should default to 0, last_played_at to NULL
+        conn.execute_batch(
+            "INSERT INTO songs (title, artist, created_at, updated_at)
+             VALUES ('Test', 'Artist', '2025-01-01', '2025-01-01')",
+        )
+        .unwrap();
+        let (pc, lpa): (i64, Option<String>) = conn
+            .query_row(
+                "SELECT play_count, last_played_at FROM songs WHERE id = 1",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(pc, 0);
+        assert!(lpa.is_none());
+
+        // Insert a playlist — type should default to 'normal', query to NULL
+        conn.execute_batch(
+            "INSERT INTO playlists (name, created_at, updated_at)
+             VALUES ('TestPL', '2025-01-01', '2025-01-01')",
+        )
+        .unwrap();
+        let (pl_type, pl_query): (String, Option<String>) = conn
+            .query_row(
+                "SELECT type, query FROM playlists WHERE id = 1",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(pl_type, "normal");
+        assert!(pl_query.is_none());
+    }
+
+    /// Test: seed a v5 DB with data → run_migrations → v6, data intact, new columns defaulted.
+    #[test]
+    fn test_v5_upgrade_preserves_data() {
+        let tmp = tempfile::tempdir().unwrap();
+        let db_path = tmp.path().join("test.db");
+        let conn = Connection::open(&db_path).unwrap();
+
+        // Create a v5 schema (same as INIT_SQL minus v6 columns)
+        conn.execute_batch(
+            "PRAGMA foreign_keys = ON;
+            PRAGMA journal_mode = WAL;
+
+            CREATE TABLE songs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                artist TEXT NOT NULL,
+                album TEXT,
+                duration INTEGER,
+                file_path TEXT UNIQUE,
+                source TEXT NOT NULL DEFAULT 'manual',
+                external_id TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                file_format TEXT,
+                album_art_path TEXT,
+                waveform_peaks TEXT,
+                dominant_color TEXT,
+                dominant_color_2 TEXT,
+                bleed_thumb BLOB,
+                bleed_region_x INTEGER,
+                bleed_region_y INTEGER,
+                bleed_region_w INTEGER,
+                bleed_region_h INTEGER,
+                file_mtime REAL,
+                replaygain_track_gain REAL,
+                replaygain_track_peak REAL,
+                replaygain_album_gain REAL,
+                replaygain_album_peak REAL,
+                bitrate INTEGER,
+                sample_rate INTEGER,
+                bit_depth INTEGER,
+                file_size INTEGER,
+                artists TEXT,
+                featured_artists TEXT,
+                stream_url TEXT,
+                stream_url_expires_at TEXT,
+                artwork_url TEXT
+            );
+
+            CREATE TABLE playlists (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                color TEXT,
+                emoji TEXT,
+                image_url TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                crossfade_enabled INTEGER DEFAULT NULL,
+                crossfade_duration_s INTEGER DEFAULT NULL,
+                dominant_color TEXT,
+                dominant_color_2 TEXT
+            );
+
+            CREATE TABLE tags (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL);
+            CREATE TABLE playlist_songs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                playlist_id INTEGER NOT NULL REFERENCES playlists(id) ON DELETE CASCADE,
+                song_id INTEGER NOT NULL REFERENCES songs(id) ON DELETE CASCADE,
+                position INTEGER NOT NULL DEFAULT 0,
+                added_at TEXT NOT NULL,
+                start_time_ms INTEGER NOT NULL DEFAULT 0,
+                end_time_ms INTEGER NOT NULL DEFAULT 0,
+                UNIQUE(playlist_id, song_id)
+            );
+            CREATE TABLE song_tags (id INTEGER PRIMARY KEY AUTOINCREMENT, song_id INTEGER NOT NULL REFERENCES songs(id) ON DELETE CASCADE, tag_id INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE, UNIQUE(song_id, tag_id));
+            CREATE TABLE addons (
+                id TEXT PRIMARY KEY, base_url TEXT NOT NULL UNIQUE, name TEXT,
+                version TEXT, manifest_json TEXT NOT NULL, enabled INTEGER DEFAULT 1,
+                added_at TEXT, last_ok_at TEXT, fail_count INTEGER DEFAULT 0, last_fail_at TEXT
+            );
+
+            INSERT INTO songs (title, artist, created_at, updated_at, file_path)
+             VALUES ('MySong', 'MyArtist', '2025-06-01', '2025-06-01', '/music/song.mp3');
+            INSERT INTO playlists (name, created_at, updated_at)
+             VALUES ('MyPlaylist', '2025-06-01', '2025-06-01');
+            PRAGMA user_version = 5;",
+        )
+        .unwrap();
+
+        // Verify pre-conditions: play_count column doesn't exist
+        let err = conn.query_row("SELECT play_count FROM songs", [], |_| Ok(()));
+        assert!(err.is_err());
+
+        // Run migrations — must upgrade to v6
+        run_migrations(&conn).unwrap();
+
+        let version: i64 = conn
+            .pragma_query_value(None, "user_version", |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, 6);
+
+        // Verify existing song data survived
+        let (title, artist): (String, String) = conn
+            .query_row(
+                "SELECT title, artist FROM songs WHERE id = 1",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(title, "MySong");
+        assert_eq!(artist, "MyArtist");
+
+        // New columns have correct defaults
+        let (pc, lpa): (i64, Option<String>) = conn
+            .query_row(
+                "SELECT play_count, last_played_at FROM songs WHERE id = 1",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(pc, 0);
+        assert!(lpa.is_none());
+
+        // Existing playlist data survived
+        let pl_name: String = conn
+            .query_row("SELECT name FROM playlists WHERE id = 1", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(pl_name, "MyPlaylist");
+
+        // Playlist new columns have correct defaults
+        let (pl_type, pl_query): (String, Option<String>) = conn
+            .query_row(
+                "SELECT type, query FROM playlists WHERE id = 1",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(pl_type, "normal");
+        assert!(pl_query.is_none());
     }
 }

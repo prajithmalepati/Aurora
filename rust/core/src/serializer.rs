@@ -61,7 +61,7 @@ fn safe_json_loads(raw: Option<&str>) -> Option<Value> {
 
 /// Serialize a song row into the canonical response shape.
 ///
-/// All ~35 fields are always present (nulls for missing values).
+/// All ~37 fields are always present (nulls for missing values).
 /// `include_peaks`: true for single-song GET (has waveform_peaks),
 ///                  false for list/filter endpoints (no waveform_peaks).
 ///
@@ -98,6 +98,8 @@ pub fn song_to_json(
     playlists_csv: Option<&str>,
     created_at: &str,
     updated_at: &str,
+    play_count: i64,
+    last_played_at: Option<&str>,
     include_peaks: bool,
 ) -> Value {
     let mut map = serde_json::Map::new();
@@ -133,6 +135,8 @@ pub fn song_to_json(
     map.insert("stream_url".into(), json_opt_str(stream_url));
     map.insert("stream_url_expires_at".into(), json_opt_str(stream_url_expires_at));
     map.insert("artwork_url".into(), json_opt_str(artwork_url));
+    map.insert("play_count".into(), Value::Number(play_count.into()));
+    map.insert("last_played_at".into(), json_opt_str(last_played_at));
 
     if include_peaks {
         map.insert("waveform_peaks".into(), safe_json_loads(waveform_peaks).unwrap_or(Value::Null));
@@ -189,6 +193,8 @@ pub fn playlist_to_json(
     dominant_color_2: Option<&str>,
     created_at: &str,
     updated_at: &str,
+    playlist_type: &str,
+    query: Option<&str>,
 ) -> Value {
     serde_json::json!({
         "id": id,
@@ -203,6 +209,8 @@ pub fn playlist_to_json(
         "dominant_color_2": dominant_color_2,
         "created_at": created_at,
         "updated_at": updated_at,
+        "type": playlist_type,
+        "query": query,
     })
 }
 
@@ -243,6 +251,8 @@ pub fn song_to_playlist_json(
     start_time_ms: i64,
     end_time_ms: i64,
     position: i64,
+    play_count: i64,
+    last_played_at: Option<&str>,
 ) -> Value {
     let mut map = serde_json::Map::new();
 
@@ -277,6 +287,8 @@ pub fn song_to_playlist_json(
     map.insert("stream_url".into(), json_opt_str(stream_url));
     map.insert("stream_url_expires_at".into(), json_opt_str(stream_url_expires_at));
     map.insert("artwork_url".into(), json_opt_str(artwork_url));
+    map.insert("play_count".into(), Value::Number(play_count.into()));
+    map.insert("last_played_at".into(), json_opt_str(last_played_at));
 
     Value::Object(map)
 }

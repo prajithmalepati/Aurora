@@ -37,6 +37,8 @@ pub struct Song {
     pub stream_url: Option<String>,
     pub stream_url_expires_at: Option<String>,
     pub artwork_url: Option<String>,
+    pub play_count: i64,
+    pub last_played_at: Option<String>,
 }
 
 impl Song {
@@ -72,6 +74,8 @@ impl Song {
             stream_url: row.get("stream_url")?,
             stream_url_expires_at: row.get("stream_url_expires_at")?,
             artwork_url: row.get("artwork_url")?,
+            play_count: row.get("play_count")?,
+            last_played_at: row.get("last_played_at")?,
         })
     }
 
