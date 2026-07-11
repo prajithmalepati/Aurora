@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from "react"
+import { useRef, useEffect, useState, useMemo } from "react"
 import { useFilterStore } from "@/stores/filterStore"
 import { useTagStore } from "@/stores/tagStore"
 import { usePlaylistStore } from "@/stores/playlistStore"
@@ -8,8 +8,21 @@ import { AutocompleteDropdown, type SuggestionItem } from "./AutocompleteDropdow
 import { SongTable } from "@/components/songs/SongTable"
 import { Search, X, Shuffle, Sparkles, SlidersHorizontal, Tag } from "lucide-react"
 import type { Song } from "@/types"
+import { parseChipStates, type ChipState } from "@/lib/chipState"
 
 const OPERATORS = ["AND", "OR", "NOT", "(", ")"] as const
+
+function chipClassName(state: ChipState): string {
+  switch (state) {
+    case "included":
+      return "text-[var(--aurora-accent-interactive)] bg-[var(--aurora-accent-interactive)]/10 border-[var(--aurora-accent-interactive)]/30"
+    case "excluded":
+      return "text-[var(--aurora-danger)] line-through border-[var(--aurora-danger)]/25 bg-transparent"
+    case "neutral":
+    default:
+      return "text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)]"
+  }
+}
 
 export function QueryBuilder() {
   const query = useFilterStore((state) => state.query)
@@ -20,7 +33,7 @@ export function QueryBuilder() {
   const isQuickTagView = useFilterStore((state) => state.isQuickTagView)
   const quickTagEditorOpen = useFilterStore((state) => state.quickTagEditorOpen)
   const appendToQuery = useFilterStore((state) => state.appendToQuery)
-  const appendTerm = useFilterStore((state) => state.appendTerm)
+  const toggleAtom = useFilterStore((state) => state.toggleAtom)
   const executeFilter = useFilterStore((state) => state.executeFilter)
   const jamFilter = useFilterStore((state) => state.jamFilter)
   const shuffleAndJamFilter = useFilterStore((state) => state.shuffleAndJamFilter)
@@ -30,6 +43,16 @@ export function QueryBuilder() {
   const playSong = usePlayerStore((state) => state.playSong)
   const tags = useTagStore((state) => state.tags)
   const playlists = usePlaylistStore((state) => state.playlists)
+
+  // Derive chip states from query + known atoms
+  const knownAtomNames = useMemo(
+    () => [...tags.map((t) => t.name), ...playlists.map((p) => p.name)],
+    [tags, playlists]
+  )
+  const { states: chipStates, isCustom } = useMemo(
+    () => parseChipStates(query, knownAtomNames),
+    [query, knownAtomNames]
+  )
 
   const [searchFired, setSearchFired] = useState(false)
 
@@ -217,17 +240,21 @@ export function QueryBuilder() {
             {/* Tag chips */}
             {tags.length > 0 && (
               <div className="flex items-center gap-1 flex-shrink-0">
-                {tags.map((tag) => (
-                  <button
-                    key={tag.id}
-                    onClick={() =>
-                      appendTerm(tag.name.includes(" ") ? `"${tag.name}"` : tag.name)
-                    }
-                    className="aurora-chip flex-shrink-0 text-[11px] font-medium text-[var(--aurora-text-secondary)] px-2.5 py-[2px] rounded-full hover:text-[var(--aurora-text)]"
-                  >
-                    {tag.name}
-                  </button>
-                ))}
+                {tags.map((tag) => {
+                  const state = chipStates.get(tag.name) ?? "neutral"
+                  return (
+                    <button
+                      key={tag.id}
+                      onClick={(e) => {
+                        toggleAtom(tag.name, e.shiftKey)
+                      }}
+                      title="Click: include · again: exclude · again: clear"
+                      className={`aurora-chip flex-shrink-0 text-[11px] font-medium px-2.5 py-[2px] rounded-full transition-[color,background-color,border-color,box-shadow] duration-150 ${chipClassName(state)}`}
+                    >
+                      {tag.name}
+                    </button>
+                  )
+                })}
               </div>
             )}
 
@@ -259,19 +286,17 @@ export function QueryBuilder() {
               <div className="flex items-center gap-1 flex-shrink-0">
                 {playlists.map((playlist) => {
                   const color = playlist.color || "#a78bfa"
+                  const state = chipStates.get(playlist.name) ?? "neutral"
                   return (
                     <button
                       key={playlist.id}
-                      onClick={() =>
-                        appendTerm(
-                          playlist.name.includes(" ")
-                            ? `"${playlist.name}"`
-                            : playlist.name.toLowerCase()
-                        )
-                      }
-                      className="flex-shrink-0 whitespace-nowrap text-[11px] font-medium px-2.5 py-[2px] rounded-full transition-colors duration-150 inline-flex items-center gap-1.5 text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)]"
+                      onClick={(e) => {
+                        toggleAtom(playlist.name, e.shiftKey)
+                      }}
+                      title="Click: include · again: exclude · again: clear"
+                      className={`flex-shrink-0 whitespace-nowrap text-[11px] font-medium px-2.5 py-[2px] rounded-full transition-[color,background-color,border-color,box-shadow] duration-150 inline-flex items-center gap-1.5 ${chipClassName(state)}`}
                       style={{
-                        border: `1px solid ${color}30`,
+                        border: state === "neutral" ? `1px solid ${color}30` : undefined,
                       }}
                     >
                       <span
@@ -283,6 +308,13 @@ export function QueryBuilder() {
                   )
                 })}
               </div>
+            )}
+
+            {/* Custom-mode marker */}
+            {isCustom && (
+              <span className="ml-2 text-[10px] font-medium text-[var(--aurora-text-tertiary)] italic flex-shrink-0">
+                custom query
+              </span>
             )}
           </div>
         )}

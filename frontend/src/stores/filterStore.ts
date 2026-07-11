@@ -3,7 +3,10 @@ import { api } from "@/lib/api"
 import type { FilterResult, ApiResponse, Song } from "@/types"
 import { usePlayerStore } from "@/stores/playerStore"
 import { isPlayable } from "@/stores/playerStore"
+import { useTagStore } from "@/stores/tagStore"
+import { usePlaylistStore } from "@/stores/playlistStore"
 import { toast } from "@/lib/toast"
+import { toggleAtom as _toggleAtom } from "@/lib/chipState"
 
 interface FilterState {
   query: string
@@ -20,6 +23,7 @@ interface FilterState {
   setQuery: (query: string) => void
   appendToQuery: (text: string) => void
   appendTerm: (term: string) => void
+  toggleAtom: (name: string, shiftHeld?: boolean) => void
   executeFilter: () => Promise<void>
   shuffleFilter: () => Promise<void>
   jamFilter: () => Promise<void>
@@ -66,6 +70,12 @@ function friendlyFilterError(query: string, raw: string): string {
   return raw.replace(/^Invalid query syntax:\s*/i, 'Invalid syntax: ')
 }
 
+function getKnownAtoms(): string[] {
+  const tags = useTagStore.getState().tags.map((t) => t.name)
+  const playlists = usePlaylistStore.getState().playlists.map((p) => p.name)
+  return [...tags, ...playlists]
+}
+
 export const useFilterStore = create<FilterState>((set, get) => ({
   query: "",
   results: [],
@@ -98,6 +108,12 @@ export const useFilterStore = create<FilterState>((set, get) => ({
     } else {
       set({ query: current + " AND " + term })
     }
+  },
+
+  toggleAtom: (name, shiftHeld) => {
+    const knownAtoms = getKnownAtoms()
+    const newQuery = _toggleAtom(get().query, name, knownAtoms, shiftHeld)
+    set({ query: newQuery })
   },
 
   executeFilter: async () => {
