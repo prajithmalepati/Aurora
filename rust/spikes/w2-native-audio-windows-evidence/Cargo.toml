@@ -1,0 +1,18 @@
+[workspace]
+# Independent workspace — does NOT join Aurora's production workspace.
+
+[package]
+name = "w2-evidence"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rodio = { version = "0.22.2", features = ["playback", "symphonia-all"] }
+# Direct symphonia dep for metadata probing (codec, sample rate, bit depth).
+# rodio re-exports symphonia internally but does not expose probe/metadata APIs.
+symphonia = { version = "0.5.5", features = ["all-formats", "all-codecs"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+
+[dev-dependencies]
