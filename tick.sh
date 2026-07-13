@@ -1,31 +1,36 @@
 #!/usr/bin/env bash
-# tick.sh — mechanical STATE generator and safe heartbeat foundation
+# tick.sh — mechanical STATE generator, safe Daiki→Verita heartbeat pipeline
 #
 # Invocation:  ./tick.sh [--dry-run]
 #
 # What it does (in order):
 #   1. Acquire a non-overlapping lock ($XDG_CACHE_HOME/aurora/tick/tick.lock)
 #   2. Check for PAUSE file at repo root → exit 0 if present
-#   3. Verify required commands (git, gh, jq)
+#   3. Verify required commands (git, gh, jq, hermes)
 #   4. git fetch origin
 #   5. Snapshot board + PR state to JSON, diff against last snapshot
 #   6. If no change → exit 0 (zero tokens)
 #   7. If change detected → render STATE.md mechanically from live commands
-#   8. Emit would-spawn-daiki / would-run-verita-stage markers (NOT actually spawning)
+#   8. Check attempt budget, reserve one attempt
+#   9. Run Daiki under bounded supervisor (30 min timeout)
+#  10. On Daiki exit 0: acknowledge snapshot, then run Verita (10 min timeout)
+#     On Daiki failure/timeout: leave snapshot unacknowledged, skip Verita
+#  11. Log metadata-only outcome, optionally notify
 #
 # Environment contract:
 #   TICK_REPO_ROOT   override repo root  (default: directory containing this script)
 #   TICK_RUNTIME_DIR override runtime dir (default: ${XDG_CACHE_HOME:-$HOME/.cache}/aurora/tick)
 #   TICK_DRY_RUN     same as --dry-run flag
 #
-# Required commands: git, gh (GitHub CLI), jq
+# Required commands: git, gh, jq, hermes
 #
 # Safe-by-default:
 #   - Does NOT configure timers, systemd, or cron
-#   - Does NOT invoke models or send notifications
 #   - Does NOT modify .gitignore, CI, or Hermes config
+#   - Does NOT create or modify Hermes profiles
 #   - STATE.md is added to .git/info/exclude (local-only)
-#   - Emits would-spawn-daiki / would-run-verita-stage on detected changes
+#   - No direct Kanban DB writes
+#   - No fix-round field/status invention
 #
 # No API keys, tokens, absolute home paths, Tailscale data, or library data
 # appear in logs or STATE.md output.  Fields that cannot be sourced are marked
@@ -59,6 +64,23 @@ DRY_RUN=false
 mkdir -p "$RUNTIME_DIR"
 
 # ---------------------------------------------------------------------------
+# Named budget and timeout constants
+# ---------------------------------------------------------------------------
+readonly MAX_ATTEMPTS_DAY=12
+readonly MAX_ATTEMPTS_MONTH=250
+readonly NOTIFY_CAP_DAY=10
+
+# Timeouts — overridable via env for testing; defaults are the production values
+DAIKI_TIMEOUT_SECS="${DAIKI_TIMEOUT_SECS:-1800}"   # 30 minutes
+VERITA_TIMEOUT_SECS="${VERITA_TIMEOUT_SECS:-600}"  # 10 minutes
+KILL_GRACE_SECS="${KILL_GRACE_SECS:-30}"
+
+# Runtime files
+readonly COUNTER_DAY="$RUNTIME_DIR/attempts_day.txt"
+readonly COUNTER_MONTH="$RUNTIME_DIR/attempts_month.txt"
+readonly LOG_FILE="$RUNTIME_DIR/tick.log"
+
+# ---------------------------------------------------------------------------
 # Lock — non-overlapping via flock
 # ---------------------------------------------------------------------------
 LOCK_FD=9
@@ -86,6 +108,152 @@ for cmd in git gh jq; do
     exit 1
   fi
 done
+
+# ---------------------------------------------------------------------------
+# Validate hermes binary — must exist before any budget or spawn work
+# ---------------------------------------------------------------------------
+if ! command -v hermes &>/dev/null; then
+  echo "tick: hermes command not found on PATH" >&2
+  exit 1
+fi
+
+# ---------------------------------------------------------------------------
+# Supervise — run a command in a new process group with bounded timeout
+#   supervise <timeout_secs> <log_label> <command...>
+#
+# Returns the supervised command's exit code, or 124 on timeout.
+# The child runs in its own process group (setsid).
+# Lock fd 9 is closed in the child (CLOEXEC / explicit).
+# On timeout: SIGTERM group → grace → SIGKILL group.
+# ---------------------------------------------------------------------------
+supervise() {
+  local timeout_secs="$1"
+  local label="$2"
+  shift 2
+  local cmd=("$@")
+  local pid_file="$RUNTIME_DIR/supervise_${label}_$$.pid"
+
+  # Launch in a new session via setsid. setsid may fork if the calling
+  # process is a process group leader (which backgrounded children are).
+  # To get the actual child PID (the session leader), the child writes
+  # its own $$ to a PID file before exec'ing the command.
+  setsid bash -c '
+    echo $$ > "'"$pid_file"'"
+    exec 9>&-
+    exec "$@"
+  ' _ "${cmd[@]}" &
+  local setsid_parent=$!
+
+  # Wait for the PID file to appear (child started and wrote its PID)
+  local waited=0
+  while [[ ! -f "$pid_file" ]] && kill -0 "$setsid_parent" 2>/dev/null; do
+    sleep 0.1
+    waited=$((waited + 1))
+    [[ $waited -ge 50 ]] && break  # 5s max wait
+  done
+
+  local child_pid=""
+  if [[ -f "$pid_file" ]]; then
+    child_pid="$(cat "$pid_file" 2>/dev/null)"
+    rm -f "$pid_file"
+  fi
+
+  # Fallback: if we couldn't get the child PID, use setsid parent
+  if [[ -z "$child_pid" ]] || ! kill -0 "$child_pid" 2>/dev/null; then
+    rm -f "$pid_file"
+    wait "$setsid_parent" 2>/dev/null
+    return $?
+  fi
+
+  # Wait with timeout
+  local elapsed=0
+  while kill -0 "$child_pid" 2>/dev/null; do
+    sleep 1
+    elapsed=$((elapsed + 1))
+    if [[ $elapsed -ge $timeout_secs ]]; then
+      # Timeout: SIGTERM the process group (child_pid IS the PGID)
+      kill -TERM -"$child_pid" 2>/dev/null || true
+      sleep "$KILL_GRACE_SECS"
+      # SIGKILL if still alive
+      kill -KILL -"$child_pid" 2>/dev/null || true
+      wait "$child_pid" 2>/dev/null || true
+      wait "$setsid_parent" 2>/dev/null || true
+      rm -f "$pid_file"
+      return 124
+    fi
+  done
+
+  # Child exited normally
+  wait "$child_pid" 2>/dev/null
+  local child_rc=$?
+  wait "$setsid_parent" 2>/dev/null || true
+  rm -f "$pid_file"
+  return $child_rc
+}
+
+# ---------------------------------------------------------------------------
+# Send notification (optional, non-fatal)
+#   send_notification <title> <message>
+# ---------------------------------------------------------------------------
+send_notification() {
+  local title="$1"
+  local message="$2"
+  local secrets_file="$RUNTIME_DIR/ntfy_secrets"
+  local notify_count_file="$RUNTIME_DIR/notify_count.txt"
+
+  # Rate limit: read current count
+  local notify_count=0
+  if [[ -f "$notify_count_file" ]]; then
+    notify_count="$(cat "$notify_count_file" 2>/dev/null || echo "0")"
+    if ! [[ "$notify_count" =~ ^[0-9]+$ ]]; then
+      notify_count=0
+    fi
+  fi
+  if [[ $notify_count -ge $NOTIFY_CAP_DAY ]]; then
+    return 0  # capped — silently skip
+  fi
+
+  # Build argv array — no source, no eval
+  local ntfy_args=("ntfy" "notify")
+
+  # Optional token from permission-checked secrets file
+  if [[ -f "$secrets_file" ]]; then
+    local perms
+    perms="$(stat -c '%a' "$secrets_file" 2>/dev/null || echo "")"
+    if [[ "$perms" == "600" ]]; then
+      local token
+      token="$(cat "$secrets_file" 2>/dev/null || echo "")"
+      if [[ -n "$token" ]]; then
+        ntfy_args+=("--token" "$token")
+      fi
+    fi
+  fi
+
+  ntfy_args+=("--title" "$title" "$message")
+
+  # Execute with argv array, discard output, non-fatal
+  if "${ntfy_args[@]}" >/dev/null 2>&1; then
+    notify_count=$((notify_count + 1))
+    echo "$notify_count" > "$notify_count_file"
+  fi
+  return 0
+}
+
+# ---------------------------------------------------------------------------
+# Log — metadata-only, no model output or secrets
+#   log_tick <outcome> [stage] [exit_class]
+# ---------------------------------------------------------------------------
+log_tick() {
+  local outcome="$1"
+  local stage="${2:-}"
+  local exit_class="${3:-}"
+  local ts
+  ts="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+  local line="$ts | $outcome"
+  [[ -n "$stage" ]] && line="$line | stage=$stage"
+  [[ -n "$exit_class" ]] && line="$line | exit=$exit_class"
+  echo "$line" >> "$LOG_FILE"
+}
 
 # ---------------------------------------------------------------------------
 # Fetch
@@ -165,8 +333,9 @@ echo "tick: change detected"
 # ---------------------------------------------------------------------------
 if $DRY_RUN; then
   echo "[dry-run] would regenerate STATE.md"
-  echo "[dry-run] would-spawn-daiki"
-  echo "[dry-run] would-run-verita-stage"
+  echo "[dry-run] would check budget"
+  echo "[dry-run] would run Daiki"
+  echo "[dry-run] would run Verita"
   exit 0
 fi
 
@@ -264,10 +433,6 @@ STATE_EOF
 mv "$STATE_TMP" "$STATE_FINAL"
 echo "tick: STATE.md written"
 
-# Save snapshot for next diff
-echo "$NEW_SNAPSHOT" > "$SNAPSHOT_FILE"
-echo "tick: snapshot saved to $SNAPSHOT_FILE"
-
 # Verify exclusion
 if git check-ignore -q STATE.md 2>/dev/null; then
   echo "tick: STATE.md confirmed git-ignored"
@@ -276,9 +441,148 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Safe-by-default markers — NOT actually spawning anything
+# Attempt budget — check and reserve before spawning
 # ---------------------------------------------------------------------------
-echo "tick: would-spawn-daiki"
-echo "tick: would-run-verita-stage"
+today="$(date -u '+%Y-%m-%d')"
+month="$(date -u '+%Y-%m')"
+
+# Read daily counter: format "YYYY-MM-DD N"
+day_count=0
+if [[ -f "$COUNTER_DAY" ]]; then
+  _raw="$(cat "$COUNTER_DAY" 2>/dev/null || echo "")"
+  _date="${_raw%% *}"
+  _num="${_raw#* }"
+  if [[ "$_date" != "$today" ]]; then
+    day_count=0
+  elif [[ "$_num" =~ ^[0-9]+$ ]]; then
+    day_count="$_num"
+  else
+    # Malformed counter — fail closed
+    echo "tick: malformed daily counter — failing closed" >&2
+    log_tick "fail-closed" "budget" "malformed-counter"
+    exit 1
+  fi
+fi
+
+# Read monthly counter: format "YYYY-MM N"
+month_count=0
+if [[ -f "$COUNTER_MONTH" ]]; then
+  _raw="$(cat "$COUNTER_MONTH" 2>/dev/null || echo "")"
+  _mon="${_raw%% *}"
+  _num="${_raw#* }"
+  if [[ "$_mon" != "$month" ]]; then
+    month_count=0
+  elif [[ "$_num" =~ ^[0-9]+$ ]]; then
+    month_count="$_num"
+  else
+    # Malformed counter — fail closed
+    echo "tick: malformed monthly counter — failing closed" >&2
+    log_tick "fail-closed" "budget" "malformed-counter"
+    exit 1
+  fi
+fi
+
+if [[ $day_count -ge $MAX_ATTEMPTS_DAY ]]; then
+  echo "tick: daily attempt cap reached ($day_count/$MAX_ATTEMPTS_DAY) — skipping model work"
+  log_tick "cap-reached" "budget" "daily"
+  send_notification "Tick: daily cap" "Daily attempt cap ($MAX_ATTEMPTS_DAY) reached"
+  echo "$NEW_SNAPSHOT" > "$SNAPSHOT_FILE"
+  echo "tick: snapshot saved to $SNAPSHOT_FILE"
+  exit 0
+fi
+
+if [[ $month_count -ge $MAX_ATTEMPTS_MONTH ]]; then
+  echo "tick: monthly attempt cap reached ($month_count/$MAX_ATTEMPTS_MONTH) — skipping model work"
+  log_tick "cap-reached" "budget" "monthly"
+  send_notification "Tick: monthly cap" "Monthly attempt cap ($MAX_ATTEMPTS_MONTH) reached"
+  echo "$NEW_SNAPSHOT" > "$SNAPSHOT_FILE"
+  echo "tick: snapshot saved to $SNAPSHOT_FILE"
+  exit 0
+fi
+
+# Reserve attempt — count before spawn, never refund
+day_count=$((day_count + 1))
+month_count=$((month_count + 1))
+echo "$today $day_count" > "$COUNTER_DAY"
+echo "$month $month_count" > "$COUNTER_MONTH"
+
+# ---------------------------------------------------------------------------
+# Daiki prompt
+# ---------------------------------------------------------------------------
+DAIKI_PROMPT='Daiki — Aurora operating cycle. You are the orchestrator, not an implementer.
+
+Load, in order:
+1. /home/fusei/Aurora/HERMES_NORTH_STAR.md      — goals, ranked; fixed; you propose changes only via north-star-proposal cards.
+2. /home/fusei/Aurora/HERMES_OPERATING_PLAN.md  — your operating manual: seats (§3), wave queue (§4), rules (§5), board contract + card anatomy (§6), escalation (§8).
+3. /home/fusei/Aurora/STATE.md if it exists, else /home/fusei/Aurora/FABLE_STATE_REVIEW_2026-07-08.md — last verified state.
+4. Ground truth: git fetch && git log origin/main --oneline -15 && gh pr list. The tree overrules every doc.
+
+Then, this cycle:
+- Reconcile the Kanban board against the wave queue (§4): create/update/close cards so the board matches. Every card follows the §6 anatomy — scope line, verified anchors, evidence gate, stop conditions, done definition. No bare "fix X" cards.
+- Do not start a lower wave'\''s cards while a higher wave has open, workable blockers.
+- Dispatch per the §6 column contract. Koji-MoA only where §3'\''s policy says. Fix-round cap = 2, then Blocked.
+- STATE.md is script-generated by the tick before you were spawned (§11) — read it, never write it and never card it. Wave logs, ledgers, and doc hygiene belong to the post-cycle Verita stage (§7); your job is to leave the board and your digest in a state it can archive.
+- Rules §5 are non-negotiable; the ones that will tempt you: evidence gates are scripts not claims (§5.2), review-before-merge for mutating code (§5.3), golden fixtures read-only (§5.6), never git add -A (§5.7).
+- End of cycle: post a board digest; anything needing merge/release/budget → notify Prajith; architecture forks → FABLE_REVIEW_QUEUE.md, keep working elsewhere. You never merge.'
+
+# ---------------------------------------------------------------------------
+# Run Daiki
+# ---------------------------------------------------------------------------
+echo "tick: spawning Daiki (timeout ${DAIKI_TIMEOUT_SECS}s)"
+daiki_rc=0
+supervise "$DAIKI_TIMEOUT_SECS" "daiki" \
+  hermes -p default chat -Q -q "$DAIKI_PROMPT" --skills kanban,aurora --source tick \
+  || daiki_rc=$?
+
+if [[ $daiki_rc -eq 0 ]]; then
+  # Daiki success → acknowledge snapshot
+  echo "$NEW_SNAPSHOT" > "$SNAPSHOT_FILE"
+  echo "tick: Daiki succeeded — snapshot acknowledged"
+
+  # ---------------------------------------------------------------------------
+  # Run Verita
+  # ---------------------------------------------------------------------------
+  VERITA_PROMPT='Read and freshness-check STATE.md — never generate it. Then perform only the §7 documentation charter: wave logs, ledgers, doc hygiene, and this queue.'
+
+  if [[ -f "$RUNTIME_DIR/verita_owed" ]]; then
+    VERITA_PROMPT="$VERITA_PROMPT
+
+Process documentation backlog since last successful run."
+    rm -f "$RUNTIME_DIR/verita_owed"
+  fi
+
+  echo "tick: spawning Verita (timeout ${VERITA_TIMEOUT_SECS}s)"
+  verita_rc=0
+  supervise "$VERITA_TIMEOUT_SECS" "verita" \
+    hermes -p verita chat -Q -q "$VERITA_PROMPT" --skills aurora --source tick \
+    || verita_rc=$?
+
+  if [[ $verita_rc -eq 0 ]]; then
+    log_tick "ok" "daiki+verita" "0"
+  else
+    # Verita failure is non-fatal; record verita-owed marker
+    echo "verita_owed" > "$RUNTIME_DIR/verita_owed"
+    if [[ $verita_rc -eq 124 ]]; then
+      log_tick "verita-timeout" "verita" "124"
+      send_notification "Tick: Verita timeout" "Verita stage timed out after ${VERITA_TIMEOUT_SECS}s"
+    else
+      log_tick "verita-failed" "verita" "$verita_rc"
+      send_notification "Tick: Verita failed" "Verita exited with code $verita_rc"
+    fi
+  fi
+else
+  # Daiki failure or timeout — snapshot NOT acknowledged, no Verita
+  if [[ $daiki_rc -eq 124 ]]; then
+    log_tick "daiki-timeout" "daiki" "124"
+    send_notification "Tick: Daiki timeout" "Daiki timed out after ${DAIKI_TIMEOUT_SECS}s"
+  else
+    log_tick "daiki-failed" "daiki" "$daiki_rc"
+    send_notification "Tick: Daiki failed" "Daiki exited with code $daiki_rc"
+  fi
+fi
+
+# ---------------------------------------------------------------------------
+# Exit — lock released by shell exit (fd 9 closed)
+# ---------------------------------------------------------------------------
 echo "tick: done"
 exit 0
