@@ -181,4 +181,33 @@ describe("playerStore queue persistence", () => {
     expect(saved.shuffle).toBe(true)
     expect(saved.originalQueueIds).toEqual([1, 2, 3])
   })
+
+  it("restoreQueue handles malformed localStorage shape without throwing", async () => {
+    const { usePlayerStore } = await import("@/stores/playerStore")
+    const songs = [makeSong(1)]
+
+    // Valid JSON but wrong shape — missing queueIds array
+    store["aurora-queue-v1"] = JSON.stringify({ foo: "bar", queueIds: "not-an-array" })
+
+    // Must not throw
+    usePlayerStore.getState().restoreQueue(songs)
+    const state = usePlayerStore.getState()
+
+    // Queue should remain empty (malformed data rejected)
+    expect(state.queue).toEqual([])
+    expect(state.currentSong).toBeNull()
+  })
+
+  it("restoreQueue handles completely empty object without throwing", async () => {
+    const { usePlayerStore } = await import("@/stores/playerStore")
+    const songs = [makeSong(1)]
+
+    store["aurora-queue-v1"] = JSON.stringify({})
+
+    usePlayerStore.getState().restoreQueue(songs)
+    const state = usePlayerStore.getState()
+
+    expect(state.queue).toEqual([])
+    expect(state.currentSong).toBeNull()
+  })
 })

@@ -426,6 +426,10 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     } catch {
       return
     }
+    // Guard against malformed shape (valid JSON, wrong keys)
+    if (!Array.isArray(data.queueIds) || !Array.isArray(data.originalQueueIds)) {
+      return
+    }
     // Build ID → Song lookup
     const songMap = new Map(allSongs.map((s) => [s.id, s]))
 

@@ -218,8 +218,14 @@ export function toggleAtom(
   const { includes, excludes, isCustom } = parseQuery(currentQuery, knownAtoms)
 
   if (isCustom) {
-    // Custom mode — append term (existing appendTerm behavior)
-    const trimmed = currentQuery.trim()
+    // Custom mode — append term, but strip trailing operators first
+    let trimmed = currentQuery.trim()
+    // Strip trailing operators (AND, OR, NOT) to prevent "X OR AND Y" malformation
+    trimmed = trimmed.replace(/\s+(AND|OR|NOT)\s*$/i, "").trim()
+    // Also handle bare trailing operator (e.g., just "OR")
+    if (/^(AND|OR|NOT)$/i.test(trimmed)) {
+      trimmed = ""
+    }
     if (!trimmed) return quoteIfNeeded(atom)
     return `${trimmed} AND ${quoteIfNeeded(atom)}`
   }

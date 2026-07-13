@@ -197,4 +197,28 @@ describe("toggleAtom", () => {
     // But since the input is custom, we just append
     expect(result).toContain("classical")
   })
+
+  it("strips trailing OR before appending in custom mode", () => {
+    const result = toggleAtom("rock OR", "gym", atoms)
+    // Should NOT produce "rock OR AND gym" — trailing operator stripped
+    expect(result).toBe("rock AND gym")
+    expect(result).not.toContain("OR AND")
+  })
+
+  it("strips trailing AND before appending in custom mode", () => {
+    const result = toggleAtom("rock AND", "gym", atoms)
+    expect(result).toBe("rock AND gym")
+    expect(result).not.toContain("AND AND")
+  })
+
+  it("strips trailing NOT before appending in custom mode", () => {
+    const result = toggleAtom("rock NOT", "gym", atoms)
+    expect(result).toBe("rock AND gym")
+    expect(result).not.toContain("NOT AND")
+  })
+
+  it("produces valid output when query is only a trailing operator", () => {
+    const result = toggleAtom("OR", "rock", atoms)
+    expect(result).toBe("rock")
+  })
 })
