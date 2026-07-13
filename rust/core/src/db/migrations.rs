@@ -52,9 +52,7 @@ CREATE TABLE IF NOT EXISTS songs (
     featured_artists        TEXT,
     stream_url              TEXT,
     stream_url_expires_at   TEXT,
-    artwork_url             TEXT,
-    play_count              INTEGER NOT NULL DEFAULT 0,
-    last_played_at          TEXT
+    artwork_url             TEXT
 );
 
 CREATE TABLE IF NOT EXISTS playlists (
@@ -68,9 +66,7 @@ CREATE TABLE IF NOT EXISTS playlists (
     crossfade_enabled   INTEGER DEFAULT NULL,
     crossfade_duration_s INTEGER DEFAULT NULL,
     dominant_color      TEXT,
-    dominant_color_2    TEXT,
-    type                TEXT    NOT NULL DEFAULT 'normal',
-    query               TEXT
+    dominant_color_2    TEXT
 );
 
 CREATE TABLE IF NOT EXISTS tags (
@@ -128,6 +124,13 @@ CREATE TABLE IF NOT EXISTS addons (
     last_ok_at      TEXT,
     fail_count      INTEGER DEFAULT 0,
     last_fail_at    TEXT
+);
+
+CREATE TABLE IF NOT EXISTS aurora_ext (
+    song_id         INTEGER NOT NULL REFERENCES songs(id) ON DELETE CASCADE,
+    play_count      INTEGER NOT NULL DEFAULT 0,
+    last_played_at  TEXT,
+    UNIQUE(song_id)
 );
 "#;
 
@@ -212,16 +215,6 @@ const MIGRATIONS: &[Migration] = &[
         version: 5,
         stmts: &[
             "ALTER TABLE addons ADD COLUMN last_fail_at TEXT",
-        ],
-    },
-    // Version 6: play counts + smart playlist fields
-    Migration {
-        version: 6,
-        stmts: &[
-            "ALTER TABLE songs ADD COLUMN play_count INTEGER NOT NULL DEFAULT 0",
-            "ALTER TABLE songs ADD COLUMN last_played_at TEXT",
-            "ALTER TABLE playlists ADD COLUMN type TEXT NOT NULL DEFAULT 'normal'",
-            "ALTER TABLE playlists ADD COLUMN query TEXT",
         ],
     },
 ];
@@ -383,7 +376,7 @@ mod tests {
         // Verify last_fail_at exists now
         conn.query_row("SELECT last_fail_at FROM addons", [], |_| Ok(())).unwrap();
 
-        // Verify user_version reaches CURRENT_VERSION (6)
+        // Verify user_version reaches CURRENT_VERSION (5)
         let version: i64 = conn
             .pragma_query_value(None, "user_version", |row| row.get(0))
             .unwrap();
@@ -459,9 +452,9 @@ mod tests {
         );
     }
 
-    /// Test: fresh DB reaches v6 with new columns and correct defaults.
+    /// Test: fresh DB has aurora_ext table with correct schema.
     #[test]
-    fn test_fresh_db_v6_columns() {
+    fn test_fresh_db_ext_table() {
         let tmp = tempfile::tempdir().unwrap();
         let db_path = tmp.path().join("test.db");
         let conn = Connection::open(&db_path).unwrap();
@@ -472,49 +465,55 @@ mod tests {
         let version: i64 = conn
             .pragma_query_value(None, "user_version", |row| row.get(0))
             .unwrap();
-        assert_eq!(version, 6);
+        assert_eq!(version, 5);
 
-        // Insert a song — play_count should default to 0, last_played_at to NULL
+        // aurora_ext table must exist
+        let tables: Vec<String> = conn
+            .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='aurora_ext'")
+            .unwrap()
+            .query_map([], |row| row.get(0))
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        assert_eq!(tables.len(), 1, "aurora_ext table must exist");
+
+        // Insert a song and verify ext row works
         conn.execute_batch(
             "INSERT INTO songs (title, artist, created_at, updated_at)
              VALUES ('Test', 'Artist', '2025-01-01', '2025-01-01')",
         )
         .unwrap();
-        let (pc, lpa): (i64, Option<String>) = conn
-            .query_row(
-                "SELECT play_count, last_played_at FROM songs WHERE id = 1",
-                [],
-                |row| Ok((row.get(0)?, row.get(1)?)),
-            )
-            .unwrap();
-        assert_eq!(pc, 0);
-        assert!(lpa.is_none());
-
-        // Insert a playlist — type should default to 'normal', query to NULL
         conn.execute_batch(
-            "INSERT INTO playlists (name, created_at, updated_at)
-             VALUES ('TestPL', '2025-01-01', '2025-01-01')",
+            "INSERT INTO aurora_ext (song_id, play_count, last_played_at)
+             VALUES (1, 5, '2025-06-01T12:00:00Z')",
         )
         .unwrap();
-        let (pl_type, pl_query): (String, Option<String>) = conn
+        let (pc, lpa): (i64, Option<String>) = conn
             .query_row(
-                "SELECT type, query FROM playlists WHERE id = 1",
+                "SELECT play_count, last_played_at FROM aurora_ext WHERE song_id = 1",
                 [],
                 |row| Ok((row.get(0)?, row.get(1)?)),
             )
             .unwrap();
-        assert_eq!(pl_type, "normal");
-        assert!(pl_query.is_none());
+        assert_eq!(pc, 5);
+        assert!(lpa.is_some());
+
+        // songs and playlists tables must NOT have ext columns
+        let err = conn.query_row("SELECT play_count FROM songs WHERE id = 1", [], |_| Ok(()));
+        assert!(err.is_err(), "songs table must not have play_count column");
+
+        let err = conn.query_row("SELECT type FROM playlists", [], |_| Ok(()));
+        assert!(err.is_err(), "playlists table must not have type column");
     }
 
-    /// Test: seed a v5 DB with data → run_migrations → v6, data intact, new columns defaulted.
+    /// Test: v5 DB stays at v5 after migrations (no v6 upgrade).
     #[test]
-    fn test_v5_upgrade_preserves_data() {
+    fn test_v5_db_stays_v5() {
         let tmp = tempfile::tempdir().unwrap();
         let db_path = tmp.path().join("test.db");
         let conn = Connection::open(&db_path).unwrap();
 
-        // Create a v5 schema (same as INIT_SQL minus v6 columns)
+        // Create a v5 schema (same as INIT_SQL — no ext columns)
         conn.execute_batch(
             "PRAGMA foreign_keys = ON;
             PRAGMA journal_mode = WAL;
@@ -596,39 +595,26 @@ mod tests {
         )
         .unwrap();
 
-        // Verify pre-conditions: play_count column doesn't exist
+        // Verify pre-conditions: play_count column doesn't exist on songs
         let err = conn.query_row("SELECT play_count FROM songs", [], |_| Ok(()));
         assert!(err.is_err());
 
-        // Run migrations — must upgrade to v6
+        // Run migrations — must stay at v5 (no v6 migration)
         run_migrations(&conn).unwrap();
 
         let version: i64 = conn
             .pragma_query_value(None, "user_version", |row| row.get(0))
             .unwrap();
-        assert_eq!(version, 6);
+        assert_eq!(version, 5);
 
         // Verify existing song data survived
         let (title, artist): (String, String) = conn
-            .query_row(
-                "SELECT title, artist FROM songs WHERE id = 1",
-                [],
-                |row| Ok((row.get(0)?, row.get(1)?)),
-            )
+            .query_row("SELECT title, artist FROM songs WHERE id = 1", [], |row| {
+                Ok((row.get(0)?, row.get(1)?))
+            })
             .unwrap();
         assert_eq!(title, "MySong");
         assert_eq!(artist, "MyArtist");
-
-        // New columns have correct defaults
-        let (pc, lpa): (i64, Option<String>) = conn
-            .query_row(
-                "SELECT play_count, last_played_at FROM songs WHERE id = 1",
-                [],
-                |row| Ok((row.get(0)?, row.get(1)?)),
-            )
-            .unwrap();
-        assert_eq!(pc, 0);
-        assert!(lpa.is_none());
 
         // Existing playlist data survived
         let pl_name: String = conn
@@ -638,15 +624,8 @@ mod tests {
             .unwrap();
         assert_eq!(pl_name, "MyPlaylist");
 
-        // Playlist new columns have correct defaults
-        let (pl_type, pl_query): (String, Option<String>) = conn
-            .query_row(
-                "SELECT type, query FROM playlists WHERE id = 1",
-                [],
-                |row| Ok((row.get(0)?, row.get(1)?)),
-            )
-            .unwrap();
-        assert_eq!(pl_type, "normal");
-        assert!(pl_query.is_none());
+        // Songs table must NOT have play_count column (dual-track: ext table instead)
+        let err = conn.query_row("SELECT play_count FROM songs WHERE id = 1", [], |_| Ok(()));
+        assert!(err.is_err(), "v5 songs table must not have play_count column");
     }
 }

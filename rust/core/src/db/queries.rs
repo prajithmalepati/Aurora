@@ -24,7 +24,6 @@ SELECT
     s.replaygain_album_gain, s.replaygain_album_peak,
     s.artists, s.featured_artists,
     s.stream_url, s.stream_url_expires_at, s.artwork_url,
-    s.play_count, s.last_played_at,
     GROUP_CONCAT(DISTINCT t.name) AS tags,
     GROUP_CONCAT(DISTINCT p.id || ':' || p.name) AS playlists,
     s.created_at, s.updated_at
@@ -78,12 +77,10 @@ mod col {
     pub const STREAM_URL: usize = 22;
     pub const STREAM_URL_EXPIRES_AT: usize = 23;
     pub const ARTWORK_URL: usize = 24;
-    pub const PLAY_COUNT: usize = 25;
-    pub const LAST_PLAYED_AT: usize = 26;
-    pub const TAGS: usize = 27;
-    pub const PLAYLISTS: usize = 28;
-    pub const CREATED_AT: usize = 29;
-    pub const UPDATED_AT: usize = 30;
+    pub const TAGS: usize = 25;
+    pub const PLAYLISTS: usize = 26;
+    pub const CREATED_AT: usize = 27;
+    pub const UPDATED_AT: usize = 28;
 }
 
 /// Serialize a rusqlite Row into the canonical song JSON.
@@ -124,8 +121,6 @@ fn row_to_song(row: &rusqlite::Row, include_peaks: bool) -> rusqlite::Result<ser
         row.get::<_, Option<String>>(col::PLAYLISTS)?.as_deref(),
         row.get::<_, String>(col::CREATED_AT)?.as_str(),
         row.get::<_, String>(col::UPDATED_AT)?.as_str(),
-        row.get(col::PLAY_COUNT)?,
-        row.get::<_, Option<String>>(col::LAST_PLAYED_AT)?.as_deref(),
         include_peaks,
     ))
 }
@@ -230,21 +225,52 @@ pub fn get_song_file_path(conn: &Connection, song_id: i64) -> Result<Option<Opti
 }
 
 /// Increment `play_count` and set `last_played_at = now()` for a song.
-/// Returns `Ok(Some(song_json))` if song exists, `Ok(None)` if not found.
+/// Uses aurora_ext table (dual-track versioning).
+/// Returns `Ok(Some((song_json, play_count, last_played_at)))` if song exists, `Ok(None)` if not found.
 pub fn increment_play_count(
     conn: &Connection,
     song_id: i64,
-) -> Result<Option<serde_json::Value>> {
-    let now = chrono_now();
-    let updated = conn.execute(
-        "UPDATE songs SET play_count = play_count + 1, last_played_at = ?1, updated_at = ?1 WHERE id = ?2",
-        rusqlite::params![now, song_id],
-    )?;
-    if updated == 0 {
-        return Ok(None);
+) -> Result<Option<(serde_json::Value, i64, Option<String>)>> {
+        // Verify song exists
+        let exists: bool = conn
+            .query_row(
+                "SELECT COUNT(*) FROM songs WHERE id = ?1",
+                [song_id],
+                |r| r.get::<_, i64>(0),
+            )?
+            > 0;
+        if !exists {
+            return Ok(None);
+        }
+
+        let now = chrono_now();
+
+        // Upsert into aurora_ext
+        conn.execute(
+            "INSERT INTO aurora_ext (song_id, play_count, last_played_at) \
+             VALUES (?1, 1, ?2) \
+             ON CONFLICT(song_id) DO UPDATE SET \
+               play_count = play_count + 1, \
+               last_played_at = ?2",
+            rusqlite::params![song_id, now],
+        )?;
+
+        // Also update songs.updated_at for sort ordering
+        conn.execute(
+            "UPDATE songs SET updated_at = ?1 WHERE id = ?2",
+            rusqlite::params![now, song_id],
+        )?;
+
+        // Read back play fields
+        let (pc, lpa): (i64, Option<String>) = conn.query_row(
+            "SELECT play_count, last_played_at FROM aurora_ext WHERE song_id = ?1",
+            [song_id],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )?;
+
+        let song = get_song(conn, song_id)?;
+        Ok(song.map(|s| (s, pc, lpa)))
     }
-    get_song(conn, song_id)
-}
 
 /// Create a song. Returns `(id, song_json)`.
 pub fn create_song(
@@ -588,12 +614,10 @@ mod pl_col {
     pub const STREAM_URL: usize = 22;
     pub const STREAM_URL_EXPIRES_AT: usize = 23;
     pub const ARTWORK_URL: usize = 24;
-    pub const PLAY_COUNT: usize = 25;
-    pub const LAST_PLAYED_AT: usize = 26;
-    pub const TAGS: usize = 27;
-    pub const START_TIME_MS: usize = 28;
-    pub const END_TIME_MS: usize = 29;
-    pub const POSITION: usize = 30;
+    pub const TAGS: usize = 25;
+    pub const START_TIME_MS: usize = 26;
+    pub const END_TIME_MS: usize = 27;
+    pub const POSITION: usize = 28;
 }
 
 /// SELECT for songs within a playlist context.
@@ -608,7 +632,6 @@ SELECT
     s.replaygain_album_gain, s.replaygain_album_peak,
     s.artists, s.featured_artists,
     s.stream_url, s.stream_url_expires_at, s.artwork_url,
-    s.play_count, s.last_played_at,
     GROUP_CONCAT(DISTINCT t.name) AS tags,
     ps.start_time_ms, ps.end_time_ms, ps.position
 FROM songs s
@@ -654,8 +677,6 @@ fn row_to_playlist_song(row: &rusqlite::Row) -> rusqlite::Result<serde_json::Val
         row.get(pl_col::START_TIME_MS)?,
         row.get(pl_col::END_TIME_MS)?,
         row.get(pl_col::POSITION)?,
-        row.get(pl_col::PLAY_COUNT)?,
-        row.get::<_, Option<String>>(pl_col::LAST_PLAYED_AT)?.as_deref(),
     ))
 }
 
@@ -665,8 +686,7 @@ pub fn list_playlists(conn: &Connection) -> Result<Vec<serde_json::Value>> {
         "SELECT p.id, p.name, p.color, p.emoji, p.image_url, \
          p.crossfade_enabled, p.crossfade_duration_s, \
          COUNT(ps.song_id) AS song_count, \
-         p.dominant_color, p.dominant_color_2, p.created_at, p.updated_at, \
-         p.type, p.query \
+         p.dominant_color, p.dominant_color_2, p.created_at, p.updated_at \
          FROM playlists p LEFT JOIN playlist_songs ps ON p.id = ps.playlist_id \
          GROUP BY p.id ORDER BY p.name ASC",
     )?;
@@ -684,8 +704,6 @@ pub fn list_playlists(conn: &Connection) -> Result<Vec<serde_json::Value>> {
             row.get::<_, Option<String>>(9)?.as_deref(),
             &row.get::<_, String>(10)?,
             &row.get::<_, String>(11)?,
-             &row.get::<_, String>(12)?,
-             row.get::<_, Option<String>>(13)?.as_deref(),
         ))
     })?;
     let mut data = Vec::new();
@@ -701,8 +719,7 @@ pub fn get_playlist(conn: &Connection, playlist_id: i64) -> Result<Option<serde_
     let meta = conn.query_row(
         "SELECT id, name, color, emoji, image_url, \
          crossfade_enabled, crossfade_duration_s, \
-         dominant_color, dominant_color_2, created_at, updated_at, \
-         type, query \
+         dominant_color, dominant_color_2, created_at, updated_at \
          FROM playlists WHERE id = ?1",
         [playlist_id],
         |row| {
@@ -718,12 +735,10 @@ pub fn get_playlist(conn: &Connection, playlist_id: i64) -> Result<Option<serde_
                 row.get::<_, Option<String>>(8)?,
                 row.get::<_, String>(9)?,
                 row.get::<_, String>(10)?,
-                row.get::<_, String>(11)?,
-                row.get::<_, Option<String>>(12)?,
             ))
         },
     );
-    let (id, name, color, emoji, image_url, ce, cd, dc, dc2, created_at, updated_at, pl_type, pl_query) = match meta {
+    let (id, name, color, emoji, image_url, ce, cd, dc, dc2, created_at, updated_at) = match meta {
         Ok(v) => v,
         Err(rusqlite::Error::QueryReturnedNoRows) => return Ok(None),
         Err(e) => return Err(e.into()),
@@ -756,8 +771,6 @@ pub fn get_playlist(conn: &Connection, playlist_id: i64) -> Result<Option<serde_
     map.insert("songs".into(), serde_json::Value::Array(songs));
     map.insert("created_at".into(), serde_json::json!(created_at));
     map.insert("updated_at".into(), serde_json::json!(updated_at));
-    map.insert("type".into(), serde_json::json!(pl_type));
-    map.insert("query".into(), serde_json::json!(pl_query));
     Ok(Some(serde_json::Value::Object(map)))
 }
 
@@ -1957,8 +1970,6 @@ mod tests {
                 stream_url TEXT DEFAULT '',
                 stream_url_expires_at TEXT DEFAULT '',
                 artwork_url TEXT DEFAULT '',
-                 play_count INTEGER NOT NULL DEFAULT 0,
-                 last_played_at TEXT,
                 created_at TEXT NOT NULL DEFAULT '',
                 updated_at TEXT NOT NULL DEFAULT ''
             );
@@ -1973,15 +1984,19 @@ mod tests {
             );
             CREATE TABLE IF NOT EXISTS playlists (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                 name TEXT NOT NULL,
-                 type TEXT NOT NULL DEFAULT 'normal',
-                 query TEXT
+                name TEXT NOT NULL
             );
             CREATE TABLE IF NOT EXISTS playlist_songs (
                 playlist_id INTEGER NOT NULL,
                 song_id INTEGER NOT NULL,
                 position INTEGER NOT NULL DEFAULT 0,
                 PRIMARY KEY (playlist_id, song_id)
+            );
+            CREATE TABLE IF NOT EXISTS aurora_ext (
+                song_id INTEGER NOT NULL,
+                play_count INTEGER NOT NULL DEFAULT 0,
+                last_played_at TEXT,
+                UNIQUE(song_id)
             );",
         )
         .unwrap();
