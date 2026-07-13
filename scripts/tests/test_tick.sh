@@ -1150,6 +1150,281 @@ test_snapshot_ack_checkpoint() {
   rm -rf "$tmpdir"
 }
 
+# === NEW TESTS T31-T36: notification cap + snapshot preservation ===
+
+# Helper: create a fake path with an ntfy shim that records invocations
+make_recording_ntfy_path() {
+  local tmpdir="$1"
+  local fakeroot="$tmpdir/_fakebin"
+  mkdir -p "$fakeroot"
+  cat > "$fakeroot/bash" <<BASHSH
+#!/bin/bash
+exec "$(command -v bash)" "\$@"
+BASHSH
+  chmod +x "$fakeroot/bash"
+  cat > "$fakeroot/gh" <<'SH'
+#!/bin/bash
+case "$*" in *"pr list"*) echo "No pull requests found.";; *) echo "{}";; esac
+SH
+  chmod +x "$fakeroot/gh"
+  # Hermes shim that fails on chat (triggers notification path)
+  cat > "$fakeroot/hermes" <<'SH'
+#!/bin/bash
+if [[ "$1" == "-p" ]] && [[ "$3" == "chat" ]]; then
+  echo "$@" >> "${HERMES_ARGV_FILE:-/dev/null}"
+  exit 1
+fi
+case "$*" in *"kanban"*"list"*"--json"*) echo '[{"id":"t_test","title":"test card","assignee":"lars","status":"running","priority":100}]';; esac
+exit 0
+SH
+  chmod +x "$fakeroot/hermes"
+  # ntfy shim that records each invocation to a file
+  cat > "$fakeroot/ntfy" <<'SH'
+#!/bin/bash
+echo "called: $*" >> "${NTFY_CALL_LOG:-/dev/null}"
+exit 0
+SH
+  chmod +x "$fakeroot/ntfy"
+  echo "$fakeroot"
+}
+
+# T31: notify same-day cap → no ntfy call, muted logged exactly once
+test_notify_same_day_cap() {
+  local tmpdir; tmpdir="$(setup_test)"
+  local fakeroot; fakeroot="$(make_recording_ntfy_path "$tmpdir")"
+  local real_path; real_path="$(get_real_path_dirs)"
+  local runtime="$tmpdir/runtime"
+  mkdir -p "$runtime"
+  local argv_file="$runtime/argv.log"
+  local ntfy_log="$runtime/ntfy_calls.log"
+  local today; today="$(date -u '+%Y-%m-%d')"
+  (cd "$tmpdir" && echo "x" > f.txt && git add f.txt && git commit -q -m "feat")
+
+  # Pre-set notify counter at cap (10)
+  echo "$today 10" > "$runtime/notify_count.txt"
+
+  local out rc=0
+  out=$(cd "$tmpdir" && TICK_REPO_ROOT="$tmpdir" TICK_RUNTIME_DIR="$runtime" \
+    PATH="$fakeroot:$real_path" HERMES_ARGV_FILE="$argv_file" \
+    NTFY_CALL_LOG="$ntfy_log" \
+    bash "$TICK" 2>&1) || rc=$?
+
+  # ntfy should NOT have been called
+  local ntfy_called=false
+  [[ -f "$ntfy_log" ]] && [[ -s "$ntfy_log" ]] && ntfy_called=true
+
+  # muted indication should be in the log
+  local muted_logged=false
+  [[ -f "$runtime/tick.log" ]] && grep -q "notifications-muted" "$runtime/tick.log" && muted_logged=true
+
+  if ! $ntfy_called && $muted_logged; then
+    pass "T31: notify same-day cap → no ntfy call, muted logged"
+  else
+    fail "T31: notify same-day cap" "ntfy_called=$ntfy_called muted_logged=$muted_logged out=$out"
+  fi
+  rm -rf "$tmpdir"
+}
+
+# T32: notify UTC-day reset → previous day counter resets, notification sent
+test_notify_day_reset() {
+  local tmpdir; tmpdir="$(setup_test)"
+  local fakeroot; fakeroot="$(make_recording_ntfy_path "$tmpdir")"
+  local real_path; real_path="$(get_real_path_dirs)"
+  local runtime="$tmpdir/runtime"
+  mkdir -p "$runtime"
+  local argv_file="$runtime/argv.log"
+  local ntfy_log="$runtime/ntfy_calls.log"
+  # Yesterday's date
+  local yesterday; yesterday="$(date -u -d 'yesterday' '+%Y-%m-%d' 2>/dev/null || date -u -v-1d '+%Y-%m-%d')"
+  (cd "$tmpdir" && echo "x" > f.txt && git add f.txt && git commit -q -m "feat")
+
+  # Pre-set notify counter from yesterday at cap
+  echo "$yesterday 10" > "$runtime/notify_count.txt"
+
+  local out rc=0
+  out=$(cd "$tmpdir" && TICK_REPO_ROOT="$tmpdir" TICK_RUNTIME_DIR="$runtime" \
+    PATH="$fakeroot:$real_path" HERMES_ARGV_FILE="$argv_file" \
+    NTFY_CALL_LOG="$ntfy_log" \
+    bash "$TICK" 2>&1) || rc=$?
+
+  # ntfy SHOULD have been called (counter reset from yesterday)
+  local ntfy_called=false
+  [[ -f "$ntfy_log" ]] && [[ -s "$ntfy_log" ]] && ntfy_called=true
+
+  # notify_count.txt should be updated to today with count 1
+  local count_content; count_content="$(cat "$runtime/notify_count.txt" 2>/dev/null || echo "")"
+  local today; today="$(date -u '+%Y-%m-%d')"
+  local count_ok=false
+  [[ "$count_content" == "$today 1" ]] && count_ok=true
+
+  if $ntfy_called && $count_ok; then
+    pass "T32: notify UTC-day reset → counter reset, notification sent"
+  else
+    fail "T32: notify day reset" "ntfy_called=$ntfy_called count_ok=$count_ok content='$count_content' out=$out"
+  fi
+  rm -rf "$tmpdir"
+}
+
+# T33: notify malformed current-day counter → fail closed, no transport
+test_notify_malformed_counter() {
+  local tmpdir; tmpdir="$(setup_test)"
+  local fakeroot; fakeroot="$(make_recording_ntfy_path "$tmpdir")"
+  local real_path; real_path="$(get_real_path_dirs)"
+  local runtime="$tmpdir/runtime"
+  mkdir -p "$runtime"
+  local argv_file="$runtime/argv.log"
+  local ntfy_log="$runtime/ntfy_calls.log"
+  local today; today="$(date -u '+%Y-%m-%d')"
+  (cd "$tmpdir" && echo "x" > f.txt && git add f.txt && git commit -q -m "feat")
+
+  # Malformed current-day counter (date correct, count non-numeric)
+  echo "$today INVALID" > "$runtime/notify_count.txt"
+
+  local out rc=0
+  out=$(cd "$tmpdir" && TICK_REPO_ROOT="$tmpdir" TICK_RUNTIME_DIR="$runtime" \
+    PATH="$fakeroot:$real_path" HERMES_ARGV_FILE="$argv_file" \
+    NTFY_CALL_LOG="$ntfy_log" \
+    bash "$TICK" 2>&1) || rc=$?
+
+  # ntfy should NOT have been called (fail closed)
+  local ntfy_called=false
+  [[ -f "$ntfy_log" ]] && [[ -s "$ntfy_log" ]] && ntfy_called=true
+
+  # Diagnostic should be in stderr/stdout
+  local has_diag=false
+  echo "$out" | grep -q "malformed notify counter" && has_diag=true
+
+  if ! $ntfy_called && $has_diag; then
+    pass "T33: notify malformed counter → fail closed, no transport"
+  else
+    fail "T33: notify malformed" "ntfy_called=$ntfy_called has_diag=$has_diag out=$out"
+  fi
+  rm -rf "$tmpdir"
+}
+
+# T34: notify exactly-once muted → second capped call has no duplicate muted log
+test_notify_exactly_once_muted() {
+  local tmpdir; tmpdir="$(setup_test)"
+  local fakeroot; fakeroot="$(make_recording_ntfy_path "$tmpdir")"
+  local real_path; real_path="$(get_real_path_dirs)"
+  local runtime="$tmpdir/runtime"
+  mkdir -p "$runtime"
+  local argv_file="$runtime/argv.log"
+  local ntfy_log="$runtime/ntfy_calls.log"
+  local today; today="$(date -u '+%Y-%m-%d')"
+  (cd "$tmpdir" && echo "x" > f.txt && git add f.txt && git commit -q -m "feat")
+
+  # Pre-set notify counter at cap
+  echo "$today 10" > "$runtime/notify_count.txt"
+
+  # First run — should log muted
+  local out rc=0
+  out=$(cd "$tmpdir" && TICK_REPO_ROOT="$tmpdir" TICK_RUNTIME_DIR="$runtime" \
+    PATH="$fakeroot:$real_path" HERMES_ARGV_FILE="$argv_file" \
+    NTFY_CALL_LOG="$ntfy_log" \
+    bash "$TICK" 2>&1) || rc=$?
+
+  # Second run (new commit to trigger change)
+  rm -f "$ntfy_log"
+  (cd "$tmpdir" && echo "y" > f.txt && git add f.txt && git commit -q -m "feat2")
+  out=$(cd "$tmpdir" && TICK_REPO_ROOT="$tmpdir" TICK_RUNTIME_DIR="$runtime" \
+    PATH="$fakeroot:$real_path" HERMES_ARGV_FILE="$argv_file" \
+    NTFY_CALL_LOG="$ntfy_log" \
+    bash "$TICK" 2>&1) || rc=$?
+
+  # Count "notifications-muted" entries in log — should be exactly 1
+  local muted_count=0
+  if [[ -f "$runtime/tick.log" ]]; then
+    muted_count=$(grep -c "notifications-muted" "$runtime/tick.log" 2>/dev/null || echo "0")
+  fi
+
+  # ntfy should NOT have been called on either run
+  local ntfy_called=false
+  [[ -f "$ntfy_log" ]] && [[ -s "$ntfy_log" ]] && ntfy_called=true
+
+  if [[ "$muted_count" -eq 1 ]] && ! $ntfy_called; then
+    pass "T34: notify exactly-once muted → single muted log entry, no duplicate"
+  else
+    fail "T34: exactly-once muted" "muted_count=$muted_count ntfy_called=$ntfy_called out=$out"
+  fi
+  rm -rf "$tmpdir"
+}
+
+# T35: daily attempt cap → no snapshot written, pending change preserved
+test_daily_cap_no_snapshot() {
+  local tmpdir; tmpdir="$(setup_test)"
+  local fakeroot; fakeroot="$(make_fake_hermes_path "$tmpdir")"
+  local real_path; real_path="$(get_real_path_dirs)"
+  local runtime="$tmpdir/runtime"
+  mkdir -p "$runtime"
+  local argv_file="$runtime/argv.log"
+  local today; today="$(date -u '+%Y-%m-%d')"
+  (cd "$tmpdir" && echo "x" > f.txt && git add f.txt && git commit -q -m "feat")
+
+  # Set daily counter at cap
+  echo "$today 12" > "$runtime/attempts_day.txt"
+
+  local out rc=0
+  out=$(cd "$tmpdir" && TICK_REPO_ROOT="$tmpdir" TICK_RUNTIME_DIR="$runtime" \
+    PATH="$fakeroot:$real_path" HERMES_ARGV_FILE="$argv_file" \
+    bash "$TICK" 2>&1) || rc=$?
+
+  # snapshot.json should NOT exist (no prior snapshot)
+  local snapshot_exists=false
+  [[ -f "$runtime/snapshot.json" ]] && snapshot_exists=true
+
+  # No model command should have run
+  local no_argv=true
+  [[ -f "$argv_file" ]] && [[ -s "$argv_file" ]] && no_argv=false
+
+  if ! $snapshot_exists && $no_argv; then
+    pass "T35: daily attempt cap → no snapshot written, no model command"
+  else
+    fail "T35: daily cap snapshot" "snapshot_exists=$snapshot_exists no_argv=$no_argv out=$out"
+  fi
+  rm -rf "$tmpdir"
+}
+
+# T36: monthly attempt cap → existing prior snapshot unchanged, no model command
+test_monthly_cap_snapshot_unchanged() {
+  local tmpdir; tmpdir="$(setup_test)"
+  local fakeroot; fakeroot="$(make_fake_hermes_path "$tmpdir")"
+  local real_path; real_path="$(get_real_path_dirs)"
+  local runtime="$tmpdir/runtime"
+  mkdir -p "$runtime"
+  local argv_file="$runtime/argv.log"
+  local month; month="$(date -u '+%Y-%m')"
+  (cd "$tmpdir" && echo "x" > f.txt && git add f.txt && git commit -q -m "feat")
+
+  # Pre-create a snapshot (simulating a prior successful run)
+  echo '{"prior": "snapshot"}' > "$runtime/snapshot.json"
+  local snap_before; snap_before="$(cat "$runtime/snapshot.json")"
+
+  # Set monthly counter at cap
+  echo "$month 250" > "$runtime/attempts_month.txt"
+
+  local out rc=0
+  out=$(cd "$tmpdir" && TICK_REPO_ROOT="$tmpdir" TICK_RUNTIME_DIR="$runtime" \
+    PATH="$fakeroot:$real_path" HERMES_ARGV_FILE="$argv_file" \
+    bash "$TICK" 2>&1) || rc=$?
+
+  # snapshot.json should be unchanged
+  local snap_after; snap_after="$(cat "$runtime/snapshot.json" 2>/dev/null || echo "")"
+  local snapshot_unchanged=false
+  [[ "$snap_before" == "$snap_after" ]] && snapshot_unchanged=true
+
+  # No model command should have run
+  local no_argv=true
+  [[ -f "$argv_file" ]] && [[ -s "$argv_file" ]] && no_argv=false
+
+  if $snapshot_unchanged && $no_argv; then
+    pass "T36: monthly attempt cap → prior snapshot unchanged, no model command"
+  else
+    fail "T36: monthly cap snapshot" "snapshot_unchanged=$snapshot_unchanged no_argv=$no_argv out=$out"
+  fi
+  rm -rf "$tmpdir"
+}
+
 # --- run all ---
 echo -e "${BOLD}tick.sh test suite${NC}"
 echo "=================="
@@ -1188,6 +1463,14 @@ test_log_metadata_only
 test_notification_nonfatal
 test_no_fix_round
 test_snapshot_ack_checkpoint
+
+# T31-T36 (notification cap + snapshot preservation fixes)
+test_notify_same_day_cap
+test_notify_day_reset
+test_notify_malformed_counter
+test_notify_exactly_once_muted
+test_daily_cap_no_snapshot
+test_monthly_cap_snapshot_unchanged
 
 echo ""
 echo "=================="

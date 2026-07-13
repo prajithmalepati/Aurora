@@ -194,23 +194,52 @@ supervise() {
 # ---------------------------------------------------------------------------
 # Send notification (optional, non-fatal)
 #   send_notification <title> <message>
+#
+# notify_count.txt format: "YYYY-MM-DD N" (UTC-day scoped, like attempt counters)
+# notify_muted.txt format: "YYYY-MM-DD"   (tracks exactly-once muted indication)
 # ---------------------------------------------------------------------------
 send_notification() {
   local title="$1"
   local message="$2"
   local secrets_file="$RUNTIME_DIR/ntfy_secrets"
   local notify_count_file="$RUNTIME_DIR/notify_count.txt"
+  local notify_muted_file="$RUNTIME_DIR/notify_muted.txt"
 
-  # Rate limit: read current count
+  local today_utc
+  today_utc="$(date -u '+%Y-%m-%d')"
+
+  # Rate limit: read and validate current count (UTC-day scoped)
   local notify_count=0
   if [[ -f "$notify_count_file" ]]; then
-    notify_count="$(cat "$notify_count_file" 2>/dev/null || echo "0")"
-    if ! [[ "$notify_count" =~ ^[0-9]+$ ]]; then
+    local _raw _date _num
+    _raw="$(cat "$notify_count_file" 2>/dev/null || echo "")"
+    _date="${_raw%% *}"
+    _num="${_raw#* }"
+    if [[ "$_date" != "$today_utc" ]]; then
+      # Previous day — reset
       notify_count=0
+    elif [[ "$_num" =~ ^[0-9]+$ ]]; then
+      notify_count="$_num"
+    else
+      # Malformed current-day counter — fail closed
+      echo "tick: malformed notify counter — failing closed" >&2
+      return 0
     fi
   fi
+
   if [[ $notify_count -ge $NOTIFY_CAP_DAY ]]; then
-    return 0  # capped — silently skip
+    # Capped — record exactly-once muted indication, then stay silent
+    local muted_today=false
+    if [[ -f "$notify_muted_file" ]]; then
+      local muted_date
+      muted_date="$(cat "$notify_muted_file" 2>/dev/null || echo "")"
+      [[ "$muted_date" == "$today_utc" ]] && muted_today=true
+    fi
+    if ! $muted_today; then
+      echo "$today_utc" > "$notify_muted_file"
+      log_tick "notifications-muted" "notify" "cap-$today_utc"
+    fi
+    return 0
   fi
 
   # Build argv array — no source, no eval
@@ -234,7 +263,7 @@ send_notification() {
   # Execute with argv array, discard output, non-fatal
   if "${ntfy_args[@]}" >/dev/null 2>&1; then
     notify_count=$((notify_count + 1))
-    echo "$notify_count" > "$notify_count_file"
+    echo "$today_utc $notify_count" > "$notify_count_file"
   fi
   return 0
 }
@@ -486,8 +515,7 @@ if [[ $day_count -ge $MAX_ATTEMPTS_DAY ]]; then
   echo "tick: daily attempt cap reached ($day_count/$MAX_ATTEMPTS_DAY) — skipping model work"
   log_tick "cap-reached" "budget" "daily"
   send_notification "Tick: daily cap" "Daily attempt cap ($MAX_ATTEMPTS_DAY) reached"
-  echo "$NEW_SNAPSHOT" > "$SNAPSHOT_FILE"
-  echo "tick: snapshot saved to $SNAPSHOT_FILE"
+  # Do NOT write snapshot — preserve pending change for next day's tick
   exit 0
 fi
 
@@ -495,8 +523,7 @@ if [[ $month_count -ge $MAX_ATTEMPTS_MONTH ]]; then
   echo "tick: monthly attempt cap reached ($month_count/$MAX_ATTEMPTS_MONTH) — skipping model work"
   log_tick "cap-reached" "budget" "monthly"
   send_notification "Tick: monthly cap" "Monthly attempt cap ($MAX_ATTEMPTS_MONTH) reached"
-  echo "$NEW_SNAPSHOT" > "$SNAPSHOT_FILE"
-  echo "tick: snapshot saved to $SNAPSHOT_FILE"
+  # Do NOT write snapshot — preserve pending change for next month's tick
   exit 0
 fi
 
