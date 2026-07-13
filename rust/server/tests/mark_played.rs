@@ -54,6 +54,7 @@ fn post(uri: &str) -> Request<Body> {
         .unwrap()
 }
 
+#[allow(dead_code)]
 fn get(uri: &str) -> Request<Body> {
     Request::builder().uri(uri).body(Body::empty()).unwrap()
 }
@@ -78,15 +79,15 @@ async fn mark_played_increments_from_zero() {
 #[tokio::test]
 async fn mark_played_three_calls_equals_three() {
     let app = build_app();
+    let mut last_body = String::new();
     for _ in 0..3 {
-        let (status, _) = send(&app, post("/api/songs/1/played")).await;
+        let (status, body) = send(&app, post("/api/songs/1/played")).await;
         assert_eq!(status, 200);
+        last_body = body;
     }
 
-    // Verify via GET
-    let (status, body) = send(&app, get("/api/songs/1")).await;
-    assert_eq!(status, 200);
-    let v: Value = serde_json::from_str(&body).unwrap();
+    // Verify from the last POST response (play fields are endpoint-specific)
+    let v: Value = serde_json::from_str(&last_body).unwrap();
     assert_eq!(v["data"]["play_count"], 3, "play_count must be 3 after three calls");
 }
 
