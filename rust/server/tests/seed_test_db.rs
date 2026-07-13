@@ -1,6 +1,6 @@
 //! Integration tests for the `seed_test_db` binary.
 //!
-//! These tests exercise the binary as a subprocess via `cargo run -p aurora_server --bin seed_test_db`.
+//! These tests build the binary with `cargo build` and then execute the resulting artifact directly.
 //! They validate safety checks (path validation, arg rejection) and the seeded fixture contract.
 
 use std::process::Command;
@@ -114,15 +114,20 @@ fn seed_rejects_existing_file() {
 
 #[test]
 fn seed_rejects_non_temp_path() {
-    // Use a path that's definitely not under the system temp dir
-    let non_temp = "/home/fusei/aurora-evil-test.db";
+    // Derive a guaranteed-absent absolute path that is NOT under the system temp dir.
+    // CARGO_MANIFEST_DIR = .../rust/server — use a sibling candidate inside the manifest dir tree.
+    let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let non_temp = manifest_dir.join("test-evil-candidate-should-not-exist.db");
+    assert!(!non_temp.exists(), "candidate path must not exist before test");
 
-    let (success, _stdout, stderr) = run_seed(&["--db", non_temp]);
+    let (success, _stdout, stderr) = run_seed(&["--db", non_temp.to_str().unwrap()]);
     assert!(!success, "should reject path outside temp dir");
     assert!(
         stderr.contains("temporary directory") || stderr.contains("temp"),
         "stderr should mention temp dir restriction: {stderr}"
     );
+    // The file must remain absent — the binary must not create it
+    assert!(!non_temp.exists(), "candidate path should not have been created");
 }
 
 // ── Test 4: Missing --db argument is rejected ───────────────────────────
