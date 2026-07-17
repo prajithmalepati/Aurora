@@ -687,23 +687,52 @@ mod tests {
 
     /// Test: opening a file-backed v5 DB creates the additive table and
     /// preserves an existing playlist row.
+    ///
+    /// The fixture represents a real pre-change v5 artifact: INIT_SQL creates
+    /// all tables (including smart_playlist_definitions), then we explicitly
+    /// DROP it to simulate a database that was created before that table was
+    /// added to the schema.  This proves that `open_and_migrate` on a genuine
+    /// legacy v5 file will add the missing table.
     #[test]
     fn test_v5_file_db_creates_smart_playlist_definitions() {
         let tmp = tempfile::tempdir().unwrap();
         let db_path = tmp.path().join("test.db");
 
-        // Phase 1: create a v5 DB WITHOUT smart_playlist_definitions
+        // Phase 1: build a v5 fixture WITHOUT smart_playlist_definitions.
+        // Run current INIT_SQL then drop the additive table to simulate
+        // a legacy v5 artifact that never had it.
         {
             let conn = Connection::open(&db_path).unwrap();
             conn.execute_batch("PRAGMA foreign_keys = ON;").unwrap();
             conn.execute_batch(INIT_SQL).unwrap();
             run_migrations(&conn).unwrap();
-            // Seed a playlist row
+
+            // Remove the additive table — simulates legacy v5 artifact
+            conn.execute_batch("DROP TABLE IF EXISTS smart_playlist_definitions")
+                .unwrap();
+
+            // Seed a playlist row (existing data that must survive)
             conn.execute_batch(
                 "INSERT INTO playlists (name, created_at, updated_at)
                  VALUES ('Existing Playlist', '2025-06-01', '2025-06-01')",
             )
             .unwrap();
+
+            // MANDATORY: assert the table is absent before we close
+            let tables: Vec<String> = conn
+                .prepare(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='smart_playlist_definitions'",
+                )
+                .unwrap()
+                .query_map([], |row| row.get(0))
+                .unwrap()
+                .collect::<Result<Vec<_>, _>>()
+                .unwrap();
+            assert!(
+                tables.is_empty(),
+                "smart_playlist_definitions must be absent in the legacy fixture"
+            );
+
             drop(conn);
         }
 
@@ -716,7 +745,7 @@ mod tests {
             .unwrap();
         assert_eq!(version, 5, "user_version must remain 5 after reopen");
 
-        // smart_playlist_definitions table must exist
+        // smart_playlist_definitions table must now exist
         let tables: Vec<String> = conn
             .prepare(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name='smart_playlist_definitions'",
