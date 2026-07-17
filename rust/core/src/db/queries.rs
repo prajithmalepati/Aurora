@@ -1930,6 +1930,242 @@ pub fn list_active_watched_folders(conn: &Connection) -> Result<Vec<(i64, String
     Ok(data)
 }
 
+// ── Smart Playlist Definitions ────────────────────────────────────────
+
+/// Create a smart playlist atomically: inserts a backing `playlists` row,
+/// then inserts the definition row. On any failure, the transaction is
+/// rolled back so no orphan playlists remain.
+///
+/// Returns Ok(id) on success, Err("empty_name"), Err("duplicate_name"),
+/// Err("invalid_query: <detail>") on validation failure.
+pub fn create_smart_playlist(
+    conn: &Connection,
+    name: &str,
+    color: Option<&str>,
+    emoji: Option<&str>,
+    query: &str,
+) -> Result<i64> {
+    let name = name.trim();
+    if name.is_empty() {
+        return Err(anyhow::anyhow!("empty_name"));
+    }
+    let query = query.trim();
+    if query.is_empty() {
+        return Err(anyhow::anyhow!("invalid_query: empty query"));
+    }
+    // Validate query through the Rust filter parser
+    if let Err(e) = crate::filter::parse(query) {
+        return Err(anyhow::anyhow!("invalid_query: {e}"));
+    }
+
+    let now = chrono_now();
+
+    // Atomic: BEGIN IMMEDIATE → insert playlist → insert definition → COMMIT
+    conn.execute_batch("BEGIN IMMEDIATE")?;
+
+    // Insert backing playlist row
+    let pl_result = conn.execute(
+        "INSERT INTO playlists (name, color, emoji, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+        rusqlite::params![name, color, emoji, now, now],
+    );
+    match pl_result {
+        Ok(_) => {}
+        Err(e) => {
+            let msg = e.to_string();
+            let _ = conn.execute_batch("ROLLBACK");
+            if msg.contains("UNIQUE constraint failed") {
+                return Err(anyhow::anyhow!("duplicate_name"));
+            }
+            return Err(e.into());
+        }
+    }
+    let playlist_id = conn.last_insert_rowid();
+
+    // Insert definition row
+    let def_result = conn.execute(
+        "INSERT INTO smart_playlist_definitions (playlist_id, query, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)",
+        rusqlite::params![playlist_id, query, now, now],
+    );
+    if let Err(e) = def_result {
+        let _ = conn.execute_batch("ROLLBACK");
+        return Err(e.into());
+    }
+
+    conn.execute_batch("COMMIT")?;
+    Ok(playlist_id)
+}
+
+/// List all smart playlists as definition representations, ordered by name.
+pub fn list_smart_playlists(conn: &Connection) -> Result<Vec<serde_json::Value>> {
+    let mut stmt = conn.prepare(
+        "SELECT p.id, p.name, p.color, p.emoji, p.image_url, sp.query, sp.created_at, sp.updated_at
+         FROM smart_playlist_definitions sp
+         JOIN playlists p ON p.id = sp.playlist_id
+         ORDER BY p.name ASC",
+    )?;
+    let rows = stmt.query_map([], |row| {
+        Ok(serde_json::json!({
+            "id": row.get::<_, i64>(0)?,
+            "name": row.get::<_, String>(1)?,
+            "color": row.get::<_, Option<String>>(2)?,
+            "emoji": row.get::<_, Option<String>>(3)?,
+            "image_url": row.get::<_, Option<String>>(4)?,
+            "query": row.get::<_, String>(5)?,
+            "created_at": row.get::<_, String>(6)?,
+            "updated_at": row.get::<_, String>(7)?,
+        }))
+    })?;
+    let mut data = Vec::new();
+    for r in rows {
+        data.push(r?);
+    }
+    Ok(data)
+}
+
+/// Get a single smart playlist definition by ID.
+/// Returns Ok(None) if the ID is absent or refers to a manual playlist.
+pub fn get_smart_playlist(conn: &Connection, playlist_id: i64) -> Result<Option<serde_json::Value>> {
+    let result = conn.query_row(
+        "SELECT p.id, p.name, p.color, p.emoji, p.image_url, sp.query, sp.created_at, sp.updated_at
+         FROM smart_playlist_definitions sp
+         JOIN playlists p ON p.id = sp.playlist_id
+         WHERE sp.playlist_id = ?1",
+        [playlist_id],
+        |row| {
+            Ok(serde_json::json!({
+                "id": row.get::<_, i64>(0)?,
+                "name": row.get::<_, String>(1)?,
+                "color": row.get::<_, Option<String>>(2)?,
+                "emoji": row.get::<_, Option<String>>(3)?,
+                "image_url": row.get::<_, Option<String>>(4)?,
+                "query": row.get::<_, String>(5)?,
+                "created_at": row.get::<_, String>(6)?,
+                "updated_at": row.get::<_, String>(7)?,
+            }))
+        },
+    );
+    match result {
+        Ok(v) => Ok(Some(v)),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+        Err(e) => Err(e.into()),
+    }
+}
+
+/// Update a smart playlist. Only supplied fields are changed.
+/// If `query` is provided, it must be non-empty and valid.
+/// Returns Ok(true) if updated, Ok(false) if not found or not a smart playlist.
+pub fn update_smart_playlist(
+    conn: &Connection,
+    playlist_id: i64,
+    name: Option<&str>,
+    color: Option<Option<&str>>,
+    emoji: Option<Option<&str>>,
+    query: Option<&str>,
+) -> Result<bool> {
+    // Check it's a smart playlist
+    let exists: bool = conn.query_row(
+        "SELECT COUNT(*) FROM smart_playlist_definitions WHERE playlist_id = ?1",
+        [playlist_id],
+        |r| r.get::<_, i64>(0),
+    )? > 0;
+    if !exists {
+        return Ok(false);
+    }
+
+    // Validate query if provided
+    if let Some(q) = query {
+        let q = q.trim();
+        if q.is_empty() {
+            return Err(anyhow::anyhow!("invalid_query: empty query"));
+        }
+        if let Err(e) = crate::filter::parse(q) {
+            return Err(anyhow::anyhow!("invalid_query: {e}"));
+        }
+    }
+
+    let now = chrono_now();
+
+    // Update playlist fields if provided
+    let mut pl_sets = Vec::new();
+    let mut pl_params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+    let mut idx = 1usize;
+
+    if let Some(n) = name {
+        pl_sets.push(format!("name = ?{idx}"));
+        pl_params.push(Box::new(n.trim().to_string()));
+        idx += 1;
+    }
+    if let Some(c) = color {
+        pl_sets.push(format!("color = ?{idx}"));
+        pl_params.push(Box::new(c.map(|s| s.to_string())));
+        idx += 1;
+    }
+    if let Some(e) = emoji {
+        pl_sets.push(format!("emoji = ?{idx}"));
+        pl_params.push(Box::new(e.map(|s| s.to_string())));
+        idx += 1;
+    }
+
+    if !pl_sets.is_empty() {
+        pl_sets.push(format!("updated_at = ?{idx}"));
+        pl_params.push(Box::new(now.clone()));
+        idx += 1;
+
+        let sql = format!("UPDATE playlists SET {} WHERE id = ?{idx}", pl_sets.join(", "));
+        pl_params.push(Box::new(playlist_id));
+        conn.execute(
+            &sql,
+            rusqlite::params_from_iter(pl_params.iter().map(|p| p.as_ref())),
+        )?;
+    }
+
+    // Update definition query if provided
+    if let Some(q) = query {
+        let q = q.trim();
+        conn.execute(
+            "UPDATE smart_playlist_definitions SET query = ?1, updated_at = ?2 WHERE playlist_id = ?3",
+            rusqlite::params![q, now, playlist_id],
+        )?;
+    } else if pl_sets.is_empty() {
+        // Nothing to update — but still touch updated_at on the definition
+        conn.execute(
+            "UPDATE smart_playlist_definitions SET updated_at = ?1 WHERE playlist_id = ?2",
+            rusqlite::params![now, playlist_id],
+        )?;
+    }
+
+    Ok(true)
+}
+
+/// Delete a smart playlist. The FK cascade removes the definition row.
+/// Returns Ok(true) if deleted, Ok(false) if not found or not a smart playlist.
+/// Returns Err("manual_playlist") if the ID refers to a manual playlist.
+pub fn delete_smart_playlist(conn: &Connection, playlist_id: i64) -> Result<bool> {
+    // Check if it's a smart playlist
+    let is_smart: bool = conn.query_row(
+        "SELECT COUNT(*) FROM smart_playlist_definitions WHERE playlist_id = ?1",
+        [playlist_id],
+        |r| r.get::<_, i64>(0),
+    )? > 0;
+
+    if !is_smart {
+        // Check if it exists as a manual playlist
+        let is_manual: bool = conn.query_row(
+            "SELECT COUNT(*) FROM playlists WHERE id = ?1",
+            [playlist_id],
+            |r| r.get::<_, i64>(0),
+        )? > 0;
+        if is_manual {
+            return Err(anyhow::anyhow!("manual_playlist"));
+        }
+        return Ok(false);
+    }
+
+    // Delete the backing playlist — FK cascade removes the definition
+    let affected = conn.execute("DELETE FROM playlists WHERE id = ?1", [playlist_id])?;
+    Ok(affected > 0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
