@@ -1,4 +1,4 @@
-// @ts-nocheck — test-only file, uses Node builtins not in tsconfig.app types
+/// <reference types="node" />
 /**
  * Cross-runtime round-trip tests for chip emission → Rust filter engine.
  *
@@ -75,7 +75,6 @@ describe("F1: canonicalizeQuery output round-trips real Rust parser", () => {
       const { ok, stderr } = filterCheck(query)
       expect(ok).toBe(true)
       if (!ok) {
-        // eslint-disable-next-line no-console
         console.error(`Query: ${query}\nStderr: ${stderr}`)
       }
     })
@@ -98,7 +97,6 @@ describe("F1: toggleAtom output round-trips real Rust parser", () => {
       const { ok, stderr } = filterCheck(result)
       expect(ok).toBe(true)
       if (!ok) {
-        // eslint-disable-next-line no-console
         console.error(`Atom: ${atom}, Query: ${result}\nStderr: ${stderr}`)
       }
     }
@@ -115,7 +113,6 @@ describe("F1: toggleAtom output round-trips real Rust parser", () => {
     const { ok, stderr } = filterCheck(query)
     expect(ok).toBe(true)
     if (!ok) {
-      // eslint-disable-next-line no-console
       console.error(`Query: ${query}\nStderr: ${stderr}`)
     }
   })
@@ -127,7 +124,6 @@ describe("F1: toggleAtom output round-trips real Rust parser", () => {
     const { ok, stderr } = filterCheck(query)
     expect(ok).toBe(true)
     if (!ok) {
-      // eslint-disable-next-line no-console
       console.error(`Query: ${query}\nStderr: ${stderr}`)
     }
   })
@@ -141,7 +137,6 @@ describe("F1: toggleAtom output round-trips real Rust parser", () => {
     const { ok, stderr } = filterCheck(result)
     expect(ok).toBe(true)
     if (!ok) {
-      // eslint-disable-next-line no-console
       console.error(`Query: ${result}\nStderr: ${stderr}`)
     }
   })
@@ -259,7 +254,6 @@ describe("F1: bare-safe vs quoted output", () => {
       const { ok, stderr } = filterCheck(query)
       expect(ok).toBe(true)
       if (!ok) {
-        // eslint-disable-next-line no-console
         console.error(`Query: ${query}\nStderr: ${stderr}`)
       }
     }
