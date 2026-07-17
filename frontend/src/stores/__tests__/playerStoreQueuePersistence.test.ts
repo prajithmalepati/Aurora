@@ -210,4 +210,121 @@ describe("playerStore queue persistence", () => {
     expect(state.queue).toEqual([])
     expect(state.currentSong).toBeNull()
   })
+
+  it("restoreQueue defaults invalid repeatMode to 'none'", async () => {
+    const { usePlayerStore } = await import("@/stores/playerStore")
+    const songs = [makeSong(1)]
+
+    store["aurora-queue-v1"] = JSON.stringify({
+      queueIds: [1],
+      originalQueueIds: [],
+      currentSongId: 1,
+      currentIndex: 0,
+      seek: 0,
+      repeatMode: "invalid_garbage",
+      shuffle: false,
+      queuePlaylistId: null,
+    })
+
+    usePlayerStore.getState().restoreQueue(songs)
+    expect(usePlayerStore.getState().repeatMode).toBe("none")
+  })
+
+  it("restoreQueue retains valid repeatMode values", async () => {
+    const { usePlayerStore } = await import("@/stores/playerStore")
+    const songs = [makeSong(1)]
+
+    for (const mode of ["none", "all", "one"] as const) {
+      store["aurora-queue-v1"] = JSON.stringify({
+        queueIds: [1],
+        originalQueueIds: [],
+        currentSongId: 1,
+        currentIndex: 0,
+        seek: 0,
+        repeatMode: mode,
+        shuffle: false,
+        queuePlaylistId: null,
+      })
+
+      usePlayerStore.getState().restoreQueue(songs)
+      expect(usePlayerStore.getState().repeatMode).toBe(mode)
+    }
+  })
+
+  it("restoreQueue defaults non-finite seek to 0", async () => {
+    const { usePlayerStore } = await import("@/stores/playerStore")
+    const songs = [makeSong(1)]
+
+    store["aurora-queue-v1"] = JSON.stringify({
+      queueIds: [1],
+      originalQueueIds: [],
+      currentSongId: 1,
+      currentIndex: 0,
+      seek: "not_a_number",
+      repeatMode: "none",
+      shuffle: false,
+      queuePlaylistId: null,
+    })
+
+    usePlayerStore.getState().restoreQueue(songs)
+    expect(usePlayerStore.getState().seek).toBe(0)
+  })
+
+  it("restoreQueue defaults negative seek to 0", async () => {
+    const { usePlayerStore } = await import("@/stores/playerStore")
+    const songs = [makeSong(1)]
+
+    store["aurora-queue-v1"] = JSON.stringify({
+      queueIds: [1],
+      originalQueueIds: [],
+      currentSongId: 1,
+      currentIndex: 0,
+      seek: -5,
+      repeatMode: "none",
+      shuffle: false,
+      queuePlaylistId: null,
+    })
+
+    usePlayerStore.getState().restoreQueue(songs)
+    expect(usePlayerStore.getState().seek).toBe(0)
+  })
+
+  it("restoreQueue retains valid seek values", async () => {
+    const { usePlayerStore } = await import("@/stores/playerStore")
+    const songs = [makeSong(1)]
+
+    store["aurora-queue-v1"] = JSON.stringify({
+      queueIds: [1],
+      originalQueueIds: [],
+      currentSongId: 1,
+      currentIndex: 0,
+      seek: 42.5,
+      repeatMode: "none",
+      shuffle: false,
+      queuePlaylistId: null,
+    })
+
+    usePlayerStore.getState().restoreQueue(songs)
+    expect(usePlayerStore.getState().seek).toBe(42.5)
+  })
+
+  it("restoreQueue defaults non-numeric currentSongId to first queue song", async () => {
+    const { usePlayerStore } = await import("@/stores/playerStore")
+    const songs = [makeSong(1), makeSong(2)]
+
+    store["aurora-queue-v1"] = JSON.stringify({
+      queueIds: [1, 2],
+      originalQueueIds: [],
+      currentSongId: "not_a_number",
+      currentIndex: 0,
+      seek: 0,
+      repeatMode: "none",
+      shuffle: false,
+      queuePlaylistId: null,
+    })
+
+    usePlayerStore.getState().restoreQueue(songs)
+    // Falls back to first song since currentSongId is invalid
+    expect(usePlayerStore.getState().currentSong?.id).toBe(1)
+  })
 })

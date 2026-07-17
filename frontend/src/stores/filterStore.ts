@@ -113,6 +113,7 @@ export const useFilterStore = create<FilterState>((set, get) => ({
   toggleAtom: (name, shiftHeld) => {
     const knownAtoms = getKnownAtoms()
     const newQuery = _toggleAtom(get().query, name, knownAtoms, shiftHeld)
+    if (newQuery === null) return // unrepresentable atom — no-op
     set({ query: newQuery })
   },
 

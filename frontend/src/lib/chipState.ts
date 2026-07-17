@@ -7,6 +7,7 @@
  *   parseChipStates(query, knownAtoms) → { states, isCustom }
  *   canonicalizeQuery(includes, excludes) → query string
  *   toggleAtom(query, atom, knownAtoms, shiftHeld?) → new query
+ *   isAtomRepresentable(atom) → boolean
  *
  * Brief: G3/E1 — Three-state tag chips
  */
@@ -18,6 +19,31 @@ export interface ParsedChips {
   states: Map<string, ChipState>
   /** True when the query contains OR, parens, or unknown terms — chips go neutral. */
   isCustom: boolean
+}
+
+// ── Engine-safe identifier check ─────────────────────────────────────────
+
+/**
+ * The Rust filter engine's bare identifier grammar:
+ *   [A-Za-z_][A-Za-z0-9_:]*
+ *
+ * Operator words (AND, OR, NOT) are reserved case-insensitively.
+ */
+const BARE_SAFE_RE = /^[A-Za-z_][A-Za-z0-9_]*$/
+const OPERATOR_WORDS = new Set(["and", "or", "not"])
+
+function isBareSafe(atom: string): boolean {
+  if (!BARE_SAFE_RE.test(atom)) return false
+  if (OPERATOR_WORDS.has(atom.toLowerCase())) return false
+  return true
+}
+
+/**
+ * Check if an atom can be represented in the filter grammar.
+ * Atoms containing BOTH double and single quotes are unrepresentable.
+ */
+export function isAtomRepresentable(atom: string): boolean {
+  return !(atom.includes('"') && atom.includes("'"))
 }
 
 // ── Tokeniser ────────────────────────────────────────────────────────────────
@@ -32,9 +58,11 @@ type Token =
 
 /**
  * Tokenise a query string into a flat token list.
- * Quoted strings are recognised as a single atom token.
- * Bare words are matched case-insensitively against known atoms first,
- * then against the operator vocabulary AND/OR/NOT.
+ * Quoted strings (both double and single) are recognised as a single atom token.
+ * Bare words are matched case-insensitively against the operator vocabulary AND/OR/NOT.
+ *
+ * Note: the Rust engine lowercases quoted atoms; we preserve original case
+ * for display but match case-insensitively against known atoms.
  */
 function tokenise(query: string): Token[] {
   const tokens: Token[] = []
@@ -45,9 +73,10 @@ function tokenise(query: string): Token[] {
     // skip whitespace
     if (/\s/.test(query[i])) { i++; continue }
 
-    // quoted string → atom
-    if (query[i] === '"') {
-      const end = query.indexOf('"', i + 1)
+    // quoted string → atom (double or single quotes)
+    if (query[i] === '"' || query[i] === "'") {
+      const quote = query[i]
+      const end = query.indexOf(quote, i + 1)
       if (end === -1) {
         // unmatched quote — treat rest as atom
         tokens.push({ kind: "atom", value: query.slice(i + 1) })
@@ -64,15 +93,16 @@ function tokenise(query: string): Token[] {
 
     // bare word
     let j = i
-    while (j < len && !/\s/.test(query[j]) && query[j] !== '"' && query[j] !== '(' && query[j] !== ')') {
+    while (j < len && !/\s/.test(query[j]) && query[j] !== '"' && query[j] !== "'" && query[j] !== '(' && query[j] !== ')') {
       j++
     }
     const word = query.slice(i, j)
 
-    // Check operators — only bare uppercase words that are NOT substrings of atom names
-    if (word === "AND") { tokens.push({ kind: "AND" }); i = j; continue }
-    if (word === "OR")  { tokens.push({ kind: "OR" });  i = j; continue }
-    if (word === "NOT") { tokens.push({ kind: "NOT" }); i = j; continue }
+    // Check operators — case-insensitive (matching Rust engine behavior)
+    const upper = word.toUpperCase()
+    if (upper === "AND") { tokens.push({ kind: "AND" }); i = j; continue }
+    if (upper === "OR")  { tokens.push({ kind: "OR" });  i = j; continue }
+    if (upper === "NOT") { tokens.push({ kind: "NOT" }); i = j; continue }
 
     // Otherwise it's an atom (bare word)
     tokens.push({ kind: "atom", value: word })
@@ -184,17 +214,19 @@ export function parseChipStates(query: string, knownAtoms: string[]): ParsedChip
  * Rules:
  *   - Includes come first, joined with AND
  *   - Then excludes, each prefixed with NOT, joined with AND
- *   - Multi-word atoms are quoted
- *   - Single-word atoms are bare
+ *   - Atoms are quoted per engine grammar (see quoteIfNeeded)
+ *   - Unrepresentable atoms (containing both quote chars) are skipped
  */
 export function canonicalizeQuery(includes: string[], excludes: string[]): string {
   const parts: string[] = []
 
   for (const atom of includes) {
-    parts.push(quoteIfNeeded(atom))
+    const quoted = quoteIfNeeded(atom)
+    if (quoted !== null) parts.push(quoted)
   }
   for (const atom of excludes) {
-    parts.push(`NOT ${quoteIfNeeded(atom)}`)
+    const quoted = quoteIfNeeded(atom)
+    if (quoted !== null) parts.push(`NOT ${quoted}`)
   }
 
   return parts.join(" AND ")
@@ -208,26 +240,37 @@ export function canonicalizeQuery(includes: string[], excludes: string[]): strin
  *
  * If the current query is in custom mode (OR/parens/unknown terms),
  * falls back to appendTerm behavior — appends the atom with AND.
+ *
+ * Returns null if the atom is unrepresentable (contains both quote chars).
  */
 export function toggleAtom(
   currentQuery: string,
   atom: string,
   knownAtoms: string[],
   shiftHeld: boolean = false,
-): string {
+): string | null {
+  if (!isAtomRepresentable(atom)) return null
+
   const { includes, excludes, isCustom } = parseQuery(currentQuery, knownAtoms)
 
   if (isCustom) {
     // Custom mode — append term, but strip trailing operators first
     let trimmed = currentQuery.trim()
-    // Strip trailing operators (AND, OR, NOT) to prevent "X OR AND Y" malformation
-    trimmed = trimmed.replace(/\s+(AND|OR|NOT)\s*$/i, "").trim()
+    // Strip trailing operators (AND, OR, NOT) repeatedly to prevent
+    // "X OR AND Y" or "rock OR NOT AND jazz" malformation
+    let prev = ""
+    while (prev !== trimmed) {
+      prev = trimmed
+      trimmed = trimmed.replace(/\s+(AND|OR|NOT)\s*$/i, "").trim()
+    }
     // Also handle bare trailing operator (e.g., just "OR")
     if (/^(AND|OR|NOT)$/i.test(trimmed)) {
       trimmed = ""
     }
-    if (!trimmed) return quoteIfNeeded(atom)
-    return `${trimmed} AND ${quoteIfNeeded(atom)}`
+    const quoted = quoteIfNeeded(atom)
+    if (quoted === null) return null
+    if (!trimmed) return quoted
+    return `${trimmed} AND ${quoted}`
   }
 
   const incIdx = includes.indexOf(atom)
@@ -261,9 +304,31 @@ export function toggleAtom(
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function quoteIfNeeded(atom: string): string {
-  if (atom.includes(" ") || atom.includes('"')) {
-    return `"${atom.replace(/"/g, '\\"')}"`
+/**
+ * Quote an atom for the Rust filter engine's grammar.
+ *
+ * Bare output: only for exact engine-safe identifiers ([A-Za-z_][A-Za-z0-9_:]*)
+ * that are not AND/OR/NOT (case-insensitive).
+ *
+ * Quoted output:
+ *   - "..." for atoms that need quoting and don't contain double quotes
+ *   - '...' for atoms that contain double quotes (single-quote form)
+ *   - null for atoms containing both quote chars (unrepresentable)
+ */
+function quoteIfNeeded(atom: string): string | null {
+  // Unrepresentable: contains both quote characters
+  if (atom.includes('"') && atom.includes("'")) {
+    return null
   }
-  return atom
+
+  // Bare-safe: engine grammar identifier, not an operator word
+  if (isBareSafe(atom)) {
+    return atom
+  }
+
+  // Must quote — prefer double quotes, use single if atom contains double
+  if (atom.includes('"')) {
+    return `'${atom}'`
+  }
+  return `"${atom}"`
 }

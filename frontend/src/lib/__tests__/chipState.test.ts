@@ -217,7 +217,15 @@ describe("toggleAtom", () => {
     expect(result).not.toContain("NOT AND")
   })
 
-  it("produces valid output when query is only a trailing operator", () => {
+  it("strips multiple trailing operators (rock OR NOT → strip both)", () => {
+    const result = toggleAtom("rock OR NOT", "jazz", atoms)
+    // Must strip both OR and NOT, not leave "rock OR"
+    expect(result).toBe("rock AND jazz")
+    expect(result).not.toContain("OR")
+    expect(result).not.toContain("NOT")
+  })
+
+  it("strips bare trailing operator", () => {
     const result = toggleAtom("OR", "rock", atoms)
     expect(result).toBe("rock")
   })

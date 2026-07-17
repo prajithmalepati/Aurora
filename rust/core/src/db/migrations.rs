@@ -236,7 +236,7 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
                     Ok(_) => {}
                     Err(e) => {
                         let msg = e.to_string();
-                         if !msg.contains("duplicate column") && !msg.contains("no such table") {
+                         if !msg.contains("duplicate column") {
                              return Err(e.into());
                          }
                     }
@@ -265,7 +265,7 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
                 Ok(_) => {}
                 Err(e) => {
                     let msg = e.to_string();
-                    if !msg.contains("duplicate column") && !msg.contains("no such table") {
+                    if !msg.contains("duplicate column") {
                         return Err(e.into());
                     }
                 }
@@ -627,5 +627,33 @@ mod tests {
         // Songs table must NOT have play_count column (dual-track: ext table instead)
         let err = conn.query_row("SELECT play_count FROM songs WHERE id = 1", [], |_| Ok(()));
         assert!(err.is_err(), "v5 songs table must not have play_count column");
+    }
+
+    /// Test: a non-duplicate-column migration failure (e.g., "no such table")
+    /// must propagate as an error, NOT be silently swallowed.
+    #[test]
+    fn test_non_duplicate_migration_failure_propagates() {
+        let tmp = tempfile::tempdir().unwrap();
+        let db_path = tmp.path().join("test.db");
+        let conn = Connection::open(&db_path).unwrap();
+
+        // Create a minimal schema without the 'songs' table
+        conn.execute_batch(
+            "PRAGMA foreign_keys = ON;
+            CREATE TABLE tags (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL);
+            PRAGMA user_version = 0;",
+        )
+        .unwrap();
+
+        // Run migrations — the v1 "ALTER TABLE songs ADD COLUMN file_format TEXT"
+        // will fail with "no such table: songs" because INIT_SQL was never run.
+        // This must propagate as an error (not be swallowed).
+        let result = run_migrations(&conn);
+        assert!(result.is_err(), "migration must fail when base table is missing");
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("no such table") || msg.contains("songs"),
+            "error must mention the missing table: {msg}"
+        );
     }
 }

@@ -255,12 +255,6 @@ pub fn increment_play_count(
             rusqlite::params![song_id, now],
         )?;
 
-        // Also update songs.updated_at for sort ordering
-        conn.execute(
-            "UPDATE songs SET updated_at = ?1 WHERE id = ?2",
-            rusqlite::params![now, song_id],
-        )?;
-
         // Read back play fields
         let (pc, lpa): (i64, Option<String>) = conn.query_row(
             "SELECT play_count, last_played_at FROM aurora_ext WHERE song_id = ?1",
@@ -2231,5 +2225,44 @@ mod tests {
         // Page 2: remaining 2 addon songs
         let (songs2, _) = list_songs(&conn, None, Some("addon:spotify"), "title", "asc", 3, 3).unwrap();
         assert_eq!(songs2.len(), 2);
+    }
+
+    // ── F2: frozen updated_at semantics ───────────────────────────────
+
+    #[test]
+    fn test_increment_play_count_preserves_updated_at() {
+        let conn = test_db();
+        conn.execute(
+            "INSERT INTO songs (id, title, artist, file_path, created_at, updated_at) \
+             VALUES (1, 'Frozen', 'Artist', '/music/frozen.mp3', '2025-01-01T00:00:00Z', '2025-01-01T00:00:00Z')",
+            [],
+        )
+        .unwrap();
+
+        // Record the original updated_at
+        let before: String = conn
+            .query_row("SELECT updated_at FROM songs WHERE id = 1", [], |r| r.get(0))
+            .unwrap();
+
+        // Play the song
+        let result = increment_play_count(&conn, 1).unwrap();
+        assert!(result.is_some(), "song must exist");
+
+        // Verify updated_at is UNCHANGED — plays are not metadata edits
+        let after: String = conn
+            .query_row("SELECT updated_at FROM songs WHERE id = 1", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(before, after, "updated_at must not change on play");
+
+        // Verify play stats DID change
+        let (pc, lpa): (i64, Option<String>) = conn
+            .query_row(
+                "SELECT play_count, last_played_at FROM aurora_ext WHERE song_id = 1",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(pc, 1, "play_count must be 1");
+        assert!(lpa.is_some(), "last_played_at must be set");
     }
 }

@@ -117,6 +117,20 @@ fn seed_rejects_non_temp_path() {
     // Derive a guaranteed-absent absolute path that is NOT under the system temp dir.
     // CARGO_MANIFEST_DIR = .../rust/server — use a sibling candidate inside the manifest dir tree.
     let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+
+    // Skip safely when the checkout is under the temporary boundary
+    // (CI temp workspaces, /tmp checkouts, etc.)
+    let temp_dir = std::env::temp_dir();
+    if manifest_dir.starts_with(&temp_dir) {
+        eprintln!(
+            "SKIP: CARGO_MANIFEST_DIR ({}) is under temp_dir ({}); \
+             cannot assert non-temp rejection from here",
+            manifest_dir.display(),
+            temp_dir.display()
+        );
+        return;
+    }
+
     let non_temp = manifest_dir.join("test-evil-candidate-should-not-exist.db");
     assert!(!non_temp.exists(), "candidate path must not exist before test");
 

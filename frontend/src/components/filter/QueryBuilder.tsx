@@ -8,7 +8,7 @@ import { AutocompleteDropdown, type SuggestionItem } from "./AutocompleteDropdow
 import { SongTable } from "@/components/songs/SongTable"
 import { Search, X, Shuffle, Sparkles, SlidersHorizontal, Tag } from "lucide-react"
 import type { Song } from "@/types"
-import { parseChipStates, type ChipState } from "@/lib/chipState"
+import { parseChipStates, type ChipState, isAtomRepresentable } from "@/lib/chipState"
 
 const OPERATORS = ["AND", "OR", "NOT", "(", ")"] as const
 
@@ -242,14 +242,26 @@ export function QueryBuilder() {
               <div className="flex items-center gap-1 flex-shrink-0">
                 {tags.map((tag) => {
                   const state = chipStates.get(tag.name) ?? "neutral"
+                  const representable = isAtomRepresentable(tag.name)
                   return (
                     <button
                       key={tag.id}
                       onClick={(e) => {
+                        if (!representable) return
                         toggleAtom(tag.name, e.shiftKey)
                       }}
-                      title="Click: include · again: exclude · again: clear"
-                      className={`aurora-chip flex-shrink-0 text-[11px] font-medium px-2.5 py-[2px] rounded-full transition-[color,background-color,border-color,box-shadow] duration-150 ${chipClassName(state)}`}
+                      disabled={!representable}
+                      title={
+                        representable
+                          ? "Click: include · again: exclude · again: clear"
+                          : `Cannot use in filter: tag name contains both " and ' characters`
+                      }
+                      aria-disabled={!representable}
+                      className={`aurora-chip flex-shrink-0 text-[11px] font-medium px-2.5 py-[2px] rounded-full transition-[color,background-color,border-color,box-shadow] duration-150 ${
+                        representable
+                          ? chipClassName(state)
+                          : "text-[var(--aurora-text-tertiary)] opacity-40 cursor-not-allowed"
+                      }`}
                     >
                       {tag.name}
                     </button>
@@ -287,16 +299,28 @@ export function QueryBuilder() {
                 {playlists.map((playlist) => {
                   const color = playlist.color || "#a78bfa"
                   const state = chipStates.get(playlist.name) ?? "neutral"
+                  const representable = isAtomRepresentable(playlist.name)
                   return (
                     <button
                       key={playlist.id}
                       onClick={(e) => {
+                        if (!representable) return
                         toggleAtom(playlist.name, e.shiftKey)
                       }}
-                      title="Click: include · again: exclude · again: clear"
-                      className={`flex-shrink-0 whitespace-nowrap text-[11px] font-medium px-2.5 py-[2px] rounded-full transition-[color,background-color,border-color,box-shadow] duration-150 inline-flex items-center gap-1.5 ${chipClassName(state)}`}
+                      disabled={!representable}
+                      title={
+                        representable
+                          ? "Click: include · again: exclude · again: clear"
+                          : `Cannot use in filter: name contains both " and ' characters`
+                      }
+                      aria-disabled={!representable}
+                      className={`flex-shrink-0 whitespace-nowrap text-[11px] font-medium px-2.5 py-[2px] rounded-full transition-[color,background-color,border-color,box-shadow] duration-150 inline-flex items-center gap-1.5 ${
+                        representable
+                          ? chipClassName(state)
+                          : "text-[var(--aurora-text-tertiary)] opacity-40 cursor-not-allowed"
+                      }`}
                       style={{
-                        border: state === "neutral" ? `1px solid ${color}30` : undefined,
+                        border: representable && state === "neutral" ? `1px solid ${color}30` : undefined,
                       }}
                     >
                       <span

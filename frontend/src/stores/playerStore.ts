@@ -452,8 +452,18 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       : 0
     const queueIndex = currentIndex >= 0 ? currentIndex : 0
 
-    // Only restore seek if the current song is the same one that was playing
-    const seekRestored = currentSong?.id === data.currentSongId ? data.seek : 0
+    // Validate scalars: repeatMode, seek, currentSongId
+    const validRepeatModes = new Set(["none", "all", "one"])
+    const repeatMode = validRepeatModes.has(data.repeatMode) ? data.repeatMode : "none"
+
+    const rawSeek = data.seek
+    const seekRestored =
+      currentSong?.id === data.currentSongId &&
+      typeof rawSeek === "number" &&
+      Number.isFinite(rawSeek) &&
+      rawSeek >= 0
+        ? rawSeek
+        : 0
 
     set({
       queue,
@@ -462,7 +472,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       isPlaying: false,
       seek: seekRestored,
       duration: currentSong?.duration ?? 0,
-      repeatMode: data.repeatMode,
+      repeatMode,
       isShuffled: data.shuffle,
       originalQueue,
       queuePlaylistId: data.queuePlaylistId,
