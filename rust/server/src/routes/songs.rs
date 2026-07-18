@@ -390,6 +390,31 @@ pub async fn stream_song(
         .unwrap()
 }
 
+/// POST /api/songs/{song_id}/played — increment play_count, set last_played_at.
+/// Returns play_count and last_played_at in the response (endpoint-specific fields).
+pub async fn mark_played(
+    State(state): State<Arc<AppState>>,
+    Path(song_id): Path<i64>,
+) -> Response {
+    let conn = state.conn.lock().await;
+    match aurora_core::db::queries::increment_play_count(&conn, song_id) {
+        Ok(Some((mut song, pc, lpa))) => {
+            // Inject play fields into the response (endpoint-specific, not in global serializer)
+            if let Some(obj) = song.as_object_mut() {
+                obj.insert("play_count".into(), serde_json::json!(pc));
+                obj.insert("last_played_at".into(), serde_json::json!(lpa));
+            }
+            envelope::ok(song, "ok").into_response()
+        }
+        Ok(None) => envelope::not_found("Song not found").into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"detail": e.to_string()})),
+        )
+            .into_response(),
+    }
+}
+
 /// GET /api/songs/{song_id}/bleed-thumb — bleed thumbnail.
 pub async fn bleed_thumb(
     State(state): State<Arc<AppState>>,

@@ -61,7 +61,7 @@ fn safe_json_loads(raw: Option<&str>) -> Option<Value> {
 
 /// Serialize a song row into the canonical response shape.
 ///
-/// All ~35 fields are always present (nulls for missing values).
+/// All ~37 fields are always present (nulls for missing values).
 /// `include_peaks`: true for single-song GET (has waveform_peaks),
 ///                  false for list/filter endpoints (no waveform_peaks).
 ///

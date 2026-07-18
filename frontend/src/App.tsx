@@ -47,6 +47,7 @@ function App() {
   const fetchPlaylists = usePlaylistStore((state) => state.fetchPlaylists)
   const fetchTags = useTagStore((state) => state.fetchTags)
   const playSong = usePlayerStore((state) => state.playSong)
+  const restoreQueue = usePlayerStore((state) => state.restoreQueue)
 
   useEffect(() => {
     fetchSongs()
@@ -54,6 +55,15 @@ function App() {
     fetchTags()
     fetchAddons()
   }, [fetchSongs, fetchPlaylists, fetchTags, fetchAddons])
+
+  // One-shot queue restore after songs are first loaded
+  const restoredRef = useRef(false)
+  useEffect(() => {
+    if (!restoredRef.current && songs.length > 0 && !songsLoading) {
+      restoredRef.current = true
+      restoreQueue(songs)
+    }
+  }, [songs, songsLoading, restoreQueue])
 
   // One-shot update check 10s after mount + apply saved zoom
   useEffect(() => {

@@ -224,6 +224,48 @@ pub fn get_song_file_path(conn: &Connection, song_id: i64) -> Result<Option<Opti
     }
 }
 
+/// Increment `play_count` and set `last_played_at = now()` for a song.
+/// Uses aurora_ext table (dual-track versioning).
+/// Returns `Ok(Some((song_json, play_count, last_played_at)))` if song exists, `Ok(None)` if not found.
+pub fn increment_play_count(
+    conn: &Connection,
+    song_id: i64,
+) -> Result<Option<(serde_json::Value, i64, Option<String>)>> {
+        // Verify song exists
+        let exists: bool = conn
+            .query_row(
+                "SELECT COUNT(*) FROM songs WHERE id = ?1",
+                [song_id],
+                |r| r.get::<_, i64>(0),
+            )?
+            > 0;
+        if !exists {
+            return Ok(None);
+        }
+
+        let now = chrono_now();
+
+        // Upsert into aurora_ext
+        conn.execute(
+            "INSERT INTO aurora_ext (song_id, play_count, last_played_at) \
+             VALUES (?1, 1, ?2) \
+             ON CONFLICT(song_id) DO UPDATE SET \
+               play_count = play_count + 1, \
+               last_played_at = ?2",
+            rusqlite::params![song_id, now],
+        )?;
+
+        // Read back play fields
+        let (pc, lpa): (i64, Option<String>) = conn.query_row(
+            "SELECT play_count, last_played_at FROM aurora_ext WHERE song_id = ?1",
+            [song_id],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )?;
+
+        let song = get_song(conn, song_id)?;
+        Ok(song.map(|s| (s, pc, lpa)))
+    }
+
 /// Create a song. Returns `(id, song_json)`.
 pub fn create_song(
     conn: &Connection,
@@ -624,8 +666,7 @@ fn row_to_playlist_song(row: &rusqlite::Row) -> rusqlite::Result<serde_json::Val
         row.get::<_, Option<String>>(pl_col::STREAM_URL)?.as_deref(),
         row.get::<_, Option<String>>(pl_col::STREAM_URL_EXPIRES_AT)?
             .as_deref(),
-        row.get::<_, Option<String>>(pl_col::ARTWORK_URL)?
-            .as_deref(),
+        row.get::<_, Option<String>>(pl_col::ARTWORK_URL)?.as_deref(),
         row.get::<_, Option<String>>(pl_col::TAGS)?.as_deref(),
         row.get(pl_col::START_TIME_MS)?,
         row.get(pl_col::END_TIME_MS)?,
@@ -1944,6 +1985,12 @@ mod tests {
                 song_id INTEGER NOT NULL,
                 position INTEGER NOT NULL DEFAULT 0,
                 PRIMARY KEY (playlist_id, song_id)
+            );
+            CREATE TABLE IF NOT EXISTS aurora_ext (
+                song_id INTEGER NOT NULL,
+                play_count INTEGER NOT NULL DEFAULT 0,
+                last_played_at TEXT,
+                UNIQUE(song_id)
             );",
         )
         .unwrap();
@@ -2178,5 +2225,44 @@ mod tests {
         // Page 2: remaining 2 addon songs
         let (songs2, _) = list_songs(&conn, None, Some("addon:spotify"), "title", "asc", 3, 3).unwrap();
         assert_eq!(songs2.len(), 2);
+    }
+
+    // ── F2: frozen updated_at semantics ───────────────────────────────
+
+    #[test]
+    fn test_increment_play_count_preserves_updated_at() {
+        let conn = test_db();
+        conn.execute(
+            "INSERT INTO songs (id, title, artist, file_path, created_at, updated_at) \
+             VALUES (1, 'Frozen', 'Artist', '/music/frozen.mp3', '2025-01-01T00:00:00Z', '2025-01-01T00:00:00Z')",
+            [],
+        )
+        .unwrap();
+
+        // Record the original updated_at
+        let before: String = conn
+            .query_row("SELECT updated_at FROM songs WHERE id = 1", [], |r| r.get(0))
+            .unwrap();
+
+        // Play the song
+        let result = increment_play_count(&conn, 1).unwrap();
+        assert!(result.is_some(), "song must exist");
+
+        // Verify updated_at is UNCHANGED — plays are not metadata edits
+        let after: String = conn
+            .query_row("SELECT updated_at FROM songs WHERE id = 1", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(before, after, "updated_at must not change on play");
+
+        // Verify play stats DID change
+        let (pc, lpa): (i64, Option<String>) = conn
+            .query_row(
+                "SELECT play_count, last_played_at FROM aurora_ext WHERE song_id = 1",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(pc, 1, "play_count must be 1");
+        assert!(lpa.is_some(), "last_played_at must be set");
     }
 }
