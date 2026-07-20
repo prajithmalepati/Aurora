@@ -74,11 +74,17 @@ pub async fn create_smart_playlist(
 /// GET /api/smart-playlists — list all smart playlist definitions.
 pub async fn list_smart_playlists(
     State(state): State<Arc<AppState>>,
-) -> Json<Value> {
+) -> Response {
     let conn = state.conn.lock().await;
-    let playlists = aurora_core::db::queries::list_smart_playlists(&conn).unwrap_or_default();
-    let total = playlists.len() as i64;
-    envelope::ok_meta(Value::Array(playlists), "ok", serde_json::json!({ "total": total }))
+    match aurora_core::db::queries::list_smart_playlists(&conn) {
+        Ok(playlists) => {
+            let total = playlists.len() as i64;
+            envelope::ok_meta(Value::Array(playlists), "ok", serde_json::json!({ "total": total })).into_response()
+        }
+        Err(e) => {
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "detail": e.to_string() }))).into_response()
+        }
+    }
 }
 
 /// GET /api/smart-playlists/{id} — get one smart playlist definition.

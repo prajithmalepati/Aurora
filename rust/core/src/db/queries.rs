@@ -2085,6 +2085,9 @@ pub fn update_smart_playlist(
 
     let now = chrono_now();
 
+    // Atomic: BEGIN IMMEDIATE → update playlist → update definition → COMMIT
+    conn.execute_batch("BEGIN IMMEDIATE")?;
+
     // Update playlist fields if provided
     let mut pl_sets = Vec::new();
     let mut pl_params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
@@ -2113,27 +2116,40 @@ pub fn update_smart_playlist(
 
         let sql = format!("UPDATE playlists SET {} WHERE id = ?{idx}", pl_sets.join(", "));
         pl_params.push(Box::new(playlist_id));
-        conn.execute(
+        let result = conn.execute(
             &sql,
             rusqlite::params_from_iter(pl_params.iter().map(|p| p.as_ref())),
-        )?;
+        );
+        if let Err(e) = result {
+            let _ = conn.execute_batch("ROLLBACK");
+            return Err(e.into());
+        }
     }
 
     // Update definition query if provided
     if let Some(q) = query {
         let q = q.trim();
-        conn.execute(
+        let result = conn.execute(
             "UPDATE smart_playlist_definitions SET query = ?1, updated_at = ?2 WHERE playlist_id = ?3",
             rusqlite::params![q, now, playlist_id],
-        )?;
+        );
+        if let Err(e) = result {
+            let _ = conn.execute_batch("ROLLBACK");
+            return Err(e.into());
+        }
     } else if pl_sets.is_empty() {
         // Nothing to update — but still touch updated_at on the definition
-        conn.execute(
+        let result = conn.execute(
             "UPDATE smart_playlist_definitions SET updated_at = ?1 WHERE playlist_id = ?2",
             rusqlite::params![now, playlist_id],
-        )?;
+        );
+        if let Err(e) = result {
+            let _ = conn.execute_batch("ROLLBACK");
+            return Err(e.into());
+        }
     }
 
+    conn.execute_batch("COMMIT")?;
     Ok(true)
 }
 

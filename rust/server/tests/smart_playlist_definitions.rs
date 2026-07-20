@@ -14,16 +14,26 @@ use aurora_server::AppState;
 
 // ── Helpers ───────────────────────────────────────────────────────────
 
-fn build_app() -> axum::Router {
+fn build_state() -> Arc<AppState> {
     let conn = aurora_core::db::open_memory().expect("open_memory failed");
-    let state = Arc::new(AppState {
+    Arc::new(AppState {
         conn: Mutex::new(conn),
         db_path: None,
         addon_state: Arc::new(aurora_server::routes::addons::AddonState::new()),
         watcher_handle: None,
         aurora_token: None,
-    });
+    })
+}
+
+fn build_app() -> axum::Router {
+    let state = build_state();
     aurora_server::build_router(state)
+}
+
+fn build_app_with_state() -> (axum::Router, Arc<AppState>) {
+    let state = build_state();
+    let router = aurora_server::build_router(Arc::clone(&state));
+    (router, state)
 }
 
 async fn send(app: &axum::Router, req: Request<Body>) -> (StatusCode, String) {
@@ -421,4 +431,87 @@ async fn delete_manual_playlist_returns_404() {
     assert_eq!(status, 200);
     let v: Value = serde_json::from_str(&resp).unwrap();
     assert_eq!(v["data"].as_array().unwrap().len(), 1, "manual playlist must survive");
+}
+
+// ── Koji repair: Finding A — atomic update ─────────────────────────────
+
+#[tokio::test]
+async fn update_smart_playlist_atomic_rollback_on_definition_failure() {
+    let conn = aurora_core::db::open_memory().expect("open_memory failed");
+
+    // Create a smart playlist via core function
+    let id = aurora_core::db::queries::create_smart_playlist(
+        &conn, "Original", None, None, "rock",
+    )
+    .expect("create failed");
+
+    // Install a trigger that makes any UPDATE on smart_playlist_definitions fail
+    conn.execute_batch(
+        "CREATE TEMP TRIGGER fail_def_update
+         BEFORE UPDATE ON smart_playlist_definitions
+         BEGIN
+             SELECT RAISE(ABORT, 'injected failure');
+         END",
+    )
+    .expect("trigger creation failed");
+
+    // Snapshot original values
+    let row: (String, String) = conn
+        .query_row(
+            "SELECT p.name, sp.query FROM playlists p JOIN smart_playlist_definitions sp ON sp.playlist_id = p.id WHERE p.id = ?1",
+            [id],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .expect("snapshot query failed");
+    let (orig_name, orig_query) = row;
+
+    // Attempt update of BOTH name and query — definition write should fail
+    let result = aurora_core::db::queries::update_smart_playlist(
+        &conn,
+        id,
+        Some("Renamed"),
+        None,
+        None,
+        Some("jazz"),
+    );
+    assert!(result.is_err(), "update must fail when definition write fails");
+
+    // Verify BOTH values are unchanged (atomic rollback)
+    let row: (String, String) = conn
+        .query_row(
+            "SELECT p.name, sp.query FROM playlists p JOIN smart_playlist_definitions sp ON sp.playlist_id = p.id WHERE p.id = ?1",
+            [id],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .expect("verify query failed");
+    assert_eq!(row.0, orig_name, "name must be unchanged after failed update");
+    assert_eq!(row.1, orig_query, "query must be unchanged after failed update");
+}
+
+// ── Koji repair: Finding B — list error propagation ────────────────────
+
+#[tokio::test]
+async fn list_smart_playlists_db_error_returns_500() {
+    let (app, state) = build_app_with_state();
+
+    // First verify normal list works (regression)
+    let (status, resp) = send(&app, get("/api/smart-playlists")).await;
+    assert_eq!(status, 200, "normal list must return 200");
+    let v: Value = serde_json::from_str(&resp).unwrap();
+    assert_eq!(v["data"].as_array().unwrap().len(), 0);
+    assert_eq!(v["meta"]["total"], 0);
+
+    // Drop the smart_playlist_definitions table to cause a DB error
+    {
+        let conn = state.conn.lock().await;
+        conn.execute_batch("DROP TABLE smart_playlist_definitions")
+            .expect("drop table failed");
+    }
+
+    // List must now return 500, NOT 200 with empty data
+    let (status, _resp) = send(&app, get("/api/smart-playlists")).await;
+    assert_eq!(
+        status, 500,
+        "list must return 500 when DB query fails, not 200 with empty data"
+    );
 }
