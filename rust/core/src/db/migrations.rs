@@ -132,6 +132,13 @@ CREATE TABLE IF NOT EXISTS aurora_ext (
     last_played_at  TEXT,
     UNIQUE(song_id)
 );
+
+CREATE TABLE IF NOT EXISTS smart_playlist_definitions (
+    playlist_id INTEGER PRIMARY KEY REFERENCES playlists(id) ON DELETE CASCADE,
+    query       TEXT NOT NULL,
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+);
 "#;
 
 /// A single migration step: (version, list of SQL statements).
@@ -627,6 +634,136 @@ mod tests {
         // Songs table must NOT have play_count column (dual-track: ext table instead)
         let err = conn.query_row("SELECT play_count FROM songs WHERE id = 1", [], |_| Ok(()));
         assert!(err.is_err(), "v5 songs table must not have play_count column");
+    }
+
+    /// Test: fresh DB creates smart_playlist_definitions table with user_version == 5.
+    #[test]
+    fn test_fresh_db_creates_smart_playlist_definitions() {
+        let tmp = tempfile::tempdir().unwrap();
+        let db_path = tmp.path().join("test.db");
+        let conn = Connection::open(&db_path).unwrap();
+        conn.execute_batch("PRAGMA foreign_keys = ON;").unwrap();
+        conn.execute_batch(INIT_SQL).unwrap();
+        run_migrations(&conn).unwrap();
+
+        // user_version must stay at 5 — no new migration entry
+        let version: i64 = conn
+            .pragma_query_value(None, "user_version", |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, 5, "user_version must remain 5");
+
+        // smart_playlist_definitions table must exist
+        let tables: Vec<String> = conn
+            .prepare(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='smart_playlist_definitions'",
+            )
+            .unwrap()
+            .query_map([], |row| row.get(0))
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        assert_eq!(tables.len(), 1, "smart_playlist_definitions table must exist");
+
+        // Verify the schema: playlist_id INTEGER PK referencing playlists(id)
+        let cols: Vec<String> = conn
+            .prepare("PRAGMA table_info(smart_playlist_definitions)")
+            .unwrap()
+            .query_map([], |row| row.get::<_, String>(1))
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        assert!(cols.contains(&"playlist_id".to_string()));
+        assert!(cols.contains(&"query".to_string()));
+        assert!(cols.contains(&"created_at".to_string()));
+        assert!(cols.contains(&"updated_at".to_string()));
+
+        // Verify FK: inserting a definition referencing a nonexistent playlist must fail
+        let err = conn.execute_batch(
+            "INSERT INTO smart_playlist_definitions (playlist_id, query, created_at, updated_at)
+             VALUES (999, 'title contains test', '2025-01-01', '2025-01-01')",
+        );
+        assert!(err.is_err(), "FK constraint must reject nonexistent playlist_id");
+    }
+
+    /// Test: opening a file-backed v5 DB creates the additive table and
+    /// preserves an existing playlist row.
+    ///
+    /// The fixture represents a real pre-change v5 artifact: INIT_SQL creates
+    /// all tables (including smart_playlist_definitions), then we explicitly
+    /// DROP it to simulate a database that was created before that table was
+    /// added to the schema.  This proves that `open_and_migrate` on a genuine
+    /// legacy v5 file will add the missing table.
+    #[test]
+    fn test_v5_file_db_creates_smart_playlist_definitions() {
+        let tmp = tempfile::tempdir().unwrap();
+        let db_path = tmp.path().join("test.db");
+
+        // Phase 1: build a v5 fixture WITHOUT smart_playlist_definitions.
+        // Run current INIT_SQL then drop the additive table to simulate
+        // a legacy v5 artifact that never had it.
+        {
+            let conn = Connection::open(&db_path).unwrap();
+            conn.execute_batch("PRAGMA foreign_keys = ON;").unwrap();
+            conn.execute_batch(INIT_SQL).unwrap();
+            run_migrations(&conn).unwrap();
+
+            // Remove the additive table — simulates legacy v5 artifact
+            conn.execute_batch("DROP TABLE IF EXISTS smart_playlist_definitions")
+                .unwrap();
+
+            // Seed a playlist row (existing data that must survive)
+            conn.execute_batch(
+                "INSERT INTO playlists (name, created_at, updated_at)
+                 VALUES ('Existing Playlist', '2025-06-01', '2025-06-01')",
+            )
+            .unwrap();
+
+            // MANDATORY: assert the table is absent before we close
+            let tables: Vec<String> = conn
+                .prepare(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='smart_playlist_definitions'",
+                )
+                .unwrap()
+                .query_map([], |row| row.get(0))
+                .unwrap()
+                .collect::<Result<Vec<_>, _>>()
+                .unwrap();
+            assert!(
+                tables.is_empty(),
+                "smart_playlist_definitions must be absent in the legacy fixture"
+            );
+
+            drop(conn);
+        }
+
+        // Phase 2: reopen with open_and_migrate (simulates app restart after code update)
+        let conn = crate::db::open_and_migrate(&db_path).unwrap();
+
+        // user_version must stay at 5
+        let version: i64 = conn
+            .pragma_query_value(None, "user_version", |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, 5, "user_version must remain 5 after reopen");
+
+        // smart_playlist_definitions table must now exist
+        let tables: Vec<String> = conn
+            .prepare(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='smart_playlist_definitions'",
+            )
+            .unwrap()
+            .query_map([], |row| row.get(0))
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        assert_eq!(tables.len(), 1, "smart_playlist_definitions table must exist after reopen");
+
+        // Existing playlist row must survive
+        let pl_name: String = conn
+            .query_row("SELECT name FROM playlists WHERE id = 1", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(pl_name, "Existing Playlist", "existing playlist row must survive");
     }
 
     /// Test: a non-duplicate-column migration failure (e.g., "no such table")

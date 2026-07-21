@@ -193,6 +193,18 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
             "/api/playlist-images/{filename}",
             axum::routing::get(routes::serve_playlist_image),
         )
+        // ── Smart playlist routes ──
+        .route(
+            "/api/smart-playlists",
+            axum::routing::get(routes::list_smart_playlists)
+                .post(routes::create_smart_playlist),
+        )
+        .route(
+            "/api/smart-playlists/{playlist_id}",
+            axum::routing::get(routes::get_smart_playlist)
+                .put(routes::update_smart_playlist)
+                .delete(routes::delete_smart_playlist),
+        )
         // ── Folder routes ──
         .route("/api/folders", axum::routing::get(routes::get_folder_tree))
         .route(

@@ -5,6 +5,7 @@ mod filter;
 mod folders;
 mod playlists;
 pub mod scanner;
+mod smart_playlists;
 mod songs;
 mod tags;
 pub mod watcher;
@@ -17,6 +18,10 @@ pub use playlists::{
     export_playlist, get_playlist, import_playlist, list_playlists, remove_song_from_playlist,
     reorder_playlist_songs, serve_playlist_image, update_playlist, update_song_timing,
     upload_playlist_image,
+};
+pub use smart_playlists::{
+    create_smart_playlist, delete_smart_playlist, get_smart_playlist, list_smart_playlists,
+    update_smart_playlist,
 };
 pub use songs::{album_art, bleed_thumb, create_song, delete_song, get_song, list_songs, mark_played, stream_song, update_song};
 pub use tags::{assign_tags, create_tag, delete_tag, list_tags, remove_tag};
