@@ -11,6 +11,21 @@ import { buildPlaybackErrorHint } from "@/lib/playbackErrorHints"
 import type { PlaybackEngine, PlaybackSource } from "@/types/playback"
 import type { Song } from "@/types"
 
+/** Create a fire-once reporter for a single engine-instance playback start.
+ *  Each call to createPlayReport returns a new reporter bound to exactly one
+ *  engine instance.  The reporter posts once and silently ignores subsequent
+ *  calls and network errors. */
+export function createPlayReport(
+  post: (path: string, body: unknown) => Promise<unknown>,
+): (songId: string) => void {
+  let reported = false
+  return (songId: string) => {
+    if (reported) return
+    reported = true
+    post(`/songs/${songId}/played`, {}).catch(() => {})
+  }
+}
+
 /** Build the PlaybackSource for a library song. URL resolution lives here —
  *  engines receive a fully resolved URL and never construct API paths. */
 function streamSource(
@@ -140,11 +155,17 @@ export function useAudioPlayer() {
   /** Attach all event handlers (play, pause, end, load, errors, buffering) to an
    *  engine. Used for both newly created and promoted preloaded engines. */
   function bindEngineHandlers(engine: PlaybackEngine, songId: string) {
+    const report = createPlayReport(api.post.bind(api))
+
     engine.on("buffering", (buffering) => {
       usePlayerStore.getState().setIsBuffering(buffering)
     })
 
     engine.on("play", () => {
+      // Report playback start exactly once per engine instance (G3 telemetry).
+      // Staleness guard: only report if this engine is still the active one.
+      if (engineRef.current === engine) report(songId)
+
       if (intervalRef.current) window.clearTimeout(intervalRef.current)
 
       let debugTickCount = 0
