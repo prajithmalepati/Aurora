@@ -205,6 +205,10 @@ pub fn build_router(state: Arc<AppState>) -> axum::Router {
                 .put(routes::update_smart_playlist)
                 .delete(routes::delete_smart_playlist),
         )
+        .route(
+            "/api/smart-playlists/{playlist_id}/songs",
+            axum::routing::get(routes::resolve_smart_playlist),
+        )
         // ── Folder routes ──
         .route("/api/folders", axum::routing::get(routes::get_folder_tree))
         .route(
