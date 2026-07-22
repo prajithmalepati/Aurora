@@ -5,6 +5,7 @@ import { useTagStore } from "@/stores/tagStore"
 import { usePlayerStore } from "@/stores/playerStore"
 import { useSettingsStore } from "@/stores/settingsStore"
 import { useAddonStore } from "@/stores/addonStore"
+import { useSmartPlaylistStore } from "@/stores/smartPlaylistStore"
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts"
 import { KeyboardShortcutsOverlay } from "@/components/ui/KeyboardShortcutsOverlay"
 import { AppShell } from "@/components/layout/AppShell"
@@ -29,6 +30,7 @@ const SettingsView = lazy(() => import("@/components/settings/SettingsView").the
 const AlbumsView = lazy(() => import("@/components/albums/AlbumsView").then(m => ({ default: m.AlbumsView })))
 const FoldersView = lazy(() => import("@/components/folders/FoldersView").then(m => ({ default: m.FoldersView })))
 const AboutView = lazy(() => import("@/components/about/AboutView").then(m => ({ default: m.AboutView })))
+const SmartPlaylistView = lazy(() => import("@/components/smart-playlists/SmartPlaylistView").then(m => ({ default: m.SmartPlaylistView })))
 
 function App() {
   const [searchQuery, setSearchQuery] = useState("")
@@ -44,6 +46,7 @@ function App() {
   const setSourceFilter = useSongStore((state) => state.setSourceFilter)
   const addons = useAddonStore((state) => state.addons)
   const fetchAddons = useAddonStore((state) => state.fetchAddons)
+  const fetchSmartPlaylists = useSmartPlaylistStore((state) => state.fetchSmartPlaylists)
   const fetchPlaylists = usePlaylistStore((state) => state.fetchPlaylists)
   const fetchTags = useTagStore((state) => state.fetchTags)
   const playSong = usePlayerStore((state) => state.playSong)
@@ -54,7 +57,8 @@ function App() {
     fetchPlaylists()
     fetchTags()
     fetchAddons()
-  }, [fetchSongs, fetchPlaylists, fetchTags, fetchAddons])
+    fetchSmartPlaylists()
+  }, [fetchSongs, fetchPlaylists, fetchTags, fetchAddons, fetchSmartPlaylists])
 
   // One-shot queue restore after songs are first loaded
   const restoredRef = useRef(false)
@@ -121,7 +125,7 @@ function App() {
 
   // Helper: get a stable key for a view
   const viewKey = (v: typeof view) =>
-    v.kind === "playlist" ? `playlist-${v.playlistId}` : v.kind
+    v.kind === "playlist" || v.kind === "smart-playlist" ? `${v.kind}-${v.playlistId}` : v.kind
 
   // Save scroll position of old view, restore for new view
   useEffect(() => {
@@ -280,6 +284,8 @@ function App() {
       content = <QueryBuilder />
     } else if (view.kind === "playlist") {
       content = <PlaylistDetail key={view.playlistId} playlistId={view.playlistId} />
+    } else if (view.kind === "smart-playlist") {
+      content = <SmartPlaylistView key={view.playlistId} playlistId={view.playlistId} />
     } else if (view.kind === "folders") {
       content = <FoldersView />
     } else if (view.kind === "albums") {
@@ -298,7 +304,7 @@ function App() {
           </div>
         }>
           <motion.div
-            key={view.kind === "playlist" ? `playlist-${view.playlistId}` : view.kind}
+            key={view.kind === "playlist" || view.kind === "smart-playlist" ? `${view.kind}-${view.playlistId}` : view.kind}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
