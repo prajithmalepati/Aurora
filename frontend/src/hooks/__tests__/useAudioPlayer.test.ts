@@ -36,6 +36,7 @@ vi.mock("@/lib/api", () => ({
   BASE_URL: "http://localhost:8000/api",
   getAuroraToken: () => undefined,
   getBaseUrl: () => "http://localhost:8000",
+  withToken: (url: string) => url,
 }))
 
 vi.mock("@/stores/playlistStore", () => ({
@@ -59,6 +60,66 @@ function makeSong(id: number) {
     updated_at: "2026-01-01T00:00:00Z",
   }
 }
+
+describe("play-report: fire-once per engine instance", () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it("Slice A: fresh reporter posts once for the given song", async () => {
+    const { createPlayReport } = await import("@/hooks/useAudioPlayer")
+    const post = vi.fn<(path: string, body: unknown) => Promise<void>>().mockResolvedValue(undefined)
+    const report = createPlayReport(post)
+
+    report("42")
+
+    expect(post).toHaveBeenCalledOnce()
+    expect(post).toHaveBeenCalledWith("/songs/42/played", {})
+  })
+
+  it("Slice B1: second call on same reporter does not post again", async () => {
+    const { createPlayReport } = await import("@/hooks/useAudioPlayer")
+    const post = vi.fn<(path: string, body: unknown) => Promise<void>>().mockResolvedValue(undefined)
+    const report = createPlayReport(post)
+
+    report("42")
+    report("42")  // resume after pause — same engine
+
+    expect(post).toHaveBeenCalledOnce()
+  })
+
+  it("Slice B2: rejected post is swallowed, does not throw", async () => {
+    const { createPlayReport } = await import("@/hooks/useAudioPlayer")
+    const post = vi.fn<(path: string, body: unknown) => Promise<unknown>>().mockRejectedValue(new Error("network"))
+    const report = createPlayReport(post)
+
+    // Must not throw
+    expect(() => report("42")).not.toThrow()
+
+    // Give the microtask queue a tick so .catch runs
+    await new Promise((r) => setTimeout(r, 0))
+
+    expect(post).toHaveBeenCalledOnce()
+    expect(post).toHaveBeenCalledWith("/songs/42/played", {})
+  })
+
+  it("Slice C: new reporter for same song posts once (new engine instance)", async () => {
+    const { createPlayReport } = await import("@/hooks/useAudioPlayer")
+    const post = vi.fn<(path: string, body: unknown) => Promise<void>>().mockResolvedValue(undefined)
+
+    // First engine instance plays song 42
+    const report1 = createPlayReport(post)
+    report1("42")
+    expect(post).toHaveBeenCalledOnce()
+
+    // Second engine instance (e.g. repeat-one re-creation) plays same song
+    const report2 = createPlayReport(post)
+    report2("42")
+    expect(post).toHaveBeenCalledTimes(2)
+    expect(post).toHaveBeenNthCalledWith(1, "/songs/42/played", {})
+    expect(post).toHaveBeenNthCalledWith(2, "/songs/42/played", {})
+  })
+})
 
 describe("repeat-one + crossfade config resolution", () => {
   beforeEach(() => {
