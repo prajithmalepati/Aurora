@@ -19,10 +19,12 @@ import { useSmartPlaylistStore } from "@/stores/smartPlaylistStore"
 import { PlaylistItem } from "@/components/playlists/PlaylistItem"
 import { BorderGlow } from "@/components/ui/BorderGlow"
 import { CreatePlaylistDialog } from "@/components/playlists/CreatePlaylistDialog"
+import { SmartPlaylistItem } from "@/components/smart-playlists/SmartPlaylistItem"
+import { SaveSmartPlaylistDialog } from "@/components/smart-playlists/SaveSmartPlaylistDialog"
 
 import { Skeleton } from "@/components/ui/skeleton"
 import { useState } from "react"
-import { Library, SlidersHorizontal, Plus, Settings, FolderOpen, Info, Disc3, Clock, Cloud, Sparkles } from "lucide-react"
+import { Library, SlidersHorizontal, Plus, Settings, FolderOpen, Info, Disc3, Clock, Cloud } from "lucide-react"
 import { AuroraWordmark } from "@/components/aurora/AuroraWordmark"
 
 function hexToGlowHSL(hex: string | null | undefined): string {
@@ -72,6 +74,21 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
   const sourceFilter = useSongStore((state) => state.sourceFilter)
   const enabledAddons = addons.filter((a) => a.enabled)
   const smartPlaylists = useSmartPlaylistStore((state) => state.smartPlaylists)
+  const beginEditing = useSmartPlaylistStore((s) => s.beginEditing)
+
+  const [renameDialogOpen, setRenameDialogOpen] = useState(false)
+
+  const handleSmartEditInMix = (sp: typeof smartPlaylists[number]) => {
+    setQuery(sp.query)
+    setIsQuickTagView(false)
+    beginEditing(sp)
+    onViewChange({ kind: "filter" })
+  }
+
+  const handleSmartRename = (sp: typeof smartPlaylists[number]) => {
+    beginEditing(sp)
+    setRenameDialogOpen(true)
+  }
 
   const handleTagClick = (tagName: string) => {
     const term = `"${tagName}"`
@@ -257,44 +274,14 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
               <div className="px-3 pb-1">
                 <div className="space-y-0.5">
                   {smartPlaylists.map((sp) => (
-                    <button
+                    <SmartPlaylistItem
                       key={sp.id}
-                      onClick={() => onViewChange({ kind: "smart-playlist", playlistId: sp.id })}
-                      className={`group relative w-full flex items-center gap-2 px-3 py-[6px] rounded-md text-left transition-colors duration-150 active:bg-white/[0.03] ${
-                        isActive({ kind: "smart-playlist", playlistId: sp.id })
-                          ? "text-[var(--aurora-text)] bg-white/[0.05]"
-                          : "text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)]"
-                      }`}
-                    >
-                      {isActive({ kind: "smart-playlist", playlistId: sp.id }) && (
-                        <span
-                          className="absolute inset-0 rounded-md pointer-events-none"
-                          style={{ background: "var(--aurora-surface)" }}
-                          aria-hidden="true"
-                        />
-                      )}
-                      <span
-                        className={`absolute inset-0 rounded-md transition-opacity duration-150 pointer-events-none ${
-                          isActive({ kind: "smart-playlist", playlistId: sp.id }) ? "opacity-0" : "opacity-0 group-hover:opacity-100"
-                        }`}
-                        style={{ background: "var(--aurora-surface-hover)" }}
-                        aria-hidden="true"
-                      />
-                      <span className="relative z-10 flex-shrink-0">
-                        <Sparkles
-                          className="h-3.5 w-3.5"
-                          strokeWidth={1.5}
-                          style={{
-                            color: isActive({ kind: "smart-playlist", playlistId: sp.id })
-                              ? "var(--aurora-accent-interactive)"
-                              : undefined,
-                          }}
-                        />
-                      </span>
-                      <span className="relative z-10 flex-1 min-w-0 truncate text-[13px] font-medium tracking-tight">
-                        {sp.emoji ? `${sp.emoji} ` : ""}{sp.name}
-                      </span>
-                    </button>
+                      sp={sp}
+                      isActive={isActive({ kind: "smart-playlist", playlistId: sp.id })}
+                      onSelect={() => onViewChange({ kind: "smart-playlist", playlistId: sp.id })}
+                      onEditInMix={handleSmartEditInMix}
+                      onRename={handleSmartRename}
+                    />
                   ))}
                 </div>
               </div>
@@ -381,6 +368,16 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
       <CreatePlaylistDialog
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
+      />
+
+      {/* Rename smart playlist dialog — reuses SaveSmartPlaylistDialog in edit mode */}
+      <SaveSmartPlaylistDialog
+        open={renameDialogOpen}
+        onOpenChange={(open) => {
+          setRenameDialogOpen(open)
+          if (!open) useSmartPlaylistStore.getState().cancelEditing()
+        }}
+        query=""
       />
 
     </>

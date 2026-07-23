@@ -5,7 +5,10 @@ import { buildSmartPlaylistQueue } from "@/lib/smartPlaylistQueue"
 import { api } from "@/lib/api"
 import { SongTable } from "@/components/songs/SongTable"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Sparkles, Play, Shuffle, AlertCircle } from "lucide-react"
+import { Sparkles, Play, Shuffle, AlertCircle, Pencil } from "lucide-react"
+import { useSmartPlaylistStore } from "@/stores/smartPlaylistStore"
+import { useFilterStore } from "@/stores/filterStore"
+import { useSongStore } from "@/stores/songStore"
 
 interface SmartPlaylistViewProps {
   playlistId: number
@@ -13,11 +16,22 @@ interface SmartPlaylistViewProps {
 
 export function SmartPlaylistView({ playlistId }: SmartPlaylistViewProps) {
   const playSong = usePlayerStore((s) => s.playSong)
+  const beginEditing = useSmartPlaylistStore((s) => s.beginEditing)
+  const setQuery = useFilterStore((s) => s.setQuery)
+  const setIsQuickTagView = useFilterStore((s) => s.setIsQuickTagView)
 
   const [definition, setDefinition] = useState<SmartPlaylistDefinition | null>(null)
   const [songs, setSongs] = useState<Song[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  const handleEditInMix = useCallback(() => {
+    if (!definition) return
+    setQuery(definition.query)
+    setIsQuickTagView(false)
+    beginEditing(definition)
+    useSongStore.getState().setView({ kind: "filter" })
+  }, [definition, setQuery, setIsQuickTagView, beginEditing])
 
   // Fetch definition + resolved songs on mount / ID change
   useEffect(() => {
@@ -112,6 +126,16 @@ export function SmartPlaylistView({ playlistId }: SmartPlaylistViewProps) {
             <Shuffle className="h-3.5 w-3.5" strokeWidth={1.5} />
             Shuffle
           </button>
+          {definition && (
+            <button
+              onClick={handleEditInMix}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full text-[12px] text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] transition-colors duration-150"
+              style={{ background: "var(--aurora-surface)", boxShadow: "inset 0 0 0 1px var(--aurora-rim)" }}
+            >
+              <Pencil className="h-3.5 w-3.5" strokeWidth={1.5} />
+              Edit in Mix
+            </button>
+          )}
         </div>
       )}
 
@@ -139,6 +163,16 @@ export function SmartPlaylistView({ playlistId }: SmartPlaylistViewProps) {
             <code className="text-[12px] font-mono text-[var(--aurora-text-tertiary)]">
               {definition.query}
             </code>
+          )}
+          {definition && (
+            <button
+              onClick={handleEditInMix}
+              className="mt-2 flex items-center gap-2 px-3 py-1.5 rounded-full text-[12px] text-[var(--aurora-text-secondary)] hover:text-[var(--aurora-text)] transition-colors duration-150"
+              style={{ background: "var(--aurora-surface)", boxShadow: "inset 0 0 0 1px var(--aurora-rim)" }}
+            >
+              <Pencil className="h-3.5 w-3.5" strokeWidth={1.5} />
+              Edit in Mix
+            </button>
           )}
         </div>
       ) : (
