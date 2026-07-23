@@ -882,6 +882,10 @@ pub fn add_song_to_playlist(conn: &Connection, playlist_id: i64, song_id: i64) -
     if !pl_exists {
         return Err(anyhow::anyhow!("playlist_not_found"));
     }
+    // Reject smart playlists — they have dynamic membership
+    if is_smart_playlist(conn, playlist_id)? {
+        return Err(anyhow::anyhow!("smart_playlist"));
+    }
     // Check song exists
     let song_exists: bool =
         conn.query_row("SELECT COUNT(*) FROM songs WHERE id = ?1", [song_id], |r| {
@@ -926,6 +930,10 @@ pub fn remove_song_from_playlist(conn: &Connection, playlist_id: i64, song_id: i
     )? > 0;
     if !pl_exists {
         return Err(anyhow::anyhow!("playlist_not_found"));
+    }
+    // Reject smart playlists — they have dynamic membership
+    if is_smart_playlist(conn, playlist_id)? {
+        return Err(anyhow::anyhow!("smart_playlist"));
     }
     // Check song
     let song_exists: bool =
@@ -972,6 +980,10 @@ pub fn reorder_playlist_songs(conn: &Connection, playlist_id: i64, song_ids: &[i
     if !pl_exists {
         return Err(anyhow::anyhow!("playlist_not_found"));
     }
+    // Reject smart playlists — they have dynamic membership
+    if is_smart_playlist(conn, playlist_id)? {
+        return Err(anyhow::anyhow!("smart_playlist"));
+    }
     // Get current song ids
     let mut stmt = conn
         .prepare("SELECT song_id FROM playlist_songs WHERE playlist_id = ?1 ORDER BY position")?;
@@ -1006,6 +1018,19 @@ pub fn update_song_timing(
     // Validate timing
     if start_time_ms > 0 && end_time_ms > 0 && start_time_ms >= end_time_ms {
         return Err(anyhow::anyhow!("invalid_timing"));
+    }
+    // Check playlist exists (needed for smart playlist guard ordering)
+    let pl_exists: bool = conn.query_row(
+        "SELECT COUNT(*) FROM playlists WHERE id = ?1",
+        [playlist_id],
+        |r| r.get::<_, i64>(0),
+    )? > 0;
+    if !pl_exists {
+        return Err(anyhow::anyhow!("not_in_playlist"));
+    }
+    // Reject smart playlists — they have dynamic membership
+    if is_smart_playlist(conn, playlist_id)? {
+        return Err(anyhow::anyhow!("smart_playlist"));
     }
     // Check link exists
     let link_exists: bool = conn.query_row(
@@ -2180,6 +2205,43 @@ pub fn delete_smart_playlist(conn: &Connection, playlist_id: i64) -> Result<bool
     // Delete the backing playlist — FK cascade removes the definition
     let affected = conn.execute("DELETE FROM playlists WHERE id = ?1", [playlist_id])?;
     Ok(affected > 0)
+}
+
+/// Resolve a smart playlist: load its stored query and run the filter engine.
+/// Returns `Ok(None)` if the ID is absent or refers to a manual playlist.
+/// Returns `Err` if the stored query cannot be parsed (degraded state).
+pub fn resolve_smart_playlist(
+    conn: &Connection,
+    playlist_id: i64,
+) -> Result<Option<Vec<serde_json::Value>>> {
+    use rusqlite::OptionalExtension;
+
+    let query: Option<String> = conn
+        .query_row(
+            "SELECT query FROM smart_playlist_definitions WHERE playlist_id = ?1",
+            [playlist_id],
+            |r| r.get(0),
+        )
+        .optional()?;
+
+    let query = match query {
+        Some(q) => q,
+        None => return Ok(None),
+    };
+
+    let songs = filter_songs(conn, &query)?;
+    Ok(Some(songs))
+}
+
+/// Check if a playlist_id is a smart playlist.
+/// Returns Ok(true) if smart, Ok(false) if manual or nonexistent.
+fn is_smart_playlist(conn: &Connection, playlist_id: i64) -> Result<bool> {
+    let count: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM smart_playlist_definitions WHERE playlist_id = ?1",
+        [playlist_id],
+        |r| r.get(0),
+    )?;
+    Ok(count > 0)
 }
 
 #[cfg(test)]

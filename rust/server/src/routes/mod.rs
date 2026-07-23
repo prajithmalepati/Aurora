@@ -21,7 +21,7 @@ pub use playlists::{
 };
 pub use smart_playlists::{
     create_smart_playlist, delete_smart_playlist, get_smart_playlist, list_smart_playlists,
-    update_smart_playlist,
+    resolve_smart_playlist, update_smart_playlist,
 };
 pub use songs::{album_art, bleed_thumb, create_song, delete_song, get_song, list_songs, mark_played, stream_song, update_song};
 pub use tags::{assign_tags, create_tag, delete_tag, list_tags, remove_tag};

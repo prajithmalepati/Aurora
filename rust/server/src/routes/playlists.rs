@@ -258,7 +258,9 @@ pub async fn add_song_to_playlist(
         }
         Err(e) => {
             let msg = e.to_string();
-            if msg.contains("playlist_not_found") {
+            if msg.contains("smart_playlist") {
+                (StatusCode::METHOD_NOT_ALLOWED, Json(serde_json::json!({"detail": "Cannot manually modify a smart playlist's songs"}))).into_response()
+            } else if msg.contains("playlist_not_found") {
                 envelope::not_found("Playlist not found").into_response()
             } else if msg.contains("song_not_found") {
                 envelope::not_found("Song not found").into_response()
@@ -287,7 +289,9 @@ pub async fn remove_song_from_playlist(
         }
         Err(e) => {
             let msg = e.to_string();
-            if msg.contains("playlist_not_found") {
+            if msg.contains("smart_playlist") {
+                (StatusCode::METHOD_NOT_ALLOWED, Json(serde_json::json!({"detail": "Cannot manually modify a smart playlist's songs"}))).into_response()
+            } else if msg.contains("playlist_not_found") {
                 envelope::not_found("Playlist not found").into_response()
             } else if msg.contains("song_not_found") {
                 envelope::not_found("Song not found").into_response()
@@ -322,7 +326,9 @@ pub async fn reorder_playlist_songs(
         }
         Err(e) => {
             let msg = e.to_string();
-            if msg.contains("playlist_not_found") {
+            if msg.contains("smart_playlist") {
+                (StatusCode::METHOD_NOT_ALLOWED, Json(serde_json::json!({"detail": "Cannot manually modify a smart playlist's songs"}))).into_response()
+            } else if msg.contains("playlist_not_found") {
                 envelope::not_found("Playlist not found").into_response()
             } else if msg.contains("id_mismatch") {
                 envelope::bad_request("song_ids doesn't match the actual songs in the playlist").into_response()
@@ -354,7 +360,9 @@ pub async fn update_song_timing(
         }
         Err(e) => {
             let msg = e.to_string();
-            if msg.contains("not_in_playlist") {
+            if msg.contains("smart_playlist") {
+                (StatusCode::METHOD_NOT_ALLOWED, Json(serde_json::json!({"detail": "Cannot manually modify a smart playlist's songs"}))).into_response()
+            } else if msg.contains("not_in_playlist") {
                 envelope::not_found("Song not in playlist").into_response()
             } else if msg.contains("invalid_timing") {
                 envelope::unprocessable("start_time_ms must be less than end_time_ms").into_response()

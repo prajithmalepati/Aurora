@@ -155,3 +155,28 @@ pub async fn delete_smart_playlist(
         }
     }
 }
+
+/// GET /api/smart-playlists/{id}/songs — resolve a smart playlist's songs dynamically.
+pub async fn resolve_smart_playlist(
+    State(state): State<Arc<AppState>>,
+    Path(playlist_id): Path<i64>,
+) -> Response {
+    let conn = state.conn.lock().await;
+    match aurora_core::db::queries::resolve_smart_playlist(&conn, playlist_id) {
+        Ok(Some(songs)) => {
+            let total = songs.len() as i64;
+            envelope::ok_meta(
+                Value::Array(songs),
+                "ok",
+                serde_json::json!({ "total": total }),
+            )
+            .into_response()
+        }
+        Ok(None) => envelope::not_found("Smart playlist not found").into_response(),
+        Err(e) => {
+            let msg = e.to_string();
+            // Filter engine errors map to 400
+            envelope::bad_request(&msg).into_response()
+        }
+    }
+}
