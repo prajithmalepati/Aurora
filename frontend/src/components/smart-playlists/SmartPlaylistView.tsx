@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react"
 import type { SmartPlaylistDefinition, ApiResponse, Song } from "@/types"
 import { usePlayerStore } from "@/stores/playerStore"
-import { isPlayable } from "@/stores/playerStore"
+import { buildSmartPlaylistQueue } from "@/lib/smartPlaylistQueue"
 import { api } from "@/lib/api"
 import { SongTable } from "@/components/songs/SongTable"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -46,7 +46,7 @@ export function SmartPlaylistView({ playlistId }: SmartPlaylistViewProps) {
     return () => { cancelled = true }
   }, [playlistId])
 
-  const playable = songs.filter(isPlayable)
+  const playable = buildSmartPlaylistQueue(songs)
 
   const handlePlay = useCallback(() => {
     if (playable.length > 0) {
@@ -63,9 +63,10 @@ export function SmartPlaylistView({ playlistId }: SmartPlaylistViewProps) {
 
   const handlePlaySong = useCallback(
     (song: Song) => {
-      playSong(song, songs, playlistId)
+      if (!playable.some((s) => s.id === song.id)) return
+      playSong(song, playable, playlistId)
     },
-    [playSong, songs, playlistId],
+    [playSong, playable, playlistId],
   )
 
   return (
