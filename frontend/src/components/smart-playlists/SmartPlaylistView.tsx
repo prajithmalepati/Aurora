@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react"
 import type { SmartPlaylistDefinition, ApiResponse, Song } from "@/types"
+import type { ListReadyState } from "@/stores/smartPlaylistStore"
 import { usePlayerStore } from "@/stores/playerStore"
 import { buildSmartPlaylistQueue } from "@/lib/smartPlaylistQueue"
 import { api } from "@/lib/api"
@@ -9,6 +10,60 @@ import { Sparkles, Play, Shuffle, AlertCircle, Pencil } from "lucide-react"
 import { useSmartPlaylistStore } from "@/stores/smartPlaylistStore"
 import { useFilterStore } from "@/stores/filterStore"
 import { useSongStore } from "@/stores/songStore"
+
+// ── Pure reconciliation helper (exported for testing) ───────────────────
+
+export type ReconcileAction =
+  | { kind: "none" }
+  | { kind: "update-definition"; definition: SmartPlaylistDefinition }
+  | { kind: "navigate-away" }
+
+/**
+ * Decide what to do when the store's authoritative smart-playlist list
+ * changes while a SmartPlaylistView is mounted.
+ *
+ * First-fetch safety: before the list is successfully fetched (idle or
+ * error), we never infer deletion — an empty array could be a loading
+ * state or a transient failure, not a confirmed absence.
+ */
+export function reconcileActiveSmartPlaylist(
+  activePlaylistId: number,
+  activeDefinition: SmartPlaylistDefinition | null,
+  smartPlaylists: SmartPlaylistDefinition[],
+  listReady: ListReadyState,
+): ReconcileAction {
+  // Only reconcile after a successful list fetch
+  if (listReady !== "ready") return { kind: "none" }
+
+  const storeDefinition = smartPlaylists.find((sp) => sp.id === activePlaylistId)
+
+  if (!storeDefinition) {
+    // Confirmed absent from a successful fetch → route away
+    return { kind: "navigate-away" }
+  }
+
+  // Present in list — check if definition changed
+  if (activeDefinition && definitionChanged(activeDefinition, storeDefinition)) {
+    return { kind: "update-definition", definition: storeDefinition }
+  }
+
+  return { kind: "none" }
+}
+
+/** Compare the fields the view header displays; ignore timestamps. */
+function definitionChanged(
+  local: SmartPlaylistDefinition,
+  store: SmartPlaylistDefinition,
+): boolean {
+  return (
+    local.name !== store.name ||
+    local.color !== store.color ||
+    local.emoji !== store.emoji ||
+    local.query !== store.query
+  )
+}
+
+// ── Component ───────────────────────────────────────────────────────────
 
 interface SmartPlaylistViewProps {
   playlistId: number
@@ -24,6 +79,26 @@ export function SmartPlaylistView({ playlistId }: SmartPlaylistViewProps) {
   const [songs, setSongs] = useState<Song[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // Subscribe to store's authoritative list + readiness
+  const smartPlaylists = useSmartPlaylistStore((s) => s.smartPlaylists)
+  const listReady = useSmartPlaylistStore((s) => s.listReady)
+
+  // Reconcile active view when store list changes
+  useEffect(() => {
+    const action = reconcileActiveSmartPlaylist(
+      playlistId,
+      definition,
+      smartPlaylists,
+      listReady,
+    )
+
+    if (action.kind === "navigate-away") {
+      useSongStore.getState().setView({ kind: "all-songs" })
+    } else if (action.kind === "update-definition") {
+      setDefinition(action.definition)
+    }
+  }, [playlistId, definition, smartPlaylists, listReady])
 
   const handleEditInMix = useCallback(() => {
     if (!definition) return

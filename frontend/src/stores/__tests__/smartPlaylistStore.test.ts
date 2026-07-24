@@ -269,6 +269,44 @@ describe("smartPlaylistStore", () => {
     expect(useSmartPlaylistStore.getState().editingSmartPlaylist).toBeNull()
   })
 
+  // ── listReady readiness signal ───────────────────────────────────
+
+  it("initial listReady is idle before any fetch", async () => {
+    const { useSmartPlaylistStore } = await import("@/stores/smartPlaylistStore")
+    expect(useSmartPlaylistStore.getState().listReady).toBe("idle")
+  })
+
+  it("successful fetch sets listReady to ready", async () => {
+    const defs = [makeDef(1, "A")]
+    vi.mocked(api.get).mockResolvedValue({ data: defs, message: "ok" })
+
+    const { useSmartPlaylistStore } = await import("@/stores/smartPlaylistStore")
+    await useSmartPlaylistStore.getState().fetchSmartPlaylists()
+
+    expect(useSmartPlaylistStore.getState().listReady).toBe("ready")
+  })
+
+  it("rejected fetch sets listReady to error", async () => {
+    vi.mocked(api.get).mockRejectedValue(new Error("down"))
+
+    const { useSmartPlaylistStore } = await import("@/stores/smartPlaylistStore")
+    await useSmartPlaylistStore.getState().fetchSmartPlaylists()
+
+    expect(useSmartPlaylistStore.getState().listReady).toBe("error")
+  })
+
+  it("listReady remains ready after successful mutation (create)", async () => {
+    vi.mocked(api.get).mockResolvedValue({ data: [makeDef(1, "A")], message: "ok" })
+    vi.mocked(api.post).mockResolvedValue({ data: makeDef(2, "B"), message: "ok" })
+
+    const { useSmartPlaylistStore } = await import("@/stores/smartPlaylistStore")
+    await useSmartPlaylistStore.getState().fetchSmartPlaylists()
+    expect(useSmartPlaylistStore.getState().listReady).toBe("ready")
+
+    await useSmartPlaylistStore.getState().createSmartPlaylist({ name: "B", query: 'tag:"B"' })
+    expect(useSmartPlaylistStore.getState().listReady).toBe("ready")
+  })
+
   // ── replacement semantics ────────────────────────────────────────
 
   it("consecutive mutations replace rather than append stale definitions", async () => {

@@ -16,10 +16,14 @@ interface UpdateSmartPlaylistPatch {
   query?: string
 }
 
+/** idle = never fetched; ready = last fetch succeeded; error = last fetch failed */
+export type ListReadyState = "idle" | "ready" | "error"
+
 interface SmartPlaylistState {
   smartPlaylists: SmartPlaylistDefinition[]
   loading: boolean
   error: string | null
+  listReady: ListReadyState
   editingSmartPlaylist: SmartPlaylistDefinition | null
 
   fetchSmartPlaylists: () => Promise<void>
@@ -34,16 +38,17 @@ export const useSmartPlaylistStore = create<SmartPlaylistState>((set) => ({
   smartPlaylists: [],
   loading: false,
   error: null,
+  listReady: "idle",
   editingSmartPlaylist: null,
 
   fetchSmartPlaylists: async () => {
     set({ loading: true, error: null })
     try {
       const res = await api.get<ApiResponse<SmartPlaylistDefinition[]>>("/smart-playlists")
-      set({ smartPlaylists: res.data, loading: false, error: null })
+      set({ smartPlaylists: res.data, loading: false, error: null, listReady: "ready" })
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Failed to fetch smart playlists"
-      set({ smartPlaylists: [], loading: false, error: message })
+      set({ smartPlaylists: [], loading: false, error: message, listReady: "error" })
     }
   },
 
