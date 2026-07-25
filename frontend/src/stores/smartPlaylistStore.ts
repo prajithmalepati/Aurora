@@ -34,6 +34,21 @@ interface SmartPlaylistState {
   cancelEditing: () => void
 }
 
+/**
+ * Monotonic generation counter. Incremented at the start of every
+ * `fetchSmartPlaylists()` call AND at the start of every successful
+ * mutation (create/update/delete). When a fetch resolves it compares
+ * its captured generation to the current value — a mismatch means a
+ * mutation committed while the fetch was in flight, so the stale
+ * response is silently discarded.
+ */
+let _fetchGeneration = 0
+
+/** Expose for tests only. */
+export function _getFetchGeneration(): number {
+  return _fetchGeneration
+}
+
 export const useSmartPlaylistStore = create<SmartPlaylistState>((set) => ({
   smartPlaylists: [],
   loading: false,
@@ -42,11 +57,16 @@ export const useSmartPlaylistStore = create<SmartPlaylistState>((set) => ({
   editingSmartPlaylist: null,
 
   fetchSmartPlaylists: async () => {
+    const gen = ++_fetchGeneration
     set({ loading: true, error: null })
     try {
       const res = await api.get<ApiResponse<SmartPlaylistDefinition[]>>("/smart-playlists")
+      // Discard stale success — a mutation committed after this fetch began
+      if (gen !== _fetchGeneration) return
       set({ smartPlaylists: res.data, loading: false, error: null, listReady: "ready" })
     } catch (e: unknown) {
+      // Discard stale failure — a mutation committed after this fetch began
+      if (gen !== _fetchGeneration) return
       const message = e instanceof Error ? e.message : "Failed to fetch smart playlists"
       set({ smartPlaylists: [], loading: false, error: message, listReady: "error" })
     }
@@ -57,6 +77,7 @@ export const useSmartPlaylistStore = create<SmartPlaylistState>((set) => ({
     try {
       const res = await api.post<ApiResponse<SmartPlaylistDefinition>>("/smart-playlists", input)
       const created = res.data
+      ++_fetchGeneration
       set((state) => ({
         smartPlaylists: [...state.smartPlaylists, created],
         editingSmartPlaylist: null,
@@ -75,6 +96,7 @@ export const useSmartPlaylistStore = create<SmartPlaylistState>((set) => ({
     try {
       const res = await api.put<ApiResponse<SmartPlaylistDefinition>>(`/smart-playlists/${id}`, patch)
       const updated = res.data
+      ++_fetchGeneration
       set((state) => ({
         smartPlaylists: state.smartPlaylists.map((sp) => (sp.id === id ? updated : sp)),
         editingSmartPlaylist: state.editingSmartPlaylist?.id === id ? null : state.editingSmartPlaylist,
@@ -92,6 +114,7 @@ export const useSmartPlaylistStore = create<SmartPlaylistState>((set) => ({
     set({ error: null })
     try {
       await api.delete<ApiResponse<{ deleted: true }>>(`/smart-playlists/${id}`)
+      ++_fetchGeneration
       set((state) => ({
         smartPlaylists: state.smartPlaylists.filter((sp) => sp.id !== id),
         editingSmartPlaylist: state.editingSmartPlaylist?.id === id ? null : state.editingSmartPlaylist,

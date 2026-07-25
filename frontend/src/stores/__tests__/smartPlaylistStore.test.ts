@@ -33,6 +33,17 @@ function makeDef(id: number, name: string, overrides?: Partial<{
   }
 }
 
+/** Create a deferred promise the test controls manually. */
+function deferred<T>() {
+  let resolve!: (v: T) => void
+  let reject!: (e: unknown) => void
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res
+    reject = rej
+  })
+  return { promise, resolve, reject }
+}
+
 describe("smartPlaylistStore", () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -328,5 +339,202 @@ describe("smartPlaylistStore", () => {
     await useSmartPlaylistStore.getState().deleteSmartPlaylist(1)
     expect(useSmartPlaylistStore.getState().smartPlaylists).toHaveLength(2)
     expect(useSmartPlaylistStore.getState().smartPlaylists.map(p => p.id)).toEqual([2, 3])
+  })
+
+  // ══════════════════════════════════════════════════════════════════
+  // ── Stale-fetch race tests (deferred-Promise controlled) ─────────
+  // ══════════════════════════════════════════════════════════════════
+
+  describe("stale fetch vs mutation races", () => {
+    it("stale fetch success after create: created item survives, stale list cannot mark ready", async () => {
+      const created = makeDef(2, "New One")
+      // Stale fetch returns only the pre-create list (missing the created item)
+      const staleList = [makeDef(1, "Existing")]
+
+      const fetchDeferred = deferred<{ data: typeof staleList; message: string }>()
+
+      vi.mocked(api.get).mockReturnValueOnce(fetchDeferred.promise as ReturnType<typeof api.get>)
+      vi.mocked(api.post).mockResolvedValue({ data: created, message: "created" })
+
+      const { useSmartPlaylistStore } = await import("@/stores/smartPlaylistStore")
+
+      // 1. Start initial fetch — promise is pending, store list still empty
+      const fetchPromise = useSmartPlaylistStore.getState().fetchSmartPlaylists()
+
+      // 2. Complete the create mutation while fetch is in flight
+      await useSmartPlaylistStore.getState().createSmartPlaylist({ name: "New One", query: 'tag:"new"' })
+      expect(useSmartPlaylistStore.getState().smartPlaylists).toContainEqual(created)
+      expect(useSmartPlaylistStore.getState().smartPlaylists).toHaveLength(1)
+
+      // 3. Now resolve the stale fetch (lacks the created item)
+      fetchDeferred.resolve({ data: staleList, message: "ok" })
+      await fetchPromise
+
+      // Assert: created item is NOT clobbered by the stale response
+      const state = useSmartPlaylistStore.getState()
+      expect(state.smartPlaylists).toContainEqual(created)
+      expect(state.smartPlaylists).toHaveLength(1)
+      // Stale fetch cannot mark listReady to ready
+      expect(state.listReady).toBe("idle")
+    })
+
+    it("stale fetch success after delete: deleted item not resurrected", async () => {
+      const initial = [makeDef(1, "Keep"), makeDef(2, "Gone")]
+      // Stale fetch still contains the deleted item
+      const staleList = [makeDef(1, "Keep"), makeDef(2, "Gone")]
+
+      const fetchDeferred = deferred<{ data: typeof staleList; message: string }>()
+
+      // First fetch succeeds normally
+      vi.mocked(api.get).mockResolvedValueOnce({ data: initial, message: "ok" })
+      vi.mocked(api.delete).mockResolvedValue({ data: { deleted: true }, message: "deleted" })
+
+      const { useSmartPlaylistStore } = await import("@/stores/smartPlaylistStore")
+      await useSmartPlaylistStore.getState().fetchSmartPlaylists()
+      expect(useSmartPlaylistStore.getState().listReady).toBe("ready")
+
+      // Start second fetch — deferred
+      vi.mocked(api.get).mockReturnValueOnce(fetchDeferred.promise as ReturnType<typeof api.get>)
+      const fetchPromise = useSmartPlaylistStore.getState().fetchSmartPlaylists()
+
+      // Delete item 2 while fetch is in flight
+      await useSmartPlaylistStore.getState().deleteSmartPlaylist(2)
+      expect(useSmartPlaylistStore.getState().smartPlaylists).toHaveLength(1)
+      expect(useSmartPlaylistStore.getState().smartPlaylists[0].id).toBe(1)
+
+      // Resolve stale fetch (still has item 2)
+      fetchDeferred.resolve({ data: staleList, message: "ok" })
+      await fetchPromise
+
+      // Assert: deleted item is NOT resurrected
+      const state = useSmartPlaylistStore.getState()
+      expect(state.smartPlaylists).toHaveLength(1)
+      expect(state.smartPlaylists[0].id).toBe(1)
+    })
+
+    it("stale fetch failure after mutation: mutation state and readiness preserved", async () => {
+      const initial = [makeDef(1, "A")]
+      const created = makeDef(2, "B")
+
+      const fetchDeferred = deferred<never>()
+
+      // First fetch succeeds
+      vi.mocked(api.get).mockResolvedValueOnce({ data: initial, message: "ok" })
+      vi.mocked(api.post).mockResolvedValue({ data: created, message: "created" })
+
+      const { useSmartPlaylistStore } = await import("@/stores/smartPlaylistStore")
+      await useSmartPlaylistStore.getState().fetchSmartPlaylists()
+      expect(useSmartPlaylistStore.getState().listReady).toBe("ready")
+
+      // Start second fetch — deferred
+      vi.mocked(api.get).mockReturnValueOnce(fetchDeferred.promise as ReturnType<typeof api.get>)
+      const fetchPromise = useSmartPlaylistStore.getState().fetchSmartPlaylists()
+
+      // Create while fetch in flight
+      await useSmartPlaylistStore.getState().createSmartPlaylist({ name: "B", query: 'tag:"B"' })
+      expect(useSmartPlaylistStore.getState().smartPlaylists).toHaveLength(2)
+
+      // Reject the stale fetch
+      fetchDeferred.reject(new Error("Network timeout"))
+      await fetchPromise
+
+      // Assert: mutation result preserved, readiness unchanged
+      const state = useSmartPlaylistStore.getState()
+      expect(state.smartPlaylists).toHaveLength(2)
+      expect(state.smartPlaylists).toContainEqual(created)
+      expect(state.listReady).toBe("ready") // not clobbered to "error"
+      expect(state.error).toBeNull()
+    })
+
+    it("non-stale successful fetch replaces list and marks ready", async () => {
+      const defs = [makeDef(1, "Fresh"), makeDef(2, "Data")]
+
+      vi.mocked(api.get).mockResolvedValue({ data: defs, message: "ok" })
+
+      const { useSmartPlaylistStore } = await import("@/stores/smartPlaylistStore")
+      await useSmartPlaylistStore.getState().fetchSmartPlaylists()
+
+      const state = useSmartPlaylistStore.getState()
+      expect(state.smartPlaylists).toEqual(defs)
+      expect(state.listReady).toBe("ready")
+      expect(state.error).toBeNull()
+    })
+
+    it("non-stale fetch failure sets error state", async () => {
+      vi.mocked(api.get).mockRejectedValue(new Error("Server down"))
+
+      const { useSmartPlaylistStore } = await import("@/stores/smartPlaylistStore")
+      await useSmartPlaylistStore.getState().fetchSmartPlaylists()
+
+      const state = useSmartPlaylistStore.getState()
+      expect(state.listReady).toBe("error")
+      expect(state.error).toBe("Server down")
+      expect(state.smartPlaylists).toEqual([])
+    })
+
+    it("stale fetch success after update: updated definition not reverted", async () => {
+      const original = makeDef(1, "Old Name", { query: 'tag:"rock"' })
+      const renamed = makeDef(1, "New Name", { query: 'tag:"rock"' })
+      const staleList = [makeDef(1, "Old Name", { query: 'tag:"rock"' })]
+
+      const fetchDeferred = deferred<{ data: typeof staleList; message: string }>()
+
+      // First fetch succeeds
+      vi.mocked(api.get).mockResolvedValueOnce({ data: [original], message: "ok" })
+      vi.mocked(api.put).mockResolvedValue({ data: renamed, message: "updated" })
+
+      const { useSmartPlaylistStore } = await import("@/stores/smartPlaylistStore")
+      await useSmartPlaylistStore.getState().fetchSmartPlaylists()
+
+      // Start second fetch — deferred
+      vi.mocked(api.get).mockReturnValueOnce(fetchDeferred.promise as ReturnType<typeof api.get>)
+      const fetchPromise = useSmartPlaylistStore.getState().fetchSmartPlaylists()
+
+      // Rename while fetch in flight
+      await useSmartPlaylistStore.getState().updateSmartPlaylist(1, { name: "New Name" })
+      expect(useSmartPlaylistStore.getState().smartPlaylists[0].name).toBe("New Name")
+
+      // Resolve stale fetch (still has old name)
+      fetchDeferred.resolve({ data: staleList, message: "ok" })
+      await fetchPromise
+
+      // Assert: rename NOT reverted
+      const state = useSmartPlaylistStore.getState()
+      expect(state.smartPlaylists[0].name).toBe("New Name")
+    })
+
+    it("mutation before initial fetch leaves listReady idle until non-stale fetch", async () => {
+      const created = makeDef(1, "First")
+      const serverList = [makeDef(1, "First")]
+
+      const fetchDeferred = deferred<{ data: typeof serverList; message: string }>()
+
+      vi.mocked(api.get).mockReturnValueOnce(fetchDeferred.promise as ReturnType<typeof api.get>)
+      vi.mocked(api.post).mockResolvedValue({ data: created, message: "created" })
+
+      const { useSmartPlaylistStore } = await import("@/stores/smartPlaylistStore")
+
+      // Start initial fetch — deferred
+      const fetchPromise = useSmartPlaylistStore.getState().fetchSmartPlaylists()
+      expect(useSmartPlaylistStore.getState().listReady).toBe("idle")
+
+      // Create while initial fetch in flight
+      await useSmartPlaylistStore.getState().createSmartPlaylist({ name: "First", query: 'tag:"first"' })
+      expect(useSmartPlaylistStore.getState().smartPlaylists).toContainEqual(created)
+
+      // Resolve stale initial fetch
+      fetchDeferred.resolve({ data: serverList, message: "ok" })
+      await fetchPromise
+
+      // listReady should remain idle — stale fetch cannot mark ready
+      expect(useSmartPlaylistStore.getState().listReady).toBe("idle")
+      // But the created item survives
+      expect(useSmartPlaylistStore.getState().smartPlaylists).toContainEqual(created)
+
+      // A fresh non-stale fetch should now mark ready
+      vi.mocked(api.get).mockResolvedValueOnce({ data: serverList, message: "ok" })
+      await useSmartPlaylistStore.getState().fetchSmartPlaylists()
+      expect(useSmartPlaylistStore.getState().listReady).toBe("ready")
+    })
   })
 })
