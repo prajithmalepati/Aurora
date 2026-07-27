@@ -69,7 +69,7 @@ describe("play-report: fire-once per engine instance", () => {
   it("Slice A: fresh reporter posts once for the given song", async () => {
     const { createPlayReport } = await import("@/hooks/useAudioPlayer")
     const post = vi.fn<(path: string, body: unknown) => Promise<void>>().mockResolvedValue(undefined)
-    const report = createPlayReport(post)
+    const [report] = createPlayReport(post)
 
     report("42")
 
@@ -80,7 +80,7 @@ describe("play-report: fire-once per engine instance", () => {
   it("Slice B1: second call on same reporter does not post again", async () => {
     const { createPlayReport } = await import("@/hooks/useAudioPlayer")
     const post = vi.fn<(path: string, body: unknown) => Promise<void>>().mockResolvedValue(undefined)
-    const report = createPlayReport(post)
+    const [report] = createPlayReport(post)
 
     report("42")
     report("42")  // resume after pause — same engine
@@ -91,7 +91,7 @@ describe("play-report: fire-once per engine instance", () => {
   it("Slice B2: rejected post is swallowed, does not throw", async () => {
     const { createPlayReport } = await import("@/hooks/useAudioPlayer")
     const post = vi.fn<(path: string, body: unknown) => Promise<unknown>>().mockRejectedValue(new Error("network"))
-    const report = createPlayReport(post)
+    const [report] = createPlayReport(post)
 
     // Must not throw
     expect(() => report("42")).not.toThrow()
@@ -108,16 +108,99 @@ describe("play-report: fire-once per engine instance", () => {
     const post = vi.fn<(path: string, body: unknown) => Promise<void>>().mockResolvedValue(undefined)
 
     // First engine instance plays song 42
-    const report1 = createPlayReport(post)
+    const [report1] = createPlayReport(post)
     report1("42")
     expect(post).toHaveBeenCalledOnce()
 
     // Second engine instance (e.g. repeat-one re-creation) plays same song
-    const report2 = createPlayReport(post)
+    const [report2] = createPlayReport(post)
     report2("42")
     expect(post).toHaveBeenCalledTimes(2)
     expect(post).toHaveBeenNthCalledWith(1, "/songs/42/played", {})
     expect(post).toHaveBeenNthCalledWith(2, "/songs/42/played", {})
+  })
+})
+
+describe("play-report: reset for same-engine repeat-one fallback (F1 regression)", () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it("Slice D: report once, suppressed, reset, report again", async () => {
+    const { createPlayReport } = await import("@/hooks/useAudioPlayer")
+    const post = vi.fn<(path: string, body: unknown) => Promise<void>>().mockResolvedValue(undefined)
+    const [report, reset] = createPlayReport(post)
+
+    // First play reports once
+    report("42")
+    expect(post).toHaveBeenCalledTimes(1)
+    expect(post).toHaveBeenCalledWith("/songs/42/played", {})
+
+    // Fire-once blocks subsequent calls (normal pause/resume)
+    report("42")
+    expect(post).toHaveBeenCalledTimes(1)
+
+    // Reset: re-arm for same-engine repeat-one natural-end fallback
+    reset()
+
+    // Next play reports exactly once more
+    report("42")
+    expect(post).toHaveBeenCalledTimes(2)
+    expect(post).toHaveBeenLastCalledWith("/songs/42/played", {})
+
+    // Fire-once blocks again after reset
+    report("42")
+    expect(post).toHaveBeenCalledTimes(2)
+  })
+
+  it("no reset means no extra report (bare seek / normal resume)", async () => {
+    const { createPlayReport } = await import("@/hooks/useAudioPlayer")
+    const post = vi.fn<(path: string, body: unknown) => Promise<void>>().mockResolvedValue(undefined)
+    const [report] = createPlayReport(post)
+
+    report("42")
+    expect(post).toHaveBeenCalledTimes(1)
+
+    // Without reset(), repeated calls are suppressed — bare seek / resume
+    report("42")
+    report("42")
+    expect(post).toHaveBeenCalledTimes(1)
+  })
+
+  it("multiple resets each permit exactly one additional report", async () => {
+    const { createPlayReport } = await import("@/hooks/useAudioPlayer")
+    const post = vi.fn<(path: string, body: unknown) => Promise<void>>().mockResolvedValue(undefined)
+    const [report, reset] = createPlayReport(post)
+
+    report("42")
+    expect(post).toHaveBeenCalledTimes(1)
+
+    // First repeat-one loop
+    reset()
+    report("42")
+    expect(post).toHaveBeenCalledTimes(2)
+
+    // Second repeat-one loop
+    reset()
+    report("42")
+    expect(post).toHaveBeenCalledTimes(3)
+
+    // Still fire-once after each reset
+    report("42")
+    expect(post).toHaveBeenCalledTimes(3)
+  })
+
+  it("reset + different song still posts the correct song id", async () => {
+    const { createPlayReport } = await import("@/hooks/useAudioPlayer")
+    const post = vi.fn<(path: string, body: unknown) => Promise<void>>().mockResolvedValue(undefined)
+    const [report, reset] = createPlayReport(post)
+
+    report("42")
+    reset()
+    report("99")
+    expect(post).toHaveBeenCalledTimes(2)
+    expect(post).toHaveBeenNthCalledWith(1, "/songs/42/played", {})
+    expect(post).toHaveBeenNthCalledWith(2, "/songs/99/played", {})
   })
 })
 
