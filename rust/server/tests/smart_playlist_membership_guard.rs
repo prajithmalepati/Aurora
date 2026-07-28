@@ -112,7 +112,7 @@ async fn create_manual_playlist(app: &axum::Router, name: &str) -> i64 {
 // ── Slice C: Membership guard — smart playlist mutations must 409 ─────
 
 #[tokio::test]
-async fn add_song_to_smart_playlist_returns_405() {
+async fn add_song_to_smart_playlist_returns_409() {
     let (app, state) = build_app_with_state();
     { let conn = state.conn.lock().await; seed_songs(&conn); }
 
@@ -127,7 +127,7 @@ async fn add_song_to_smart_playlist_returns_405() {
 }
 
 #[tokio::test]
-async fn remove_song_from_smart_playlist_returns_405() {
+async fn remove_song_from_smart_playlist_returns_409() {
     let (app, state) = build_app_with_state();
     { let conn = state.conn.lock().await; seed_songs(&conn); }
 
@@ -141,7 +141,7 @@ async fn remove_song_from_smart_playlist_returns_405() {
 }
 
 #[tokio::test]
-async fn reorder_smart_playlist_songs_returns_405() {
+async fn reorder_smart_playlist_songs_returns_409() {
     let (app, state) = build_app_with_state();
     { let conn = state.conn.lock().await; seed_songs(&conn); }
 
@@ -156,7 +156,7 @@ async fn reorder_smart_playlist_songs_returns_405() {
 }
 
 #[tokio::test]
-async fn update_timing_on_smart_playlist_returns_405() {
+async fn update_timing_on_smart_playlist_returns_409() {
     let (app, state) = build_app_with_state();
     { let conn = state.conn.lock().await; seed_songs(&conn); }
 
