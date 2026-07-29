@@ -12,6 +12,21 @@ import {
 import { useSmartPlaylistStore } from "@/stores/smartPlaylistStore"
 import { toast } from "@/lib/toast"
 
+/** Build the PATCH payload for updating an existing smart playlist. */
+export function buildUpdatePatch(fields: {
+  name: string
+  color: string
+  emoji: string
+  query: string
+}): { name: string; color: string | null; emoji: string | null; query: string } {
+  return {
+    name: fields.name.trim(),
+    color: fields.color.trim() || null,
+    emoji: fields.emoji.trim() || null,
+    query: fields.query,
+  }
+}
+
 // Preset color swatches — aurora palette, matching CreatePlaylistDialog
 const PRESET_COLORS = [
   { hex: "#5eead4", name: "teal" },
@@ -27,7 +42,7 @@ const PRESET_COLORS = [
 interface SaveSmartPlaylistDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  /** The raw query being saved. Required for create; ignored for edit (edit uses stored query). */
+  /** The raw query being saved or edited. */
   query: string
   /** Called after a successful create so the parent can navigate to the new view. */
   onCreated?: (definition: { id: number }) => void
@@ -73,11 +88,7 @@ export function SaveSmartPlaylistDialog({ open, onOpenChange, query, onCreated }
     setSubmitting(true)
     try {
       if (isEditing) {
-        await updateSmartPlaylist(editingSmartPlaylist.id, {
-          name: name.trim(),
-          color: color.trim() || null,
-          emoji: emoji.trim() || null,
-        })
+        await updateSmartPlaylist(editingSmartPlaylist.id, buildUpdatePatch({ name, color, emoji, query }))
         toast.success("Smart playlist updated")
         onOpenChange(false)
       } else {
@@ -122,7 +133,7 @@ export function SaveSmartPlaylistDialog({ open, onOpenChange, query, onCreated }
             <DialogTitle>{isEditing ? "Edit smart playlist" : "Save mix"}</DialogTitle>
             <DialogDescription>
               {isEditing
-                ? "Update the name, color, or emoji for this smart playlist."
+                ? "Update the name, color, emoji, or query for this smart playlist."
                 : "Give this query a name to save it as a smart playlist."}
             </DialogDescription>
           </DialogHeader>
@@ -183,7 +194,7 @@ export function SaveSmartPlaylistDialog({ open, onOpenChange, query, onCreated }
             <div className="space-y-2">
               <label className="label-micro text-[9.5px]">Query</label>
               <div className="rounded-md px-3 py-2 text-[12px] font-mono text-[var(--aurora-text-tertiary)] break-all" style={{ background: "var(--aurora-surface)" }}>
-                {isEditing ? editingSmartPlaylist.query : query}
+                {query}
               </div>
             </div>
 
