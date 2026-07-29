@@ -3,7 +3,7 @@
 //! TDD: tests written before implementation.
 //!
 //! Smart playlists are dynamic-only — manual membership mutations must
-//! return 405 METHOD_NOT_ALLOWED for smart playlist IDs.
+//! return 409 CONFLICT for smart playlist IDs.
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
@@ -109,10 +109,10 @@ async fn create_manual_playlist(app: &axum::Router, name: &str) -> i64 {
     v["data"]["id"].as_i64().unwrap()
 }
 
-// ── Slice C: Membership guard — smart playlist mutations must 405 ─────
+// ── Slice C: Membership guard — smart playlist mutations must 409 ─────
 
 #[tokio::test]
-async fn add_song_to_smart_playlist_returns_405() {
+async fn add_song_to_smart_playlist_returns_409() {
     let (app, state) = build_app_with_state();
     { let conn = state.conn.lock().await; seed_songs(&conn); }
 
@@ -120,28 +120,28 @@ async fn add_song_to_smart_playlist_returns_405() {
 
     let body = serde_json::json!({ "song_id": 1 });
     let (status, resp) = send(&app, post_json(&format!("/api/playlists/{sp_id}/songs"), &body)).await;
-    assert_eq!(status, 405, "POST songs to smart playlist must return 405: {resp}");
+    assert_eq!(status, 409, "POST songs to smart playlist must return 409: {resp}");
 
     let v: Value = serde_json::from_str(&resp).unwrap();
     assert_eq!(v["detail"], "Cannot manually modify a smart playlist's songs");
 }
 
 #[tokio::test]
-async fn remove_song_from_smart_playlist_returns_405() {
+async fn remove_song_from_smart_playlist_returns_409() {
     let (app, state) = build_app_with_state();
     { let conn = state.conn.lock().await; seed_songs(&conn); }
 
     let sp_id = create_smart_playlist(&app, "Rock SP", "rock").await;
 
     let (status, resp) = send(&app, delete(&format!("/api/playlists/{sp_id}/songs/1"))).await;
-    assert_eq!(status, 405, "DELETE song from smart playlist must return 405: {resp}");
+    assert_eq!(status, 409, "DELETE song from smart playlist must return 409: {resp}");
 
     let v: Value = serde_json::from_str(&resp).unwrap();
     assert_eq!(v["detail"], "Cannot manually modify a smart playlist's songs");
 }
 
 #[tokio::test]
-async fn reorder_smart_playlist_songs_returns_405() {
+async fn reorder_smart_playlist_songs_returns_409() {
     let (app, state) = build_app_with_state();
     { let conn = state.conn.lock().await; seed_songs(&conn); }
 
@@ -149,14 +149,14 @@ async fn reorder_smart_playlist_songs_returns_405() {
 
     let body = serde_json::json!({ "song_ids": [1, 2, 3] });
     let (status, resp) = send(&app, put_json(&format!("/api/playlists/{sp_id}/songs/reorder"), &body)).await;
-    assert_eq!(status, 405, "PUT reorder smart playlist must return 405: {resp}");
+    assert_eq!(status, 409, "PUT reorder smart playlist must return 409: {resp}");
 
     let v: Value = serde_json::from_str(&resp).unwrap();
     assert_eq!(v["detail"], "Cannot manually modify a smart playlist's songs");
 }
 
 #[tokio::test]
-async fn update_timing_on_smart_playlist_returns_405() {
+async fn update_timing_on_smart_playlist_returns_409() {
     let (app, state) = build_app_with_state();
     { let conn = state.conn.lock().await; seed_songs(&conn); }
 
@@ -164,7 +164,7 @@ async fn update_timing_on_smart_playlist_returns_405() {
 
     let body = serde_json::json!({ "start_time_ms": 0, "end_time_ms": 60000 });
     let (status, resp) = send(&app, patch_json(&format!("/api/playlists/{sp_id}/songs/1/timing"), &body)).await;
-    assert_eq!(status, 405, "PATCH timing on smart playlist must return 405: {resp}");
+    assert_eq!(status, 409, "PATCH timing on smart playlist must return 409: {resp}");
 
     let v: Value = serde_json::from_str(&resp).unwrap();
     assert_eq!(v["detail"], "Cannot manually modify a smart playlist's songs");

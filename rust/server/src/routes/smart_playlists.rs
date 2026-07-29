@@ -157,26 +157,46 @@ pub async fn delete_smart_playlist(
 }
 
 /// GET /api/smart-playlists/{id}/songs — resolve a smart playlist's songs dynamically.
+/// F3: pre-validate the stored query before calling resolve to avoid leaking
+/// FilterError details (erased into anyhow by queries::resolve_smart_playlist).
 pub async fn resolve_smart_playlist(
     State(state): State<Arc<AppState>>,
     Path(playlist_id): Path<i64>,
 ) -> Response {
     let conn = state.conn.lock().await;
-    match aurora_core::db::queries::resolve_smart_playlist(&conn, playlist_id) {
-        Ok(Some(songs)) => {
-            let total = songs.len() as i64;
-            envelope::ok_meta(
-                Value::Array(songs),
-                "ok",
-                serde_json::json!({ "total": total }),
-            )
-            .into_response()
-        }
+    // Step 1: load definition (not resolve) to validate the query first
+    match aurora_core::db::queries::get_smart_playlist(&conn, playlist_id) {
         Ok(None) => envelope::not_found("Smart playlist not found").into_response(),
-        Err(e) => {
-            let msg = e.to_string();
-            // Filter engine errors map to 400
-            envelope::bad_request(&msg).into_response()
+        Err(_) => {
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({
+                "detail": "Unable to resolve smart playlist"
+            }))).into_response()
+        }
+        Ok(Some(def)) => {
+            // Step 2: validate the stored query is parseable
+            let query = def.get("query").and_then(|v| v.as_str()).unwrap_or("");
+            if aurora_core::filter::parse(query).is_err() {
+                return (StatusCode::BAD_REQUEST, Json(serde_json::json!({
+                    "detail": "Smart playlist query is invalid"
+                }))).into_response();
+            }
+            // Step 3: resolve — map ALL remaining errors to a fixed 500
+            match aurora_core::db::queries::resolve_smart_playlist(&conn, playlist_id) {
+                Ok(Some(songs)) => {
+                    let total = songs.len() as i64;
+                    envelope::ok_meta(
+                        Value::Array(songs),
+                        "ok",
+                        serde_json::json!({ "total": total }),
+                    ).into_response()
+                }
+                Ok(None) => envelope::not_found("Smart playlist not found").into_response(),
+                Err(_) => {
+                    (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({
+                        "detail": "Unable to resolve smart playlist"
+                    }))).into_response()
+                }
+            }
         }
     }
 }

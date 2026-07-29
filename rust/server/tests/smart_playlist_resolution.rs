@@ -286,7 +286,41 @@ async fn resolve_invalid_stored_query_returns_400() {
 
     let v: Value = serde_json::from_str(&body).unwrap();
     let detail = v["detail"].as_str().unwrap();
-    // Must contain parse error info but NOT leak internal details
-    assert!(detail.contains("Invalid query") || detail.contains("Unexpected"),
-            "error detail should mention invalid query: {detail}");
+    // F3: exact fixed string, no raw error leaking
+    assert_eq!(detail, "Smart playlist query is invalid");
+}
+
+#[tokio::test]
+async fn resolve_smart_playlist_db_error_returns_500() {
+    let (app, state) = build_app_with_state();
+    {
+        let conn = state.conn.lock().await;
+        seed_songs_and_tags(&conn);
+
+        // Create a backing playlist
+        conn.execute(
+            "INSERT INTO playlists (id, name, created_at, updated_at) VALUES (101, 'Good SP', '2025-01-01T00:00:00Z', '2025-01-01T00:00:00Z')",
+            [],
+        ).unwrap();
+
+        // Insert a valid smart definition
+        conn.execute(
+            "INSERT INTO smart_playlist_definitions (playlist_id, query, created_at, updated_at) \
+             VALUES (101, 'rock', '2025-01-01T00:00:00Z', '2025-01-01T00:00:00Z')",
+            [],
+        ).unwrap();
+
+        // Drop the songs table so resolve fails at execution time
+        conn.execute("DROP TABLE songs", []).unwrap();
+    }
+
+    let (status, body) = send(&app, get("/api/smart-playlists/101/songs")).await;
+    assert_eq!(status, 500, "DB error during resolve must return 500: {body}");
+
+    let v: Value = serde_json::from_str(&body).unwrap();
+    let detail = v["detail"].as_str().unwrap();
+    // F3: exact fixed string, no SQL/schema text leaking
+    assert_eq!(detail, "Unable to resolve smart playlist");
+    // Must NOT contain raw SQL or schema details
+    assert!(!detail.contains("no such table"), "must not leak SQL error: {detail}");
 }

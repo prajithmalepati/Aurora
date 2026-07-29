@@ -12,18 +12,21 @@ import type { PlaybackEngine, PlaybackSource } from "@/types/playback"
 import type { Song } from "@/types"
 
 /** Create a fire-once reporter for a single engine-instance playback start.
- *  Each call to createPlayReport returns a new reporter bound to exactly one
- *  engine instance.  The reporter posts once and silently ignores subsequent
- *  calls and network errors. */
+ *  Each call to createPlayReport returns a [report, reset] tuple bound to
+ *  exactly one engine instance.  The reporter posts once and silently ignores
+ *  subsequent calls and network errors.  reset() re-arms the reporter for
+ *  the same engine instance (used by repeat-one natural-end fallback). */
 export function createPlayReport(
   post: (path: string, body: unknown) => Promise<unknown>,
-): (songId: string) => void {
+): [(songId: string) => void, () => void] {
   let reported = false
-  return (songId: string) => {
+  const report = (songId: string) => {
     if (reported) return
     reported = true
     post(`/songs/${songId}/played`, {}).catch(() => {})
   }
+  const reset = () => { reported = false }
+  return [report, reset]
 }
 
 /** Build the PlaybackSource for a library song. URL resolution lives here —
@@ -155,7 +158,7 @@ export function useAudioPlayer() {
   /** Attach all event handlers (play, pause, end, load, errors, buffering) to an
    *  engine. Used for both newly created and promoted preloaded engines. */
   function bindEngineHandlers(engine: PlaybackEngine, songId: string) {
-    const report = createPlayReport(api.post.bind(api))
+    const [report, resetReport] = createPlayReport(api.post.bind(api))
 
     engine.on("buffering", (buffering) => {
       usePlayerStore.getState().setIsBuffering(buffering)
@@ -399,7 +402,10 @@ export function useAudioPlayer() {
           engine.stop()
           engine.unload()
         } else {
-          // No preload available — fall back to seek+play (small gap)
+          // No preload available — fall back to seek+play (small gap).
+          // resetReport re-arms the telemetry reporter so the repeat-one
+          // loop count is deterministic (F1).
+          resetReport()
           engine.seek(startSec)
           engine.play()
           updateSeek(startSec)
