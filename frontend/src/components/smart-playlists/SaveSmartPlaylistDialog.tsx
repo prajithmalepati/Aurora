@@ -12,6 +12,15 @@ import {
 import { useSmartPlaylistStore } from "@/stores/smartPlaylistStore"
 import { toast } from "@/lib/toast"
 
+/**
+ * Resolve the effective query for an edit PATCH.
+ * Returns the supplied query unchanged if nonblank (after trim);
+ * otherwise falls back to the stored query from the smart playlist.
+ */
+export function resolveEditQuery(supplied: string, stored: string): string {
+  return supplied.trim() ? supplied : stored
+}
+
 /** Build the PATCH payload for updating an existing smart playlist. */
 export function buildUpdatePatch(fields: {
   name: string
@@ -54,6 +63,7 @@ export function SaveSmartPlaylistDialog({ open, onOpenChange, query, onCreated }
   const updateSmartPlaylist = useSmartPlaylistStore((s) => s.updateSmartPlaylist)
 
   const isEditing = editingSmartPlaylist !== null
+  const effectiveQuery = isEditing ? resolveEditQuery(query, editingSmartPlaylist.query) : query
 
   const [name, setName] = useState("")
   const [color, setColor] = useState("")
@@ -88,7 +98,7 @@ export function SaveSmartPlaylistDialog({ open, onOpenChange, query, onCreated }
     setSubmitting(true)
     try {
       if (isEditing) {
-        await updateSmartPlaylist(editingSmartPlaylist.id, buildUpdatePatch({ name, color, emoji, query }))
+        await updateSmartPlaylist(editingSmartPlaylist.id, buildUpdatePatch({ name, color, emoji, query: effectiveQuery }))
         toast.success("Smart playlist updated")
         onOpenChange(false)
       } else {
@@ -194,7 +204,7 @@ export function SaveSmartPlaylistDialog({ open, onOpenChange, query, onCreated }
             <div className="space-y-2">
               <label className="label-micro text-[9.5px]">Query</label>
               <div className="rounded-md px-3 py-2 text-[12px] font-mono text-[var(--aurora-text-tertiary)] break-all" style={{ background: "var(--aurora-surface)" }}>
-                {query}
+                {effectiveQuery}
               </div>
             </div>
 
