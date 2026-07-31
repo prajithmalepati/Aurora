@@ -186,6 +186,17 @@ export interface WatchedFolder {
 
 // ── Addon types ─────────────────────────────────────────────────────────
 
+export interface SmartPlaylistDefinition {
+  id: number
+  name: string
+  color: string | null
+  emoji: string | null
+  image_url: string | null
+  query: string
+  created_at: string
+  updated_at: string
+}
+
 export interface Addon {
   id: string
   base_url: string

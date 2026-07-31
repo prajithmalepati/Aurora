@@ -11,6 +11,7 @@ type View =
   | { kind: "recently-added" }
   | { kind: "filter" }
   | { kind: "playlist"; playlistId: number }
+  | { kind: "smart-playlist"; playlistId: number }
   | { kind: "albums" }
   | { kind: "folders" }
   | { kind: "settings" }
@@ -263,7 +264,8 @@ export const useSongStore = create<SongState>((set, get) => ({
     const current = get().view
     // Same-view re-click: signal scroll-to-top instead of re-setting view
     const isSame = view.kind === current.kind &&
-      (view.kind !== "playlist" || current.kind !== "playlist" || view.playlistId === current.playlistId)
+      (view.kind !== "playlist" || current.kind !== "playlist" || view.playlistId === current.playlistId) &&
+      (view.kind !== "smart-playlist" || current.kind !== "smart-playlist" || view.playlistId === current.playlistId)
     if (isSame) {
       set((s) => ({ scrollToTop: s.scrollToTop + 1 }))
       return

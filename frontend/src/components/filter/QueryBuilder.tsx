@@ -6,9 +6,12 @@ import { usePlayerStore } from "@/stores/playerStore"
 import { QueryInput, validateQuery } from "./QueryInput"
 import { AutocompleteDropdown, type SuggestionItem } from "./AutocompleteDropdown"
 import { SongTable } from "@/components/songs/SongTable"
-import { Search, X, Shuffle, Sparkles, SlidersHorizontal, Tag } from "lucide-react"
+import { Search, X, Shuffle, Sparkles, SlidersHorizontal, Tag, Bookmark } from "lucide-react"
 import type { Song } from "@/types"
 import { parseChipStates, type ChipState, isAtomRepresentable } from "@/lib/chipState"
+import { useSmartPlaylistStore } from "@/stores/smartPlaylistStore"
+import { useSongStore } from "@/stores/songStore"
+import { SaveSmartPlaylistDialog } from "@/components/smart-playlists/SaveSmartPlaylistDialog"
 
 const OPERATORS = ["AND", "OR", "NOT", "(", ")"] as const
 
@@ -43,6 +46,11 @@ export function QueryBuilder() {
   const playSong = usePlayerStore((state) => state.playSong)
   const tags = useTagStore((state) => state.tags)
   const playlists = usePlaylistStore((state) => state.playlists)
+
+  // Smart playlist editing state
+  const editingSmartPlaylist = useSmartPlaylistStore((s) => s.editingSmartPlaylist)
+  const cancelEditing = useSmartPlaylistStore((s) => s.cancelEditing)
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false)
 
   // Derive chip states from query + known atoms
   const knownAtomNames = useMemo(
@@ -349,16 +357,50 @@ export function QueryBuilder() {
         <p className="text-[var(--aurora-danger)] text-[11px] px-1 mt-1.5">{error}</p>
       )}
 
-      {/* Row 3 — Primary Jam button (inline, between query bar and results) */}
-      <div className="flex items-center justify-end mt-4">
-        <button
-          onClick={jamFilter}
-          disabled={loading || !query.trim()}
-          className="mix-jam-primary aurora-btn-press"
-        >
-          <Sparkles className="h-[18px] w-[18px]" strokeWidth={2} />
-          <span className="font-display text-[18px] font-medium leading-none">Jam</span>
-        </button>
+      {/* Row 3 — Primary Jam button + Save affordance (inline, between query bar and results) */}
+      <div className="flex items-center justify-between mt-4 gap-3">
+        {/* Left: editing indicator */}
+        <div className="flex items-center gap-2 min-w-0">
+          {editingSmartPlaylist && (
+            <span className="flex items-center gap-2 text-[12px] text-[var(--aurora-text-secondary)]">
+              <span className="truncate">Editing <strong className="text-[var(--aurora-text)]">{editingSmartPlaylist.name}</strong></span>
+              <button
+                onClick={cancelEditing}
+                className="flex-shrink-0 text-[var(--aurora-text-tertiary)] hover:text-[var(--aurora-text)] transition-colors duration-150"
+                aria-label="Cancel editing"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          )}
+        </div>
+
+        {/* Right: Save + Jam */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {(editingSmartPlaylist || (query.trim() && !error && results.length > 0)) && (
+            <button
+              onClick={() => setSaveDialogOpen(true)}
+              disabled={loading || !query.trim()}
+              className="h-8 px-4 rounded-full text-[12px] font-semibold inline-flex items-center gap-1.5 flex-shrink-0 transition-colors duration-150 aurora-btn-press hover:text-[var(--aurora-text)] disabled:opacity-40"
+              style={{
+                background: "var(--aurora-surface)",
+                boxShadow: "inset 0 0 0 1px var(--aurora-rim)",
+                color: "var(--aurora-text-secondary)",
+              }}
+            >
+              <Bookmark className="h-3 w-3" strokeWidth={2} />
+              {editingSmartPlaylist ? "Save changes" : "Save mix"}
+            </button>
+          )}
+          <button
+            onClick={jamFilter}
+            disabled={loading || !query.trim()}
+            className="mix-jam-primary aurora-btn-press"
+          >
+            <Sparkles className="h-[18px] w-[18px]" strokeWidth={2} />
+            <span className="font-display text-[18px] font-medium leading-none">Jam</span>
+          </button>
+        </div>
       </div>
 
       {/* Sentinel — IntersectionObserver watches this to trigger floating zone */}
@@ -418,6 +460,16 @@ export function QueryBuilder() {
           <span className="font-display text-[18px] font-medium leading-none">Jam</span>
         </button>
       </div>
+
+      {/* Save Smart Playlist Dialog */}
+      <SaveSmartPlaylistDialog
+        open={saveDialogOpen}
+        onOpenChange={setSaveDialogOpen}
+        query={query}
+        onCreated={(def) => {
+          useSongStore.getState().setView({ kind: "smart-playlist", playlistId: def.id })
+        }}
+      />
     </div>
   )
 }

@@ -3,6 +3,7 @@ type View =
   | { kind: "recently-added" }
   | { kind: "filter" }
   | { kind: "playlist"; playlistId: number }
+  | { kind: "smart-playlist"; playlistId: number }
   | { kind: "albums" }
   | { kind: "folders" }
   | { kind: "settings" }
@@ -14,9 +15,12 @@ import { useFilterStore } from "@/stores/filterStore"
 import { useUpdateStore } from "@/stores/updateStore"
 import { useAddonStore } from "@/stores/addonStore"
 import { useSongStore } from "@/stores/songStore"
+import { useSmartPlaylistStore } from "@/stores/smartPlaylistStore"
 import { PlaylistItem } from "@/components/playlists/PlaylistItem"
 import { BorderGlow } from "@/components/ui/BorderGlow"
 import { CreatePlaylistDialog } from "@/components/playlists/CreatePlaylistDialog"
+import { SmartPlaylistItem } from "@/components/smart-playlists/SmartPlaylistItem"
+import { SaveSmartPlaylistDialog } from "@/components/smart-playlists/SaveSmartPlaylistDialog"
 
 import { Skeleton } from "@/components/ui/skeleton"
 import { useState } from "react"
@@ -69,6 +73,22 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
   const setSourceFilter = useSongStore((state) => state.setSourceFilter)
   const sourceFilter = useSongStore((state) => state.sourceFilter)
   const enabledAddons = addons.filter((a) => a.enabled)
+  const smartPlaylists = useSmartPlaylistStore((state) => state.smartPlaylists)
+  const beginEditing = useSmartPlaylistStore((s) => s.beginEditing)
+
+  const [renameDialogOpen, setRenameDialogOpen] = useState(false)
+
+  const handleSmartEditInMix = (sp: typeof smartPlaylists[number]) => {
+    setQuery(sp.query)
+    setIsQuickTagView(false)
+    beginEditing(sp)
+    onViewChange({ kind: "filter" })
+  }
+
+  const handleSmartRename = (sp: typeof smartPlaylists[number]) => {
+    beginEditing(sp)
+    setRenameDialogOpen(true)
+  }
 
   const handleTagClick = (tagName: string) => {
     const term = `"${tagName}"`
@@ -82,6 +102,9 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
 
   const isActive = (view: View) => {
     if (view.kind === "playlist" && currentView.kind === "playlist") {
+      return currentView.playlistId === view.playlistId
+    }
+    if (view.kind === "smart-playlist" && currentView.kind === "smart-playlist") {
       return currentView.playlistId === view.playlistId
     }
     return currentView.kind === view.kind
@@ -238,6 +261,33 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
             )}
           </div>
 
+          {/* Smart Playlists — conditional, between manual Playlists and Tags */}
+          {smartPlaylists.length > 0 && (
+            <>
+              <div className="aurora-divider-h mx-6 my-4" />
+              <div className="px-6 mb-2 flex items-center justify-between">
+                <span className="label-micro">Smart</span>
+                <span className="text-[10px] text-[var(--aurora-text-tertiary)] tabular-nums">
+                  {smartPlaylists.length}
+                </span>
+              </div>
+              <div className="px-3 pb-1">
+                <div className="space-y-0.5">
+                  {smartPlaylists.map((sp) => (
+                    <SmartPlaylistItem
+                      key={sp.id}
+                      sp={sp}
+                      isActive={isActive({ kind: "smart-playlist", playlistId: sp.id })}
+                      onSelect={() => onViewChange({ kind: "smart-playlist", playlistId: sp.id })}
+                      onEditInMix={handleSmartEditInMix}
+                      onRename={handleSmartRename}
+                    />
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+
           {/* Divider between sections */}
           <div className="aurora-divider-h mx-6 my-4" />
 
@@ -318,6 +368,16 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
       <CreatePlaylistDialog
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
+      />
+
+      {/* Rename smart playlist dialog — reuses SaveSmartPlaylistDialog in edit mode */}
+      <SaveSmartPlaylistDialog
+        open={renameDialogOpen}
+        onOpenChange={(open) => {
+          setRenameDialogOpen(open)
+          if (!open) useSmartPlaylistStore.getState().cancelEditing()
+        }}
+        query=""
       />
 
     </>
