@@ -1327,7 +1327,8 @@ pre, code {
   background: var(--aurora-gradient);
   color: #060709;
   box-shadow:
-    0 0 20px -8px rgba(45, 212, 191, 0.18),
+    0 0 28px -6px rgba(94, 234, 212, 0.30),
+    0 0 28px -6px rgba(167, 139, 250, 0.20),
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
   transition: box-shadow 200ms ease, transform 100ms ease, background 150ms ease;
 }
@@ -1349,7 +1350,8 @@ pre, code {
 }
 .mix-jam-primary:not(:disabled):hover {
   box-shadow:
-    0 0 28px -4px rgba(45, 212, 191, 0.30),
+    0 0 36px -4px rgba(94, 234, 212, 0.42),
+    0 0 36px -4px rgba(167, 139, 250, 0.30),
     inset 0 1px 0 rgba(255, 255, 255, 0.10);
   transform: scale(1.02);
 }
@@ -1408,12 +1410,20 @@ pre, code {
   font-weight: 600;
   color: var(--aurora-accent-interactive);
   background: rgba(255, 255, 255, 0.08);
+  box-shadow:
+    inset 0 0 0 1px var(--aurora-rim-bright),
+    0 0 var(--aurora-button-glow-rest) calc(-1 * var(--aurora-button-glow-spread))
+      var(--aurora-accent-interactive-glow);
   border: 0;
   cursor: pointer;
-  transition: color 150ms ease;
+  transition: color 150ms ease, background 150ms ease, box-shadow 200ms ease;
 }
 .mix-float-search:not(:disabled):hover {
   background: rgba(255, 255, 255, 0.12);
+  box-shadow:
+    inset 0 0 0 1px var(--aurora-rim-bright),
+    0 0 var(--aurora-button-glow-hover) calc(-1 * var(--aurora-button-glow-spread-hover))
+      var(--aurora-accent-interactive-glow);
 }
 .mix-float-search:disabled {
   opacity: 0.55;
@@ -1434,7 +1444,8 @@ pre, code {
   color: #060709;
   cursor: pointer;
   box-shadow:
-    0 0 20px -8px rgba(45, 212, 191, 0.18),
+    0 0 28px -6px rgba(94, 234, 212, 0.30),
+    0 0 28px -6px rgba(167, 139, 250, 0.20),
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
   transition: box-shadow 200ms ease, transform 100ms ease, background 150ms ease;
 }
@@ -1456,7 +1467,8 @@ pre, code {
 }
 .mix-float-jam:not(:disabled):hover {
   box-shadow:
-    0 0 28px -4px rgba(45, 212, 191, 0.30),
+    0 0 36px -4px rgba(94, 234, 212, 0.42),
+    0 0 36px -4px rgba(167, 139, 250, 0.30),
     inset 0 1px 0 rgba(255, 255, 255, 0.10);
   transform: scale(1.02);
 }
