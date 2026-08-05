@@ -6,7 +6,8 @@ A personal music library with smart tagging, boolean filtering, and a built-in a
 
 ## Features
 
-- **Smart Boolean Filtering** — query your library with AND, OR, NOT, and parentheses (e.g. `tag:electronic AND bpm:>120 NOT artist:drake`)
+- **Smart Boolean Filtering** — query your library by tag and playlist name with AND, OR, NOT, and parentheses (e.g. `electronic AND (chill OR ambient) AND NOT live`). Multi-word names go in quotes: `"deep house" AND NOT "gym"`. `&`, `|`, `~` work as shorthand.
+- **Smart Playlists** — save any query to the sidebar; it re-resolves against your library every time you open it, and plays or shuffles like a normal playlist
 - **Custom Tagging** — create and assign tags to any song, filter by combinations
 - **Playlist Management** — create playlists, drag-to-reorder songs, per-song trim points
 - **Album View** — browse your library by album with cover art grid
@@ -160,16 +161,11 @@ sudo dpkg -i Aurora_0.1.1_amd64.deb
 # Then run: Aurora
 ```
 
-**From AUR (Arch Linux):**
+**From AUR (Arch Linux):** not published yet.
 
-```bash
-# Build from source (aurora-git)
-git clone https://aur.archlinux.org/aurora-git.git
-cd aurora-git
-makepkg -si
-```
-
-See [`packaging/aur/README.md`](packaging/aur/README.md) for details.
+`packaging/aur/aurora-git/PKGBUILD` is a local template, not an upstream package. Note that
+the name `aurora-git` is already taken on the AUR by an unrelated project (an AUR helper), so
+publishing will require a different `pkgname`. See [`packaging/aur/README.md`](packaging/aur/README.md).
 
 The backend binds to `127.0.0.1` by default. For LAN/mobile access: `AURORA_HOST=0.0.0.0 Aurora`.
 
